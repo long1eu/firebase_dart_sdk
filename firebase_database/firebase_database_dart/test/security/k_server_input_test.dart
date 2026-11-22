@@ -1,6 +1,8 @@
 // Owner K. Threat model T11, the decoder's rows of server_input_test.dart: one case per rule, each
 // asserting a protocol-error Ignored (the connection closes it with backoff; brief rule 4) and so
 // no record that could reach the delegate.
+import 'dart:convert';
+
 import 'package:firebase_database_dart/src/realtime/server_message.dart';
 import 'package:test/test.dart';
 
@@ -214,6 +216,44 @@ void main() {
     test('a non-integer or negative tag is refused', () {
       for (final Object tag in <Object>[1.5, -1, '1', true, <Object?>[]]) {
         expect(_push('a', 1, tag: tag), _protocolError(), reason: '$tag');
+      }
+    });
+
+    test('a tag or request number that is not a whole number below 2^53 is refused on every '
+        'compiler (web audit U1, U2)', () {
+      // JSON texts that this compiler's jsonDecode turns into an int on one compiler and a
+      // double on another (1e20, 1.5e300 are ints on dart2js), or into a value the web cannot
+      // hold exactly (beyond 2^53).
+      for (final String text in <String>[
+        '1e20',
+        '1.5e300',
+        '1e400',
+        '-1e400',
+        '9007199254740992',
+        '9007199254740993',
+        '9223372036854775807',
+        '-9223372036854775808',
+        '-1',
+        '1.5',
+      ]) {
+        final Object? seen = (jsonDecode('[$text]') as List<Object?>).single;
+        final String reason =
+            'JSON $text decodes here to $seen (${seen.runtimeType}, is int: ${seen is int})';
+        expect(
+          decodeServerMessage(
+            jsonDecode('{"a":"d","b":{"p":"a","d":1,"t":$text}}')
+                as Map<String, Object?>,
+          ),
+          _protocolError(),
+          reason: 'tag: $reason',
+        );
+        expect(
+          decodeServerMessage(
+            jsonDecode('{"r":$text,"b":{"s":"ok"}}') as Map<String, Object?>,
+          ),
+          _protocolError(),
+          reason: 'r: $reason',
+        );
       }
     });
 

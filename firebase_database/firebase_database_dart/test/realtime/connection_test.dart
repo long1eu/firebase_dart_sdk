@@ -173,6 +173,75 @@ void main() {
     });
   });
 
+  group('hello ts, the same on every compiler (web audit U1, U2)', () {
+    // Each JSON text goes through this compiler's jsonDecode inside the connection: 1e20 and
+    // 1700000000000.0 are ints on dart2js only; 9223372036854775807 is an int on the VM.
+    String helloWithTs(String ts) =>
+        '{"t":"c","d":{"t":"h","d":{"ts":$ts,"v":"5","h":"$configuredHost","s":"a"}}}';
+
+    String seen(String text) {
+      final Object? value = (jsonDecode('[$text]') as List<Object?>).single;
+      return 'JSON $text decodes here to $value (${value.runtimeType}, is int: ${value is int})';
+    }
+
+    const Map<String, int> accepted = <String, int>{
+      '1700000000000': 1700000000000,
+      '1700000000000.0': 1700000000000,
+      '1.7e12': 1700000000000,
+      '0': 0,
+      '281474976710655': 281474976710655,
+    };
+    for (final MapEntry<String, int> entry in accepted.entries) {
+      test('ts ${entry.key} is accepted as ${entry.value}', () {
+        fakeAsync((FakeAsync async) {
+          final ConnectionRig rig = ConnectionRig(async);
+          final RealtimeConnection connection = rig.open();
+          rig.fake.last.serverText(helloWithTs(entry.key));
+          rig.flush();
+
+          expect(connection.isConnected, isTrue, reason: seen(entry.key));
+          expect(
+            rig.delegate.readies.single.ts,
+            entry.value,
+            reason: seen(entry.key),
+          );
+        });
+      });
+    }
+
+    // 281474976710656 is 2^48, the first time a push id cannot hold; 8640000000000001 is past
+    // the last DateTime.
+    const List<String> refused = <String>[
+      '281474976710656',
+      '8640000000000001',
+      '1e20',
+      '1e400',
+      '9007199254740993',
+      '9223372036854775807',
+      '-1',
+      '1.5',
+      '"1700000000000"',
+    ];
+    for (final String text in refused) {
+      test('ts $text is a protocol error', () {
+        fakeAsync((FakeAsync async) {
+          final ConnectionRig rig = ConnectionRig(async);
+          final RealtimeConnection connection = rig.open();
+          rig.fake.last.serverText(helloWithTs(text));
+          rig.flush();
+
+          expect(rig.delegate.readies, isEmpty, reason: seen(text));
+          expect(
+            rig.delegate.disconnects.single.reason,
+            DisconnectReason.other,
+            reason: seen(text),
+          );
+          expect(connection.isConnected, isFalse, reason: seen(text));
+        });
+      });
+    }
+  });
+
   group('hello host (B-3.2c)', () {
     test('a new h is the host of the next attempt, with ns', () {
       fakeAsync((FakeAsync async) {

@@ -104,6 +104,50 @@ void main() {
       }
     });
 
+    test(
+      'iat 1.0 is iat 1 and is encoded as 1 on every compiler (web audit U2)',
+      () {
+        // The VM and wasm keep 1.0 a double (jsonEncode prints 1.0); dart2js sees an int.
+        final String token = createMockUserToken(<String, Object?>{
+          'sub': 'u',
+          'iat': 1.0,
+        }, projectId: 'p');
+        final String payload = decodePart(token.split('.')[1]);
+        expect(payload, contains('"iat":1,"exp":3601,"auth_time":1,'));
+      },
+    );
+
+    test(
+      'an iat that is not a whole number below 2^53 is refused as such on every '
+      'compiler (web audit U2)',
+      () {
+        // On dart2js 1e20 and infinity pass `is int`; infinity then failed in jsonEncode with
+        // "claims must be JSON values" instead of the iat message.
+        for (final Object iat in <Object>[
+          1e20,
+          double.infinity,
+          double.nan,
+          int.parse('9007199254740993'),
+          1.5,
+        ]) {
+          expect(
+            () => createMockUserToken(<String, Object?>{
+              'sub': 'u',
+              'iat': iat,
+            }, projectId: 'p'),
+            throwsA(
+              isA<ArgumentError>().having(
+                (ArgumentError e) => e.message,
+                'message',
+                contains('"iat" must be an integer'),
+              ),
+            ),
+            reason: '$iat (${iat.runtimeType}, is int: ${iat is int})',
+          );
+        }
+      },
+    );
+
     test('an error does not quote a claim value', () {
       expect(
         () => createMockUserToken(<String, Object?>{

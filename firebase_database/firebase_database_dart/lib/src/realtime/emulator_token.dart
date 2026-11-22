@@ -4,6 +4,8 @@ library;
 
 import 'dart:convert';
 
+import 'package:firebase_database_dart/src/realtime/server_message.dart';
+
 /// The credential the admin SDKs send to the emulator, as `gauth` with `cred: "owner"` (2.4,
 /// AuthTokenProvider.ts:108-111, PersistentConnection.ts:383).
 const String ownerToken = 'owner';
@@ -20,8 +22,9 @@ const String ownerToken = 'owner';
 /// caller).
 ///
 /// `sub` defaults to `user_id` (the emulator reads the uid from `sub` only, probe "Auth"). Also
-/// throws [ArgumentError] for an empty [projectId], a non-string or empty `sub`/`user_id`, a
-/// non-integer `iat` and a claim value JSON cannot encode. Errors never quote a claim value.
+/// throws [ArgumentError] for an empty [projectId], a non-string or empty `sub`/`user_id`, an
+/// `iat` that is not a whole number (`wholeJsonNumber`: `1.0` is accepted and sent as `1` on every
+/// compiler) and a claim value JSON cannot encode. Errors never quote a claim value.
 String createMockUserToken(
   Map<String, Object?> claims, {
   required String projectId,
@@ -42,8 +45,8 @@ String createMockUserToken(
       'claims',
     );
   }
-  final Object iatClaim = claims['iat'] ?? 0;
-  if (iatClaim is! int) {
+  final int? iat = wholeJsonNumber(claims['iat'] ?? 0);
+  if (iat == null) {
     throw ArgumentError(
       'mockUserToken "iat" must be an integer (seconds)',
       'claims',
@@ -52,9 +55,9 @@ String createMockUserToken(
   final Map<String, Object?> payload = <String, Object?>{
     'iss': 'https://securetoken.google.com/$projectId',
     'aud': projectId,
-    'iat': iatClaim,
-    'exp': iatClaim + 3600,
-    'auth_time': iatClaim,
+    'iat': iat,
+    'exp': iat + 3600,
+    'auth_time': iat,
     'sub': sub,
     'user_id': sub,
     'firebase': <String, Object?>{
@@ -63,6 +66,9 @@ String createMockUserToken(
     },
     ...claims,
   };
+  // The claims may hold `iat` as `1.0`, which the VM encodes as `1.0` and dart2js as `1`; the
+  // int keeps the claim's place and encodes as `1` on every compiler.
+  payload['iat'] = iat;
   final String encodedPayload;
   try {
     encodedPayload = _base64UrlJson(payload);

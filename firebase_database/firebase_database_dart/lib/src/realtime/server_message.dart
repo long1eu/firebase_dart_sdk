@@ -9,6 +9,7 @@ library;
 
 import 'package:firebase_database_dart/src/core/connection/wire_range_merge.dart';
 import 'package:firebase_database_dart/src/core/database_error.dart';
+import 'package:firebase_database_dart/src/core/util/numbers.dart';
 import 'package:firebase_database_dart/src/realtime/connection_timings.dart';
 import 'package:firebase_database_dart/src/realtime/realtime_error.dart';
 
@@ -22,15 +23,17 @@ sealed class ServerMessage {
 ///
 /// A body that is not an object or a status that is not a string decodes to a response with status
 /// `failure`, the wire status of `DatabaseErrorCode.operationFailed` (iOS U-I06, U-I07 use
-/// `failed`, which the core's vocabulary does not have); a non-integer or negative `r` decodes to
-/// [Ignored] (U-I09). An `ok` answer whose data holds a non-finite number or an oversized string
-/// also decodes to `failure` (threat model T11). A non-`ok` status and a string [data] are cleaned
-/// by [safeServerText]; other data of a non-`ok` answer is dropped. The keys of `ok` data are not
-/// checked here (an `auth` answer echoes token claims such as `https://x/roles`): the owner checks
-/// the data of a `g` answer with [isValidServerData].
+/// `failed`, which the core's vocabulary does not have); an `r` that is not a non-negative whole
+/// number ([wholeJsonNumber]) decodes to [Ignored] (U-I09). An `ok` answer whose data holds a
+/// non-finite number or an oversized string, or (when the caller flagged the answer) an invalid
+/// key, also decodes to `failure` with [dataRefused] (threat model T11). A non-`ok` status and a
+/// string [data] are cleaned by [safeServerText]; other data of a non-`ok` answer is dropped. The
+/// keys of `ok` data are checked only for flagged answers (`checkAnswerKeys` of
+/// [decodeServerMessage]): an `auth` answer echoes token claims such as `https://x/roles`.
 final class Response extends ServerMessage {
-  /// Creates the response to [r] with [status] and [data].
-  const Response(this.r, this.status, this.data);
+  /// Creates the response to [r] with [status] and [data]; [dataRefused] when the server answered
+  /// `ok` with data that was refused.
+  const Response(this.r, this.status, this.data, {this.dataRefused = false});
 
   /// The request number.
   final int r;
@@ -40,6 +43,11 @@ final class Response extends ServerMessage {
 
   /// The result on `ok`, a human-readable reason otherwise.
   final Object? data;
+
+  /// Whether the server answered `ok` with data that is not acceptable (a non-finite number, an
+  /// oversized string, or, for an answer the caller flagged, an invalid key): [status] is then
+  /// `failure` and [data] null. Set so that the connection can close as for a protocol error.
+  final bool dataRefused;
 
   @override
   String toString() => 'Response($r, $status)';
@@ -201,9 +209,10 @@ final class RangeMergePush extends Push {
 /// logged and dropped (iOS U-I05, U-I08, U-I09; test plan B-5.4).
 ///
 /// With [isProtocolError] the message broke a rule of threat model T11 (a known message of the
-/// wrong shape, a bad path or key, a non-integer `r` or `t`, a non-finite number): the owner closes
-/// the connection as a protocol error with backoff (brief, security rule 4). Without it the message
-/// is only logged: an unknown action, or an `rm` with an empty list (a compound hash match).
+/// wrong shape, a bad path or key, an `r` or `t` that is not a whole number, a non-finite
+/// number): the owner closes the connection as a protocol error with backoff (brief, security
+/// rule 4). Without it the message is only logged: an unknown action, or an `rm` with an empty
+/// list (a compound hash match).
 final class Ignored extends ServerMessage {
   /// Creates the record with [why] it was ignored (no server data in it).
   const Ignored(this.why, {this.isProtocolError = false});
@@ -226,7 +235,18 @@ final class Ignored extends ServerMessage {
 /// number of a push is validated (threat model T11) and every path is converted with
 /// [wirePathFromServer]. An unknown action is [Ignored] without a protocol error, so a newer server
 /// does not break the connection.
-ServerMessage decodeServerMessage(Object? json) {
+///
+/// [checkAnswerKeys] is called once for every [Response] with a valid request number, `ok` or
+/// not; when it returns true, the data of an `ok` answer must also pass the key rules of
+/// [isValidServerData], in the same walk that checks its values. The connection flags its `g`
+/// answers this way; other answers are not key-checked (an `auth` answer echoes token claims such
+/// as `https://x/roles`). Nesting depth is not checked here: every message reaching this function
+/// went through the frame assembler's text scan (`checkJsonDepth`, threat model T10), and the walk
+/// itself does not recurse.
+ServerMessage decodeServerMessage(
+  Object? json, {
+  bool Function(int r)? checkAnswerKeys,
+}) {
   if (json is! Map<String, Object?>) {
     return const Ignored(
       'data message is not an object',
@@ -234,7 +254,7 @@ ServerMessage decodeServerMessage(Object? json) {
     );
   }
   if (json.containsKey(RealtimeProtocol.requestNumberKey)) {
-    return _decodeResponse(json);
+    return _decodeResponse(json, checkAnswerKeys);
   }
   if (json.containsKey(_errorKey)) {
     final Object? error = json[_errorKey];
@@ -283,9 +303,10 @@ String wirePathFromServer(String serverPath) {
 /// character), except `.priority` anywhere and `.value` next to nothing but `.priority`. `.sv`
 /// from the server is refused.
 ///
-/// The decoder applies it to push data; the owner applies it to the data of a `g` answer, which
-/// [decodeServerMessage] cannot tell from other answers. Nesting depth is bounded by the frame
-/// assembler (T10), not here.
+/// The decoder applies it to push data, and to the data of the answers its caller flags
+/// (`checkAnswerKeys` of [decodeServerMessage]); the REST client applies it to its answers. Same
+/// walk as the decoder's. Nesting depth is bounded before decoding (the frame assembler's
+/// `checkJsonDepth`, the REST client's own depth walk; threat model T10), not here.
 bool isValidServerData(Object? data) =>
     _dataProblem(data, checkKeys: true) == null;
 
@@ -307,11 +328,30 @@ String get _failed => DatabaseErrorCode.operationFailed.wireStatus;
 
 Ignored _violation(String why) => Ignored(why, isProtocolError: true);
 
-ServerMessage _decodeResponse(Map<String, Object?> json) {
-  final Object? r = json[RealtimeProtocol.requestNumberKey];
-  if (r is! int || !r.isFinite || r < 0) {
+/// The integer that the JSON number [value] stands for, or null when [value] is not a number or not
+/// a whole number within plus or minus [maxSafeInteger]. Used for every integer field of a server
+/// message (`r`, `t`, the hello's `ts`) and for the `iat` of a mock user token.
+///
+/// The rule is the same on the VM, dart2js and dart2wasm: a whole number is accepted however it is
+/// written (`1`, `1.0`, `1e3`). JSON has no integer type, and the JS SDK takes any number, so `1.0`
+/// is the integer 1 on the wire even though the server writes integers without a fraction. `is int`
+/// alone would split the compilers: `jsonDecode('1.0')` is a double on the VM and wasm and an `int`
+/// on dart2js, where also `1e20` is an `int`. Beyond [maxSafeInteger] the web cannot hold the value
+/// exactly (`9007199254740993` decodes as `9007199254740992` there), so such values are refused on
+/// every compiler; no request number, tag or time the client uses comes near 2^53.
+int? wholeJsonNumber(Object? value) =>
+    value is num && isIntegral(value) ? value.toInt() : null;
+
+ServerMessage _decodeResponse(
+  Map<String, Object?> json,
+  bool Function(int r)? checkAnswerKeys,
+) {
+  final int? r = wholeJsonNumber(json[RealtimeProtocol.requestNumberKey]);
+  if (r == null || r < 0) {
     return _violation('request number is not a non-negative integer');
   }
+  // Asked for every response, so a caller that tracks its requests can forget this one.
+  final bool checkKeys = checkAnswerKeys?.call(r) ?? false;
   final Object? body = json[RealtimeProtocol.bodyKey];
   if (body is! Map<String, Object?>) {
     return Response(r, _failed, null);
@@ -322,8 +362,8 @@ ServerMessage _decodeResponse(Map<String, Object?> json) {
   }
   final Object? data = body[_dataKey];
   if (status == _ok) {
-    if (_dataProblem(data, checkKeys: false) != null) {
-      return Response(r, _failed, null);
+    if (_dataProblem(data, checkKeys: checkKeys) != null) {
+      return Response(r, _failed, null, dataRefused: true);
     }
     return Response(r, status, data);
   }
@@ -496,14 +536,15 @@ WireRangeMerge? _rangeEntry(Object? entry, int index, int count) {
   );
 }
 
-/// The tag of a push: absent, null and 0 are untagged (5, Repo.ts:354-410); a positive integer is
-/// the tag; anything else is invalid (the first value false).
+/// The tag of a push: absent, null and 0 are untagged (5, Repo.ts:354-410); a positive whole
+/// number ([wholeJsonNumber]) is the tag; anything else is invalid (the first value false).
 (bool, int?) _tag(Map<String, Object?> body) {
-  final Object? tag = body[_tagKey];
-  if (tag == null) {
+  final Object? raw = body[_tagKey];
+  if (raw == null) {
     return (true, null);
   }
-  if (tag is! int || !tag.isFinite || tag < 0) {
+  final int? tag = wholeJsonNumber(raw);
+  if (tag == null || tag < 0) {
     return (false, null);
   }
   return (true, tag == 0 ? null : tag);
@@ -544,15 +585,18 @@ bool _isValidKeyText(String key) {
   }
   for (int i = 0; i < key.length; i++) {
     final int unit = key.codeUnitAt(i);
-    if (unit < 0x20 || unit == 0x7F || _forbiddenKeyUnits.contains(unit)) {
+    if (unit < 0x20 || unit == 0x7F || _isForbiddenKeyUnit(unit)) {
       return false;
     }
   }
   return true;
 }
 
-/// `.` `#` `$` `[` `]` `/`.
-const Set<int> _forbiddenKeyUnits = <int>{0x2E, 0x23, 0x24, 0x5B, 0x5D, 0x2F};
+/// `.` `#` `$` `[` `]` `/`: compared, not looked up in a set (no hashing per code unit).
+bool _isForbiddenKeyUnit(int unit) => switch (unit) {
+  0x2E || 0x23 || 0x24 || 0x5B || 0x5D || 0x2F => true,
+  _ => false,
+};
 
 bool _isValidDataKey(String key, Map<String, Object?> parent) {
   if (key == _priorityKey) {
@@ -566,36 +610,68 @@ bool _isValidDataKey(String key, Map<String, Object?> parent) {
 
 /// Why [root] is not acceptable server data, or null (see [isValidServerData]); [checkKeys] off
 /// checks only the values (answers, query objects). Iterative: no recursion on server input.
-String? _dataProblem(Object? root, {required bool checkKeys}) {
-  final List<Object?> pending = <Object?>[root];
-  while (pending.isNotEmpty) {
-    final Object? value = pending.removeLast();
+String? _dataProblem(Object? root, {required bool checkKeys}) =>
+    _DataWalk(checkKeys).run(root);
+
+/// One walk over server data. Leaves are checked where they are found; only lists and maps go on
+/// the stack, and map entries are visited with `forEach` (no `MapEntry` per entry, no lookup).
+final class _DataWalk {
+  _DataWalk(this._checkKeys);
+
+  final bool _checkKeys;
+  final List<Object> _containers = <Object>[];
+  Map<String, Object?> _parent = const <String, Object?>{};
+  String? _problem;
+
+  String? run(Object? root) {
+    _visit(root);
+    while (_problem == null && _containers.isNotEmpty) {
+      final Object container = _containers.removeLast();
+      if (container is List<Object?>) {
+        for (final Object? child in container) {
+          _visit(child);
+          if (_problem != null) {
+            break;
+          }
+        }
+      } else if (container is Map<String, Object?>) {
+        _parent = container;
+        container.forEach(_visitEntry);
+      }
+    }
+    return _problem;
+  }
+
+  void _visitEntry(String key, Object? value) {
+    if (_problem != null) {
+      return;
+    }
+    if (_checkKeys && !_isValidDataKey(key, _parent)) {
+      _problem = 'invalid key';
+      return;
+    }
+    _visit(value);
+  }
+
+  void _visit(Object? value) {
     if (value == null || value is bool) {
-      continue;
+      return;
     }
     // On the web an infinity also passes `is int`, so finiteness is asked of every number.
     if (value is num) {
       if (!value.isFinite) {
-        return 'non-finite number';
+        _problem = 'non-finite number';
       }
     } else if (value is String) {
       if (_utf8Exceeds(value, RealtimeProtocol.maxLeafBytes)) {
-        return 'string too long';
+        _problem = 'string too long';
       }
-    } else if (value is List<Object?>) {
-      pending.addAll(value);
-    } else if (value is Map<String, Object?>) {
-      for (final MapEntry<String, Object?> entry in value.entries) {
-        if (checkKeys && !_isValidDataKey(entry.key, value)) {
-          return 'invalid key';
-        }
-        pending.add(entry.value);
-      }
+    } else if (value is List<Object?> || value is Map<String, Object?>) {
+      _containers.add(value);
     } else {
-      return 'not a JSON value';
+      _problem = 'not a JSON value';
     }
   }
-  return null;
 }
 
 /// Whether the UTF-8 encoding of [text] is longer than [limit] bytes, counted only as far as
