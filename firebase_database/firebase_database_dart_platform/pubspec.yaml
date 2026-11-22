@@ -49,6 +49,9 @@ dependencies:
     sdk: flutter
 
 dev_dependencies:
+  # Parses lib in test/public_api_lister.dart (dart:mirrors is not available
+  # under flutter test).
+  analyzer: ^13.0.0
   # The app-facing package the tests drive, as an app would.
   firebase_database: ^13.1.0
   flutter_test:
