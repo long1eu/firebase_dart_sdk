@@ -1,8 +1,10 @@
 // Owner P. A rig for the tests of PersistentConnection: the real RealtimeConnection over T's
 // FakeRtdbServer, a scripted token source, the core's RecordingServerActionsDelegate, and helpers
-// to wait for conditions. Most tests run in real time with shrunk ConnectionTimings (milliseconds);
-// the timing-sensitive ones (test/security/p_limits_test.dart) inject `now` and `elapsed` from
-// fake_async (addendum 3).
+// to wait for conditions. By default the server answers every request as the emulator does, the
+// credentials included (a refused token is refused); `hold` keeps the answers back for the test
+// to give. Tests that only wait for events run in real time with shrunk ConnectionTimings
+// (milliseconds); every test of a delay, or of something that must not happen, runs on fake time
+// (`fakeTimeRig`, addendum 3).
 
 import 'dart:async';
 
@@ -25,15 +27,26 @@ import 'package:firebase_database_dart/src/testing/recording_server_actions_dele
 
 import 'fake_rtdb_server.dart';
 
+/// A user-shaped JWT the emulator accepts as `auth`: header {"alg":"none"}, claims
+/// {"sub":"u1","iat":0} (probe addendum 2 item 14). A token that is not a decodable JWT with
+/// `iat` goes out as `gauth` (auth_session.dart authActionFor).
+const String validAuthToken =
+    'eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1MSIsImlhdCI6MH0.sig';
+
+/// A JWT with claims {"iat":0} and no `sub`: sent as `auth`, refused `invalid_token` ("Missing
+/// claim 'sub' in auth token.", measured).
+const String authTokenWithoutSub = 'eyJhbGciOiJub25lIn0.eyJpYXQiOjB9.sig';
+
+/// An App Check token the fake server accepts: header {"alg":"RS256"}, claims {"sub":"app"}.
+const String validAppCheckToken = 'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJhcHAifQ.sig';
+
 /// A token source with fixed tokens, change streams, a gate to hold a fetch in flight, and a
 /// record of every `forceRefresh`.
 final class ScriptedTokens implements RealtimeTokenSource {
   /// Creates the source handing out [auth] and [appCheck].
   ScriptedTokens({
-    // A user-shaped JWT (header {"alg":"none"}, claims {"iat":0}): K sends it as `auth`. A token
-    // that is not a decodable JWT with `iat` goes out as `gauth` (auth_session.dart authActionFor).
-    this.auth = 'eyJhbGciOiJub25lIn0.eyJpYXQiOjB9.sig',
-    this.appCheck = 'app-check-token',
+    this.auth = validAuthToken,
+    this.appCheck = validAppCheckToken,
   });
 
   /// The auth token handed out (null: nobody signed in).
@@ -48,8 +61,14 @@ final class ScriptedTokens implements RealtimeTokenSource {
   /// When set, every auth fetch fails with it.
   Exception? error;
 
+  /// Called at the start of every auth fetch, after it was recorded in [authCalls].
+  void Function()? onAuthFetch;
+
   /// The `forceRefresh` of every auth fetch.
   final List<bool> authCalls = <bool>[];
+
+  /// The `forceRefresh` of every App Check fetch.
+  final List<bool> appCheckCalls = <bool>[];
 
   /// The kinds reported invalid.
   final List<TokenKind> invalid = <TokenKind>[];
@@ -65,9 +84,16 @@ final class ScriptedTokens implements RealtimeTokenSource {
     _authChanges.add(token);
   }
 
+  /// Emits a new App Check token on [appCheckChanges].
+  void emitAppCheck(String? token) {
+    appCheck = token;
+    _appCheckChanges.add(token);
+  }
+
   @override
   Future<String?> authToken({required bool forceRefresh}) async {
     authCalls.add(forceRefresh);
+    onAuthFetch?.call();
     // The value of the moment the fetch starts, as a provider whose request is in flight: a
     // sign-out after this point does not change what the fetch returns (review H2).
     final String? value = auth;
@@ -81,8 +107,11 @@ final class ScriptedTokens implements RealtimeTokenSource {
 
   @override
   Future<String?> appCheckToken({required bool forceRefresh}) async {
+    appCheckCalls.add(forceRefresh);
+    // The value of the moment the fetch starts, as for [authToken].
+    final String? value = appCheck;
     await gate?.future;
-    return appCheck;
+    return value;
   }
 
   @override
@@ -164,10 +193,19 @@ ConnectionTimings shrunkTimings({
 final class PRig {
   /// Builds the rig; nothing connects before [start]. [random] is the jitter of the backoff (1:
   /// the full bound, so delays are deterministic upper bounds).
+  ///
+  /// By default the server answers every request itself, as the emulator does. With [hold], every
+  /// answer except those to the credential requests is kept back: the test gives it ([answer], or
+  /// `server.connector.last.serverResponse`). With [holdCredentials], the credential answers are
+  /// kept back too (a server that answers nothing) until [answerCredentials]; it implies [hold].
+  /// With [logConnection], the RealtimeConnection of every attempt logs to [logs] too, as in
+  /// production (`server_actions_factories.dart` gives both the same logger).
   PRig({
     ConnectionTimings? timings,
     double Function()? random,
-    bool hold = true,
+    bool hold = false,
+    bool holdCredentials = false,
+    bool logConnection = false,
     bool emulator = false,
     RecordingServerActionsDelegate? delegate,
     DateTime Function()? now,
@@ -189,8 +227,8 @@ final class PRig {
       useHeaders: true,
     );
     final double Function() jitter = random ?? () => 1;
-    if (hold) {
-      server.holdResponses();
+    if (hold || holdCredentials) {
+      server.holdResponses(credentials: holdCredentials);
     }
     connection = PersistentConnection(
       target: target,
@@ -211,6 +249,7 @@ final class PRig {
               lastSessionId: lastSessionId,
               appId: appId,
               appCheckToken: appCheckToken,
+              logger: logConnection ? _log : null,
             );
           },
       backoff: ReconnectBackoff(
@@ -225,8 +264,7 @@ final class PRig {
       delegate: _Forwarding(this),
       timings: this.timings,
       appId: '1:123:dart:abc',
-      logger: (DatabaseLogLevel level, String message) =>
-          logs.add('${level.name}: $message'),
+      logger: _log,
       now: _now,
       random: jitter,
       connectivityHints: hints.stream,
@@ -252,8 +290,11 @@ final class PRig {
   /// moment it happens: for ordering checks against callbacks and the server log.
   void Function(String method)? onCall;
 
-  /// Every log line.
+  /// Every log line, as `<level>: <message>`.
   final List<String> logs = <String>[];
+
+  void _log(DatabaseLogLevel level, String message) =>
+      logs.add('${level.name}: $message');
 
   /// The connectivity hints.
   final StreamController<void> hints = StreamController<void>.broadcast();
@@ -306,31 +347,20 @@ final class PRig {
   }) async {
     await settle();
     final ServerSeen seen = sent(action).last;
-    _answered.add('${seen.connection}/${seen.r}');
     server.connector.last.serverResponse(seen.r!, status: status, data: data);
     await settle();
   }
 
-  /// Answers `ok` to every credential request (`auth`, `gauth`, `appcheck`) of the current
-  /// connection that is not answered yet.
+  /// With `holdCredentials`: sends the server's own answers to the credential requests held so
+  /// far (`ok` for the default tokens, the emulator's refusal for an invalid one).
   Future<void> answerCredentials() async {
     await settle();
     answerCredentialsNow();
     await settle();
   }
 
-  final Set<String> _answered = <String>{};
-
   /// Like [answerCredentials], without waiting: for tests under fake_async, which flush instead.
-  void answerCredentialsNow() {
-    for (final ServerSeen seen in server.log) {
-      if (seen.connection == server.connections &&
-          const <String>{'auth', 'gauth', 'appcheck'}.contains(seen.action) &&
-          _answered.add('${seen.connection}/${seen.r}')) {
-        server.connector.last.serverResponse(seen.r!);
-      }
-    }
-  }
+  void answerCredentialsNow() => server.releaseCredentialResponses();
 
   /// Closes the current connection from the server side and waits until it is noticed.
   Future<void> drop() async {
@@ -339,7 +369,8 @@ final class PRig {
     await until(() => delegate.callsOf('disconnect').length > before);
   }
 
-  /// Lets queued events and microtasks run.
+  /// Lets queued events and microtasks run. Not a wait for a timer: a check that something did
+  /// not happen after a delay belongs on fake time.
   Future<void> settle() =>
       Future<void>.delayed(const Duration(milliseconds: 5));
 }
@@ -441,17 +472,82 @@ void elapseUntil(
   }
 }
 
-/// A rig on fake time: `now` and `elapsed` follow [async].
+/// The wall clock of [fakeTimeRig] at virtual time zero.
+final DateTime fakeTimeStart = DateTime.utc(2026, 11, 22);
+
+/// A rig on fake time: `now` and `elapsed` follow [async]; the other arguments are [PRig]'s.
 PRig fakeTimeRig(
   FakeAsync async, {
   ConnectionTimings? timings,
+  bool hold = false,
+  bool holdCredentials = false,
   WsConnector Function(WsConnector connector)? wrapConnector,
-}) {
-  final DateTime start = DateTime.utc(2026, 11, 22);
-  return PRig(
-    timings: timings,
-    now: () => start.add(async.elapsed),
-    elapsed: () => async.elapsed,
-    wrapConnector: wrapConnector,
-  );
+}) => PRig(
+  timings: timings,
+  hold: hold,
+  holdCredentials: holdCredentials,
+  now: () => fakeTimeStart.add(async.elapsed),
+  elapsed: () => async.elapsed,
+  wrapConnector: wrapConnector,
+);
+
+/// Shuts [rig] down on fake time and checks that no timer is left (a reconnect, a request or a
+/// liveness timer that outlives the connection).
+void shutDownOnFakeTime(FakeAsync async, PRig rig) {
+  unawaited(rig.connection.shutdown());
+  async.flushMicrotasks();
+  if (async.pendingTimers.isNotEmpty) {
+    throw StateError(
+      'timers left after shutdown: ${async.pendingTimers.toList()}',
+    );
+  }
+}
+
+/// A channel that throws on its [failAt]-th sent frame (a socket that died mid-send).
+final class FailingChannel implements WsChannel {
+  /// Wraps [_inner]; the [failAt]-th call of [sendText] throws.
+  FailingChannel(this._inner, this.failAt);
+
+  final WsChannel _inner;
+
+  /// The number of the frame that throws, from 1.
+  final int failAt;
+  int _sent = 0;
+
+  @override
+  Stream<WsEvent> get events => _inner.events;
+
+  @override
+  void sendText(String frame) {
+    if (++_sent == failAt) {
+      throw StateError('the socket is gone');
+    }
+    _inner.sendText(frame);
+  }
+
+  @override
+  Future<void> close([int code = 1000, String? reason]) =>
+      _inner.close(code, reason);
+
+  @override
+  void abandon() => _inner.abandon();
+}
+
+/// A connector wrapper for [PRig]: the first channel throws on its [failAt]-th frame, later
+/// channels are untouched.
+WsConnector Function(WsConnector) failFrameOfFirstChannel(int failAt) {
+  int channels = 0;
+  return (WsConnector inner) =>
+      (
+        Uri url, {
+        Map<String, String> headers = const <String, String>{},
+        Future<void>? abort,
+      }) async {
+        final WsChannel channel = await inner(
+          url,
+          headers: headers,
+          abort: abort,
+        );
+        return ++channels == 1 ? FailingChannel(channel, failAt) : channel;
+      };
 }

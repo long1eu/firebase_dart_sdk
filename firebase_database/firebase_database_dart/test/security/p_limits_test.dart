@@ -1,8 +1,11 @@
 // Owner P. Threat model T13 (backoff that a server can reset) for PersistentConnection: the delay
 // resets only after a healthy connection answered a request `ok`, never after a hello alone.
 // Virtual time (fake_async) and a deterministic jitter (random 1: every delay is its full bound),
-// so the gaps between attempts are the backoff bounds exactly.
+// so the gaps between attempts are the backoff bounds exactly. The server holds the credential
+// answers until a test sends them, except in the invalid-token test, where it refuses the token
+// itself as the emulator does.
 import 'package:fake_async/fake_async.dart';
+import 'package:firebase_database_dart/src/testing/recording_server_actions_delegate.dart';
 import 'package:test/test.dart';
 
 import '../util/persistent_connection_harness.dart';
@@ -22,18 +25,15 @@ void _elapseUntil(
   }
 }
 
-PRig _rig(FakeAsync async) {
-  final DateTime start = DateTime.utc(2026, 11, 22);
-  return PRig(
-    timings: shrunkTimings(
-      reconnectMin: const Duration(milliseconds: 100),
-      reconnectMax: const Duration(seconds: 60),
-      reconnectResetAfter: Duration.zero,
-    ),
-    now: () => start.add(async.elapsed),
-    elapsed: () => async.elapsed,
-  );
-}
+PRig _rig(FakeAsync async, {bool holdCredentials = true}) => fakeTimeRig(
+  async,
+  timings: shrunkTimings(
+    reconnectMin: const Duration(milliseconds: 100),
+    reconnectMax: const Duration(seconds: 60),
+    reconnectResetAfter: Duration.zero,
+  ),
+  holdCredentials: holdCredentials,
+);
 
 /// Waits for connection [number], optionally answers its credentials (two `ok` responses: a
 /// healthy connection with an ok answer), then drops it from the server side.
@@ -79,8 +79,7 @@ void main() {
         final List<int> gaps = _gapsMs(rig);
         expect(gaps.first, inInclusiveRange(95, 110));
         expect(gaps.last, inInclusiveRange(790, 810));
-        rig.connection.shutdown();
-        async.flushMicrotasks();
+        shutDownOnFakeTime(async, rig);
       });
     },
   );
@@ -102,8 +101,7 @@ void main() {
           inInclusiveRange(390, 410),
         ); // The bound had grown to 400 ms.
         expect(gaps.last, inInclusiveRange(95, 110)); // Back to 100 ms.
-        rig.connection.shutdown();
-        async.flushMicrotasks();
+        shutDownOnFakeTime(async, rig);
       });
     },
   );
@@ -133,8 +131,7 @@ void main() {
         // Breaks if `!_okOnConnection` is removed from _markEstablishedWhenHealthy
         // (persistent_connection.dart): every gap would be the 100 ms minimum.
         expect(_gapsMs(rig).last, inInclusiveRange(790, 810));
-        rig.connection.shutdown();
-        async.flushMicrotasks();
+        shutDownOnFakeTime(async, rig);
       });
     },
   );
@@ -143,33 +140,36 @@ void main() {
     'three refused auth tokens raise the next delay to its cap (T14b wiring)',
     () {
       fakeAsync((FakeAsync async) {
-        final PRig rig = _rig(async);
+        // The server answers by itself and refuses the token (no `sub`); no App Check token, so
+        // no answer is ok and no connection is established.
+        final PRig rig = _rig(async, holdCredentials: false);
+        rig.tokens
+          ..auth = authTokenWithoutSub
+          ..appCheck = null;
         rig.connection.initialize();
         for (int n = 1; n <= 3; n++) {
           _elapseUntil(async, () => rig.connects == n);
           _elapseUntil(
             async,
-            () => rig.sent('auth', onConnection: n).isNotEmpty,
-          );
-          final int r = rig.sent('auth', onConnection: n).single.r!;
-          rig.server.connector.last.serverResponse(r, status: 'invalid_token');
-          _elapseUntil(
-            async,
             () => rig.delegate.callsOf('disconnect').length == n,
           );
         }
+        expect(
+          rig.delegate.callsOf('authStatus').map((DelegateCall c) => c.status),
+          <String>['invalid_token', 'invalid_token', 'invalid_token'],
+        );
         _elapseUntil(
           async,
           () => rig.attemptTimes.length == 4,
           limit: const Duration(seconds: 90),
         );
         final List<int> gaps = _gapsMs(rig);
-        expect(gaps[1], inInclusiveRange(190, 210));
+        expect(gaps[0], inInclusiveRange(98, 102));
+        expect(gaps[1], inInclusiveRange(198, 202));
         // Breaks if PersistentConnection._detach stops calling _backoff.setToMax() when
         // invalidTokenThresholdReached: the gap would be the 400 ms bound.
-        expect(gaps[2], greaterThanOrEqualTo(59000));
-        rig.connection.shutdown();
-        async.flushMicrotasks();
+        expect(gaps[2], inInclusiveRange(59998, 60002));
+        shutDownOnFakeTime(async, rig);
       });
     },
   );

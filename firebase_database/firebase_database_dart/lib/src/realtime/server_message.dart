@@ -328,20 +328,6 @@ String get _failed => DatabaseErrorCode.operationFailed.wireStatus;
 
 Ignored _violation(String why) => Ignored(why, isProtocolError: true);
 
-/// The integer that the JSON number [value] stands for, or null when [value] is not a number or not
-/// a whole number within plus or minus [maxSafeInteger]. Used for every integer field of a server
-/// message (`r`, `t`, the hello's `ts`) and for the `iat` of a mock user token.
-///
-/// The rule is the same on the VM, dart2js and dart2wasm: a whole number is accepted however it is
-/// written (`1`, `1.0`, `1e3`). JSON has no integer type, and the JS SDK takes any number, so `1.0`
-/// is the integer 1 on the wire even though the server writes integers without a fraction. `is int`
-/// alone would split the compilers: `jsonDecode('1.0')` is a double on the VM and wasm and an `int`
-/// on dart2js, where also `1e20` is an `int`. Beyond [maxSafeInteger] the web cannot hold the value
-/// exactly (`9007199254740993` decodes as `9007199254740992` there), so such values are refused on
-/// every compiler; no request number, tag or time the client uses comes near 2^53.
-int? wholeJsonNumber(Object? value) =>
-    value is num && isIntegral(value) ? value.toInt() : null;
-
 ServerMessage _decodeResponse(
   Map<String, Object?> json,
   bool Function(int r)? checkAnswerKeys,

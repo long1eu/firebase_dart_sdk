@@ -149,15 +149,8 @@ void main() {
       },
     );
 
-    test(
-      'jsStringify(${_large.source}) is ${_large.js} as in JavaScript',
-      () {
-        expect(largeText, _large.js, reason: _compiler);
-      },
-      skip: _isJs
-          ? false
-          : 'query_params.dart _jsNumber prints integral doubles below 1e21 through BigInt, '
-                'the exact digits 123456789012345683968; remove this skip with that fix',
-    );
+    test('jsStringify(${_large.source}) is ${_large.js} as in JavaScript', () {
+      expect(largeText, _large.js, reason: _compiler);
+    });
   });
 }

@@ -5,14 +5,15 @@
 // target does not trust with a token, so the connection works without any credential.
 import 'package:firebase_database_dart/src/core/repo_info.dart';
 import 'package:firebase_database_dart/src/realtime/connection_timings.dart';
+import 'package:firebase_database_dart/src/testing/recording_server_actions_delegate.dart';
 import 'package:test/test.dart';
 
 import '../realtime/persistent_connection_custom_rig.dart';
 import '../util/fake_ws.dart';
 import '../util/persistent_connection_harness.dart';
 
-const String _authToken = 'eyJhbGciOiJub25lIn0.eyJpYXQiOjB9.sig';
-const String _appCheckToken = 'app-check-token';
+const String _authToken = validAuthToken;
+const String _appCheckToken = validAppCheckToken;
 
 RepoInfo _emulator(String host) => RepoInfo(
   host: host,
@@ -84,6 +85,18 @@ void main() {
 
         expect(rig.sentAuthCredentials, <Object?>[_authToken]);
         expect(_appCheckInUpgrade(rig), isTrue);
+        // Both accepted: the connection stays (a refused auth would close it).
+        await until(() => rig.delegate.callsOf('appCheckStatus').isNotEmpty);
+        expect(
+          rig.delegate.callsOf('authStatus').map((DelegateCall c) => c.status),
+          <String>['ok'],
+        );
+        expect(
+          rig.delegate
+              .callsOf('appCheckStatus')
+              .map((DelegateCall c) => c.status),
+          <String>['ok'],
+        );
         await rig.connection.shutdown();
       },
     );

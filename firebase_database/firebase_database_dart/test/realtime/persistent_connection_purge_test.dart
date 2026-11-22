@@ -43,7 +43,7 @@ void main() {
   test(
     'an onDisconnect request already sent is kept and completes with the server answer',
     () async {
-      final PRig rig = PRig();
+      final PRig rig = PRig(hold: true);
       await rig.start();
       final List<String> statuses = <String>[];
       rig.connection.onDisconnectPut(
@@ -64,4 +64,36 @@ void main() {
       await rig.connection.shutdown();
     },
   );
+
+  test('every write gets one completion: answered before the purge as the server said, after it '
+      'write_canceled, and a later answer is dropped', () async {
+    final PRig rig = PRig(hold: true);
+    await rig.start();
+    final List<String> statuses = <String>[];
+    rig.connection
+      ..put(
+        '/a',
+        1,
+        onComplete: (String s, _) {
+          statuses.add('a $s');
+          // Purge from inside the first completion: /b is still waiting for its answer.
+          rig.connection.purgeOutstandingWrites();
+        },
+      )
+      ..put('/b', 2, onComplete: (String s, _) => statuses.add('b $s'));
+    await rig.settle();
+    final int a = rig.sent('p')[0].r!;
+    final int b = rig.sent('p')[1].r!;
+
+    rig.server.connector.last.serverResponse(a);
+    await until(() => statuses.length == 2);
+    // Breaks if the response callback of _sendWrite completes a write the purge removed.
+    rig.server.connector.last.serverResponse(b, status: 'permission_denied');
+    await rig.settle();
+    expect(statuses, <String>[
+      'a ok',
+      'b ${DatabaseErrorCode.writeCanceled.wireStatus}',
+    ]);
+    await rig.connection.shutdown();
+  });
 }

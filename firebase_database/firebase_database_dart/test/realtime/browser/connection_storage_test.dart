@@ -34,7 +34,9 @@ void main() {
       rig.connection.put('/a', <String, Object?>{'k': 'v'});
       rig.connection.onDisconnectPut('/b', 1);
       rig.server.pushData('/a', <String, Object?>{'k': 'w'});
-      rig.tokens.emitAuth('eyJhbGciOiJub25lIn0.eyJpYXQiOjF9.sig2');
+      rig.tokens.emitAuth(
+        'eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1MiIsImlhdCI6MX0.sig2',
+      );
       await rig.settle();
       await rig.drop();
       await until(() => rig.connects == 2);

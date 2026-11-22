@@ -5,13 +5,13 @@ library;
 import 'dart:async';
 
 import 'package:firebase_database_dart/src/core/util/logger.dart';
+import 'package:firebase_database_dart/src/core/util/numbers.dart';
 import 'package:firebase_database_dart/src/core/view/query_params.dart';
 import 'package:firebase_database_dart/src/realtime/connection_timings.dart';
 import 'package:firebase_database_dart/src/realtime/framing.dart';
 import 'package:firebase_database_dart/src/realtime/liveness.dart';
 import 'package:firebase_database_dart/src/realtime/realtime_error.dart';
 import 'package:firebase_database_dart/src/realtime/realtime_target.dart';
-import 'package:firebase_database_dart/src/realtime/server_message.dart';
 import 'package:firebase_database_dart/src/realtime/transport/ws_channel.dart';
 
 /// Why a [RealtimeConnection] ended (test plan section 5, interface C to P).

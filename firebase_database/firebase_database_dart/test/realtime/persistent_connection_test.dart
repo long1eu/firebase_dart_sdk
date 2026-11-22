@@ -1,7 +1,9 @@
 // Owner P. Unit tests of PersistentConnection over FakeRtdbServer (test plan section 3, rows with
-// P). Real time, shrunk timings (no fake_async in the package).
+// P). Shrunk timings; real time where a test waits for an event, fake time where it checks that
+// something does not happen within a delay. `hold: true` where the test gives the answers.
 import 'dart:async';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
 import 'package:firebase_database_dart/src/core/connection/wire_range_merge.dart';
 import 'package:firebase_database_dart/src/testing/recording_server_actions_delegate.dart';
@@ -38,7 +40,7 @@ void main() {
     test(
       'B-4.0a a response for an unknown r is ignored; a non-object body fails the request',
       () async {
-        rig = PRig();
+        rig = PRig(hold: true);
         await rig.start();
         final List<String> statuses = <String>[];
         rig.connection.put(
@@ -47,14 +49,15 @@ void main() {
           onComplete: (String s, _) => statuses.add(s),
         );
         await rig.settle();
-        rig.server.connector.last.serverResponse(9999);
-        await rig.settle();
-        expect(statuses, isEmpty);
         final int r = rig.sent('p').single.r!;
-        rig.server.connector.last.serverMessage(<String, Object?>{
-          't': 'd',
-          'd': <String, Object?>{'r': r, 'b': 'not an object'},
-        });
+        rig.server.connector.last
+          ..serverResponse(9999)
+          ..serverMessage(<String, Object?>{
+            't': 'd',
+            'd': <String, Object?>{'r': r, 'b': 'not an object'},
+          });
+        // The two arrive in order: had the unknown r completed the put, `ok` would come first.
+        await until(() => statuses.isNotEmpty);
         await rig.settle();
         // The core's operationFailed wire status (K's decoder; the stub's 'failed' was wrong).
         expect(statuses, <String>['failure']);
@@ -118,7 +121,7 @@ void main() {
     test(
       'B-4.1c an ok listen stays and warns about no_index; a failed one is removed',
       () async {
-        rig = PRig();
+        rig = PRig(hold: true);
         await rig.start();
         final List<String> statuses = <String>[];
         rig.connection.listen(
@@ -218,12 +221,10 @@ void main() {
     test(
       'B-4.3a a get sends p and q, never t or h; offline it waits for the connection',
       () async {
-        rig = PRig();
+        rig = PRig(hold: true);
         final Future<Object?> result = rig.connection.get(
           taggedListen('/users'),
         );
-        await rig.settle();
-        expect(rig.server.log, isEmpty);
         await rig.start();
         expect(rig.sent('g').single.body, <String, Object?>{
           'p': '/users',
@@ -235,7 +236,7 @@ void main() {
     );
 
     test('B-4.4a put shapes and completions with status and reason', () async {
-      rig = PRig();
+      rig = PRig(hold: true);
       await rig.start();
       final List<String> results = <String>[];
       rig.connection.put('/a', <String, Object?>{'.value': 1, '.priority': 2});
@@ -285,7 +286,7 @@ void main() {
     test(
       'B-4.5a onDisconnect shapes; oc carries d: null; the callback is never synchronous',
       () async {
-        rig = PRig();
+        rig = PRig(hold: true);
         await rig.start();
         final List<String> statuses = <String>[];
         rig.connection.onDisconnectPut(
@@ -374,7 +375,7 @@ void main() {
     test(
       'B-5.2 a c push cancels every listen at its path with permission_denied',
       () async {
-        rig = PRig();
+        rig = PRig(hold: true);
         await rig.start();
         final List<String> statuses = <String>[];
         for (final (String name, int? tag) in <(String, int?)>[
@@ -408,7 +409,7 @@ void main() {
     test(
       'B-5.6 a data push and the response after it reach Repo in order',
       () async {
-        rig = PRig();
+        rig = PRig(hold: true);
         await rig.start();
         final List<String> order = <String>[];
         rig.onCall = order.add;
@@ -432,7 +433,7 @@ void main() {
     for (final bool burst in <bool>[true, false]) {
       test('a write\'s push then its ack reach Repo in arrival order '
           '(${burst ? 'one burst' : 'separate events'})', () async {
-        rig = PRig();
+        rig = PRig(hold: true);
         await rig.start();
         final List<String> order = <String>[];
         rig.onCall = order.add;
@@ -455,7 +456,7 @@ void main() {
     }
 
     test('a get answer is seen before a push that arrived after it', () async {
-      rig = PRig();
+      rig = PRig(hold: true);
       await rig.start();
       final List<String> order = <String>[];
       rig.onCall = order.add;
@@ -502,77 +503,102 @@ void main() {
       },
     );
 
-    test(
-      'B-8.6b an interrupt while the tokens are fetched drops the fetch',
-      () async {
-        rig = PRig();
+    test('B-8.6b an interrupt while the tokens are fetched drops the fetch', () {
+      fakeAsync((FakeAsync async) {
+        rig = fakeTimeRig(async);
         rig.tokens.gate = Completer<void>();
         rig.connection.initialize();
-        await until(() => rig.tokens.authCalls.isNotEmpty);
+        elapseUntil(async, () => rig.tokens.authCalls.isNotEmpty);
         rig.connection.interrupt('repo_interrupt');
         rig.tokens.gate!.complete();
-        await rig.settle();
-        await rig.settle();
+        // Reconnects wait 1 ms: a fetch result that was not dropped would connect long before.
+        async.elapse(const Duration(minutes: 1));
         expect(rig.attemptTimes, isEmpty);
         rig.connection.resume('repo_interrupt');
-        await until(() => rig.connects == 1);
-      },
-    );
+        elapseUntil(async, () => rig.connects == 1);
+        shutDownOnFakeTime(async, rig);
+      });
+    });
 
     test(
       'B-8.6a interrupt closes without reconnecting; resume reconnects at once',
-      () async {
-        rig = PRig(
-          timings: shrunkTimings(
-            reconnectMin: const Duration(hours: 1),
-            reconnectMax: const Duration(hours: 1),
-          ),
-        );
-        await rig.start();
-        rig.connection.interrupt('repo_interrupt');
-        await until(() => rig.delegate.callsOf('disconnect').length == 1);
-        expect(rig.connection.isInterrupted('repo_interrupt'), isTrue);
-        await rig.settle();
-        expect(rig.attemptTimes, hasLength(1));
-        rig.connection.resume('repo_interrupt');
-        await until(() => rig.connects == 2);
+      () {
+        fakeAsync((FakeAsync async) {
+          rig = fakeTimeRig(async);
+          rig.connection.initialize();
+          elapseUntil(async, () => rig.connects == 1);
+          rig.connection.interrupt('repo_interrupt');
+          elapseUntil(
+            async,
+            () => rig.delegate.callsOf('disconnect').length == 1,
+          );
+          expect(rig.connection.isInterrupted('repo_interrupt'), isTrue);
+          // Reconnects wait 1 ms: only the interrupt keeps the client offline for a minute.
+          async.elapse(const Duration(minutes: 1));
+          expect(rig.attemptTimes, hasLength(1));
+          final Duration resumedAt = async.elapsed;
+          rig.connection.resume('repo_interrupt');
+          elapseUntil(async, () => rig.connects == 2);
+          expect(
+            rig.attemptTimes.last - resumedAt,
+            lessThan(const Duration(milliseconds: 2)),
+          );
+          shutDownOnFakeTime(async, rig);
+        });
       },
     );
 
     test(
       'B-8.6a a server shutdown reports the reason and is never followed by a reconnect',
-      () async {
-        rig = PRig();
-        await rig.start();
-        rig.server.pushShutdown('maintenance');
-        await until(() => rig.delegate.callsOf('serverShutdown').isNotEmpty);
-        expect(rig.connection.isInterrupted('server_kill'), isTrue);
-        rig.connection.resume('server_kill');
-        rig.connection.interrupt('repo_interrupt');
-        rig.connection.resume('repo_interrupt');
-        await rig.settle();
-        await rig.settle();
-        expect(rig.attemptTimes, hasLength(1));
+      () {
+        fakeAsync((FakeAsync async) {
+          rig = fakeTimeRig(async);
+          rig.connection.initialize();
+          elapseUntil(async, () => rig.connects == 1);
+          rig.server.pushShutdown('maintenance');
+          elapseUntil(
+            async,
+            () => rig.delegate.callsOf('serverShutdown').isNotEmpty,
+          );
+          expect(
+            rig.delegate.callsOf('serverShutdown').single.status,
+            'maintenance',
+          );
+          expect(rig.connection.isInterrupted('server_kill'), isTrue);
+          rig.connection
+            ..resume('server_kill')
+            ..interrupt('repo_interrupt')
+            ..resume('repo_interrupt');
+          rig.hints.add(null);
+          // Reconnects wait 1 ms: a minute without an attempt means none is coming.
+          async.elapse(const Duration(minutes: 1));
+          expect(rig.attemptTimes, hasLength(1));
+          shutDownOnFakeTime(async, rig);
+        });
       },
     );
 
-    test(
-      'B-8.2c a connectivity hint starts a waiting attempt at once',
-      () async {
-        rig = PRig(
+    test('B-8.2c a connectivity hint starts a waiting attempt at once', () {
+      fakeAsync((FakeAsync async) {
+        rig = fakeTimeRig(
+          async,
           timings: shrunkTimings(
             reconnectMin: const Duration(hours: 1),
             reconnectMax: const Duration(hours: 1),
           ),
         );
-        await rig.start();
-        await rig.drop();
-        await rig.settle();
+        rig.connection.initialize();
+        elapseUntil(async, () => rig.connects == 1);
+        rig.server.connector.last.serverClose(1006);
+        async.elapse(const Duration(minutes: 1));
+        expect(rig.delegate.callsOf('disconnect'), hasLength(1));
         expect(rig.attemptTimes, hasLength(1));
         rig.hints.add(null);
-        await until(() => rig.connects == 2);
-      },
-    );
+        async.elapse(const Duration(milliseconds: 10));
+        expect(rig.connects, 2);
+        shutDownOnFakeTime(async, rig);
+      });
+    });
 
     test(
       'an admin credential (the emulator owner) goes out as gauth',
@@ -646,17 +672,18 @@ void main() {
     test(
       'the hello publishes serverTimeOffset and its session id becomes ls',
       () async {
-        rig = PRig();
+        // The client's clock is 1234 ms behind the hello's `ts`.
+        rig = PRig(
+          now: () => DateTime.fromMillisecondsSinceEpoch(
+            PRig.serverTimeMs - 1234,
+            isUtc: true,
+          ),
+        );
         await rig.start();
         final Map<String, Object?> info =
             rig.delegate.callsOf('serverInfoUpdate').single.data!
                 as Map<String, Object?>;
-        final int offset = info['serverTimeOffset']! as int;
-        expect(
-          (PRig.serverTimeMs - DateTime.now().millisecondsSinceEpoch - offset)
-              .abs(),
-          lessThan(5000),
-        );
+        expect(info, <String, Object?>{'serverTimeOffset': 1234});
         await rig.drop();
         await until(() => rig.connects == 2);
         expect(rig.lastSessionIds, <String?>[null, 'sess-1']);
@@ -667,6 +694,7 @@ void main() {
       'B-8.5 an unsent transaction put survives a drop and is sent at the reconnect',
       () async {
         rig = PRig(
+          hold: true,
           timings: shrunkTimings(
             reconnectMin: const Duration(hours: 1),
             reconnectMax: const Duration(hours: 1),
@@ -695,7 +723,7 @@ void main() {
     test(
       'purgeOutstandingWrites completes every write with write_canceled, asynchronously',
       () async {
-        rig = PRig();
+        rig = PRig(hold: true);
         await rig.start();
         final List<String> statuses = <String>[];
         rig.connection.put(
@@ -719,7 +747,7 @@ void main() {
     test(
       'shutdown drops every callback; later calls are ignored and a get fails',
       () async {
-        rig = PRig();
+        rig = PRig(hold: true);
         await rig.start();
         final List<String> statuses = <String>[];
         rig.connection.put(
@@ -736,7 +764,13 @@ void main() {
         );
         await expectLater(
           rig.connection.get(defaultListen('/a')),
-          throwsA(isA<ServerActionsException>()),
+          throwsA(
+            isA<ServerActionsException>().having(
+              (ServerActionsException e) => e.status,
+              'status',
+              'database_closed',
+            ),
+          ),
         );
         await rig.settle();
         expect(statuses, isEmpty);

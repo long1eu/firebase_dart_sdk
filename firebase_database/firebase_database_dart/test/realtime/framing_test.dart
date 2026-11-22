@@ -279,6 +279,31 @@ void main() {
       expect(split.add(json.substring(5)), isNotNull);
     });
 
+    test('the limit is per message: messages under it never add up (T9)', () {
+      // One assembler lives as long as the socket; every message is measured on its own.
+      const String json = '{"a":"xxxx"}';
+      const Map<String, Object?> message = <String, Object?>{'a': 'xxxx'};
+      final FrameAssembler assembler = _assembler(maxMessageBytes: json.length);
+      for (int i = 0; i < 5; i++) {
+        expect(assembler.add(json), message, reason: 'one-frame message $i');
+      }
+      assembler.add('2');
+      assembler.add(json.substring(0, 5));
+      expect(assembler.add(json.substring(5)), message);
+      expect(assembler.add(json), message);
+    });
+
+    test('a refused message does not count against the next one', () {
+      const String json = '{"a":"xxxx"}';
+      final FrameAssembler assembler = _assembler(maxMessageBytes: json.length);
+      expect(
+        () => assembler.add('{"a":"xxxxx"}'),
+        throwsA(isA<FramingException>()),
+      );
+      expect(() => assembler.add('{"a":'), throwsA(isA<FramingException>()));
+      expect(assembler.add(json), <String, Object?>{'a': 'xxxx'});
+    });
+
     test('nesting up to the depth limit passes, one level more is refused', () {
       String nested(int depth) => '${'{"a":' * depth}1${'}' * depth}';
       expect(_assembler(maxDepth: 64).add(nested(64)), isNotNull);
