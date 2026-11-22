@@ -199,32 +199,11 @@ class _NotesPageState extends State<NotesPage> {
   }
 
   Future<void> _edit(DataSnapshot note) async {
-    final TextEditingController field = TextEditingController(
-      text: '${note.child('text').value}',
-    );
     final String? text = await showDialog<String>(
       context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: const Text('Edit note'),
-        content: TextField(
-          key: const ValueKey<String>('editField'),
-          controller: field,
-          autofocus: true,
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            key: const ValueKey<String>('editSave'),
-            onPressed: () => Navigator.pop(context, field.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
+      builder: (BuildContext context) =>
+          _EditNoteDialog(initialText: '${note.child('text').value}'),
     );
-    field.dispose();
     if (text == null || text.isEmpty) {
       return;
     }
@@ -366,6 +345,52 @@ class _NotesPageState extends State<NotesPage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The edit dialog. It owns its text controller, so the controller lives until the dialog's
+/// closing animation has ended; disposing it when `showDialog` returns is too early.
+class _EditNoteDialog extends StatefulWidget {
+  const _EditNoteDialog({required this.initialText});
+
+  final String initialText;
+
+  @override
+  State<_EditNoteDialog> createState() => _EditNoteDialogState();
+}
+
+class _EditNoteDialogState extends State<_EditNoteDialog> {
+  late final TextEditingController _field = TextEditingController(
+    text: widget.initialText,
+  );
+
+  @override
+  void dispose() {
+    _field.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit note'),
+      content: TextField(
+        key: const ValueKey<String>('editField'),
+        controller: _field,
+        autofocus: true,
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const ValueKey<String>('editSave'),
+          onPressed: () => Navigator.pop(context, _field.text.trim()),
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }
