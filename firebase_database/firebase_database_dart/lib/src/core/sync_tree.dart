@@ -4,26 +4,58 @@
 /// Tags start at 1 per [SyncTree] instance (a field counter, not JS's module global): two trees,
 /// hence two Repos, each give their first filtered query tag 1. Pinned by the sync tree API
 /// contract with two instances.
+///
+/// Differences from Android, each on purpose:
+///
+/// * Calls to the [ListenProvider] are made after the persistence transaction of the entry point
+///   closes, in the order Android makes them: the `.info` provider applies data to its tree
+///   synchronously inside `startListening`, which would nest transactions otherwise.
+/// * `setQueryInactive` is called for each removed query (iOS `FSyncTree.m`), not for the
+///   query passed in once per removed query.
+/// * Shadowing below a new default listen and the views re-listened after a default listen goes
+///   use JS's fold, which stops at a complete view (Android's `foreach` also visits below it and
+///   stops listens that were never started).
+/// * `skipDedup` skips only the listen bookkeeping; tags are still removed and the cancel events
+///   returned (JS `syncTreeRemoveEventRegistration`; Android returns null).
+/// * `calcCompleteEventCache` looks at the root sync point too (JS `findOnPath`).
+/// * `getServerValue` does not leave an empty sync point in the tree.
 library;
 
 import 'package:firebase_database_dart/src/core/compound_write.dart';
+import 'package:firebase_database_dart/src/core/connection/listen_hash_provider.dart';
 import 'package:firebase_database_dart/src/core/database_error.dart';
 import 'package:firebase_database_dart/src/core/event_registration.dart';
 import 'package:firebase_database_dart/src/core/listen_provider.dart';
+import 'package:firebase_database_dart/src/core/operation/operation.dart';
+import 'package:firebase_database_dart/src/core/operation/operation_source.dart';
 import 'package:firebase_database_dart/src/core/path.dart';
+import 'package:firebase_database_dart/src/core/persistence/noop_persistence_manager.dart';
 import 'package:firebase_database_dart/src/core/persistence/persistence_manager.dart';
+import 'package:firebase_database_dart/src/core/snap/child_key.dart';
+import 'package:firebase_database_dart/src/core/snap/children_node.dart';
+import 'package:firebase_database_dart/src/core/snap/compound_hash.dart';
+import 'package:firebase_database_dart/src/core/snap/indexes/key_index.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
 import 'package:firebase_database_dart/src/core/snap/range_merge.dart';
 import 'package:firebase_database_dart/src/core/sync_point.dart';
 import 'package:firebase_database_dart/src/core/sync_tree_api.dart';
 import 'package:firebase_database_dart/src/core/tag.dart';
+import 'package:firebase_database_dart/src/core/user_write_record.dart';
 import 'package:firebase_database_dart/src/core/util/immutable_tree.dart';
+import 'package:firebase_database_dart/src/core/util/node_size_estimator.dart';
+import 'package:firebase_database_dart/src/core/util/server_values.dart';
 import 'package:firebase_database_dart/src/core/view/cache_node.dart';
 import 'package:firebase_database_dart/src/core/view/change.dart';
 import 'package:firebase_database_dart/src/core/view/event.dart';
 import 'package:firebase_database_dart/src/core/view/query_spec.dart';
+import 'package:firebase_database_dart/src/core/view/view.dart';
 import 'package:firebase_database_dart/src/core/write_id.dart';
 import 'package:firebase_database_dart/src/core/write_tree.dart';
+import 'package:firebase_database_dart/src/core/write_tree_ref.dart';
+
+part 'sync_tree_listen.dart';
+part 'sync_tree_operations.dart';
+part 'sync_tree_registrations.dart';
 
 /// Cached server data larger than this (estimated JSON bytes) makes a listen send a compound
 /// hash.
@@ -34,21 +66,66 @@ const int sizeThresholdForCompoundHash = 1024;
 /// [PersistenceManager.runInTransaction].
 final class SyncTree implements SyncTreeApi {
   /// Creates a tree listening through [listenProvider] and persisting through
-  /// [persistenceManager] (a no-op one by default).
+  /// [persistenceManager] (a no-op one by default). Android `SyncTree(Context,
+  /// PersistenceManager, ListenProvider)`.
   factory SyncTree({
     required ListenProvider listenProvider,
     PersistenceManager? persistenceManager,
-  }) => throw UnimplementedError();
+  }) => SyncTree._(
+    listenProvider,
+    persistenceManager ?? NoopPersistenceManager(),
+  );
 
-  /// The sync points (for tests).
-  ImmutableTree<SyncPoint> get syncPointTree => throw UnimplementedError();
+  SyncTree._(this._listenProvider, this._persistenceManager);
+
+  final ListenProvider _listenProvider;
+  final PersistenceManager _persistenceManager;
+  ImmutableTree<SyncPoint> _syncPointTree = ImmutableTree<SyncPoint>.empty();
+  final WriteTree _pendingWriteTree = WriteTree();
+  final Map<Tag, QuerySpec> _tagToQuery = <Tag, QuerySpec>{};
+  final Map<QuerySpec, Tag> _queryToTag = <QuerySpec, Tag>{};
+  final Set<QuerySpec> _keepSyncedQueries = <QuerySpec>{};
+  int _nextQueryTag = 1;
+
+  /// Listen provider calls made during the current entry point, run once its transaction closes.
+  final List<List<Event> Function()> _pendingProviderCalls =
+      <List<Event> Function()>[];
+
+  /// The sync points (Android `SyncTree.getSyncPointTree`, for tests).
+  ImmutableTree<SyncPoint> get syncPointTree => _syncPointTree;
 
   /// The pending writes (for tests).
-  WriteTree get pendingWriteTree => throw UnimplementedError();
+  WriteTree get pendingWriteTree => _pendingWriteTree;
 
+  /// Whether no query is registered (Android `SyncTree.isEmpty`).
   @override
-  bool get isEmpty => throw UnimplementedError();
+  bool get isEmpty => _syncPointTree.isEmpty;
 
+  /// Runs [body] in one persistence transaction, then the listen provider calls it queued, and
+  /// returns the events of both.
+  List<Event> _run(List<Event> Function() body) {
+    final List<Event> events;
+    try {
+      events = _persistenceManager.runInTransaction(body);
+    } on Object {
+      _pendingProviderCalls.clear();
+      rethrow;
+    }
+    if (_pendingProviderCalls.isEmpty) {
+      return events;
+    }
+    final List<List<Event> Function()> calls = List<List<Event> Function()>.of(
+      _pendingProviderCalls,
+    );
+    _pendingProviderCalls.clear();
+    final List<Event> result = List<Event>.of(events);
+    for (final List<Event> Function() call in calls) {
+      result.addAll(call());
+    }
+    return result;
+  }
+
+  /// Android `SyncTree.applyUserOverwrite`.
   @override
   List<Event> applyUserOverwrite(
     Path path,
@@ -57,8 +134,26 @@ final class SyncTree implements SyncTreeApi {
     WriteId writeId, {
     required bool visible,
     required bool persist,
-  }) => throw UnimplementedError();
+  }) {
+    assert(
+      visible || !persist,
+      "We shouldn't be persisting non-visible writes.",
+    );
+    return _run(() {
+      if (persist) {
+        _persistenceManager.saveUserOverwrite(path, newDataUnresolved, writeId);
+      }
+      _pendingWriteTree.addOverwrite(path, newData, writeId, visible: visible);
+      if (!visible) {
+        return const <Event>[];
+      }
+      return _applyOperationToSyncPoints(
+        Overwrite(OperationSource.user, path, newData),
+      );
+    });
+  }
 
+  /// Android `SyncTree.applyUserMerge`.
   @override
   List<Event> applyUserMerge(
     Path path,
@@ -66,140 +161,380 @@ final class SyncTree implements SyncTreeApi {
     CompoundWrite children,
     WriteId writeId, {
     required bool persist,
-  }) => throw UnimplementedError();
+  }) => _run(() {
+    if (persist) {
+      _persistenceManager.saveUserMerge(path, unresolvedChildren, writeId);
+    }
+    _pendingWriteTree.addMerge(path, children, writeId);
+    return _applyOperationToSyncPoints(
+      Merge(OperationSource.user, path, children),
+    );
+  });
 
+  /// Android `SyncTree.ackUserWrite`, with the server values given instead of a clock. The
+  /// removal from the write log and the promotion into the server cache share one transaction.
   @override
   List<Event> ackUserWrite(
     WriteId writeId, {
     required bool revert,
     required bool persist,
     required Map<String, Object?> serverValues,
-  }) => throw UnimplementedError();
+  }) => _run(() {
+    if (persist) {
+      _persistenceManager.removeUserWrite(writeId);
+    }
+    final UserWriteRecord? write = _pendingWriteTree.getWrite(writeId);
+    if (write == null) {
+      throw StateError('ackUserWrite called with nonexistent writeId');
+    }
+    final bool needToReevaluate = _pendingWriteTree.removeWrite(writeId);
+    if (write.visible && !revert) {
+      Node? existing(Path p, List<WriteId> exclude) =>
+          calcCompleteEventCache(p, writeIdsToExclude: exclude);
+      final Node? overwrite = write.overwrite;
+      if (overwrite != null) {
+        _persistenceManager.applyUserWriteToServerCache(
+          write.path,
+          resolveDeferredValueTree(
+            write.path,
+            overwrite,
+            existing,
+            serverValues,
+          ),
+        );
+      } else {
+        _persistenceManager.applyUserMergeToServerCache(
+          write.path,
+          resolveDeferredValueMerge(
+            write.merge!,
+            write.path,
+            existing,
+            serverValues,
+          ),
+        );
+      }
+    }
+    if (!needToReevaluate) {
+      return const <Event>[];
+    }
+    ImmutableTree<bool> affectedTree = ImmutableTree<bool>.empty();
+    if (write.isOverwrite) {
+      affectedTree = affectedTree.set(Path.empty, true);
+    } else {
+      for (final MapEntry<Path, Node> entry in write.merge!.entries) {
+        affectedTree = affectedTree.set(entry.key, true);
+      }
+    }
+    return _applyOperationToSyncPoints(
+      AckUserWrite(write.path, affectedTree, revert: revert),
+    );
+  });
 
+  /// Android `SyncTree.removeAllWrites`.
   @override
-  List<Event> removeAllWrites() => throw UnimplementedError();
+  List<Event> removeAllWrites() => _run(() {
+    _persistenceManager.removeAllUserWrites();
+    final List<UserWriteRecord> purgedWrites = _pendingWriteTree
+        .purgeAllWrites();
+    if (purgedWrites.isEmpty) {
+      return const <Event>[];
+    }
+    return _applyOperationToSyncPoints(
+      AckUserWrite(Path.empty, ImmutableTree<bool>(true), revert: true),
+    );
+  });
 
+  /// Android `SyncTree.applyServerOverwrite`. Applying the same data twice raises no events the
+  /// second time (overlapping listens push the same data twice).
   @override
-  List<Event> applyServerOverwrite(Path path, Node newData) =>
-      throw UnimplementedError();
+  List<Event> applyServerOverwrite(Path path, Node newData) => _run(() {
+    _persistenceManager.updateServerCache(QuerySpec.defaultAt(path), newData);
+    return _applyOperationToSyncPoints(
+      Overwrite(OperationSource.server, path, newData),
+    );
+  });
 
+  /// Android `SyncTree.applyServerMerge`.
   @override
   List<Event> applyServerMerge(Path path, Map<Path, Node> changedChildren) =>
-      throw UnimplementedError();
+      _run(() {
+        final CompoundWrite merge = CompoundWrite.fromPathMerge(
+          changedChildren,
+        );
+        _persistenceManager.updateServerCacheWithMerge(path, merge);
+        return _applyOperationToSyncPoints(
+          Merge(OperationSource.server, path, merge),
+        );
+      });
 
+  /// Android `SyncTree.applyServerRangeMerges`: applies the merges to the complete view's server
+  /// cache and the result as a server overwrite.
   @override
-  List<Event> applyServerRangeMerges(Path path, List<RangeMerge> rangeMerges) =>
-      throw UnimplementedError();
+  List<Event> applyServerRangeMerges(Path path, List<RangeMerge> rangeMerges) {
+    final View? view = _syncPointTree.get(path)?.completeView;
+    if (view == null) {
+      // The view was removed: ignore the update.
+      return const <Event>[];
+    }
+    Node serverNode = view.serverCache;
+    for (final RangeMerge merge in rangeMerges) {
+      serverNode = merge.applyTo(serverNode);
+    }
+    return applyServerOverwrite(path, serverNode);
+  }
 
-  @override
-  List<Event> applyListenComplete(Path path) => throw UnimplementedError();
-
-  @override
-  List<Event> applyTaggedListenComplete(Tag tag) => throw UnimplementedError();
-
-  @override
-  List<Event> applyTaggedQueryOverwrite(Path path, Node snap, Tag tag) =>
-      throw UnimplementedError();
-
-  @override
-  List<Event> applyTaggedQueryMerge(
-    Path path,
-    Map<Path, Node> changedChildren,
-    Tag tag,
-  ) => throw UnimplementedError();
-
+  /// Android `SyncTree.applyTaggedRangeMerges`.
   @override
   List<Event> applyTaggedRangeMerges(
     Path path,
     List<RangeMerge> rangeMerges,
     Tag tag,
-  ) => throw UnimplementedError();
+  ) {
+    final QuerySpec? query = _tagToQuery[tag];
+    if (query == null) {
+      // The query was removed: ignore the update.
+      return const <Event>[];
+    }
+    assert(path == query.path, 'Range merge for a different path');
+    final SyncPoint? syncPoint = _syncPointTree.get(query.path);
+    final View? view = syncPoint?.viewForQuery(query);
+    if (view == null) {
+      throw StateError("Missing view for query tag that we're tracking");
+    }
+    Node serverNode = view.serverCache;
+    for (final RangeMerge merge in rangeMerges) {
+      serverNode = merge.applyTo(serverNode);
+    }
+    return applyTaggedQueryOverwrite(path, serverNode, tag);
+  }
 
+  /// Android `SyncTree.applyListenComplete`.
+  @override
+  List<Event> applyListenComplete(Path path) => _run(() {
+    _persistenceManager.setQueryComplete(QuerySpec.defaultAt(path));
+    return _applyOperationToSyncPoints(
+      ListenComplete(OperationSource.server, path),
+    );
+  });
+
+  /// Android `SyncTree.applyTaggedListenComplete`.
+  @override
+  List<Event> applyTaggedListenComplete(Tag tag) => _run(() {
+    final QuerySpec? query = _tagToQuery[tag];
+    if (query == null) {
+      return const <Event>[];
+    }
+    _persistenceManager.setQueryComplete(query);
+    return _applyTaggedOperation(
+      query,
+      ListenComplete(
+        OperationSource.forServerTaggedQuery(query.params),
+        Path.empty,
+      ),
+    );
+  });
+
+  /// Android `SyncTree.applyTaggedQueryOverwrite`.
+  @override
+  List<Event> applyTaggedQueryOverwrite(Path path, Node snap, Tag tag) =>
+      _run(() {
+        final QuerySpec? query = _tagToQuery[tag];
+        if (query == null) {
+          return const <Event>[];
+        }
+        final Path relativePath = Path.relative(query.path, path);
+        _persistenceManager.updateServerCache(
+          relativePath.isEmpty ? query : QuerySpec.defaultAt(path),
+          snap,
+        );
+        return _applyTaggedOperation(
+          query,
+          Overwrite(
+            OperationSource.forServerTaggedQuery(query.params),
+            relativePath,
+            snap,
+          ),
+        );
+      });
+
+  /// Android `SyncTree.applyTaggedQueryMerge`.
+  @override
+  List<Event> applyTaggedQueryMerge(
+    Path path,
+    Map<Path, Node> changedChildren,
+    Tag tag,
+  ) => _run(() {
+    final QuerySpec? query = _tagToQuery[tag];
+    if (query == null) {
+      return const <Event>[];
+    }
+    final Path relativePath = Path.relative(query.path, path);
+    final CompoundWrite merge = CompoundWrite.fromPathMerge(changedChildren);
+    _persistenceManager.updateServerCacheWithMerge(path, merge);
+    return _applyTaggedOperation(
+      query,
+      Merge(
+        OperationSource.forServerTaggedQuery(query.params),
+        relativePath,
+        merge,
+      ),
+    );
+  });
+
+  /// Android `SyncTree.setQueryActive`.
+  @override
+  void setQueryActive(QuerySpec query) => _persistenceManager
+      .runInTransaction<void>(() => _persistenceManager.setQueryActive(query));
+
+  /// Android `SyncTree.setQueryInactive`.
+  @override
+  void setQueryInactive(QuerySpec query) =>
+      _persistenceManager.runInTransaction<void>(
+        () => _persistenceManager.setQueryInactive(query),
+      );
+
+  /// Android `SyncTree.persistenceServerCache`: the persisted server data of [query], or null
+  /// when there is none (Android's caller checks `exists()`).
+  @override
+  Node? persistenceServerCache(QuerySpec query) {
+    final Node node = _persistenceManager.serverCache(query).node;
+    return node.isEmpty ? null : node.withIndex(query.index);
+  }
+
+  /// Android `SyncTree.getServerValue`: the complete data of [query] from the tree, pending
+  /// writes included (a write not yet acknowledged that covers the query counts, JS
+  /// `SyncTree.ts:646-657`), or null.
+  @override
+  Node? getServerValue(QuerySpec query) =>
+      _persistenceManager.runInTransaction(() {
+        final Path path = query.path;
+        Node? serverCacheNode = _ancestorServerCache(path).serverCache;
+        final SyncPoint syncPoint =
+            _syncPointTree.get(path) ?? SyncPoint(_persistenceManager);
+        serverCacheNode ??= syncPoint.completeServerCache(Path.empty);
+        final CacheNode serverCache = CacheNode(
+          (serverCacheNode ?? ChildrenNode.empty).withIndex(query.index),
+          fullyInitialized: serverCacheNode != null,
+          filtered: false,
+        );
+        return syncPoint
+            .getView(query, _pendingWriteTree.childWrites(path), serverCache)
+            .completeNode;
+      });
+
+  /// Android `SyncTree.addEventRegistration`; [preloadedServerCache] replaces the persistence
+  /// lookup. The events [ListenProvider.startListening] returns come last.
   @override
   List<Event> addEventRegistration(
     EventRegistration registration, {
     bool skipListenerSetup = false,
     CacheNode? preloadedServerCache,
-  }) => throw UnimplementedError();
+  }) => _run(
+    () => _addEventRegistration(
+      registration,
+      skipListenerSetup: skipListenerSetup,
+      preloadedServerCache: preloadedServerCache,
+    ),
+  );
 
+  /// Android `SyncTree.removeEventRegistration(EventRegistration, boolean)`.
   @override
   List<Event> removeEventRegistration(
     EventRegistration registration, {
     bool skipDedup = false,
-  }) => throw UnimplementedError();
+  }) => _removeEventRegistration(
+    registration.querySpec,
+    registration,
+    null,
+    skipDedup: skipDedup,
+  );
 
+  /// Android `SyncTree.removeAllEventRegistrations`.
   @override
   List<Event> removeAllEventRegistrations(
     QuerySpec query,
     DatabaseError error,
-  ) => throw UnimplementedError();
+  ) => _removeEventRegistration(query, null, error, skipDedup: false);
 
+  /// Android `SyncTree.removeEventRegistration(QuerySpec, EventRegistration, DatabaseError,
+  /// boolean)`.
+  List<Event> _removeEventRegistration(
+    QuerySpec query,
+    EventRegistration? registration,
+    DatabaseError? cancelError, {
+    required bool skipDedup,
+  }) => _run(
+    () => _removeEventRegistrationInTransaction(
+      query,
+      registration,
+      cancelError,
+      skipDedup: skipDedup,
+    ),
+  );
+
+  /// Android `SyncTree.keepSynced(QuerySpec, boolean, boolean)`.
   @override
   void keepSynced(
     QuerySpec query, {
     required bool keep,
     bool skipDedup = false,
-  }) => throw UnimplementedError();
+  }) {
+    if (keep && !_keepSyncedQueries.contains(query)) {
+      addEventRegistration(
+        KeepSyncedEventRegistration(query),
+        skipListenerSetup: skipDedup,
+      );
+      _keepSyncedQueries.add(query);
+    } else if (!keep && _keepSyncedQueries.contains(query)) {
+      removeEventRegistration(
+        KeepSyncedEventRegistration(query),
+        skipDedup: skipDedup,
+      );
+      _keepSyncedQueries.remove(query);
+    }
+  }
 
+  /// The tag of [query], or null (Android `SyncTree.tagForQuery`).
   @override
-  Node? getServerValue(QuerySpec query) => throw UnimplementedError();
+  Tag? tagForQuery(QuerySpec query) => _queryToTag[query];
 
-  @override
-  Node? persistenceServerCache(QuerySpec query) => throw UnimplementedError();
-
-  @override
-  void setQueryActive(QuerySpec query) => throw UnimplementedError();
-
-  @override
-  void setQueryInactive(QuerySpec query) => throw UnimplementedError();
-
-  @override
-  Node? calcCompleteEventCache(
-    Path path, {
-    List<WriteId> writeIdsToExclude = const <WriteId>[],
-  }) => throw UnimplementedError();
-
+  /// Android `SyncTree.calcCompleteEventCacheFromRoot`.
   @override
   Node? calcCompleteEventCacheFromRoot(
     Path path, {
     List<WriteId> writeIdsToExclude = const <WriteId>[],
-  }) => throw UnimplementedError();
+  }) {
+    final Node? serverCache = _syncPointTree.value?.completeServerCache(
+      Path.empty,
+    );
+    if (serverCache != null) {
+      return _pendingWriteTree.calcCompleteEventCache(
+        path,
+        serverCache,
+        writeIdsToExclude: writeIdsToExclude,
+        includeHiddenWrites: true,
+      );
+    }
+    return calcCompleteEventCache(path, writeIdsToExclude: writeIdsToExclude);
+  }
 
+  /// Android `SyncTree.calcCompleteEventCache`, with JS's lookup of the server cache on the path
+  /// (`syncTreeCalcCompleteEventCache`, which includes the root). Hidden writes count.
   @override
-  Tag? tagForQuery(QuerySpec query) => throw UnimplementedError();
-}
-
-/// A registration that raises nothing and only keeps a query listened to and cached
-/// (`keepSynced`, and Repo's `get` bracket). Equal to any other one on the same query.
-final class KeepSyncedEventRegistration extends EventRegistration {
-  /// Creates the registration for [querySpec].
-  KeepSyncedEventRegistration(this.querySpec);
-
-  @override
-  final QuerySpec querySpec;
-
-  @override
-  bool respondsTo(EventType type) => throw UnimplementedError();
-
-  @override
-  DataEvent createEvent(Change change, QuerySpec query) =>
-      throw UnimplementedError();
-
-  @override
-  void fireEvent(DataEvent event) => throw UnimplementedError();
-
-  @override
-  void fireCancelEvent(DatabaseError error) => throw UnimplementedError();
-
-  @override
-  EventRegistration clone(QuerySpec newQuery) => throw UnimplementedError();
-
-  @override
-  bool isSameListener(EventRegistration other) => throw UnimplementedError();
-
-  @override
-  bool operator ==(Object other) => throw UnimplementedError();
-
-  @override
-  int get hashCode => throw UnimplementedError();
+  Node? calcCompleteEventCache(
+    Path path, {
+    List<WriteId> writeIdsToExclude = const <WriteId>[],
+  }) {
+    final Node? serverCache = _syncPointTree.findOnPath<Node>(
+      path,
+      (Path pathSoFar, SyncPoint syncPoint) =>
+          syncPoint.completeServerCache(Path.relative(pathSoFar, path)),
+    );
+    return _pendingWriteTree.calcCompleteEventCache(
+      path,
+      serverCache,
+      writeIdsToExclude: writeIdsToExclude,
+      includeHiddenWrites: true,
+    );
+  }
 }
