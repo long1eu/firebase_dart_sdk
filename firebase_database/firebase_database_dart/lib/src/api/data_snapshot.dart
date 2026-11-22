@@ -3,8 +3,14 @@
 library;
 
 import 'package:firebase_database_dart/src/api/database_reference.dart';
+import 'package:firebase_database_dart/src/core/path.dart';
+import 'package:firebase_database_dart/src/core/snap/children_node.dart';
 import 'package:firebase_database_dart/src/core/snap/indexes/index.dart';
+import 'package:firebase_database_dart/src/core/snap/indexes/priority_index.dart';
+import 'package:firebase_database_dart/src/core/snap/named_node.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
+import 'package:firebase_database_dart/src/core/util/validation.dart';
+import 'package:firebase_database_dart/src/core/view/query_spec.dart';
 import 'package:meta/meta.dart';
 
 /// The data at a location at one moment, from an event, `Query.get`, `Query.once` or a transaction.
@@ -47,33 +53,43 @@ final class DataSnapshot {
   final Index index;
 
   /// The last segment of [ref]'s path, or null at the root.
-  String? get key => throw UnimplementedError();
+  String? get key => ref.key;
 
   /// Whether the location holds data. A location with no data reads [value] as null.
-  bool get exists => throw UnimplementedError();
+  bool get exists => !node.isEmpty;
 
   /// The data as plain Dart values (see the class documentation), or null when there is none.
   ///
   /// It is built once per snapshot and then cached. It is unmodifiable at every depth: changing a map or list
   /// throws [UnsupportedError] where the change is attempted. Copy it to change it.
-  Object? get value => throw UnimplementedError();
+  Object? get value => node.value;
 
   /// The priority of the location: null, a `num` or a `String`. Every snapshot has its own, child snapshots
   /// included.
-  Object? get priority => throw UnimplementedError();
+  Object? get priority {
+    final Node p = node.priority;
+    return p.isEmpty ? null : p.value;
+  }
 
   /// The snapshot of the location at [path] below this one. [path] may have several segments (`'a/b'`) and
   /// may name a list index (`'0'`). A missing child is a snapshot whose [exists] is false.
-  DataSnapshot child(String path) => throw UnimplementedError();
+  DataSnapshot child(String path) => DataSnapshot.internal(
+    ref.child(path),
+    node.getChild(Path(path)),
+    priorityIndex,
+  );
 
   /// Whether the location at [path] below this one holds data; [path] may have several segments.
-  bool hasChild(String path) => throw UnimplementedError();
+  bool hasChild(String path) {
+    validatePathString('DataSnapshot.hasChild', 'path', path);
+    return !node.getChild(Path(path)).isEmpty;
+  }
 
   /// Whether the location has children (a leaf value or no data has none).
-  bool get hasChildren => throw UnimplementedError();
+  bool get hasChildren => !node.isLeafNode && !node.isEmpty;
 
   /// The number of direct children.
-  int get childrenCount => throw UnimplementedError();
+  int get childrenCount => node.numChildren;
 
   /// The direct children in the query's index order, built lazily, each with its own [ref] and [priority].
   ///
@@ -82,9 +98,27 @@ final class DataSnapshot {
   ///   print('${child.key}: ${child.value}');
   /// }
   /// ```
-  Iterable<DataSnapshot> get children => throw UnimplementedError();
+  Iterable<DataSnapshot> get children {
+    // A node from the cache or a get may not carry the query's index yet.
+    final Node current = node.isIndexed(index) ? node : node.withIndex(index);
+    if (current is! ChildrenNode || current.isEmpty) {
+      return const <DataSnapshot>[];
+    }
+    return current
+        .childrenInOrder(index)
+        .map(
+          (NamedNode child) => DataSnapshot.internal(
+            DatabaseReference.internal(
+              ref.database,
+              QuerySpec.defaultAt(ref.spec.path.child(child.name)),
+            ),
+            child.node,
+            priorityIndex,
+          ),
+        );
+  }
 
   /// The data in export form, as the JS SDK's `exportVal()`: a node with a priority becomes a map with
   /// `.value` (for a leaf) or its children plus `.priority`. So `jsonEncode(snapshot)` works.
-  Object? toJson() => throw UnimplementedError();
+  Object? toJson() => node.toJson(exportFormat: true);
 }

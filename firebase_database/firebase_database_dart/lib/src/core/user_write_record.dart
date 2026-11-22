@@ -44,12 +44,24 @@ final class UserWriteRecord {
   /// Whether this is an overwrite.
   bool get isOverwrite => overwrite != null;
 
+  /// Equal id, path, visibility and data. Android: `UserWriteRecord.equals`.
   @override
-  bool operator ==(Object other) => throw UnimplementedError();
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is UserWriteRecord &&
+          writeId == other.writeId &&
+          path == other.path &&
+          visible == other.visible &&
+          overwrite == other.overwrite &&
+          merge == other.merge;
 
+  /// Android: `UserWriteRecord.hashCode`.
   @override
-  int get hashCode => throw UnimplementedError();
+  int get hashCode => Object.hash(writeId, visible, path, overwrite, merge);
 
+  /// Android: `UserWriteRecord.toString`.
   @override
-  String toString() => throw UnimplementedError();
+  String toString() =>
+      'UserWriteRecord{id=$writeId path=$path visible=$visible '
+      'overwrite=$overwrite merge=$merge}';
 }

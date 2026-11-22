@@ -242,10 +242,8 @@ final class LeafNode implements Node {
         final bool b = otherLeaf._raw as bool;
         return a == b ? 0 : (a ? 1 : -1);
       case LeafType.number:
-        // JS `<` and `===`: -0.0 equals 0 (num.compareTo would order them).
-        final num a = _raw as num;
-        final num b = otherLeaf._raw as num;
-        return a < b ? -1 : (a == b ? 0 : 1);
+        // -0.0 equals 0 (num.compareTo would order them); exact for large ints, as the server.
+        return compareNumbers(_raw as num, otherLeaf._raw as num);
       case LeafType.string:
         final int cmp = (_raw as String).compareTo(otherLeaf._raw as String);
         return cmp < 0 ? -1 : (cmp == 0 ? 0 : 1);
@@ -267,7 +265,9 @@ final class LeafNode implements Node {
     }
     return other is LeafNode &&
         leafType == other.leafType &&
-        _raw == other._raw &&
+        (_raw is num
+            ? compareNumbers(_raw, other._raw as num) == 0
+            : _raw == other._raw) &&
         _priority == other._priority;
   }
 

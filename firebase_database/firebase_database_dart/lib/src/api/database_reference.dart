@@ -2,14 +2,26 @@
 /// `update`, `push`, `runTransaction`); Android: `DatabaseReference.java`.
 library;
 
+import 'package:firebase_database_dart/src/api/data_snapshot.dart';
+import 'package:firebase_database_dart/src/api/firebase_database.dart';
 import 'package:firebase_database_dart/src/api/on_disconnect.dart';
 import 'package:firebase_database_dart/src/api/query.dart';
+import 'package:firebase_database_dart/src/api/transaction.dart';
 import 'package:firebase_database_dart/src/api/transaction_handler.dart';
 import 'package:firebase_database_dart/src/api/transaction_result.dart';
+import 'package:firebase_database_dart/src/api/user_value.dart';
+import 'package:firebase_database_dart/src/core/compound_write.dart';
+import 'package:firebase_database_dart/src/core/database_error.dart';
+import 'package:firebase_database_dart/src/core/path.dart';
+import 'package:firebase_database_dart/src/core/repo.dart';
+import 'package:firebase_database_dart/src/core/snap/child_key.dart';
+import 'package:firebase_database_dart/src/core/snap/children_node.dart';
+import 'package:firebase_database_dart/src/core/snap/indexes/priority_index.dart';
+import 'package:firebase_database_dart/src/core/snap/node.dart';
+import 'package:firebase_database_dart/src/core/transaction_data.dart';
+import 'package:firebase_database_dart/src/core/util/validation.dart';
+import 'package:firebase_database_dart/src/core/view/query_spec.dart';
 import 'package:meta/meta.dart';
-
-// Imported for the references in the documentation below.
-import 'package:firebase_database_dart/src/api/firebase_database.dart';
 
 /// A location in the database. Creating one makes no request.
 ///
@@ -41,17 +53,32 @@ final class DatabaseReference extends Query {
     : super.internal();
 
   /// The last segment of the path, or null at the root.
-  String? get key => throw UnimplementedError();
+  String? get key => spec.path.back?.name;
 
   /// The reference one level up, or null at the root.
-  DatabaseReference? get parent => throw UnimplementedError();
+  DatabaseReference? get parent {
+    final Path? parentPath = spec.path.parent;
+    return parentPath == null
+        ? null
+        : DatabaseReference.internal(database, QuerySpec.defaultAt(parentPath));
+  }
 
   /// The root of the database.
-  DatabaseReference get root => throw UnimplementedError();
+  DatabaseReference get root => database.ref();
 
   /// The reference at [path] below this one. [path] may have several segments; empty segments are dropped,
   /// so `child('a//b')` is `child('a/b')`. Throws an [ArgumentError] for an invalid key.
-  DatabaseReference child(String path) => throw UnimplementedError();
+  DatabaseReference child(String path) {
+    if (spec.path.isEmpty) {
+      validateRootPathString('child', 'path', path);
+    } else {
+      validatePathString('child', 'path', path);
+    }
+    return DatabaseReference.internal(
+      database,
+      QuerySpec.defaultAt(spec.path.childPath(Path(path))),
+    );
+  }
 
   /// A new child with a unique key made on this device, ordered by creation time. It only makes the
   /// reference: nothing is written until you call [set] on it.
@@ -59,35 +86,66 @@ final class DatabaseReference extends Query {
   /// ```dart
   /// await db.ref('messages').push().set(<String, Object?>{'text': 'hi'});
   /// ```
-  DatabaseReference push() => throw UnimplementedError();
+  DatabaseReference push() {
+    validateWritablePath('push', spec.path);
+    return DatabaseReference.internal(
+      database,
+      QuerySpec.defaultAt(spec.path.child(ChildKey(database.nextPushId()))),
+    );
+  }
 
   /// Replaces the data at this location with [value], and its priority with [priority] when given. A
   /// `null` [value] removes the data. Fires local events before the Future completes; see the class
   /// documentation for completion, rollback and value rules.
-  Future<void> set(Object? value, {Object? priority}) {
-    // TODO(repo): normalise numbers with normalizeUserNumber (core/util/numbers.dart) before the write
-    // leaves the API, so a -0.0 written by the user is sent as 0.
-    throw UnimplementedError();
+  Future<void> set(Object? value, {Object? priority}) =>
+      _set('set', value, priority);
+
+  Future<void> _set(String fnName, Object? value, Object? priority) {
+    final Path path = spec.path;
+    validateWritablePath(fnName, path);
+    validateUserValue(fnName, value, path);
+    if (priority != null) {
+      validateNotReadOnlyKey(fnName, path);
+      validateUserPriority(fnName, priority);
+    }
+    final Node node = userValueNode(value, priority);
+    return database.write(
+      (Repo repo, WriteCompletion done) =>
+          repo.setValue(path, node, onComplete: done),
+    );
   }
 
   /// Writes each entry of [values] below this location, leaving other children alone. Keys may be
   /// multi-segment paths (`'a/b'`), which makes one atomic write to several places; a `null` value removes
   /// that child. Two keys where one is a prefix of the other throw an [ArgumentError].
   Future<void> update(Map<String, Object?> values) {
-    // TODO(repo): normalise numbers with normalizeUserNumber (core/util/numbers.dart) before the write
-    // leaves the API, so a -0.0 written by the user is sent as 0.
-    throw UnimplementedError();
+    final Path path = spec.path;
+    validateWritablePath('update', path);
+    validateUserMerge('update', values, path);
+    final Map<String, Object?> normalized =
+        normalizeUserValue(values)! as Map<String, Object?>;
+    final CompoundWrite write = CompoundWrite.fromValue(normalized);
+    return database.write(
+      (Repo repo, WriteCompletion done) =>
+          repo.updateChildren(path, write, normalized, onComplete: done),
+    );
   }
 
   /// Sets the priority of this location: null, a `num` or a `String`.
   Future<void> setPriority(Object? priority) {
-    // TODO(repo): normalise numbers with normalizeUserNumber (core/util/numbers.dart) before the write
-    // leaves the API, so a -0.0 written by the user is sent as 0.
-    throw UnimplementedError();
+    final Path path = spec.path;
+    validateWritablePath('setPriority', path);
+    validateUserPriority('setPriority', priority);
+    final Path priorityPath = path.child(ChildKey.priority);
+    final Node node = userValueNode(priority);
+    return database.write(
+      (Repo repo, WriteCompletion done) =>
+          repo.setValue(priorityPath, node, onComplete: done),
+    );
   }
 
   /// Removes the data at this location: the same as `set(null)`.
-  Future<void> remove() => throw UnimplementedError();
+  Future<void> remove() => _set('remove', null, null);
 
   /// Atomically changes the data at this location with [handler].
   ///
@@ -112,11 +170,75 @@ final class DatabaseReference extends Query {
     TransactionHandler handler, {
     bool applyLocally = true,
   }) {
-    // TODO(repo): normalise numbers with normalizeUserNumber (core/util/numbers.dart) on each value the
-    // handler returns, before the write leaves the API, so a -0.0 written by the user is sent as 0.
-    throw UnimplementedError();
+    const String fnName = 'runTransaction';
+    final Path path = spec.path;
+    validateWritablePath(fnName, path);
+    validateNotReadOnlyKey(fnName, path);
+
+    // The handler's own error (or an invalid value it returned) fails the Future as it is; the
+    // transaction aborts.
+    Object? thrown;
+    StackTrace? thrownStackTrace;
+
+    TransactionOutcome update(Object? currentValue) {
+      try {
+        final Transaction result = handler(currentValue);
+        if (result.aborted) {
+          return TransactionOutcome.abort;
+        }
+        validateUserValue(fnName, result.value, path);
+        final Object? priority = result.priority;
+        if (priority != null) {
+          validateUserPriority(fnName, priority);
+        }
+        final Object? value = normalizeUserValue(result.value);
+        return TransactionSuccess(
+          priority == null
+              ? value
+              : <String, Object?>{
+                  '.value': value,
+                  '.priority': normalizeUserValue(priority),
+                },
+        );
+      } on Object catch (error, stackTrace) {
+        thrown = error;
+        thrownStackTrace = stackTrace;
+        return TransactionOutcome.abort;
+      }
+    }
+
+    return database.request<TransactionResult>((
+      Repo repo,
+      void Function(TransactionResult) complete,
+      void Function(Object, [StackTrace?]) fail,
+    ) {
+      repo.startTransaction(
+        path,
+        update,
+        applyLocally: applyLocally,
+        onComplete: (DatabaseError? error, bool committed, Node? node) {
+          final Object? handlerError = thrown;
+          if (handlerError != null) {
+            fail(handlerError, thrownStackTrace);
+          } else if (error != null) {
+            fail(toApiError(error));
+          } else {
+            complete(
+              TransactionResult.internal(
+                committed: committed,
+                snapshot: DataSnapshot.internal(
+                  this,
+                  node ?? ChildrenNode.empty,
+                  priorityIndex,
+                ),
+              ),
+            );
+          }
+        },
+      );
+    });
   }
 
   /// The writes the server applies at this location when this client disconnects.
-  OnDisconnect get onDisconnect => throw UnimplementedError();
+  OnDisconnect get onDisconnect => OnDisconnect.internal(this);
 }

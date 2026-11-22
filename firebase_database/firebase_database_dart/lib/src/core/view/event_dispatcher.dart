@@ -7,6 +7,7 @@
 library;
 
 import 'dart:async';
+import 'dart:collection';
 
 import 'package:firebase_database_dart/src/core/event_registration.dart';
 import 'package:firebase_database_dart/src/core/view/event.dart';
@@ -28,12 +29,75 @@ const int eventsPerDrainSlice = 1000;
 ///   the events of one change are always delivered together.
 final class EventDispatcher {
   /// Creates a dispatcher that schedules its drain with [schedule] and yields after [yieldEvery]
-  /// events.
+  /// events. Replaces JS `EventQueue` and Android `EventRaiser`.
   factory EventDispatcher({
     void Function(void Function()) schedule = scheduleMicrotask,
     int yieldEvery = eventsPerDrainSlice,
-  }) => throw UnimplementedError();
+  }) => EventDispatcher._(schedule, yieldEvery);
 
-  /// Appends the events of one change and schedules a drain if none is pending.
-  void enqueue(List<Event> events) => throw UnimplementedError();
+  EventDispatcher._(this._schedule, this._yieldEvery);
+
+  final void Function(void Function()) _schedule;
+  final int _yieldEvery;
+
+  /// The changes not delivered yet, oldest first; each change is delivered whole.
+  final Queue<List<Event>> _changes = Queue<List<Event>>();
+
+  /// Whether a drain (the first microtask or a yield's `Timer.run`) is scheduled.
+  bool _scheduled = false;
+
+  /// Whether a drain is running (events a listener causes are appended, never fired nested).
+  bool _draining = false;
+
+  /// Appends the events of one change and schedules a drain if none is pending. Android
+  /// `EventRaiser.raiseEvents`; JS `eventQueueQueueEvents`.
+  void enqueue(List<Event> events) {
+    if (events.isEmpty) {
+      return;
+    }
+    _changes.add(List<Event>.of(events));
+    if (!_scheduled && !_draining) {
+      _scheduled = true;
+      _schedule(_drain);
+    }
+  }
+
+  void _drain() {
+    _scheduled = false;
+    if (_draining) {
+      return;
+    }
+    _draining = true;
+    int delivered = 0;
+    try {
+      while (_changes.isNotEmpty) {
+        if (delivered >= _yieldEvery) {
+          // Only between changes: let timers and I/O run, then go on with the next change.
+          _scheduled = true;
+          Timer.run(_drain);
+          return;
+        }
+        final List<Event> change = _changes.removeFirst();
+        for (final Event event in change) {
+          _fire(event);
+          delivered++;
+        }
+      }
+    } finally {
+      _draining = false;
+    }
+  }
+
+  static void _fire(Event event) {
+    // A cancel event always goes out: the view leaves a cancelled registration alive until its
+    // cancel event fires, and the registration ignores it once zombied by its own listener.
+    if (event is DataEvent && event.eventRegistration.isZombied) {
+      return;
+    }
+    try {
+      event.fire();
+    } on Object catch (error, stackTrace) {
+      Zone.current.handleUncaughtError(error, stackTrace);
+    }
+  }
 }

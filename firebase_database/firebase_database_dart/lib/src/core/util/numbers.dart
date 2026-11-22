@@ -48,6 +48,38 @@ num normalizeNumber(num value) {
 /// sends and stores `0` (JS `JSON.stringify(-0)` is `"0"`).
 num normalizeUserNumber(num value) => value == 0 ? 0 : normalizeNumber(value);
 
+/// Compares two stored numbers as the server orders them: exactly, also beyond [maxSafeInteger]
+/// (measured: orderByValue separates 9007199254740992 and 9007199254740993). Negative zero equals
+/// zero. Returns -1, 0 or 1.
+///
+/// On the VM and wasm two ints are compared as ints, and an int against a double without
+/// rounding the int. On the web every number is a double, so such values compare as equal there.
+int compareNumbers(num a, num b) {
+  if (a is int && b is int) {
+    return a < b ? -1 : (a == b ? 0 : 1);
+  }
+  if (a is int) {
+    return _compareIntToDouble(a, b.toDouble());
+  }
+  if (b is int) {
+    return -_compareIntToDouble(b, a.toDouble());
+  }
+  return a < b ? -1 : (a == b ? 0 : 1);
+}
+
+int _compareIntToDouble(int i, double d) {
+  final double rounded = i.toDouble();
+  if (rounded != d) {
+    return rounded < d ? -1 : 1;
+  }
+  // Equal after rounding: decide on the exact integers. 2^63 and beyond is above every int.
+  if (d >= 9223372036854775808.0) {
+    return -1;
+  }
+  final int exact = d.toInt();
+  return i < exact ? -1 : (i == exact ? 0 : 1);
+}
+
 /// Whether [value] is NaN or infinite, which JSON cannot carry.
 bool isInvalidJsonNumber(Object? value) =>
     value is num && (value.isNaN || value.isInfinite);

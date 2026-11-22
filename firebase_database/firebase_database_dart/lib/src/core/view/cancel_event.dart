@@ -16,9 +16,11 @@ final class CancelEvent extends Event {
   @override
   final Path path;
 
+  /// Hands [error] to [eventRegistration] (Android `CancelEvent.fire`).
   @override
-  void fire() => throw UnimplementedError();
+  void fire() => eventRegistration.fireCancelEvent(error);
 
+  /// As Android `CancelEvent.toString`.
   @override
-  String toString() => throw UnimplementedError();
+  String toString() => '$path:CANCEL';
 }

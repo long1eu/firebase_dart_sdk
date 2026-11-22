@@ -1,0 +1,32 @@
+name: rtdb_cli
+description: >-
+  A command-line tool for the Firebase Realtime Database: get, set, update,
+  push, remove, watch, export and import, with query flags.
+publish_to: none
+
+environment:
+  sdk: ^3.8.0
+
+executables:
+  rtdb_cli:
+
+dependencies:
+  args: ^2.5.0
+  firebase_app_dart:
+    path: ../../firebase_core/firebase_app_dart
+  firebase_database_dart:
+    path: ../../firebase_database/firebase_database_dart
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.0
+
+# The examples run against the code of this repository. Each package declares
+# the others as hosted dependencies: the overrides make every one of them come
+# from this repository. Outside the repository, remove this section and depend
+# on the versions on pub.dev.
+dependency_overrides:
+  firebase_app_dart:
+    path: ../../firebase_core/firebase_app_dart
+  firebase_database_dart:
+    path: ../../firebase_database/firebase_database_dart

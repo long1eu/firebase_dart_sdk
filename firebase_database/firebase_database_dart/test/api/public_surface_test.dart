@@ -288,10 +288,15 @@ void _testingLibrary(FirebaseApp app, FakeDatabaseServer server) {
   server.acceptConnections = false;
   final _Same<int> _ = server.connectionAttempts.exact;
   final _Same<List<String>> _ = server.requests.exact;
-  final _Same<void Function(String, Object?)> _ = server.answerListen.exact;
-  final _Same<void Function(String, String)> _ = server.failListen.exact;
+  final _Same<void Function(String, Object?, {Map<String, Object?>? query})> _ =
+      server.answerListen.exact;
+  final _Same<void Function(String, String, {Map<String, Object?>? query})> _ =
+      server.failListen.exact;
   final _Same<void Function(String, Object?)> _ = server.push.exact;
-  final _Same<void Function(String, String)> _ = server.cancelListen.exact;
+  final _Same<void Function(String, String, {Map<String, Object?>? query})> _ =
+      server.cancelListen.exact;
+  final _Same<List<String?>> _ = server.receivedAuthTokens.exact;
+  final _Same<DateTime?> _ = server.serverTime.exact;
   final _Same<void Function()> _ = server.ackLastWrite.exact;
   final _Same<void Function(String)> _ = server.failLastWrite.exact;
   final _Same<void Function()> _ = server.ackLastOnDisconnect.exact;

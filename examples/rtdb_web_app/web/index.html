@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*">
+  <title>Realtime list: firebase_database_dart</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h1>Realtime list</h1>
+  <p>A live list on the Realtime Database, with <code>firebase_database_dart</code> (pure Dart,
+    compiled to JavaScript). Items live at <code>rtdb_web_app/items</code>.</p>
+
+  <p id="notice" class="notice" hidden>
+    Not connected. Start a Realtime Database emulator on your machine and enter its host below
+    (for example <code>127.0.0.1:9000</code>), or open this page with <code>?emulator=127.0.0.1:9000</code>.
+  </p>
+
+  <dl>
+    <dt>Backend</dt><dd id="backend">none</dd>
+    <dt>Connection</dt><dd><span id="connected" class="offline">Not connected</span>
+      <button id="toggle" type="button" disabled>Go offline</button></dd>
+    <dt>Pending</dt><dd id="pending">0 writes made while offline, not yet sent</dd>
+  </dl>
+
+  <form id="add">
+    <input id="text" placeholder="A new item" autocomplete="off" required>
+    <button type="submit" disabled>Add</button>
+  </form>
+  <p id="error" role="alert"></p>
+  <ul id="items"></ul>
+
+  <details id="connect-panel">
+    <summary>Connect your own emulator or project</summary>
+    <form id="connect">
+      <label>Emulator host <input id="f-emulator" placeholder="127.0.0.1:9000" autocomplete="off"></label>
+      <p class="hint">or a project:</p>
+      <label>Database URL <input id="f-url" placeholder="https://my-project-default-rtdb.firebaseio.com" autocomplete="off"></label>
+      <label>API key <input id="f-key" autocomplete="off"></label>
+      <label>Project id <input id="f-project" placeholder="my-project" autocomplete="off"></label>
+      <label class="check"><input id="f-remember" type="checkbox"> Remember in this browser (localStorage)</label>
+      <button type="submit">Connect</button>
+      <button id="forget" type="button">Forget stored settings</button>
+    </form>
+    <p class="hint">Nothing leaves the browser except to that database: the page has no server of its
+      own, sends nothing anywhere else, and its Content-Security-Policy only allows connections to
+      <code>*.firebaseio.com</code>, <code>*.firebasedatabase.app</code> and this machine
+      (<code>127.0.0.1</code>, <code>localhost</code>). Settings are stored only if you tick the box;
+      the same fields can be given as <code>?emulator=</code>, <code>?databaseUrl=</code>,
+      <code>?apiKey=</code> and <code>?project=</code>.</p>
+  </details>
+
+  <script defer src="main.dart.js"></script>
+</body>
+</html>

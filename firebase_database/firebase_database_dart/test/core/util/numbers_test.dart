@@ -157,4 +157,37 @@ void main() {
       expect(tryParseJsonNumber(' 1'), isNull);
     });
   });
+
+  group('large integers (emulator v4.11.2, probe addendum 4)', () {
+    final int a = int.parse('9007199254740992');
+    final int b = int.parse('9007199254740993');
+
+    test('the hash goes through the double form', () {
+      // Measured: a listen with this hash for ...993 is answered with no data push.
+      expect(doubleToIeee754String(b.toDouble()), '4340000000000000');
+      expect(doubleToIeee754String(a.toDouble()), '4340000000000000');
+    });
+
+    test('order is exact on the VM and wasm', () {
+      expect(compareNumbers(a, b), -1);
+      expect(compareNumbers(b, a), 1);
+      expect(compareNumbers(b, b), 0);
+      expect(compareNumbers(b, 9007199254740992.0), 1);
+      expect(compareNumbers(9007199254740992.0, b), -1);
+      expect(compareNumbers(a, 9007199254740992.0), 0);
+      expect(
+        compareNumbers(int.parse('9223372036854775807'), 9223372036854775808.0),
+        -1,
+      );
+    }, testOn: '!js');
+
+    test('small values and zeros', () {
+      expect(compareNumbers(1, 1.0), 0);
+      expect(compareNumbers(1, 1.5), -1);
+      expect(compareNumbers(2.5, 2), 1);
+      expect(compareNumbers(-0.0, 0), 0);
+      expect(compareNumbers(0, -0.0), 0);
+      expect(compareNumbers(-1.5, -1), -1);
+    });
+  });
 }
