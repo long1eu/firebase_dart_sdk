@@ -12,30 +12,32 @@ final class ValueIndex extends Index {
   const ValueIndex();
 
   @override
-  int compare(NamedNode a, NamedNode b) => throw UnimplementedError();
+  int compare(NamedNode a, NamedNode b) {
+    final int indexCmp = a.node.compareTo(b.node);
+    return indexCmp == 0 ? a.name.compareTo(b.name) : indexCmp;
+  }
 
   @override
-  bool isDefinedOn(Node node) => throw UnimplementedError();
+  bool isDefinedOn(Node node) => true;
 
   @override
-  bool indexedValueChanged(Node oldNode, Node newNode) =>
-      throw UnimplementedError();
+  bool indexedValueChanged(Node oldNode, Node newNode) => oldNode != newNode;
 
   @override
-  NamedNode get minPost => throw UnimplementedError();
+  NamedNode get minPost => NamedNode.min;
 
   @override
-  NamedNode get maxPost => throw UnimplementedError();
+  NamedNode get maxPost => NamedNode.max;
 
   @override
   NamedNode makePost(Node indexValue, ChildKey name) =>
-      throw UnimplementedError();
+      NamedNode(name, indexValue);
 
   @override
-  String get queryDefinition => throw UnimplementedError();
+  String get queryDefinition => '.value';
 
   @override
-  String toString() => throw UnimplementedError();
+  String toString() => queryDefinition;
 }
 
 /// The single instance.

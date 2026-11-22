@@ -4,8 +4,12 @@ library;
 
 import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:firebase_database_dart/src/core/snap/child_key.dart';
+import 'package:firebase_database_dart/src/core/snap/children_node.dart';
 import 'package:firebase_database_dart/src/core/snap/indexes/index.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
+import 'package:firebase_database_dart/src/core/snap/priority.dart';
+import 'package:firebase_database_dart/src/core/util/hash.dart';
+import 'package:firebase_database_dart/src/core/util/numbers.dart';
 
 /// The kind of a leaf, in sort order: deferred server values, booleans, numbers, strings.
 enum LeafType {
@@ -22,83 +26,265 @@ enum LeafType {
   string,
 }
 
+/// The read form of a stored number: `int` when integral within 2^53, except negative zero,
+/// which stays `-0.0` (the server keeps it).
+num _readNumber(num value) {
+  if (value is double && value == 0 && value.isNegative) {
+    return value;
+  }
+  return normalizeNumber(value);
+}
+
 /// A leaf: a boolean, a number, a string or an unresolved server value map, with a priority.
 final class LeafNode implements Node {
   /// Creates a leaf of [value] (`bool`, `num`, `String` or a server value `Map`) with
   /// [priorityNode] (empty by default).
-  factory LeafNode(Object value, [Node? priorityNode]) =>
-      throw UnimplementedError();
+  ///
+  /// Numbers are kept as given (the server keeps `1.0`, `-0.0` and large integers); [value] reads
+  /// them in the normalised form and [hash] goes through the double form, so `1` and `1.0` hash
+  /// the same.
+  factory LeafNode(Object value, [Node? priorityNode]) {
+    final LeafType type;
+    if (value is Map) {
+      type = LeafType.deferredValue;
+    } else if (value is bool) {
+      type = LeafType.boolean;
+    } else if (value is num) {
+      type = LeafType.number;
+    } else if (value is String) {
+      type = LeafType.string;
+    } else {
+      throw ArgumentError.value(value, 'value', 'Unsupported leaf value type');
+    }
+    final Node priority = priorityNode ?? ChildrenNode.empty;
+    validatePriorityNode(priority);
+    return LeafNode._(value, type, priority);
+  }
 
-  /// The value; numbers are `num` normalised by `normalizeNumber`.
-  Object get value => throw UnimplementedError();
+  LeafNode._(this._raw, this.leafType, this._priority);
+
+  /// The value as stored (numbers as given).
+  final Object _raw;
+
+  final Node _priority;
+
+  String? _lazyHash;
+  Object? _lazyValue;
+  int? _lazyHashCode;
+
+  /// The value, memoised: numbers in the read form (`int` when integral within 2^53, negative
+  /// zero kept), a server value map unmodifiable at every depth.
+  @override
+  Object get value => _lazyValue ??= switch (_raw) {
+    final num n => _readNumber(n),
+    final Map<Object?, Object?> m => _freeze(m)!,
+    _ => _raw,
+  };
+
+  static Object? _freeze(Object? json) => switch (json) {
+    final Map<Object?, Object?> m =>
+      Map<String, Object?>.unmodifiable(<String, Object?>{
+        for (final MapEntry<Object?, Object?> e in m.entries)
+          '${e.key}': _freeze(e.value),
+      }),
+    final List<Object?> l => List<Object?>.unmodifiable(l.map(_freeze)),
+    _ => json,
+  };
+
+  static Object? _copy(Object? json) => switch (json) {
+    final Map<Object?, Object?> m => <String, Object?>{
+      for (final MapEntry<Object?, Object?> e in m.entries)
+        '${e.key}': _copy(e.value),
+    },
+    final List<Object?> l => <Object?>[for (final Object? e in l) _copy(e)],
+    _ => json,
+  };
 
   /// The kind of [value].
-  LeafType get leafType => throw UnimplementedError();
+  final LeafType leafType;
 
   @override
-  bool get isLeafNode => throw UnimplementedError();
+  bool get isLeafNode => true;
 
   @override
-  Node get priority => throw UnimplementedError();
+  Node get priority => _priority;
 
   @override
-  Node updatePriority(Node newPriority) => throw UnimplementedError();
+  Node updatePriority(Node newPriority) => LeafNode(_raw, newPriority);
 
   @override
-  Node getImmediateChild(ChildKey key) => throw UnimplementedError();
+  Node getImmediateChild(ChildKey key) =>
+      key.isPriorityKey ? _priority : ChildrenNode.empty;
 
   @override
-  Node getChild(Path path) => throw UnimplementedError();
+  Node getChild(Path path) {
+    if (path.isEmpty) {
+      return this;
+    } else if (path.front!.isPriorityKey) {
+      return _priority;
+    } else {
+      return ChildrenNode.empty;
+    }
+  }
 
   @override
   ChildKey? getPredecessorChildKey(ChildKey key, Node child, Index index) =>
-      throw UnimplementedError();
+      null;
 
   @override
-  Node updateImmediateChild(ChildKey key, Node newChild) =>
-      throw UnimplementedError();
+  Node updateImmediateChild(ChildKey key, Node newChild) {
+    if (key.isPriorityKey) {
+      return updatePriority(newChild);
+    } else if (newChild.isEmpty) {
+      return this;
+    } else {
+      return ChildrenNode.empty
+          .updateImmediateChild(key, newChild)
+          .updatePriority(_priority);
+    }
+  }
 
   @override
-  Node updateChild(Path path, Node newChild) => throw UnimplementedError();
+  Node updateChild(Path path, Node newChild) {
+    final ChildKey? front = path.front;
+    if (front == null) {
+      return newChild;
+    } else if (newChild.isEmpty && !front.isPriorityKey) {
+      return this;
+    } else {
+      assert(
+        !front.isPriorityKey || path.length == 1,
+        '.priority must be the last token in a path',
+      );
+      return updateImmediateChild(
+        front,
+        ChildrenNode.empty.updateChild(path.popFront(), newChild),
+      );
+    }
+  }
 
   @override
-  bool hasChild(ChildKey key) => throw UnimplementedError();
+  bool hasChild(ChildKey key) => false;
 
   @override
-  bool get isEmpty => throw UnimplementedError();
+  bool get isEmpty => false;
 
   @override
-  int get numChildren => throw UnimplementedError();
+  int get numChildren => 0;
 
   @override
-  bool forEachChild(Index index, ChildVisitor action) =>
-      throw UnimplementedError();
+  bool forEachChild(Index index, ChildVisitor action) => false;
 
   @override
-  Object? toJson({bool exportFormat = false}) => throw UnimplementedError();
+  Object? toJson({bool exportFormat = false}) {
+    if (exportFormat && !_priority.isEmpty) {
+      return <String, Object?>{
+        '.value': _copyRaw(),
+        '.priority': _priority.toJson(exportFormat: true),
+      };
+    }
+    if (exportFormat) {
+      return _copyRaw();
+    }
+    return switch (_raw) {
+      final num n => _readNumber(n),
+      _ => _copy(_raw),
+    };
+  }
+
+  Object _copyRaw() => _copy(_raw)!;
 
   @override
-  String hash() => throw UnimplementedError();
+  String hash() => _lazyHash ??= sha1Base64(hashText());
 
   /// The text the hash is computed from (`number:<ieee754>`, `string:<s>`, with the priority
   /// prefix); the compound hash reuses it.
-  String hashText() => throw UnimplementedError();
+  String hashText() {
+    final StringBuffer toHash = StringBuffer();
+    if (!_priority.isEmpty) {
+      toHash
+        ..write('priority:')
+        ..write(priorityHashText(_priority.value!))
+        ..write(':');
+    }
+    final Object raw = _raw;
+    switch (leafType) {
+      case LeafType.number:
+        toHash
+          ..write('number:')
+          ..write(doubleToIeee754String((raw as num).toDouble()));
+      case LeafType.string:
+        toHash
+          ..write('string:')
+          ..write(raw);
+      case LeafType.boolean:
+        toHash
+          ..write('boolean:')
+          ..write(raw);
+      case LeafType.deferredValue:
+        // JS `typeof {}` and `'' + {}`.
+        toHash.write('object:[object Object]');
+    }
+    return toHash.toString();
+  }
 
   @override
-  int compareTo(Node other) => throw UnimplementedError();
+  int compareTo(Node other) {
+    if (other.isEmpty) {
+      return 1;
+    } else if (other is ChildrenNode) {
+      return -1;
+    }
+    final LeafNode otherLeaf = other as LeafNode;
+    if (leafType != otherLeaf.leafType) {
+      return leafType.index - otherLeaf.leafType.index;
+    }
+    switch (leafType) {
+      case LeafType.deferredValue:
+        // Deferred values are all equal.
+        return 0;
+      case LeafType.boolean:
+        final bool a = _raw as bool;
+        final bool b = otherLeaf._raw as bool;
+        return a == b ? 0 : (a ? 1 : -1);
+      case LeafType.number:
+        // JS `<` and `===`: -0.0 equals 0 (num.compareTo would order them).
+        final num a = _raw as num;
+        final num b = otherLeaf._raw as num;
+        return a < b ? -1 : (a == b ? 0 : 1);
+      case LeafType.string:
+        final int cmp = (_raw as String).compareTo(otherLeaf._raw as String);
+        return cmp < 0 ? -1 : (cmp == 0 ? 0 : 1);
+    }
+  }
 
   @override
-  Node withIndex(Index index) => throw UnimplementedError();
+  Node withIndex(Index index) => this;
 
   @override
-  bool isIndexed(Index index) => throw UnimplementedError();
+  bool isIndexed(Index index) => true;
+
+  /// JS `equals`: the same value (`===`, so server value maps only by identity) and an equal
+  /// priority.
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is LeafNode &&
+        leafType == other.leafType &&
+        _raw == other._raw &&
+        _priority == other._priority;
+  }
 
   @override
-  bool operator ==(Object other) => throw UnimplementedError();
+  int get hashCode => _lazyHashCode ??= Object.hash(
+    _raw is num ? _raw.toDouble() : _raw,
+    _priority.isEmpty ? 0 : _priority.hashCode,
+  );
 
   @override
-  int get hashCode => throw UnimplementedError();
-
-  @override
-  String toString() => throw UnimplementedError();
+  String toString() => _priority.isEmpty
+      ? 'LeafNode($_raw)'
+      : 'LeafNode($_raw, priority: $_priority)';
 }

@@ -7,7 +7,7 @@ import 'package:firebase_database_dart/src/core/snap/named_node.dart';
 
 /// Compares two named nodes by name only.
 int nameOnlyComparator(NamedNode left, NamedNode right) =>
-    throw UnimplementedError();
+    left.name.compareTo(right.name);
 
 /// Compares two child keys.
-int nameComparator(ChildKey left, ChildKey right) => throw UnimplementedError();
+int nameComparator(ChildKey left, ChildKey right) => left.compareTo(right);

@@ -4,6 +4,7 @@ library;
 
 import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:firebase_database_dart/src/core/snap/child_key.dart';
+import 'package:firebase_database_dart/src/core/snap/children_node.dart';
 import 'package:firebase_database_dart/src/core/snap/indexes/index.dart';
 import 'package:firebase_database_dart/src/core/snap/named_node.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
@@ -17,27 +18,37 @@ final class PathIndex extends Index {
   final Path indexPath;
 
   @override
-  int compare(NamedNode a, NamedNode b) => throw UnimplementedError();
+  int compare(NamedNode a, NamedNode b) {
+    final int indexCmp = a.node
+        .getChild(indexPath)
+        .compareTo(b.node.getChild(indexPath));
+    return indexCmp == 0 ? a.name.compareTo(b.name) : indexCmp;
+  }
 
   @override
-  bool isDefinedOn(Node node) => throw UnimplementedError();
+  bool isDefinedOn(Node node) => !node.getChild(indexPath).isEmpty;
 
   @override
   NamedNode makePost(Node indexValue, ChildKey name) =>
-      throw UnimplementedError();
+      NamedNode(name, ChildrenNode.empty.updateChild(indexPath, indexValue));
 
   @override
-  NamedNode get maxPost => throw UnimplementedError();
+  NamedNode get maxPost => NamedNode(
+    ChildKey.max,
+    ChildrenNode.empty.updateChild(indexPath, MaxNode.instance),
+  );
 
   @override
-  String get queryDefinition => throw UnimplementedError();
+  String get queryDefinition => indexPath.toStringList().join('/');
 
   @override
-  bool operator ==(Object other) => throw UnimplementedError();
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PathIndex && indexPath == other.indexPath;
 
   @override
-  int get hashCode => throw UnimplementedError();
+  int get hashCode => indexPath.hashCode;
 
   @override
-  String toString() => throw UnimplementedError();
+  String toString() => queryDefinition;
 }
