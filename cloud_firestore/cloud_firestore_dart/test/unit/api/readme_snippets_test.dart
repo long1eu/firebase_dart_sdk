@@ -44,6 +44,15 @@ const Map<String, String> _fixedReadmes = <String, String>{
 /// `queriesAndDataGuide`.
 const String _guides = '../../docs/guides';
 
+/// Guides whose snippets another package compiles, because they need packages
+/// this one does not depend on: the Realtime Database guides are checked by the
+/// `readme_snippets_test.dart` of `firebase_database_dart_sqlite` and of
+/// `firebase_database_dart_platform`.
+const Set<String> _guidesCheckedElsewhere = <String>{
+  'database.md',
+  'database_flutter.md',
+};
+
 /// [_fixedReadmes] and every guide, in a fixed order.
 final Map<String, String> _readmes = <String, String>{
   ..._fixedReadmes,
@@ -53,6 +62,8 @@ final Map<String, String> _readmes = <String, String>{
             .whereType<File>()
             .map((File file) => file.path.replaceAll(r'\', '/'))
             .where((String path) => path.endsWith('.md'))
+            .where((String path) =>
+                !_guidesCheckedElsewhere.contains(path.split('/').last))
             .toList()
           ..sort()))
       path: '${_camelCase(path.split('/').last.replaceAll('.md', ''))}Guide',
