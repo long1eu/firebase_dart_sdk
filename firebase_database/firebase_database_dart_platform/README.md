@@ -14,13 +14,13 @@ affiliated with or endorsed by Google or Firebase.
 
 > **Status: 0.0.1, not published, work in progress.** What is and is not verified:
 >
-> - The client underneath, `firebase_database_dart`, is **not finished**: its bodies are being written. Until it
->   lands, nothing in this package can run.
-> - The unit tests of this package are written against the client's contract and its fake server
->   (`package:firebase_database_dart/testing.dart`); they have **not run yet**.
+> - The client underneath, `firebase_database_dart`, is complete, and its tests pass against the Database emulator.
+> - The unit tests of this package have run, against the client's fake server
+>   (`package:firebase_database_dart/testing.dart`).
 > - FlutterFire's own `firebase_database` integration suite (78 tests) is the acceptance gate
 >   (`tool/test_flutterfire_database_gate.sh`, against the Database emulator); it has **not run yet**.
-> - The Windows registration is verified with stand-in plugins; a real Windows build is run before release.
+> - The Windows registration is verified with stand-in plugins; a real Windows build has **not run yet** and is run
+>   before release.
 > - Nothing has run against a production project.
 
 ## How to enable it

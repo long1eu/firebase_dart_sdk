@@ -2,7 +2,7 @@
 
 - Work in progress, not published: an implementation of `DatabasePlatform` (the platform interface of the
   official `firebase_database` plugin, 13.1.0) on top of `firebase_database_dart`, so that an app keeps the
-  official API. The client underneath is not finished, and nothing has run yet.
+  official API. FlutterFire's integration suite and a real Windows build have not run yet.
 - Registers itself on Linux and, as a direct dependency, on Windows (verified with stand-in plugins; a real
   Windows build is run before release); `FirebaseDatabaseDart.use()` selects it on any other platform.
 - `FirebaseDatabaseDart.use` takes `tokenProviderFor`, `appCheckProviderFor`, `persistenceFor` (a factory from

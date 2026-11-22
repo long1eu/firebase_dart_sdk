@@ -2,8 +2,8 @@
 // against a Realtime Database emulator: write, read, listen, transaction,
 // onDisconnect registration.
 //
-// Needs FIREBASE_DATABASE_EMULATOR_HOST (for example 127.0.0.1:9000, started
-// with tool/start_database_emulator.sh 9000 from the repository root);
+// Needs FIREBASE_DATABASE_EMULATOR_HOST (for example 127.0.0.1:9100, started
+// with tool/start_database_emulator.sh 9100 from the repository root);
 // skipped without it. The namespace is demo-shim-smoke, which no rules file
 // names, so the emulator's open default rules apply.
 

@@ -41,6 +41,10 @@ void main() {
   registerForTests();
 
   final DebugPrintCallback originalDebugPrint = debugPrint;
+  // The configuration of registerForTests (its token providers), restored
+  // after each test that changes it.
+  late DartDatabaseConfig registered;
+  setUpAll(() => registered = DartFirebaseDatabase.config);
   setUp(() {
     printed.clear();
     factoryCalls.clear();
@@ -50,11 +54,13 @@ void main() {
   });
   tearDown(() {
     debugPrint = originalDebugPrint;
-    DartFirebaseDatabase.config = const DartDatabaseConfig();
+    DartFirebaseDatabase.config = registered;
   });
 
   void usePersistenceFactory() {
-    DartFirebaseDatabase.config = const DartDatabaseConfig(
+    DartFirebaseDatabase.config = DartDatabaseConfig(
+      tokenProviderFor: registered.tokenProviderFor,
+      appCheckProviderFor: registered.appCheckProviderFor,
       persistenceFor: persistenceFor,
     );
   }
@@ -204,10 +210,22 @@ void main() {
 
     test(
       'the connection authenticates with the token of tokenProviderFor',
-      () async {},
-      skip:
-          'Needs FakeDatabaseServer to expose the auth tokens it received '
-          '(gap G2, requested from the client author).',
+      () async {
+        final FirebaseApp signedIn = await newApp();
+        final FirebaseApp anonymous = await newApp();
+        tokens[signedIn.name] = 'token-2';
+
+        await FirebaseDatabase.instanceFor(app: signedIn).goOnline();
+        await settle();
+        final List<String?> signedInTokens = List<String?>.of(
+          server.receivedAuthTokens,
+        );
+        await FirebaseDatabase.instanceFor(app: anonymous).goOnline();
+        await settle();
+
+        expect(signedInTokens, <String?>['token-2']);
+        expect(server.receivedAuthTokens, <String?>['token-2', null]);
+      },
     );
   });
 

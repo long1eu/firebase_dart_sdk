@@ -26,10 +26,12 @@
 #      - integration_test/gate_test.dart: sets the target platform to Linux (flutter test
 #        otherwise reports Android, and useDatabaseEmulator maps localhost to 10.0.2.2 there),
 #        calls FirebaseDatabaseDart.use(useDartCore: true), then FlutterFire's e2e main;
+#      - integration_test/e2e_test.dart: `const emulatorPort` set to GATE_DATABASE_PORT (the suite
+#        hard-codes 9000, the CLI's default port, which tool/start_database_emulator.sh refuses);
 #      - a linux/ folder (`flutter create --platforms=linux`), which the example does not have;
 #   4. runs `flutter pub get` in the copy;
-#   5. starts the Database emulator on port 9000 (the port e2e_test.dart hard-codes) with
-#      tool/start_database_emulator.sh, and loads FlutterFire's rules into the namespace of the
+#   5. starts the Database emulator on GATE_DATABASE_PORT with tool/start_database_emulator.sh
+#      (from the branch rtdb/emulator), and loads FlutterFire's rules into the namespace of the
 #      databaseURL through the emulator's REST API;
 #   6. runs `flutter test integration_test/gate_test.dart`, prints the passed, failed and skipped
 #      counts, and fails on any failure or on a skip count other than EXPECTED_SKIPS (2: the web
@@ -44,12 +46,12 @@
 #                       git -C flutterfire sparse-checkout set packages/firebase_database .github
 #                       git -C flutterfire checkout 6a80b1b5eea1ea86ba8c7e7bf2a8525cabb77126
 #   FLUTTER           the flutter command (default: flutter on the PATH; the repository pins 3.44.9)
+#   GATE_DATABASE_PORT  the port of the emulator (default 9100)
 #   EXPECTED_SKIPS    the number of skipped tests that passes the gate (default 2)
 set -euo pipefail
 
 PINNED_COMMIT=6a80b1b5eea1ea86ba8c7e7bf2a8525cabb77126
 FIREBASE_DATABASE_VERSION=13.1.0
-EMULATOR_PORT=9000
 DATABASE_URL=https://flutterfire-e2e-tests-default-rtdb.europe-west1.firebasedatabase.app
 NAMESPACE=flutterfire-e2e-tests-default-rtdb
 EXAMPLE_PATH=packages/firebase_database/firebase_database/example
@@ -59,6 +61,13 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SHIM="$ROOT/firebase_database/firebase_database_dart_platform"
 FLUTTER="${FLUTTER:-flutter}"
 EXPECTED_SKIPS="${EXPECTED_SKIPS:-2}"
+EMULATOR_PORT="${GATE_DATABASE_PORT:-9100}"
+case "$EMULATOR_PORT" in
+'' | *[!0-9]*)
+  echo "GATE_DATABASE_PORT must be a number: $EMULATOR_PORT" >&2
+  exit 2
+  ;;
+esac
 FF="${FLUTTERFIRE_DIR:-}"
 
 DRY_RUN=0
@@ -143,10 +152,11 @@ if [ ! -f "$SHIM/pubspec.yaml" ]; then
   fail_check "No package at $SHIM."
 fi
 if [ ! -x "$ROOT/tool/start_database_emulator.sh" ]; then
-  fail_check "tool/start_database_emulator.sh is missing (it comes with the emulator scripts)."
+  fail_check "$ROOT/tool/start_database_emulator.sh is missing: the gate expects the emulator \
+scripts of the branch rtdb/emulator (tool/start_database_emulator.sh, stop_database_emulator.sh)."
 fi
 if [ "$DRY_RUN" = 0 ] && curl -s -o /dev/null "http://127.0.0.1:$EMULATOR_PORT"; then
-  fail_check "Port $EMULATOR_PORT is in use; stop what listens there (the e2e suite needs it)."
+  fail_check "Port $EMULATOR_PORT is in use; stop what listens there or set GATE_DATABASE_PORT."
 fi
 
 TMP_BASE="${TMPDIR:-/tmp}"
@@ -222,6 +232,10 @@ void main() {
   e2e.main();
 }
 EOF
+
+E2E="$APP/integration_test/e2e_test.dart"
+run perl -pi -e "s{^const emulatorPort = 9000;\$}{const emulatorPort = $EMULATOR_PORT;}" "$E2E"
+expect_in "$E2E" "const emulatorPort = $EMULATOR_PORT;"
 
 run "$FLUTTER" create --no-pub --platforms=linux --project-name firebase_database_example "$APP"
 

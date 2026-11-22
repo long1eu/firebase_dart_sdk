@@ -61,11 +61,32 @@ void main() {
   test('set writes the value, with stringified keys, on disconnect', () async {
     final (DatabaseReference ref, List<DataSnapshot> snapshots) =
         await listenedAt('on');
-    await acked(ref.onDisconnect().set(<Object?, Object?>{1.5: 'x'}), 'o /p');
+    await acked(
+      ref.onDisconnect().set(<Object?, Object?>{
+        7: <Object?, Object?>{true: 'x'},
+      }),
+      'o /p',
+    );
     expect(snapshots.last.value, 'on');
 
     await disconnect();
-    expect(snapshots.last.value, <Object?, Object?>{'1.5': 'x'});
+    expect(snapshots.last.value, <Object?, Object?>{
+      '7': <Object?, Object?>{'true': 'x'},
+    });
+  });
+
+  // 1.5 stringifies to '1.5', and a key may not contain a dot: the client's
+  // ArgumentError, passed on as itself. FlutterFire's Android plugin fails
+  // the Future with the SDK's DatabaseException (FirebaseDatabasePlugin.kt).
+  test('set with a key that stringifies to an invalid one fails with the '
+      'client ArgumentError and sends nothing', () async {
+    final (DatabaseReference ref, _) = await listenedAt('on');
+
+    await expectLater(
+      ref.onDisconnect().set(<Object?, Object?>{1.5: 'x'}),
+      throwsArgumentError,
+    );
+    expect(server.requests, isNot(contains('o /p')));
   });
 
   test(

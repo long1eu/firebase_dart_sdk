@@ -116,7 +116,7 @@ void main() {
     final (DatabaseReference ref, _) = await listenedAt(null);
     final Future<TransactionResult> result = ref.runTransaction(
       (Object? value) => Transaction.success(<Object?, Object?>{
-        1.5: <Object?, Object?>{true: 'x'},
+        7: <Object?, Object?>{true: 'x'},
       }),
     );
     await settle();
@@ -124,8 +124,27 @@ void main() {
 
     final TransactionResult done = await result;
     expect(done.snapshot.value, <Object?, Object?>{
-      '1.5': <Object?, Object?>{'true': 'x'},
+      '7': <Object?, Object?>{'true': 'x'},
     });
+  });
+
+  // 1.5 stringifies to '1.5', and a key may not contain a dot. The client
+  // refuses it with an ArgumentError, which the shim passes on as itself (a
+  // programmer error). FlutterFire's Android plugin catches the SDK's
+  // exception inside the handler and aborts the transaction
+  // (TransactionHandler.kt:75-77).
+  test('a success value whose stringified key is invalid fails with the '
+      'client ArgumentError and writes nothing', () async {
+    final (DatabaseReference ref, List<Object?> values) = await listenedAt(0);
+
+    await expectLater(
+      ref.runTransaction(
+        (Object? value) => Transaction.success(<Object?, Object?>{1.5: 'x'}),
+      ),
+      throwsArgumentError,
+    );
+    expect(wroteC(), isFalse);
+    expect(values, <Object?>[0]);
   });
 
   test('applyLocally false raises no local event before the ack', () async {

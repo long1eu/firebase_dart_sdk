@@ -29,10 +29,17 @@ void main() {
       'c': 3,
     });
     final DataSnapshot snapshot = await get;
+    // The default index is the priority: null first, then numbers, then
+    // strings.
+    expect(snapshot.children.map((DataSnapshot c) => c.key), <String>[
+      'c',
+      'a',
+      'b',
+    ]);
     expect(snapshot.children.map((DataSnapshot c) => c.priority), <Object?>[
+      null,
       20,
       'p',
-      null,
     ]);
     expect(snapshot.child('a').priority, 20);
   });

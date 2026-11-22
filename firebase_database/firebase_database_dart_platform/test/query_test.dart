@@ -83,8 +83,8 @@ void main() {
                 .orderByChild('c/d'),
             <QueryModifier>[StartCursorModifier.startAfter('s', null)]: client
                 .startAfter('s'),
-            <QueryModifier>[EndCursorModifier.endBefore(true, null)]: client
-                .endBefore(true),
+            <QueryModifier>[EndCursorModifier.endBefore('e', null)]: client
+                .endBefore('e'),
             <QueryModifier>[LimitModifier.limitToFirst(3)]: client.limitToFirst(
               3,
             ),
@@ -306,9 +306,10 @@ void main() {
         app: await newApp(),
       );
       final DatabaseReference ref = db.ref('a');
-      final Future<void> write = ref.set(<Object?, Object?>{1: 'one'});
+      final Future<void> write = ref.set(<Object?, Object?>{true: 'yes'});
       final DatabaseEvent local = await ref.once();
-      expect(local.snapshot.value, <Object?, Object?>{'1': 'one'});
+      expect(local.snapshot.value, <Object?, Object?>{'true': 'yes'});
+      await settle();
       expect(server.requests, contains('p /a'));
       server.ackLastWrite();
       await write;
@@ -323,6 +324,7 @@ void main() {
       final DataSnapshot local = (await ref.once()).snapshot;
       expect(local.value, 'v');
       expect(local.priority, 7);
+      await settle();
       server.ackLastWrite();
       await write;
     });
@@ -350,6 +352,7 @@ void main() {
       final Future<void> priority = ref.setPriority('p');
       final DataSnapshot local = (await ref.once()).snapshot;
       expect(local.priority, 'p');
+      await settle();
       server.ackLastWrite();
       server.ackLastWrite();
       await write;
