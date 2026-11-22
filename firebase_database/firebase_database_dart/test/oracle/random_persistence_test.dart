@@ -492,11 +492,16 @@ final class _RandomOperationGenerator {
   }
 
   /// Java `Random.nextInt()`: any 32-bit int.
-  int _nextInt32() => _random.nextInt(1 << 32) - (1 << 31);
+  int _nextInt32() => _random.nextInt(0x100000000) - 0x80000000;
 
   /// Java `Random.nextLong()`: any 64-bit int.
-  int _nextLong() =>
-      (_random.nextInt(1 << 32) << 32) | _random.nextInt(1 << 32);
+  ///
+  /// In a browser an int is a double, so there the range is the integers a double holds exactly
+  /// (below 2^53 in size), which is also the range the client accepts.
+  int _nextLong() => identical(0, 0.0)
+      ? (_random.nextInt(0x400000) - 0x200000) * 0x100000000 +
+            _random.nextInt(0x100000000)
+      : (_random.nextInt(0x100000000) << 32) | _random.nextInt(0x100000000);
 
   Node _getRandomLeafNodeWithoutLongs() =>
       _getRandomLeafNodeFromRandom(_random.nextDouble() * 0.8);

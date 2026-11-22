@@ -603,7 +603,8 @@ void runPersistenceOracle(OpenEngine openEngine) {
       final PersistenceStorageEngine storage = newEngine();
       final TestCachePolicy cachePolicy = TestCachePolicy(
         1.0,
-        0x7fffffffffffffff,
+        // Java Long.MAX_VALUE; 2^53 - 1 is the largest int every platform holds.
+        9007199254740991,
       );
       final PersistenceManager manager = DefaultPersistenceManager(
         storage,
@@ -725,7 +726,8 @@ void runPersistenceOracle(OpenEngine openEngine) {
       final PersistenceStorageEngine storage = newEngine();
       final TestCachePolicy cachePolicy = TestCachePolicy(
         0.5,
-        0x7fffffffffffffff,
+        // Java Long.MAX_VALUE; 2^53 - 1 is the largest int every platform holds.
+        9007199254740991,
       );
       final TestClock clock = TestClock();
       final PersistenceManager manager = DefaultPersistenceManager(
