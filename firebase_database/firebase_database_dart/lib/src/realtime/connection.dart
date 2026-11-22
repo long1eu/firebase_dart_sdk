@@ -11,6 +11,7 @@ import 'package:firebase_database_dart/src/realtime/framing.dart';
 import 'package:firebase_database_dart/src/realtime/liveness.dart';
 import 'package:firebase_database_dart/src/realtime/realtime_error.dart';
 import 'package:firebase_database_dart/src/realtime/realtime_target.dart';
+import 'package:firebase_database_dart/src/realtime/server_message.dart';
 import 'package:firebase_database_dart/src/realtime/transport/ws_channel.dart';
 
 /// Why a [RealtimeConnection] ended (test plan section 5, interface C to P).
@@ -32,7 +33,8 @@ enum DisconnectReason {
 /// What a [RealtimeConnection] reports to its owner. Every callback may close or replace the
 /// connection (re-entrancy, test plan B-3.5b).
 abstract interface class RealtimeDelegate {
-  /// The hello arrived (3.2): [serverTimeMs] is its `ts`, [sessionId] its `s`. Called once.
+  /// The hello arrived (3.2): [serverTimeMs] is its `ts`, a whole number from 0 to 2^48 - 1,
+  /// [sessionId] its `s`. Called once.
   void onReady(int serverTimeMs, String sessionId);
 
   /// A data message (`{"t":"d","d":message}`) arrived; [message] is its `d` object, not yet
@@ -48,6 +50,13 @@ abstract interface class RealtimeDelegate {
 }
 
 enum _State { idle, connecting, connected, closed }
+
+/// The largest server time a hello may carry: 2^48 - 1 ms (the year 10889). The time sets the
+/// server clock offset, and a push id holds the time in 8 base-64 digits (48 bits): a larger time
+/// makes every push id fail (`PushIdGenerator.next` throws), and from 8.64e15 on
+/// `FirebaseDatabase.estimatedServerTime` throws too. A negative time (before 1970) is refused as
+/// well: its push ids would not sort by time.
+const int _maxServerTimeMs = 0xFFFFFFFFFFFF;
 
 /// The actions whose body carries a credential, or that belong to one: logged as
 /// `<action> (contents hidden)`, never with their body (threat model T7; Android
@@ -408,11 +417,14 @@ final class RealtimeConnection {
       _protocolError('hello is not an object');
       return;
     }
-    final Object? ts = payload['ts'];
+    final int? ts = wholeJsonNumber(payload['ts']);
     final Object? sessionId = payload['s'];
     final Object? host = payload['h'];
-    // On the web an infinity (`1e400`) also passes `is int`.
-    if (ts is! int || !ts.isFinite || sessionId is! String || host is! String) {
+    if (ts == null ||
+        ts < 0 ||
+        ts > _maxServerTimeMs ||
+        sessionId is! String ||
+        host is! String) {
       _protocolError('hello with a missing or invalid ts, s or h');
       return;
     }

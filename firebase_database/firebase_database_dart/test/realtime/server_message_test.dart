@@ -5,6 +5,8 @@ import 'dart:convert';
 
 import 'package:firebase_database_dart/src/core/connection/wire_range_merge.dart';
 import 'package:firebase_database_dart/src/core/database_error.dart';
+import 'package:firebase_database_dart/src/realtime/connection_timings.dart';
+import 'package:firebase_database_dart/src/realtime/framing.dart';
 import 'package:firebase_database_dart/src/realtime/server_message.dart';
 import 'package:test/test.dart';
 
@@ -152,6 +154,78 @@ void main() {
           reason: '$r',
         );
       }
+    });
+  });
+
+  group('whole numbers, the same on every compiler (web audit U2)', () {
+    // JSON texts, decoded here by this compiler's jsonDecode: `1.0` is a double on the VM and
+    // wasm and an int on dart2js; 1e20 is an int on dart2js only; 9007199254740993 is exact on
+    // the VM only (and, if it keeps 64 bits, wasm).
+    const Map<String, int> accepted = <String, int>{
+      '0': 0,
+      '4': 4,
+      '4.0': 4,
+      '4e0': 4,
+      '9007199254740991': 9007199254740991,
+    };
+    const List<String> refused = <String>[
+      '4.5',
+      '1e20',
+      '1e400',
+      '9007199254740992',
+      '9007199254740993',
+      '9223372036854775807',
+      '"4"',
+      'null',
+    ];
+
+    test('wholeJsonNumber takes a whole number however it is written', () {
+      for (final MapEntry<String, int> entry in accepted.entries) {
+        expect(
+          wholeJsonNumber(_decodeOne(entry.key)),
+          entry.value,
+          reason: _seen(entry.key),
+        );
+      }
+      expect(wholeJsonNumber(_decodeOne('-1')), -1, reason: _seen('-1'));
+    });
+
+    test(
+      'wholeJsonNumber refuses fractions, non-numbers and values beyond 2^53',
+      () {
+        for (final String text in refused) {
+          expect(
+            wholeJsonNumber(_decodeOne(text)),
+            isNull,
+            reason: _seen(text),
+          );
+        }
+      },
+    );
+
+    test('a request number written as 4.0 is request 4', () {
+      for (final MapEntry<String, int> entry in accepted.entries) {
+        expect(
+          decodeServerMessage(
+            _decodeMap('{"r":${entry.key},"b":{"s":"ok","d":null}}'),
+          ),
+          isA<Response>()
+              .having((Response x) => x.r, 'r', entry.value)
+              .having((Response x) => x.status, 'status', 'ok'),
+          reason: _seen(entry.key),
+        );
+      }
+    });
+
+    test('a tag written as 3.0 is tag 3, and 0.0 is untagged', () {
+      DataPush push(String tag) =>
+          decodeServerMessage(
+                _decodeMap('{"a":"d","b":{"p":"a","d":1,"t":$tag}}'),
+              )
+              as DataPush;
+      expect(push('3.0').tag, 3, reason: _seen('3.0'));
+      expect(push('3e0').tag, 3, reason: _seen('3e0'));
+      expect(push('0.0').tag, isNull, reason: _seen('0.0'));
     });
   });
 
@@ -575,6 +649,263 @@ void main() {
     });
   });
 
+  group('answers flagged for the key check (one walk)', () {
+    // Every kind of key the write rules refuse, as a key of the answer's data.
+    final Map<String, Map<String, Object?>> invalidKeys =
+        <String, Map<String, Object?>>{
+          'empty': <String, Object?>{'': 1},
+          'dot': <String, Object?>{'a.b': 1},
+          'hash': <String, Object?>{'a#b': 1},
+          'dollar': <String, Object?>{r'a$b': 1},
+          'open bracket': <String, Object?>{'a[b': 1},
+          'close bracket': <String, Object?>{'a]b': 1},
+          'slash': <String, Object?>{'a/b': 1},
+          'control character': <String, Object?>{'a\u0001b': 1},
+          'delete character': <String, Object?>{'a\u007fb': 1},
+          'server value': <String, Object?>{'.sv': 'timestamp'},
+          '.value beside another key': <String, Object?>{'.value': 1, 'x': 2},
+          'longer than 768 UTF-8 bytes': <String, Object?>{'é' * 385: 1},
+        };
+
+    ServerMessage answer(Object? data, {bool flagged = true}) =>
+        decodeServerMessage(<String, Object?>{
+          'r': 7,
+          'b': <String, Object?>{'s': 'ok', 'd': data},
+        }, checkAnswerKeys: (int r) => flagged);
+
+    final Matcher refused = isA<Response>()
+        .having((Response x) => x.r, 'r', 7)
+        .having((Response x) => x.status, 'status', _failure)
+        .having((Response x) => x.data, 'data', isNull)
+        .having((Response x) => x.dataRefused, 'dataRefused', isTrue);
+
+    Matcher acceptedWith(Object? data) => isA<Response>()
+        .having((Response x) => x.status, 'status', 'ok')
+        .having((Response x) => x.data, 'data', same(data))
+        .having((Response x) => x.dataRefused, 'dataRefused', isFalse);
+
+    Map<String, Object?> nested(int depth, Map<String, Object?> leaf) {
+      Map<String, Object?> node = leaf;
+      for (int i = 0; i < depth; i++) {
+        node = <String, Object?>{'k$i': node};
+      }
+      return node;
+    }
+
+    for (final MapEntry<String, Map<String, Object?>> entry
+        in invalidKeys.entries) {
+      test(
+        'a key that is ${entry.key} is refused at the top, at depth 30 and in a list',
+        () {
+          expect(isValidServerData(entry.value), isFalse);
+          expect(answer(entry.value), refused);
+          expect(answer(nested(30, entry.value)), refused);
+          expect(
+            answer(<Object?>[
+              1,
+              <String, Object?>{'a': entry.value},
+            ]),
+            refused,
+          );
+        },
+      );
+
+      test(
+        'a key that is ${entry.key} is kept when the answer is not flagged',
+        () {
+          final Map<String, Object?> data = nested(3, entry.value);
+          expect(answer(data, flagged: false), acceptedWith(data));
+          expect(
+            decodeServerMessage(<String, Object?>{
+              'r': 7,
+              'b': <String, Object?>{'s': 'ok', 'd': data},
+            }),
+            acceptedWith(data),
+          );
+        },
+      );
+    }
+
+    test('.priority anywhere and .value beside .priority are accepted', () {
+      final Map<String, Object?> data = <String, Object?>{
+        '.priority': 1,
+        'a': <String, Object?>{'.value': 2, '.priority': 'p'},
+        'é' * 384: true,
+      };
+      expect(isValidServerData(data), isTrue);
+      expect(answer(data), acceptedWith(data));
+    });
+
+    test(
+      '100,000 children: accepted, and refused for one bad key at the end',
+      () {
+        final Map<String, Object?> data = <String, Object?>{
+          for (int i = 0; i < 100000; i++)
+            'child$i': <String, Object?>{'n': i, 's': 'x'},
+        };
+        expect(answer(data), acceptedWith(data));
+        data['bad.key'] = 1;
+        expect(answer(data), refused);
+        expect(answer(data, flagged: false), acceptedWith(data));
+      },
+    );
+
+    test(
+      'the flag is asked once per response, ok or not, with its request number',
+      () {
+        final List<int> asked = <int>[];
+        bool flag(int r) {
+          asked.add(r);
+          return true;
+        }
+
+        decodeServerMessage(<String, Object?>{
+          'r': 1,
+          'b': <String, Object?>{'s': 'ok', 'd': 1},
+        }, checkAnswerKeys: flag);
+        decodeServerMessage(<String, Object?>{
+          'r': 2,
+          'b': <String, Object?>{'s': 'permission_denied', 'd': 'no'},
+        }, checkAnswerKeys: flag);
+        decodeServerMessage(<String, Object?>{
+          'r': 3,
+          'b': 'not a map',
+        }, checkAnswerKeys: flag);
+        decodeServerMessage(<String, Object?>{
+          'r': -1,
+          'b': <String, Object?>{'s': 'ok'},
+        }, checkAnswerKeys: flag);
+        decodeServerMessage(<String, Object?>{
+          'a': 'd',
+          'b': <String, Object?>{'p': 'a', 'd': 1},
+        }, checkAnswerKeys: flag);
+        expect(asked, <int>[1, 2, 3]);
+      },
+    );
+
+    test('values are refused flagged or not, as before', () {
+      for (final bool flagged in <bool>[true, false]) {
+        expect(
+          answer(<Object?>[1, double.infinity], flagged: flagged),
+          refused,
+        );
+        expect(
+          answer(<String, Object?>{
+            'a': 'x' * (10 * 1024 * 1024 + 1),
+          }, flagged: flagged),
+          refused,
+        );
+        expect(
+          answer(<String, Object?>{'a': Object()}, flagged: flagged),
+          refused,
+        );
+      }
+    });
+
+    test(
+      'a refused non-ok answer or a bad body is not marked as refused data',
+      () {
+        expect(
+          decodeServerMessage(<String, Object?>{
+            'r': 3,
+            'b': 'not a map',
+          }, checkAnswerKeys: (_) => true),
+          isA<Response>().having(
+            (Response x) => x.dataRefused,
+            'dataRefused',
+            isFalse,
+          ),
+        );
+        expect(
+          decodeServerMessage(<String, Object?>{
+            'r': 3,
+            'b': <String, Object?>{
+              's': 'permission_denied',
+              'd': <String, Object?>{'a.b': 1},
+            },
+          }, checkAnswerKeys: (_) => true),
+          isA<Response>()
+              .having((Response x) => x.status, 'status', 'permission_denied')
+              .having((Response x) => x.dataRefused, 'dataRefused', isFalse),
+        );
+      },
+    );
+  });
+
+  group('depth (T10): bounded by the frame scan before the decoder', () {
+    const ConnectionTimings timings = ConnectionTimings();
+    // The envelope `{"t":"d","d":{...,"b":{...,"d":DATA}}}` holds DATA at depth 3.
+    const int envelope = 3;
+    final int deepest = timings.maxJsonDepth - envelope;
+
+    String arrays(int depth) => '${'[' * depth}1${']' * depth}';
+    String objects(int depth) => '${'{"a":' * depth}1${'}' * depth}';
+    String push(String data) =>
+        '{"t":"d","d":{"a":"d","b":{"p":"a","d":$data}}}';
+    String answerText(String data) =>
+        '{"t":"d","d":{"r":1,"b":{"s":"ok","d":$data}}}';
+
+    /// The way every server message reaches the decoder: the connection's assembler, then
+    /// decodeServerMessage of the `d` of the message (connection.dart, persistent_connection.dart).
+    ServerMessage receive(String text) {
+      final FrameAssembler assembler = FrameAssembler(
+        maxMessageBytes: timings.maxMessageBytes,
+        maxDepth: timings.maxJsonDepth,
+      );
+      final Map<String, Object?> message = assembler.add(text)!;
+      return decodeServerMessage(message['d'], checkAnswerKeys: (_) => true);
+    }
+
+    final Matcher tooDeep = throwsA(isA<FramingException>());
+
+    for (final (String kind, String Function(int) build)
+        in <(String, String Function(int))>[
+          ('arrays', arrays),
+          ('objects', objects),
+        ]) {
+      test(
+        'a push of $kind at the deepest allowed level decodes; one deeper never decodes',
+        () {
+          expect(receive(push(build(deepest))), isA<DataPush>());
+          expect(() => receive(push(build(deepest + 1))), tooDeep);
+        },
+      );
+
+      test(
+        'an answer of $kind at the deepest allowed level decodes; one deeper never decodes',
+        () {
+          expect(
+            receive(answerText(build(deepest))),
+            isA<Response>().having((Response x) => x.status, 'status', 'ok'),
+          );
+          expect(() => receive(answerText(build(deepest + 1))), tooDeep);
+        },
+      );
+    }
+
+    test('100,000 levels are refused by the scan, without recursion', () {
+      expect(() => receive(push(arrays(100000))), tooDeep);
+      expect(() => receive(answerText(objects(100000))), tooDeep);
+    });
+
+    test(
+      'the decoder walk itself does not recurse (100,000 levels built in Dart)',
+      () {
+        Object? data = 1;
+        for (int i = 0; i < 100000; i++) {
+          data = <String, Object?>{'a': data};
+        }
+        expect(
+          decodeServerMessage(<String, Object?>{
+            'a': 'd',
+            'b': <String, Object?>{'p': 'a', 'd': data},
+          }),
+          isA<DataPush>(),
+        );
+      },
+    );
+  });
+
   group('table-driven fuzz (test plan idea 3)', _fuzz);
 }
 
@@ -891,4 +1222,18 @@ void _set(Object? root, List<Object> path, Object? value) {
   } else {
     map[last as String] = value;
   }
+}
+
+/// One JSON value decoded by this compiler's jsonDecode.
+Object? _decodeOne(String text) =>
+    (jsonDecode('[$text]') as List<Object?>).single;
+
+/// A JSON object decoded by this compiler's jsonDecode.
+Map<String, Object?> _decodeMap(String text) =>
+    jsonDecode(text) as Map<String, Object?>;
+
+/// What this compiler made of [text], for failure messages.
+String _seen(String text) {
+  final Object? value = _decodeOne(text);
+  return 'JSON $text decodes here to $value (${value.runtimeType}, is int: ${value is int})';
 }
