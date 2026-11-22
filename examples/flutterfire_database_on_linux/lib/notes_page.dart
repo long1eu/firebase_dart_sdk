@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'bootstrap.dart';
 
 /// Shows the connection state, the last notes (a query ordered by a child with
-/// a limit), a field that pushes a note, a counter changed by a transaction
+/// a limit, kept in order from its child events), a field that pushes a note, a counter changed by a transaction
 /// and the presence entries, one of which is this app's, with an
 /// `onDisconnect` write.
 class NotesPage extends StatefulWidget {
@@ -30,13 +30,19 @@ class _NotesPageState extends State<NotesPage> {
   );
   late final DatabaseReference _me = _presence.child(AppConfig.clientId);
 
+  late final Query _notesQuery = _notes
+      .orderByChild('createdAt')
+      .limitToLast(10);
+
   final TextEditingController _text = TextEditingController();
   final List<StreamSubscription<DatabaseEvent>> _subscriptions =
       <StreamSubscription<DatabaseEvent>>[];
 
   bool _connected = false;
   String _status = 'Ready';
-  List<DataSnapshot> _noteList = <DataSnapshot>[];
+
+  /// The notes in the window, oldest first, as the query orders them.
+  final List<DataSnapshot> _noteList = <DataSnapshot>[];
   int _count = 0;
   Map<String, Object?> _others = <String, Object?>{};
 
@@ -45,11 +51,10 @@ class _NotesPageState extends State<NotesPage> {
     super.initState();
     _subscriptions.addAll(<StreamSubscription<DatabaseEvent>>[
       _database.ref('.info/connected').onValue.listen(_onConnected),
-      _notes
-          .orderByChild('createdAt')
-          .limitToLast(10)
-          .onValue
-          .listen(_onNotes, onError: _onError),
+      _notesQuery.onChildAdded.listen(_place, onError: _onError),
+      _notesQuery.onChildChanged.listen(_replace, onError: _onError),
+      _notesQuery.onChildMoved.listen(_place, onError: _onError),
+      _notesQuery.onChildRemoved.listen(_drop, onError: _onError),
       _counter.onValue.listen((DatabaseEvent event) {
         setState(() => _count = (event.snapshot.value as int?) ?? 0);
       }, onError: _onError),
@@ -86,10 +91,38 @@ class _NotesPageState extends State<NotesPage> {
     }
   }
 
-  void _onNotes(DatabaseEvent event) {
-    setState(
-      () => _noteList = event.snapshot.children.toList().reversed.toList(),
-    );
+  /// Puts the child after the one named by `previousChildKey` (first when
+  /// null), for a new child and for one that moved.
+  void _place(DatabaseEvent event) {
+    setState(() {
+      _noteList.removeWhere((DataSnapshot n) => n.key == event.snapshot.key);
+      final int previous = _noteList.indexWhere(
+        (DataSnapshot n) => n.key == event.previousChildKey,
+      );
+      _noteList.insert(
+        event.previousChildKey == null ? 0 : previous + 1,
+        event.snapshot,
+      );
+    });
+  }
+
+  void _replace(DatabaseEvent event) {
+    setState(() {
+      final int index = _noteList.indexWhere(
+        (DataSnapshot n) => n.key == event.snapshot.key,
+      );
+      if (index >= 0) {
+        _noteList[index] = event.snapshot;
+      }
+    });
+  }
+
+  /// Also called for the oldest note when a new one pushes it out of the
+  /// window of `limitToLast(10)`.
+  void _drop(DatabaseEvent event) {
+    setState(() {
+      _noteList.removeWhere((DataSnapshot n) => n.key == event.snapshot.key);
+    });
   }
 
   void _onError(Object error) {
@@ -133,9 +166,46 @@ class _NotesPageState extends State<NotesPage> {
 
   Future<void> _remove(DataSnapshot note) async {
     try {
-      await note.ref.remove();
+      await _notes.child(note.key!).remove();
     } on FirebaseException catch (error) {
       _setStatus('Remove failed: ${error.code}');
+    }
+  }
+
+  Future<void> _edit(DataSnapshot note) async {
+    final TextEditingController field = TextEditingController(
+      text: '${note.child('text').value}',
+    );
+    final String? text = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('Edit note'),
+        content: TextField(
+          key: const ValueKey<String>('editField'),
+          controller: field,
+          autofocus: true,
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: const ValueKey<String>('editSave'),
+            onPressed: () => Navigator.pop(context, field.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    field.dispose();
+    if (text == null || text.isEmpty) {
+      return;
+    }
+    try {
+      await _notes.child(note.key!).update(<String, Object?>{'text': text});
+    } on FirebaseException catch (error) {
+      _setStatus('Edit failed: ${error.code}');
     }
   }
 
@@ -229,15 +299,25 @@ class _NotesPageState extends State<NotesPage> {
                   ? const Center(child: Text('No notes yet'))
                   : ListView(
                       children: <Widget>[
-                        for (final DataSnapshot note in _noteList)
+                        for (final DataSnapshot note in _noteList.reversed)
                           ListTile(
                             key: ValueKey<String>('note-${note.key}'),
                             title: Text('${note.child('text').value}'),
                             subtitle: Text('${note.child('by').value}'),
-                            trailing: IconButton(
-                              key: ValueKey<String>('delete-${note.key}'),
-                              icon: const Icon(Icons.delete_outline),
-                              onPressed: () => _remove(note),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: <Widget>[
+                                IconButton(
+                                  key: ValueKey<String>('edit-${note.key}'),
+                                  icon: const Icon(Icons.edit_outlined),
+                                  onPressed: () => _edit(note),
+                                ),
+                                IconButton(
+                                  key: ValueKey<String>('delete-${note.key}'),
+                                  icon: const Icon(Icons.delete_outline),
+                                  onPressed: () => _remove(note),
+                                ),
+                              ],
                             ),
                           ),
                       ],

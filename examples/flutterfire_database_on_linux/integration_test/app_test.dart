@@ -47,6 +47,35 @@ void main() {
     await tester.tap(byKey('pushButton'));
     await pumpUntil(tester, find.text('hello from the test'));
 
+    // onChildChanged: edit the note through the dialog.
+    final Finder edit = find.byWidgetPredicate(
+      (Widget w) =>
+          w.key is ValueKey<String> &&
+          (w.key! as ValueKey<String>).value.startsWith('edit-'),
+    );
+    await tester.tap(edit);
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.enterText(byKey('editField'), 'edited by the test');
+    await tester.tap(byKey('editSave'));
+    await pumpUntil(tester, find.text('edited by the test'));
+    expect(find.text('hello from the test'), findsNothing);
+
+    // onChildAdded keeps the order and onChildRemoved drops the oldest: 11
+    // notes through the field leave the 10 newest.
+    for (int i = 0; i < 10; i++) {
+      await tester.enterText(byKey('noteField'), 'note $i');
+      await tester.tap(byKey('pushButton'));
+      await pumpUntil(tester, find.text('note $i'));
+    }
+    for (int i = 0; i < 100; i++) {
+      if (find.text('edited by the test').evaluate().isEmpty) {
+        break;
+      }
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.text('edited by the test'), findsNothing);
+    expect(find.text('note 0'), findsOneWidget);
+
     await tester.tap(byKey('counterButton'));
     await pumpUntil(tester, find.text('Counter: 1'));
     final DataSnapshot counter = await FirebaseDatabase.instance

@@ -11,7 +11,8 @@ registers before `main()` on Linux. The app code does not import it; the only si
 | --- | --- |
 | `Firebase.initializeApp(options: FirebaseOptions(...))` with placeholder `demo-` values and a `databaseURL`, `useDatabaseEmulator(host, port)` from `--dart-define` | `lib/bootstrap.dart` |
 | The connection state from `.info/connected`, shown as a chip | `initState`, `_onConnected`, `build` in `lib/notes_page.dart` |
-| The last 10 notes: `orderByChild('createdAt').limitToLast(10)` bound to `onValue`, newest first | `initState`, `_onNotes` |
+| The last 10 notes: `orderByChild('createdAt').limitToLast(10)` bound to `onChildAdded`, `onChildChanged`, `onChildMoved` and `onChildRemoved`; the list is placed with `previousChildKey`, and the oldest note leaves through `onChildRemoved` when a new one enters | `initState`, `_place`, `_replace`, `_drop` in `lib/notes_page.dart` |
+| Edit of a note with `update({'text': ...})`, which fires `onChildChanged` | `_edit` |
 | A text field that pushes a note with `push()`, `set` and `ServerValue.timestamp` | `_push` |
 | Delete of a note with `remove()` | `_remove` |
 | A counter changed by `runTransaction` | `_increment` |
@@ -70,12 +71,13 @@ close one.
 flutter test integration_test/app_test.dart -d linux --dart-define=EMULATOR_PORT=9100 --dart-define=ROOT=ffdb-test
 ```
 
-It empties the node, waits for **Connected**, types a note and taps **Push**, taps **Count with a transaction**,
+It empties the node, waits for **Connected**, types a note and taps **Push**, edits it, pushes 10 more (the first, edited note leaves the window of 10), taps **Count with a transaction**,
 checks the counter with `get()`, and checks that the presence entry of the run is `online`.
 
 ## Status
 
-- `flutter analyze` reports no issues (Flutter 3.44.9, macOS).
+- `flutter analyze` reports no issues (Flutter 3.44.9, macOS). The list code was written for the child events
+  of a `limitToLast` query as the JS SDK delivers them; how the adapter orders them was not run.
 - **Not built or run on Linux.** The build was not tried (it needs a Linux machine), the integration test was not
   run, and the app has not been seen on screen. Treat the code as written against the API, not as observed
   behaviour.
