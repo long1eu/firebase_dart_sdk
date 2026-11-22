@@ -23,14 +23,14 @@ Future<void> main() => runExample('priority', (db, root) async {
 
   // Without priority orderByPriority is the default order of children() too.
   // Children without a priority come first, then numbers, then strings.
-  final ordered = await queue.orderByPriority().get();
+  final ordered = await once(queue.orderByPriority());
   for (final DataSnapshot child in ordered.children) {
     print('${child.key}: ${child.value} (priority ${child.priority})');
   }
 
   // setPriority changes only the priority.
   await queue.child('low').setPriority(5);
-  print('after setPriority: ${describe(await queue.orderByPriority().get())}');
+  print('after setPriority: ${describe(await once(queue.orderByPriority()))}');
 
   // A set() with no priority removes the priority: it is part of the data
   // the call replaces.
@@ -47,7 +47,7 @@ Future<void> main() => runExample('priority', (db, root) async {
     'e': 1,
     'f': <String, Object?>{'k': 1},
   });
-  final mixed = await root.child('mixed').orderByValue().get();
+  final mixed = await once(root.child('mixed').orderByValue());
   print(
     'by value: ${mixed.children.map((c) => '${c.key}:${c.value}').join(' ')}',
   );

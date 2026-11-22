@@ -104,3 +104,13 @@ Future<void> settle() => Future<void>.delayed(const Duration(milliseconds: 50));
 /// produced it.
 String describe(DataSnapshot snapshot) =>
     snapshot.children.map((DataSnapshot c) => '${c.key}=${c.value}').join(', ');
+
+/// The current result of [query], read with a listener.
+///
+/// `Query.get` asks the server to run the query, and the server refuses an
+/// ordered query on a child or on values unless the rules have an `.indexOn`
+/// for it (`index-not-defined`). A listener has no such limit: without the
+/// index the client downloads the location and filters it itself, and logs a
+/// warning. The examples run with any rules, so they read this way; with the
+/// index in your rules, `get` works and downloads only the result.
+Future<DataSnapshot> once(Query query) async => (await query.once()).snapshot;

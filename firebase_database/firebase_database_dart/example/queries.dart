@@ -22,35 +22,35 @@ Future<void> main() => runExample('queries', (db, root) async {
   // A query is immutable: every modifier returns a new one. Results always
   // come in ascending order. For a top-3 board take the LAST three: there is
   // no descending order and no limit-and-reverse; reverse the list yourself.
-  final top = await players.orderByChild('score').limitToLast(3).get();
+  final top = await once(players.orderByChild('score').limitToLast(3));
   print('top 3 (ascending): ${describe(top)}');
   print(
     'top 3 (best first): ${top.children.toList().reversed.map((c) => c.key)}',
   );
 
   // Ranges: startAt and endAt are both included.
-  final mid = await players.orderByChild('score').startAt(20).endAt(30).get();
+  final mid = await once(players.orderByChild('score').startAt(20).endAt(30));
   print('score 20..30: ${describe(mid)}');
 
   // startAfter and endBefore leave the bound out.
-  final after = await players.orderByChild('score').startAfter(20).get();
+  final after = await once(players.orderByChild('score').startAfter(20));
   print('score > 20: ${describe(after)}');
 
   // equalTo matches one value; it already is a start and an end bound, so it
   // cannot be combined with startAt or endAt.
-  final red = await players.orderByChild('team').equalTo('red').get();
+  final red = await once(players.orderByChild('team').equalTo('red'));
   print('team red: ${describe(red)}');
 
   // Order by key and by value.
-  final byKey = await players.orderByKey().startAt('b').endAt('c').get();
+  final byKey = await once(players.orderByKey().startAt('b').endAt('c'));
   print('keys b..c: ${describe(byKey)}');
   await root.child('flat').set(<String, Object?>{'x': 3, 'y': 1, 'z': 2});
-  final byValue = await root.child('flat').orderByValue().limitToFirst(2).get();
+  final byValue = await once(root.child('flat').orderByValue().limitToFirst(2));
   print('two smallest values: ${describe(byValue)}');
 
   // Children without the ordered child come first, with a null value.
   await players.child('eve').set(<String, Object?>{'team': 'red'});
-  final all = await players.orderByChild('score').limitToFirst(1).get();
+  final all = await once(players.orderByChild('score').limitToFirst(1));
   print('no score first: ${describe(all)}');
 
   // The query decides the order of snapshot.children, but a value read as

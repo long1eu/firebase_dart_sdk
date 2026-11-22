@@ -50,8 +50,15 @@ Future<void> main() => runExample('transactions', (db, root) async {
   final DatabaseReference account = root.child('account');
   await account.set(<String, Object?>{'balance': 100, 'log': 0});
   await account.runTransaction((Object? v) {
+    // The first run sees what the client has cached, and with no listener
+    // here that is null even though the value was just written. Return null
+    // unchanged: the server sees that its value differs, sends it, and the
+    // handler runs again with the real data. Never assume a non-null value.
+    if (v == null) {
+      return Transaction.success(null);
+    }
     final Map<String, Object?> data = Map<String, Object?>.of(
-      v! as Map<String, Object?>,
+      v as Map<String, Object?>,
     );
     data['balance'] = (data['balance']! as num) - 30;
     data['log'] = (data['log']! as num) + 1;
