@@ -73,17 +73,21 @@ final class SqlitePersistence {
   /// The paths of the stores of this object that are open and own their file.
   final Set<String> _openPaths = <String>{};
 
-  /// The path of the store file of [databaseUrl] of the app named [appName].
-  String pathOf(String appName, Uri databaseUrl) {
+  /// The path of the store file of [key].
+  String pathOf(PersistenceKey key) {
     return SqliteFiles.join(
       directory,
-      SqliteFiles.fileName(appName, databaseUrl),
+      SqliteFiles.fileName(key.appName, key.databaseUrl),
     );
   }
 
-  @override
-  Future<PersistenceStorageEngine> open(String appName, Uri databaseUrl) async {
-    final String fileName = SqliteFiles.fileName(appName, databaseUrl);
+  /// [open] as the client's opener type, for `FirebaseDatabase(persistence: ...)`.
+  PersistenceStorageEngineOpener get opener => open;
+
+  /// Opens the store of [key]; what `FirebaseDatabase` calls once at Repo start. Never fails: a
+  /// store that can not own its file comes back with `isDurable` false.
+  Future<PersistenceStorageEngine> open(PersistenceKey key) async {
+    final String fileName = SqliteFiles.fileName(key.appName, key.databaseUrl);
     final String path = SqliteFiles.join(directory, fileName);
     if (_openPaths.contains(path)) {
       return engineOverConnection(

@@ -30,7 +30,7 @@ abstract final class SqliteSchema {
     'tracked_keys',
   ];
 
-  /// Every table of the schema, created with `IF NOT EXISTS`.
+  /// Every table and index of the schema, created with `IF NOT EXISTS`.
   static const List<String> createStatements = <String>[
     'CREATE TABLE IF NOT EXISTS lease ('
         'id INTEGER PRIMARY KEY CHECK (id = 0), '
@@ -56,6 +56,9 @@ abstract final class SqliteSchema {
         'query_id INTEGER NOT NULL, '
         'key TEXT NOT NULL, '
         'PRIMARY KEY (query_id, key)) WITHOUT ROWID',
+    // One id per query, as the reference engine of the client checks.
+    'CREATE UNIQUE INDEX IF NOT EXISTS tracked_queries_by_query '
+        'ON tracked_queries (path, query_params)',
   ];
 
   /// Sets the file-level settings of a new, empty file. `auto_vacuum` only takes effect before the
