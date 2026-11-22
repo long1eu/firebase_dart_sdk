@@ -1,7 +1,6 @@
 import 'package:firebase_database_dart/firebase_database_dart.dart'
     show DatabaseLogger;
 import 'package:firebase_database_dart/storage_engine.dart';
-import 'package:firebase_database_dart_sqlite/src/node_codec.dart';
 import 'package:firebase_database_dart_sqlite/src/server_cache_rows.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';
 import 'package:firebase_database_dart_sqlite/src/tracked_query_rows.dart';
@@ -37,13 +36,23 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
   late final UserWriteRows _userWrites;
   late final TrackedQueryRows _trackedQueries;
 
+  /// Whether an engine transaction is open: [beginTransaction] was called and [endTransaction]
+  /// was not. Kept apart from the connection's flag, which [close] clears.
+  bool _open = false;
   bool _successful = false;
   int _sizeAtBegin = 0;
 
   void _requireTransaction() {
-    if (!_connection.inTransaction) {
+    if (!_open) {
       throw StateError('Transaction expected to already be in progress.');
     }
+  }
+
+  /// Checks that an engine transaction is open ([StateError] otherwise) and tells whether a
+  /// mutation still reaches the connection: false after a [close] inside the transaction.
+  bool _canMutate() {
+    _requireTransaction();
+    return _connection.inTransaction;
   }
 
   @override
@@ -54,12 +63,13 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
 
   @override
   void beginTransaction() {
-    if (_connection.inTransaction) {
+    if (_open || _connection.inTransaction) {
       throw StateError(
         'beginTransaction called while a storage transaction is already in progress.',
       );
     }
     _connection.begin();
+    _open = true;
     _successful = false;
     _sizeAtBegin = _serverCache.size;
   }
@@ -73,30 +83,40 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
   @override
   void endTransaction() {
     _requireTransaction();
-    if (_successful) {
-      _connection.commit();
-    } else {
-      _connection.rollback();
-      _serverCache.size = _sizeAtBegin;
+    // A close inside the transaction already rolled it back; ending it is then a no-op.
+    if (_connection.inTransaction) {
+      if (_successful) {
+        _connection.commit();
+      } else {
+        _connection.rollback();
+        _serverCache.size = _sizeAtBegin;
+      }
     }
+    _open = false;
     _successful = false;
   }
 
   @override
   void saveUserOverwrite(Path path, Node node, int writeId) {
-    _requireTransaction();
+    if (!_canMutate()) {
+      return;
+    }
     _userWrites.saveOverwrite(path, node, writeId);
   }
 
   @override
   void saveUserMerge(Path path, CompoundWrite children, int writeId) {
-    _requireTransaction();
+    if (!_canMutate()) {
+      return;
+    }
     _userWrites.saveMerge(path, children, writeId);
   }
 
   @override
   void removeUserWrite(int writeId) {
-    _requireTransaction();
+    if (!_canMutate()) {
+      return;
+    }
     _userWrites.remove(writeId);
   }
 
@@ -105,33 +125,36 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
 
   @override
   void removeAllUserWrites() {
-    _requireTransaction();
+    if (!_canMutate()) {
+      return;
+    }
     _userWrites.removeAll();
   }
 
   @override
-  Node serverCache(Path path) {
-    if (!isDurable) {
-      return NodeCodec.emptyNode;
-    }
-    return _serverCache.load(path);
-  }
+  Node serverCache(Path path) => _serverCache.load(path);
 
   @override
   void overwriteServerCache(Path path, Node node) {
-    _requireTransaction();
+    if (!_canMutate()) {
+      return;
+    }
     _serverCache.overwrite(path, node);
   }
 
   @override
   void mergeIntoServerCache(Path path, Node node) {
-    _requireTransaction();
+    if (!_canMutate()) {
+      return;
+    }
     _serverCache.mergeChildren(path, node);
   }
 
   @override
   void mergeIntoServerCacheWrite(Path path, CompoundWrite children) {
-    _requireTransaction();
+    if (!_canMutate()) {
+      return;
+    }
     _serverCache.mergeWrite(path, children);
   }
 
@@ -142,13 +165,17 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
 
   @override
   void saveTrackedQuery(TrackedQuery trackedQuery) {
-    _requireTransaction();
+    if (!_canMutate()) {
+      return;
+    }
     _trackedQueries.save(trackedQuery);
   }
 
   @override
   void deleteTrackedQuery(int trackedQueryId) {
-    _requireTransaction();
+    if (!_canMutate()) {
+      return;
+    }
     _trackedQueries.delete(trackedQueryId);
   }
 
@@ -157,8 +184,10 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
 
   @override
   void resetPreviouslyActiveTrackedQueries(int lastUse) {
-    if (_connection.inTransaction) {
-      _trackedQueries.resetPreviouslyActive(lastUse);
+    if (_open) {
+      if (_connection.inTransaction) {
+        _trackedQueries.resetPreviouslyActive(lastUse);
+      }
       return;
     }
     beginTransaction();
@@ -172,7 +201,9 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
 
   @override
   void saveTrackedQueryKeys(int trackedQueryId, Set<ChildKey> keys) {
-    _requireTransaction();
+    if (!_canMutate()) {
+      return;
+    }
     _trackedQueries.saveKeys(trackedQueryId, keys);
   }
 
@@ -182,7 +213,9 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
     Set<ChildKey> added,
     Set<ChildKey> removed,
   ) {
-    _requireTransaction();
+    if (!_canMutate()) {
+      return;
+    }
     _trackedQueries.updateKeys(trackedQueryId, added, removed);
   }
 
@@ -192,8 +225,7 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
 
   @override
   void pruneCache(Path root, PruneForest pruneForest) {
-    _requireTransaction();
-    if (!isDurable || !pruneForest.prunesAnything()) {
+    if (!_canMutate() || !isDurable || !pruneForest.prunesAnything()) {
       return;
     }
     _serverCache.prune(root, pruneForest);

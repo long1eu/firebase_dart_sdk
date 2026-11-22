@@ -96,7 +96,7 @@ void main() {
 
   group('E-D1 storage errors', () {
     test(
-      'a full disk degrades the store to memory without throwing; rows are wiped',
+      'H1 a full disk degrades the store without throwing; the committed write survives a reopen',
       () async {
         final SqliteConnection store = await fixture.open();
         final sqlite.Database db = store.debugDatabase!;
@@ -129,12 +129,21 @@ void main() {
         store.close();
 
         final sqlite.Database other = fixture.raw();
-        expect(
-          StoreFixture.scalar(other, 'SELECT count(*) FROM user_writes'),
-          0,
-        );
         expect(SqliteLease.read(other), isNull);
         StoreFixture.closeRaw(other);
+
+        // Revised after review, 2026-11-22: a storage error deletes nothing. The write committed
+        // before the error is still there after a reopen; the failed transaction left nothing.
+        final SqliteConnection reopened = await fixture.open();
+        addTearDown(reopened.close);
+        expect(reopened.isDurable, isTrue);
+        expect(
+          reopened
+              .select('SELECT id FROM user_writes ORDER BY id')
+              .map((sqlite.Row row) => row['id'])
+              .toList(),
+          <Object?>[1],
+        );
       },
     );
 
@@ -179,5 +188,86 @@ void main() {
       store.commit();
       expect(store.state, StoreState.degraded);
     });
+  });
+
+  group('review findings, 2026-11-22', () {
+    test(
+      'M5 a busy file skips one transaction and the store stays durable',
+      () async {
+        // Fails if `_isBusy` is not checked in SqliteConnection._onStorageError (every busy
+        // degrades).
+        final SqliteConnection store = await fixture.open();
+        addTearDown(store.close);
+        final sqlite.Database other = fixture.raw();
+        addTearDown(() => StoreFixture.closeRaw(other));
+        other.execute('BEGIN IMMEDIATE');
+
+        expect(store.begin(), isFalse);
+        store.execute(insertWrite, <Object?>[1, '/a/', 'o', Uint8List(1)]);
+        store.rollback();
+        expect(store.state, StoreState.durable);
+
+        other.execute('ROLLBACK');
+        expect(store.begin(), isTrue);
+        store.execute(insertWrite, <Object?>[2, '/b/', 'o', Uint8List(1)]);
+        store.commit();
+        expect(store.select('SELECT id FROM user_writes').single['id'], 2);
+      },
+    );
+
+    test(
+      'M5 three busy transactions in a row degrade the store; a success resets the count',
+      () async {
+        // Fails if `maxConsecutiveBusy` is not compared in _onStorageError, or the count is not
+        // reset after a commit (SqliteConnection.commit).
+        final SqliteConnection store = await fixture.open();
+        addTearDown(store.close);
+        final sqlite.Database other = fixture.raw();
+        addTearDown(() => StoreFixture.closeRaw(other));
+
+        void busyTransaction() {
+          other.execute('BEGIN IMMEDIATE');
+          expect(store.begin(), isFalse);
+          store.rollback();
+          other.execute('ROLLBACK');
+        }
+
+        busyTransaction();
+        busyTransaction();
+        expect(store.begin(), isTrue);
+        store.commit();
+        busyTransaction();
+        busyTransaction();
+        expect(store.state, StoreState.durable);
+
+        busyTransaction();
+        expect(store.state, StoreState.degraded);
+      },
+    );
+
+    test('M5 normal work waits 1 s for a lock', () async {
+      final SqliteConnection store = await fixture.open();
+      addTearDown(store.close);
+
+      expect(
+        StoreFixture.scalar(store.debugDatabase!, 'PRAGMA busy_timeout'),
+        busyTimeoutMs,
+      );
+      expect(busyTimeoutMs, 1000);
+    });
+
+    test(
+      'L9 a close inside a transaction leaves the end of the transaction harmless',
+      () async {
+        // Fails without the `StoreState.closed` early return in SqliteConnection.commit/rollback.
+        final SqliteConnection store = await fixture.open();
+        store.begin();
+        store.close();
+
+        store.commit();
+        store.rollback();
+        expect(store.state, StoreState.closed);
+      },
+    );
   });
 }

@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_files.dart';
+import 'package:firebase_database_dart_sqlite/src/sqlite_lease.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_schema.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:test/test.dart';
@@ -113,6 +114,8 @@ void main() {
       final SqliteConnection owner = await fixture.open();
       addTearDown(owner.close);
       changeFile((sqlite.Database db) => db.userVersion = 2000);
+      // The owner refreshes while the new open watches its lease.
+      fixture.clock.onAdvance = owner.refreshLease;
 
       final SqliteConnection store = await fixture.open();
       addTearDown(store.close);
@@ -120,7 +123,7 @@ void main() {
       expect(store.state, StoreState.memoryOnly);
       expect(SqliteFiles.badCopies(fixture.path), isEmpty);
       expect(File(fixture.path).existsSync(), isTrue);
-      expect(fixture.clock.delays, isEmpty);
+      expect(fixture.clock.delays, <Duration>[SqliteLease.observation]);
     },
   );
 

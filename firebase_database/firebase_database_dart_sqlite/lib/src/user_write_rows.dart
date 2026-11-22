@@ -98,9 +98,10 @@ final class UserWriteRows {
           );
       }
       return null;
-    } on FormatException {
-      return null;
-    } on ArgumentError {
+    } on Object {
+      // A damaged or hostile row (threat model T22) is a cache miss, never an error: the JSON
+      // decoder, nodeFromJson and the core's constructors throw several kinds (FormatException,
+      // ArgumentError, UnsupportedError for an infinite limit, TypeError).
       return null;
     }
   }

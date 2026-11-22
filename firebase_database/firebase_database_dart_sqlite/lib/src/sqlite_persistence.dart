@@ -35,8 +35,9 @@ DatabasePersistence sqlitePersistence(String directory, {int? cacheSizeBytes}) {
 /// Deletes the cache files of [databaseUrl] of the app named [appName] in [directory]: the
 /// database file, its side files and its moved-aside copies.
 ///
-/// Throws a [StateError] while an instance holds the file (in this process or another: a live
-/// lease), and a [ClearPersistenceException] listing the files that could not be deleted.
+/// Throws a [StateError] while an instance holds the file (in this process or another: an owner
+/// that refreshes its lease during one observation period, about 7.5 s), and a
+/// [ClearPersistenceException] listing the files that could not be deleted.
 Future<void> clearSqlitePersistence(
   String directory, {
   required String appName,
@@ -131,9 +132,14 @@ final class SqlitePersistence {
 
   /// Deletes the store files of [key]: the database file, its side files and its `.bad-` copies.
   ///
-  /// Throws a [StateError] while a store of this object has the file open, or while another process
-  /// or isolate holds a live lease on it; a [ClearPersistenceException] that lists the files that
-  /// could not be deleted.
+  /// Clears under the lease (revised after review, 2026-11-22): the lease row is watched for one
+  /// observation period ([SqliteLease.observation]); if its owner rewrites it, the owner is alive
+  /// and this throws a [StateError]. Otherwise a tombstone row is written in the same transaction
+  /// that checks the row did not change, so a connection that opened the file meanwhile goes
+  /// memory-only instead of writing into deleted files; then the files are deleted.
+  ///
+  /// Throws a [StateError] while a store of this object has the file open or another process or
+  /// isolate owns it; a [ClearPersistenceException] that lists the files that could not be deleted.
   Future<void> clear(PersistenceKey key) async {
     final String path = pathOf(key);
     if (_openPaths.contains(path)) {
@@ -141,7 +147,7 @@ final class SqlitePersistence {
         'The offline cache of this database is open; close the database first.',
       );
     }
-    if (File(path).existsSync() && _heldByLiveOwner(path)) {
+    if (File(path).existsSync() && !await _tombstone(path)) {
       throw StateError(
         'Another process or isolate is using the offline cache of this database.',
       );
@@ -152,18 +158,35 @@ final class SqlitePersistence {
     }
   }
 
-  bool _heldByLiveOwner(String path) {
+  /// Watches the lease row of the file at [path] and writes the tombstone when nobody refreshed it.
+  /// Returns false when a live owner holds the file; true when the tombstone is written or the file
+  /// has no readable lease (a damaged or foreign file is deleted as it is).
+  Future<bool> _tombstone(String path) async {
     final sqlite.Database db;
     try {
       db = _options.openDatabase(path);
     } on sqlite.SqliteException {
-      return false;
+      return true;
     }
     try {
       db.select('PRAGMA busy_timeout = $busyTimeoutMs');
-      return SqliteLease.isHeldByLiveOwner(db, _options.nowMs());
-    } on sqlite.SqliteException {
-      return false;
+      final LeaseRow? first = SqliteLease.read(db);
+      if (first != null) {
+        if (first.ownerId == SqliteLease.clearingOwnerId &&
+            first.expiresAtMs >= _options.nowMs()) {
+          return false;
+        }
+        await _options.delay(SqliteLease.observation);
+      }
+      return SqliteLease.writeTombstone(
+        db,
+        observed: first,
+        nowMs: _options.nowMs(),
+      );
+    } on sqlite.SqliteException catch (e) {
+      // A busy or locked file is in use; any other error means it can not be read as a store.
+      return e.resultCode != sqlite.SqlError.SQLITE_BUSY &&
+          e.resultCode != sqlite.SqlError.SQLITE_LOCKED;
     } finally {
       // ignore: deprecated_member_use
       db.dispose();

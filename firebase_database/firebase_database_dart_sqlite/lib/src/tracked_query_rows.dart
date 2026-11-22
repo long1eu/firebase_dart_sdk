@@ -4,6 +4,7 @@ import 'package:firebase_database_dart/firebase_database_dart.dart'
     show DatabaseLogLevel, DatabaseLogger;
 import 'package:firebase_database_dart/storage_engine.dart';
 import 'package:firebase_database_dart_sqlite/src/node_codec.dart';
+import 'package:firebase_database_dart_sqlite/src/sql_in_list.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -14,10 +15,6 @@ final class TrackedQueryRows {
 
   final SqliteConnection _connection;
   final DatabaseLogger _log;
-
-  /// The most ids bound in one `IN (...)` list: `SQLITE_MAX_VARIABLE_NUMBER` was 999 before SQLite
-  /// 3.32.
-  static const int chunkSize = 500;
 
   /// The `query_params` column form of the parameters of [spec]: the wire object as JSON with its
   /// keys sorted at every level, so one query always has one text (the unique index
@@ -127,9 +124,10 @@ final class TrackedQueryRows {
         complete: complete != 0,
         active: active != 0,
       );
-    } on FormatException {
-      return null;
-    } on ArgumentError {
+    } on Object {
+      // A damaged or hostile row (threat model T22) is a cache miss, never an error: the JSON
+      // decoder, nodeFromJson and the core's constructors throw several kinds (FormatException,
+      // ArgumentError, UnsupportedError for an infinite limit, TypeError).
       return null;
     }
   }
@@ -174,16 +172,11 @@ final class TrackedQueryRows {
   /// The union of the keys of [ids].
   Set<ChildKey> loadKeys(Set<int> ids) {
     final Set<ChildKey> keys = <ChildKey>{};
-    final List<int> all = ids.toList();
-    for (int start = 0; start < all.length; start += chunkSize) {
-      final List<int> chunk = all.sublist(
-        start,
-        start + chunkSize < all.length ? start + chunkSize : all.length,
-      );
-      final String marks = List<String>.filled(chunk.length, '?').join(', ');
+    for (final List<int> chunk in SqlInList.chunks(ids.toList())) {
       for (final sqlite.Row row in _connection.select(
-        'SELECT DISTINCT key FROM tracked_keys WHERE query_id IN ($marks)',
-        chunk,
+        'SELECT DISTINCT key FROM tracked_keys '
+        'WHERE query_id IN (${SqlInList.marks(chunk)})',
+        SqlInList.pad(chunk),
       )) {
         final Object? key = row.columnAt(0);
         if (key is String) {

@@ -32,10 +32,24 @@ final class FakeClock {
     onAdvance?.call();
   }
 
+  /// When set, [delay] moves the clock in steps of this size, running [onAdvance] after each, so
+  /// that a test can model an owner whose refresh comes late within the wait.
+  Duration? delayStep;
+
   /// A `delay` that records [duration] and moves the clock by it.
   Future<void> delay(Duration duration) async {
     delays.add(duration);
-    advance(duration);
+    final Duration? step = delayStep;
+    if (step == null) {
+      advance(duration);
+      return;
+    }
+    Duration left = duration;
+    while (left > Duration.zero) {
+      final Duration next = left < step ? left : step;
+      advance(next);
+      left -= next;
+    }
   }
 }
 

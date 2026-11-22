@@ -8,6 +8,7 @@ import 'package:firebase_database_dart/firebase_database_dart.dart'
 import 'package:firebase_database_dart/storage_engine.dart';
 import 'package:firebase_database_dart_sqlite/firebase_database_dart_sqlite.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_files.dart';
+import 'package:firebase_database_dart_sqlite/src/sqlite_lease.dart';
 import 'package:test/test.dart';
 
 import 'support/store_fixture.dart';
@@ -176,10 +177,59 @@ void main() {
       );
       final PersistenceStorageEngine engine = await other.open(key);
       addTearDown(engine.close);
+      // The owner works (and so refreshes its lease) while clear watches it.
+      fixture.clock.onAdvance = () {
+        engine.beginTransaction();
+        engine.setTransactionSuccessful();
+        engine.endTransaction();
+      };
 
       await expectLater(persistence.clear(key), throwsStateError);
       expect(File(persistence.pathOf(key)).existsSync(), isTrue);
     });
+
+    test(
+      'M3 is refused while the owner refreshes, also when its lease expired by the clock',
+      () async {
+        // Fails if clear decides by `expires_at_ms` against the clock again instead of watching
+        // the row (SqlitePersistence._tombstone and SqliteLease.writeTombstone).
+        final SqlitePersistence other = SqlitePersistence(
+          fixture.directory,
+          options: fixture.options(),
+        );
+        final PersistenceStorageEngine engine = await other.open(key);
+        addTearDown(engine.close);
+        fixture.clock.advance(const Duration(seconds: 20));
+        fixture.clock.onAdvance = () {
+          engine.beginTransaction();
+          engine.setTransactionSuccessful();
+          engine.endTransaction();
+        };
+
+        await expectLater(persistence.clear(key), throwsStateError);
+
+        expect(File(persistence.pathOf(key)).existsSync(), isTrue);
+        expect(engine.isDurable, isTrue);
+      },
+    );
+
+    test(
+      'M3 of an owner that vanished waits one observation, then deletes',
+      () async {
+        final SqlitePersistence other = SqlitePersistence(
+          fixture.directory,
+          options: fixture.options(),
+        );
+        // Opened and never refreshed: a crashed owner.
+        final PersistenceStorageEngine crashed = await other.open(key);
+        addTearDown(crashed.close);
+
+        await persistence.clear(key);
+
+        expect(fixture.clock.delays, <Duration>[SqliteLease.observation]);
+        expect(File(persistence.pathOf(key)).existsSync(), isFalse);
+      },
+    );
 
     test('of a database that never existed does nothing', () async {
       await persistence.clear(key);

@@ -505,7 +505,7 @@ void main() {
     });
 
     // Ignored upstream ("a rare edge case around priorities"). Mutation: return early at the top
-    // of ServerCacheRows._dropPrioritiesOfEmptiedNodes: the priority comes back with baz.
+    // of ServerCacheRows._clearEmptiedNodes: the priority comes back with baz.
     test('E-C17 a priority is cleared when its node empties', () {
       h.overwrite('foo', node(<String, Object?>{'bar': 'bar-value'}));
       h.overwrite('foo/.priority', node('prio-value'));
@@ -533,6 +533,28 @@ void main() {
         expect(h.cache('foo'), node(<String, Object?>{'new': 'n'}));
       },
     );
+
+    // Review L1. Mutation: in ServerCacheRows._hasPriority, return false after the `.priority` row
+    // check (the priority inside the /a/ row comes back with b).
+    test(
+      'a priority inside an ancestor row is cleared when its node empties',
+      () {
+        h.overwrite('a', node(<String, Object?>{'z': 1, '.priority': 5}));
+        h.overwrite('a/z', node(null));
+        expect(h.cache('a').isEmpty, isTrue);
+        h.overwrite('a/b', node(2));
+        final Node a = h.cache('a');
+        expect(a, node(<String, Object?>{'b': 2}));
+        expect(a.priority.isEmpty, isTrue);
+        expect(h.engine.serverCacheEstimatedSizeInBytes(), h.fullSum());
+      },
+    );
+
+    test('a node that keeps data keeps its priority after a deletion', () {
+      h.overwrite('a', node(<String, Object?>{'y': 1, 'z': 1, '.priority': 5}));
+      h.overwrite('a/z', node(null));
+      expect(h.cache('a').priority, node(5));
+    });
 
     test('E-C18 huge leaf node', () {
       final Node tenMeg = leafOfSize(10 * _mib);
@@ -947,8 +969,8 @@ void main() {
     });
   });
 
-  // Mutation: delete `_requireTransaction();` from SqliteStorageEngine.updateTrackedQueryKeys or
-  // mergeIntoServerCache (the calls with nothing to write then pass silently).
+  // Mutation: in SqliteStorageEngine._requireTransaction, drop the throw (the calls with nothing
+  // to write then pass silently).
   group('transactions', () {
     test('E-T1 every mutation outside a transaction is a StateError', () {
       final PruneForest forest = PruneForest.fromTree(
@@ -1213,6 +1235,18 @@ void main() {
       ]);
       expect(h.warnings.single, contains('tracked queries'));
     });
+
+    // Review M4. Mutation: in TrackedQueryRows._decode, catch `on FormatException` only instead of
+    // `on Object`: QueryParams.fromWireObject's UnsupportedError reaches loadTrackedQueries.
+    test('a limit of 1e999 (infinity) is a cache miss, not an exception', () {
+      h.rawExecute(
+        'INSERT INTO tracked_queries '
+        '(id, path, query_params, last_use_ms, complete, active) '
+        "VALUES (1, '/a/', '{\"l\":1e999}', 0, 0, 0)",
+      );
+      expect(h.engine.loadTrackedQueries(), isEmpty);
+      expect(h.warnings.single, contains('tracked queries'));
+    });
   });
 
   // Mutation: in ServerCacheRows.prune, delete `_collectResaves(...)` (kept data inside a pruned
@@ -1366,6 +1400,25 @@ void main() {
         expect(h.engine.isDurable, isFalse);
         expect(h.cache('a').isEmpty, isTrue);
         expect(() => h.engine.removeUserWrite(1), throwsStateError);
+      },
+    );
+
+    // Review L9. Mutation: in SqliteStorageEngine.endTransaction, drop the
+    // `if (_connection.inTransaction)` test (rollback() then throws StateError).
+    test(
+      'a close inside a transaction: later calls of that transaction are quiet',
+      () async {
+        h.engine.beginTransaction();
+        h.engine.saveUserOverwrite(Path('a'), node(1), 1);
+        h.engine.close();
+        h.engine.saveUserOverwrite(Path('b'), node(2), 2);
+        h.engine.resetPreviouslyActiveTrackedQueries(5);
+        h.engine.setTransactionSuccessful();
+        h.engine.endTransaction();
+        expect(h.engine.beginTransaction, returnsNormally);
+        h.engine.endTransaction();
+        await h.open();
+        expect(h.engine.loadUserWrites(), isEmpty);
       },
     );
   });

@@ -3,9 +3,17 @@ import 'dart:async';
 import 'package:firebase_database_dart/firebase_database_dart.dart'
     show DatabaseLogLevel, DatabaseLogger;
 import 'package:firebase_database_dart_sqlite/src/sqlite_lease.dart';
-import 'package:firebase_database_dart_sqlite/src/sqlite_schema.dart';
 import 'package:meta/meta.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
+
+/// How long a statement waits for another connection's lock before failing with `SQLITE_BUSY`, in
+/// milliseconds. Short, because the store runs on the application's main isolate (revised after
+/// review, 2026-11-22: was 5 s).
+const int busyTimeoutMs = 1000;
+
+/// How many storage transactions in a row may fail on a busy or locked file before the store gives
+/// up and degrades.
+const int maxConsecutiveBusy = 3;
 
 /// Creates the periodic timer of the lease refresh; [Timer.periodic] outside tests.
 typedef PeriodicTimerFactory =
@@ -24,8 +32,9 @@ enum StoreState {
   /// no-ops and nothing more is written.
   fenced,
 
-  /// A storage error (disk full, I/O error, corruption) stopped the writes during the session. The
-  /// data tables were emptied, best effort, so that the next start does not replay stale writes.
+  /// A storage error (disk full, I/O error, corruption, or a file busy [maxConsecutiveBusy] times
+  /// in a row) stopped the writes during the session. Nothing is deleted: the file keeps everything
+  /// committed before the error, pending writes included (revised after review, 2026-11-22).
   degraded,
 
   /// [SqliteConnection.close] was called.
@@ -46,12 +55,17 @@ enum StoreState {
 ///   a transaction (`loadUserWrites` at start reads outside one).
 ///
 /// The connection never lets an [sqlite.SqliteException] reach the engine. When a statement fails
-/// the connection rolls back, moves to [StoreState.degraded] (or [StoreState.fenced] when the lease
-/// was lost), logs one message without data, and from then on [execute] does nothing and [select]
-/// returns no rows. The engine needs no error handling of its own: it keeps calling the same
-/// methods and checks [isDurable] where it wants to skip work. A failure that can only come from
-/// wrong SQL (`SQLITE_ERROR`, a constraint, a type mismatch, misuse) also fails an assertion, so
-/// the engine's tests see it; production builds degrade.
+/// the connection rolls back the transaction and the rest of it is a no-op:
+///
+/// * `SQLITE_BUSY` or `SQLITE_LOCKED` (another connection held the file for [busyTimeoutMs]): the
+///   store stays durable; only after [maxConsecutiveBusy] such transactions in a row it degrades.
+/// * Any other error: [StoreState.degraded] for the rest of the session, one log message without
+///   data, nothing deleted. A lost lease: [StoreState.fenced].
+///
+/// From then on [execute] does nothing and [select] returns no rows. The engine needs no error
+/// handling of its own. A failure that can only come from wrong SQL (`SQLITE_ERROR`, a constraint,
+/// a type mismatch, misuse) also fails an assertion, so the engine's tests see it; production
+/// builds degrade.
 final class SqliteConnection {
   /// A connection that owns [database] (at [path]) under [lease]. Called by the opener only, after
   /// the lease was acquired; call [startLeaseRefresh] next.
@@ -99,6 +113,8 @@ final class SqliteConnection {
   Timer? _refreshTimer;
   bool _inTransaction = false;
   bool _transactionFailed = false;
+  bool _sqliteTransactionOpen = false;
+  int _consecutiveBusy = 0;
   final Map<String, sqlite.PreparedStatement> _statements =
       <String, sqlite.PreparedStatement>{};
 
@@ -160,43 +176,72 @@ final class SqliteConnection {
     final sqlite.Database db = _db!;
     final bool started = _guard(() {
       db.execute('BEGIN IMMEDIATE');
+      _sqliteTransactionOpen = true;
       return true;
     }, fallback: false);
-    if (!started) {
+    if (!started || !isDurable) {
       return false;
     }
-    final bool ours = _guard(() => _lease!.holdsFence(db), fallback: false);
-    if (!ours && isDurable) {
+    bool ours;
+    try {
+      ours = _guard(() => _lease!.holdsFence(db), fallback: false);
+    } on Object {
+      // A lease row this code can not read is not ours (revised after review, 2026-11-22).
+      ours = false;
+    }
+    if (!isDurable || _transactionFailed) {
+      return false;
+    }
+    if (!ours) {
       _stopWriting(
         StoreState.fenced,
         'another process or isolate took over the offline cache',
       );
       return false;
     }
-    return isDurable;
+    _guard(() => _lease!.extendIfDue(db));
+    return isDurable && !_transactionFailed;
   }
 
-  /// Commits the transaction [begin] started. Requires an open transaction ([StateError]).
+  /// Commits the transaction [begin] started. Requires an open transaction ([StateError]), except
+  /// after [close], when it does nothing.
   void commit() {
+    if (_state == StoreState.closed) {
+      return;
+    }
     _requireTransaction('commit');
     final bool failed = _transactionFailed;
     _inTransaction = false;
     _transactionFailed = false;
-    if (!isDurable || failed) {
+    if (!isDurable || failed || !_sqliteTransactionOpen) {
       return;
     }
-    _guard(() => _db!.execute('COMMIT'));
+    final bool committed = _guard(() {
+      _db!.execute('COMMIT');
+      _sqliteTransactionOpen = false;
+      return true;
+    }, fallback: false);
+    if (committed) {
+      _consecutiveBusy = 0;
+    }
   }
 
-  /// Rolls back the transaction [begin] started. Requires an open transaction ([StateError]).
+  /// Rolls back the transaction [begin] started. Requires an open transaction ([StateError]),
+  /// except after [close], when it does nothing.
   void rollback() {
+    if (_state == StoreState.closed) {
+      return;
+    }
     _requireTransaction('rollback');
     _inTransaction = false;
     _transactionFailed = false;
-    if (!isDurable) {
+    if (!isDurable || !_sqliteTransactionOpen) {
       return;
     }
-    _guard(() => _db!.execute('ROLLBACK'));
+    _guard(() {
+      _db!.execute('ROLLBACK');
+      _sqliteTransactionOpen = false;
+    });
   }
 
   /// Runs a statement that returns no rows, with [parameters] bound in order.
@@ -239,11 +284,14 @@ final class SqliteConnection {
     _refreshTimer = null;
     final sqlite.Database? db = _db;
     if (db != null && isDurable) {
-      if (_inTransaction) {
+      if (_sqliteTransactionOpen) {
         _quietly(() => db.execute('ROLLBACK'));
+        _sqliteTransactionOpen = false;
       }
-      _lease!.release(db);
-      _quietly(() => db.select('PRAGMA wal_checkpoint(TRUNCATE)'));
+      _withoutBusyWait(db, () {
+        _lease!.release(db);
+        _quietly(() => db.select('PRAGMA wal_checkpoint(TRUNCATE)'));
+      });
     }
     _inTransaction = false;
     _dispose();
@@ -271,7 +319,7 @@ final class SqliteConnection {
     return statement;
   }
 
-  /// Runs [body]; on an [sqlite.SqliteException] stops writing and returns [fallback].
+  /// Runs [body]; on an [sqlite.SqliteException] handles the error and returns [fallback].
   T _guard<T>(T Function() body, {T? fallback}) {
     try {
       return body();
@@ -283,6 +331,18 @@ final class SqliteConnection {
 
   void _onStorageError(sqlite.SqliteException error) {
     _transactionFailed = true;
+    if (_isBusy(error)) {
+      _consecutiveBusy++;
+      if (_consecutiveBusy < maxConsecutiveBusy) {
+        _rollbackQuietly();
+        _log(
+          DatabaseLogLevel.info,
+          'Realtime Database offline cache: the file was busy (SQLite result code '
+          '${error.resultCode}); one storage transaction was not saved.',
+        );
+        return;
+      }
+    }
     _stopWriting(
       StoreState.degraded,
       'a storage error (SQLite result code ${error.resultCode}) stopped the offline cache',
@@ -292,6 +352,11 @@ final class SqliteConnection {
       'A statement of the SQLite store failed with result code ${error.resultCode}: '
       'the SQL or its parameters are wrong.',
     );
+  }
+
+  static bool _isBusy(sqlite.SqliteException error) {
+    return error.resultCode == sqlite.SqlError.SQLITE_BUSY ||
+        error.resultCode == sqlite.SqlError.SQLITE_LOCKED;
   }
 
   static bool _isProgrammingError(sqlite.SqliteException error) {
@@ -315,10 +380,11 @@ final class SqliteConnection {
     _refreshTimer?.cancel();
     _refreshTimer = null;
     final sqlite.Database db = _db!;
-    _quietly(() => db.execute('ROLLBACK'));
+    _rollbackQuietly();
     if (next == StoreState.degraded) {
-      _wipeQuietly(db);
-      _lease!.release(db);
+      // Nothing is deleted: the failed transaction was rolled back, so the file is consistent as of
+      // its last commit and keeps the pending writes (revised after review, 2026-11-22).
+      _withoutBusyWait(db, () => _lease!.release(db));
     }
     _dispose();
     _log(
@@ -327,19 +393,21 @@ final class SqliteConnection {
     );
   }
 
-  /// Empties the data tables if the lease is still ours, so that the next start neither replays
-  /// writes whose acknowledgement was never stored nor reads a half-updated cache.
-  void _wipeQuietly(sqlite.Database db) {
-    try {
-      db.execute('BEGIN IMMEDIATE');
-      if (_lease!.holdsFence(db)) {
-        for (final String table in SqliteSchema.dataTables) {
-          db.execute('DELETE FROM $table');
-        }
-      }
-      db.execute('COMMIT');
-    } on sqlite.SqliteException {
+  void _rollbackQuietly() {
+    final sqlite.Database? db = _db;
+    if (db != null && _sqliteTransactionOpen) {
       _quietly(() => db.execute('ROLLBACK'));
+    }
+    _sqliteTransactionOpen = false;
+  }
+
+  /// Runs best-effort clean-up with `busy_timeout` 0, so that it never waits on the main isolate.
+  static void _withoutBusyWait(sqlite.Database db, void Function() body) {
+    _quietly(() => db.select('PRAGMA busy_timeout = 0'));
+    try {
+      body();
+    } finally {
+      _quietly(() => db.select('PRAGMA busy_timeout = $busyTimeoutMs'));
     }
   }
 

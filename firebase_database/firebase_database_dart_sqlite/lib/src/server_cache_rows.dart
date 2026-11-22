@@ -11,6 +11,7 @@ import 'package:firebase_database_dart/src/core/util/immutable_tree.dart';
 import 'package:firebase_database_dart/src/core/util/node_size_estimator.dart';
 import 'package:firebase_database_dart/storage_engine.dart';
 import 'package:firebase_database_dart_sqlite/src/node_codec.dart';
+import 'package:firebase_database_dart_sqlite/src/sql_in_list.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -38,10 +39,6 @@ final class ServerCacheRows {
   /// A children node above this estimated JSON size is stored child by child (Android's
   /// `CHILDREN_NODE_SPLIT_SIZE_THRESHOLD`).
   static const int splitThreshold = 16 * 1024;
-
-  /// The most keys bound in one `IN (...)` list: `SQLITE_MAX_VARIABLE_NUMBER` was 999 before
-  /// SQLite 3.32.
-  static const int chunkSize = 500;
 
   /// The bytes of every row, paths included; restored by the engine on rollback.
   int size = 0;
@@ -139,23 +136,33 @@ final class ServerCacheRows {
     }
     try {
       return NodeCodec.decodeNode(value);
-    } on FormatException {
-      return null;
-    } on ArgumentError {
+    } on Object {
+      // A damaged or hostile row (threat model T22) is a cache miss, never an error: the JSON
+      // decoder, nodeFromJson and the core's constructors throw several kinds (FormatException,
+      // ArgumentError, UnsupportedError for an infinite limit, TypeError).
       return null;
     }
   }
 
   /// The rows at [path], at its ancestors and below it, ordered by path (ancestors first).
+  ///
+  /// Two statements, each read in primary-key order: one `OR` would make SQLite sort the whole
+  /// subtree in a temporary B-tree before the first row. Every ancestor key sorts before the
+  /// range, so concatenating keeps the order.
   Iterable<sqlite.Row> _selectNested(Path path, {required bool withValues}) {
     final List<String> ancestors = PathKey.selfAndAncestors(path);
     final String start = ancestors.first;
-    final String marks = List<String>.filled(ancestors.length, '?').join(', ');
-    return _connection.select(
-      'SELECT path${withValues ? ', value' : ''} FROM server_cache '
-      'WHERE path IN ($marks) OR (path > ? AND path < ?) ORDER BY path',
-      <Object?>[...ancestors, start, PathKey.rangeEnd(start)],
+    final String columns = withValues ? 'path, value' : 'path';
+    final Iterable<sqlite.Row> above = _connection.select(
+      'SELECT $columns FROM server_cache '
+      'WHERE path IN (${SqlInList.marks(ancestors)}) ORDER BY path',
+      SqlInList.pad(ancestors),
     );
+    final Iterable<sqlite.Row> below = _connection.select(
+      'SELECT $columns FROM server_cache WHERE path > ? AND path < ? ORDER BY path',
+      <Object?>[start, PathKey.rangeEnd(start)],
+    );
+    return above.followedBy(below);
   }
 
   /// Replaces the cache at [path] with [node].
@@ -164,7 +171,7 @@ final class ServerCacheRows {
     _saveNested(path, node);
     final Path? parent = path.parent;
     if (node.isEmpty && parent != null) {
-      _dropPrioritiesOfEmptiedNodes(parent);
+      _clearEmptiedNodes(parent);
     }
   }
 
@@ -192,36 +199,73 @@ final class ServerCacheRows {
       }
     }
     for (final Path parent in emptied) {
-      _dropPrioritiesOfEmptiedNodes(parent);
+      _clearEmptiedNodes(parent);
     }
   }
 
-  /// Deletes the `.priority` rows of [deepest] and its ancestors whose node is now empty.
+  /// After a write that deleted something below [deepest]: for [deepest] and each ancestor that
+  /// has a priority (a `.priority` row of its own, or one inside an ancestor's row) and is now
+  /// empty, replaces its subtree with one empty row.
   ///
-  /// A node loses its priority when it becomes empty, but a priority stored in a row of its own
-  /// would otherwise come back when a later write fills the node again (Android's ignored
-  /// `priorityIsCleared` test). Costs one indexed lookup per deletion.
-  void _dropPrioritiesOfEmptiedNodes(Path deepest) {
+  /// A node loses its priority when it becomes empty. Without this, the priority would come back
+  /// when a later write fills the node again: from a `.priority` row (Android's ignored
+  /// `priorityIsCleared` test) or from an ancestor row that still holds it. The empty row hides
+  /// both. Costs one indexed lookup of at most two keys per level, and the decoding of the
+  /// ancestor rows, per deleting write; the node itself is loaded only when it has a priority.
+  void _clearEmptiedNodes(Path deepest) {
+    final List<String> levels = PathKey.selfAndAncestors(deepest);
     final List<String> keys = <String>[
-      for (final String key in PathKey.selfAndAncestors(deepest))
-        '$key.priority/',
+      ...levels,
+      for (final String key in levels) '$key.priority/',
     ];
-    final String marks = List<String>.filled(keys.length, '?').join(', ');
-    final List<String> found = <String>[
+    // Each row found, decoded once (null when it does not decode).
+    final Map<String, Node?> rows = <String, Node?>{};
+    for (final List<String> chunk in SqlInList.chunks(keys)) {
       for (final sqlite.Row row in _connection.select(
-        'SELECT path FROM server_cache WHERE path IN ($marks)',
-        keys,
-      ))
-        if (row.columnAt(0) case final String key) key,
-    ];
-    // Whether a node is empty does not depend on the priorities of its children, so the order of
-    // these checks does not matter.
-    for (final String priorityKey in found) {
-      final Path owner = PathKey.toPath(priorityKey).parent!;
-      if (load(owner).isEmpty) {
-        _removeNested(PathKey.toPath(priorityKey));
+        'SELECT path, value FROM server_cache '
+        'WHERE path IN (${SqlInList.marks(chunk)})',
+        SqlInList.pad(chunk),
+      )) {
+        if (row.columnAt(0) case final String key) {
+          rows[key] = _decode(row.columnAt(1));
+        }
       }
     }
+    // Deepest first: once a level holds data, every level above it does too.
+    for (final String level in levels) {
+      if (!_hasPriority(level, levels, rows)) {
+        continue;
+      }
+      final Path owner = PathKey.toPath(level);
+      if (!load(owner).isEmpty) {
+        return;
+      }
+      _removeNested(owner);
+      _saveRow(owner, NodeCodec.emptyNode);
+    }
+  }
+
+  /// Whether the node at [level] has a priority in [rows]: a `.priority` row of its own, or a
+  /// priority inside the deepest row at or above it ([levels] runs deepest first).
+  bool _hasPriority(
+    String level,
+    List<String> levels,
+    Map<String, Node?> rows,
+  ) {
+    if (rows.containsKey('$level.priority/')) {
+      return true;
+    }
+    for (final String above in levels.skip(levels.indexOf(level))) {
+      if (rows.containsKey(above)) {
+        final Node? row = rows[above];
+        final Path relative = Path.relative(
+          PathKey.toPath(above),
+          PathKey.toPath(level),
+        );
+        return row != null && !row.getChild(relative).priority.isEmpty;
+      }
+    }
+    return false;
   }
 
   int _saveNested(Path path, Node node) {
@@ -392,15 +436,10 @@ final class ServerCacheRows {
   }
 
   void _deleteRows(List<String> keys) {
-    for (int start = 0; start < keys.length; start += chunkSize) {
-      final int end = start + chunkSize < keys.length
-          ? start + chunkSize
-          : keys.length;
-      final List<String> chunk = keys.sublist(start, end);
-      final String marks = List<String>.filled(chunk.length, '?').join(', ');
+    for (final List<String> chunk in SqlInList.chunks(keys)) {
       _connection.execute(
-        'DELETE FROM server_cache WHERE path IN ($marks)',
-        chunk,
+        'DELETE FROM server_cache WHERE path IN (${SqlInList.marks(chunk)})',
+        SqlInList.pad(chunk),
       );
     }
   }

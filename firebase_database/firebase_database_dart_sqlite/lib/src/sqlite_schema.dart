@@ -2,10 +2,16 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 /// The tables of a store file and how its version is numbered.
 ///
-/// `PRAGMA user_version` is `major * 1000 + minor`. A reader opens any file of its own major
-/// (minors only add tables or columns, created with `IF NOT EXISTS`) and treats a higher major as
-/// written by a newer version. `PRAGMA application_id` marks the file as a Realtime Database store.
-/// Design: `rtdb_storage_engine_design.md` sections 2, 8 and 13a.
+/// `PRAGMA user_version` is `major * 1000 + minor`. A reader opens any file of its own major and
+/// treats a higher major as written by a newer version. `PRAGMA application_id` marks the file as a
+/// Realtime Database store. Design: `rtdb_storage_engine_design.md` sections 2, 8 and 13a.
+///
+/// What a minor may change, so that an older reader of the same major keeps working: add tables,
+/// indexes, and columns that are nullable or have a `DEFAULT` (created with `IF NOT EXISTS` or
+/// `ADD COLUMN`). A minor must never add a `NOT NULL` column without a default, a `CHECK` or a
+/// unique index that older `INSERT`s can violate, or change the meaning of an existing column:
+/// older code would fail its writes (revised after review, 2026-11-22). Anything else is a new
+/// major.
 abstract final class SqliteSchema {
   /// `PRAGMA application_id` of a store file: 0x52544442, `RTDB` in ASCII.
   static const int applicationId = 0x52544442;
@@ -21,14 +27,6 @@ abstract final class SqliteSchema {
 
   /// The major version of a stored [version] (`PRAGMA user_version`).
   static int majorOf(int version) => version ~/ 1000;
-
-  /// The tables that hold cached data and pending writes; emptied when a store degrades.
-  static const List<String> dataTables = <String>[
-    'server_cache',
-    'user_writes',
-    'tracked_queries',
-    'tracked_keys',
-  ];
 
   /// Every table and index of the schema, created with `IF NOT EXISTS`.
   static const List<String> createStatements = <String>[

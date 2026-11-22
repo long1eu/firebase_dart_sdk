@@ -14,9 +14,6 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 /// The oldest SQLite this store runs on: 3.24.0. Older libraries get a memory-only store.
 const int minimumSqliteVersionNumber = 3024000;
 
-/// How long a connection waits for another connection's lock before giving up, in milliseconds.
-const int busyTimeoutMs = 5000;
-
 /// What the opener takes from its environment; every member can be replaced in tests.
 final class SqliteStoreOptions {
   /// The options of a real run unless a member is given.
@@ -78,9 +75,11 @@ final class SqliteStoreOptions {
 
   static sqlite.Database _openFile(String path) => sqlite.sqlite3.open(path);
 
+  /// `<process id>:<32 random hex digits>`: the process part tells a hot restart (same process)
+  /// from a crash.
   static String _randomOwnerId() {
     final Random random = Random.secure();
-    final StringBuffer buffer = StringBuffer();
+    final StringBuffer buffer = StringBuffer('$pid:');
     for (int i = 0; i < 16; i++) {
       buffer.write(random.nextInt(256).toRadixString(16).padLeft(2, '0'));
     }
@@ -99,13 +98,15 @@ final class SqliteStoreOptions {
 ///    SQLite opens it; an existing file loses its group and other bits.
 /// 3. The file is classified: new, ours (same major version), written by a newer major, foreign
 ///    (another `application_id`), or unreadable. A newer or unreadable file is left alone when a
-///    live lease is found in it (another version is running on it) and the store is memory-only;
+///    live owner is observed in it (another version is running on it) and the store is memory-only;
 ///    otherwise it is moved aside with its write-ahead log and the store starts empty. A foreign
 ///    file is always moved aside.
 /// 4. Write-ahead logging, `synchronous = FULL`, the tables of this version.
-/// 5. The lease: taken at once when free; when held, waited for once until it expires, then taken
-///    or given up (memory-only). When the previous owner vanished without releasing it, the file
-///    is checked with `PRAGMA quick_check` and moved aside if damaged.
+/// 5. The lease: taken at once when free; when held, the row is watched for
+///    [SqliteLease.observation]: unchanged, it is taken over; rewritten, the store is memory-only.
+///    When the previous owner vanished without releasing it and ran in another process, the file
+///    is checked with `PRAGMA quick_check` and moved aside if damaged. A file that
+///    `clearSqlitePersistence` is deleting is never taken.
 ///
 /// [onClosed] runs when the returned connection is closed (not for a memory-only connection).
 Future<SqliteConnection> openSqliteStore({
@@ -174,7 +175,11 @@ final class _StoreOpener {
           SqliteSchema.ensureTables(db);
         case _FileKind.newer:
         case _FileKind.unreadable:
-          if (SqliteLease.isHeldByLiveOwner(db, options.nowMs())) {
+          if (await SqliteLease.isHeldByLiveOwner(
+            db,
+            nowMs: options.nowMs,
+            delay: options.delay,
+          )) {
             return memoryOnly(
               kind == _FileKind.newer
                   ? 'it was written by a newer version, which is using it'
@@ -204,15 +209,23 @@ final class _StoreOpener {
         ownerId: options.newOwnerId(),
         nowMs: options.nowMs,
       );
+      // Liveness by observation: an owner that does not rewrite its row within one observation
+      // period is gone (revised after review, 2026-11-22).
       LeaseAttempt attempt = lease.tryAcquire(db);
       if (attempt is LeaseHeld) {
-        await options.delay(_waitFor(attempt));
-        attempt = lease.tryAcquire(db);
+        await options.delay(SqliteLease.observation);
+        attempt = lease.tryAcquire(db, observed: attempt.observed);
       }
       switch (attempt) {
+        case LeaseCleared():
+          return memoryOnly('it is being deleted');
         case LeaseHeld():
           return memoryOnly('another process or isolate owns it');
-        case LeaseAcquired(previousOwnerVanished: true)
+        // A hot restart (same process) did not crash the process: no check needed.
+        case LeaseAcquired(
+              previousOwnerVanished: true,
+              previousOwnerSameProcess: false,
+            )
             when !_passesQuickCheck(db):
           lease.release(db);
           _disposeQuietly(db);
@@ -361,16 +374,6 @@ final class _StoreOpener {
     } on sqlite.SqliteException {
       return false;
     }
-  }
-
-  Duration _waitFor(LeaseHeld held) {
-    final int longest =
-        (SqliteLease.duration + SqliteLease.takeOverSlack).inMilliseconds;
-    final int wait =
-        held.expiresAtMs +
-        SqliteLease.takeOverSlack.inMilliseconds -
-        options.nowMs();
-    return Duration(milliseconds: wait.clamp(0, longest));
   }
 
   static bool _isDamage(sqlite.SqliteException e) {
