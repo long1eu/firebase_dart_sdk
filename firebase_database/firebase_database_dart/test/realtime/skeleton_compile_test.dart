@@ -108,6 +108,8 @@ final List<Object?> _topLevel = <Object?>[
   FrameSplitter.new,
   FrameAssembler.new,
   FramingException.new,
+  checkJsonDepth,
+  utf8Length,
   // liveness.dart
   Liveness.new,
   // persistent_connection.dart
