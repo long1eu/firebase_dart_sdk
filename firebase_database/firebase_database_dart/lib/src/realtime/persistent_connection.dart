@@ -46,8 +46,11 @@ typedef RealtimeConnectionFactory =
 /// `permission_denied` (lead's decision). Every delegate call and every [RequestResultCallback]
 /// takes one microtask hop in socket arrival order (addendum 5). Before each attempt the tokens
 /// are fetched (bounded by `ConnectionTimings.connectTimeout`); a token change during the fetch
-/// wins over the fetched value (review H2). Tokens are handed over only where
-/// [RealtimeTarget.mayReceiveTokens] allows (review M1, threat model T3).
+/// wins over the fetched value (review H2). An auth change event is a signal: the token is fetched
+/// again, never taken from the event (shim review H1). Tokens are handed over only where
+/// [RealtimeTarget.mayReceiveTokens] allows (review M1, threat model T3). A message the decoder
+/// marks as a protocol error closes the connection, and the next attempt waits for the backoff at
+/// its cap (threat model T11, decisions section 6).
 ///
 /// Timeouts (review H1, the lead's replaced rule): the request table measures link silence. When
 /// the link has been silent for `ConnectionTimings.requestTimeout` with requests waiting, the
@@ -345,11 +348,7 @@ final class PersistentConnection implements ServerActions {
       get.completer.completeError(
         ServerActionsException(DatabaseErrorCode.operationFailed.wireStatus),
       );
-      _log(
-        DatabaseLogLevel.warning,
-        'Invalid data in a get answer; reconnecting',
-      );
-      _closeConnection(DisconnectReason.other);
+      _protocolError('invalid data in a get answer');
       return;
     }
     get.completer.complete(data);
@@ -422,14 +421,21 @@ final class PersistentConnection implements ServerActions {
     return sent;
   }
 
+  /// Android PersistentConnectionImpl.purgeOutstandingWrites (:464-483): every put and merge not
+  /// yet acked, and every onDisconnect request queued while offline, completes with
+  /// `write_canceled`; a later ack of a sent put is ignored. An onDisconnect request already sent
+  /// is kept, as Android keeps it (its queue holds only unsent requests, :578-586): the server
+  /// may hold it, so its own answer, or `disconnect` at a drop (review H3), completes it.
   @override
   void purgeOutstandingWrites() {
-    // Android PersistentConnectionImpl.purgeOutstandingWrites: every put and merge not yet acked
-    // completes with write_canceled; a later ack of a sent one is ignored.
-    final List<OutstandingWrite> purged = _queues.writes.toList();
+    final List<RequestResultCallback?> purged = <RequestResultCallback?>[
+      for (final OutstandingWrite write in _queues.writes) write.onComplete,
+      for (final QueuedOnDisconnect request in _queues.onDisconnects)
+        request.onComplete,
+    ];
     _queues.writes.clear();
-    for (final OutstandingWrite write in purged) {
-      final RequestResultCallback? onComplete = write.onComplete;
+    _queues.onDisconnects.clear();
+    for (final RequestResultCallback? onComplete in purged) {
       if (onComplete != null) {
         _emit(
           () => onComplete(DatabaseErrorCode.writeCanceled.wireStatus, null),
@@ -579,9 +585,38 @@ final class PersistentConnection implements ServerActions {
   // ---------------------------------------------------------------------------------------------
   // Tokens
 
+  /// A sign-out (null) is applied at once. Any other event only says that the token changed: the
+  /// token is fetched from the source and applied if no later event came meanwhile (shim review
+  /// H1: a provider may announce a change with a marker in place of the token; review H2: a
+  /// sign-out during the fetch wins).
   void _onAuthTokenChanged(String? token) {
-    if (!_shutdown) {
-      _authVersion++;
+    if (_shutdown) {
+      return;
+    }
+    final int version = ++_authVersion;
+    if (token == null) {
+      _session.authChanged(null);
+      return;
+    }
+    unawaited(_fetchChangedAuthToken(version));
+  }
+
+  Future<void> _fetchChangedAuthToken(int version) async {
+    final String? token;
+    try {
+      token = await _tokens.authToken(forceRefresh: false);
+    } on Object catch (error) {
+      if (version == _authVersion && !_shutdown) {
+        // Only the type: the provider's message may hold a credential (threat model T8). The
+        // current credential stays; the next connection fetches again.
+        _log(
+          DatabaseLogLevel.warning,
+          'Failed to get the changed auth token: ${error.runtimeType}',
+        );
+      }
+      return;
+    }
+    if (version == _authVersion && !_shutdown) {
       _session.authChanged(token);
     }
   }
@@ -843,13 +878,33 @@ final class PersistentConnection implements ServerActions {
           DatabaseLogLevel.warning,
           'Server error: ${safeServerText(decoded.message)}',
         );
+      case Ignored(isProtocolError: true):
+        _protocolError(decoded.why);
       case Ignored():
+        // An unknown action: a newer server must not break the connection.
         _log(
           DatabaseLogLevel.debug,
           'Ignored a server message: ${decoded.why}',
         );
     }
-    _markEstablishedWhenHealthy();
+    // The message may have closed the connection (a protocol error, an invalid get answer): a
+    // closed connection never counts as healthy.
+    if (identical(link, _link)) {
+      _markEstablishedWhenHealthy();
+    }
+  }
+
+  /// The server sent a message this client must not use (threat model T11, decisions section 6):
+  /// logged once at warning, the connection closed and the next attempt delayed by the backoff at
+  /// its cap. The cap also forgets an earlier `markEstablished`, so a server that sends a
+  /// malformed message on every connection never resets the delay to its minimum.
+  void _protocolError(String what) {
+    _log(
+      DatabaseLogLevel.warning,
+      'protocol error: ${safeServerText(what)}; reconnecting',
+    );
+    _backoff.setToMax();
+    _closeConnection(DisconnectReason.other);
   }
 
   /// The backoff resets only after the connection was healthy (enough messages, 3.4) and the server

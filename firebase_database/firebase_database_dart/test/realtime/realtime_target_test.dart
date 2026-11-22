@@ -347,7 +347,18 @@ void main() {
           ),
           useHeaders: true,
         ),
-        throwsArgumentError,
+        throwsA(
+          isA<ArgumentError>().having(
+            (ArgumentError e) => e.message,
+            'message',
+            allOf(
+              contains('http://x.firebaseio.com is plain text'),
+              contains('only the Realtime Database emulator accepts'),
+              contains('https://'),
+              contains('emulatorHost'),
+            ),
+          ),
+        ),
       );
     });
 

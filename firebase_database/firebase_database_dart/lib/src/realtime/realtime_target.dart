@@ -29,10 +29,11 @@ final class RealtimeTarget {
       _userAgent = userAgent,
       _address = _configuredAddress(repoInfo) {
     if (!repoInfo.secure && !repoInfo.isUsingEmulator) {
-      throw ArgumentError.value(
-        repoInfo.host,
-        'repoInfo',
-        'a database that is not the emulator must use TLS',
+      // Scheme and host only: a RepoInfo holds no query and no credential (threat model T8).
+      throw ArgumentError(
+        'http://${joinHostPort(_address.host, _address.port)} is plain text, which only the '
+        'Realtime Database emulator accepts. Use an https:// database URL, or select the '
+        "emulator with the emulatorHost argument ('host:port') of FirebaseDatabase.",
       );
     }
   }
@@ -200,7 +201,10 @@ final class RealtimeTarget {
   ///
   /// The scheme must be the configured one's family (`wss`/`https` when secure, `ws`/`http` for a
   /// plain-text emulator); a URL with user info never qualifies. The port compared is the
-  /// explicit one or the scheme's default (443 for `wss`/`https`, 80 for `ws`/`http`).
+  /// explicit one or the scheme's default (443 for `wss`/`https`, 80 for `ws`/`http`). A configured
+  /// host without a port stands for port 443 in both families, so a plain-text emulator receives
+  /// tokens only when its port is named: `emulatorHost: 'localhost'` gets no token (the
+  /// persistent connection's second gate, review M1 (b)).
   bool mayReceiveTokens(Uri uri) {
     final bool secure = repoInfo.secure;
     final String scheme = uri.scheme.toLowerCase();

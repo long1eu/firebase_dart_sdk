@@ -40,7 +40,10 @@ abstract interface class RealtimeTokenSource {
   /// The App Check token for the next connection, or null when there is no App Check.
   Future<String?> appCheckToken({required bool forceRefresh});
 
-  /// Every change of the auth token; null after a sign-out (8.3).
+  /// Every change of the auth token: null after a sign-out (8.3), non-null after a sign-in or a
+  /// refresh. A non-null value is only a signal: the connection fetches the token with
+  /// [authToken] and never sends the value of the event (an `AuthTokenChange` may carry a marker
+  /// in place of the token, shim review H1).
   Stream<String?> get authChanges;
 
   /// Every change of the App Check token.
