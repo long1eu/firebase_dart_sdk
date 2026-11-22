@@ -147,7 +147,11 @@ final List<Object> _query = <Object>[
   _keepSynced,
 ];
 const List<String> Function(String? path) _pathSegments = pathSegments;
-const DartQuery Function(DartFirebaseDatabase database, List<String> segments)
+const DartQuery Function(
+  DartFirebaseDatabase database,
+  List<String> segments, {
+  fs.DatabaseReference? clientRef,
+})
 _newQuery = DartQuery.new;
 DartFirebaseDatabase _queryDatabase(DartQuery q) => q.database;
 fs.DatabaseReference _clientRef(DartQuery q) => q.clientRef;
