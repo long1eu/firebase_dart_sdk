@@ -1,0 +1,120 @@
+class DataSnapshot
+  child(String path): DataSnapshot
+  final index: Index @internal
+  final node: Node @internal
+  final ref: DatabaseReference
+  get children: Iterable<DataSnapshot>
+  get childrenCount: int
+  get exists: bool
+  get hasChildren: bool
+  get key: String
+  get priority: Object
+  get value: Object
+  hasChild(String path): bool
+  new DataSnapshot.internal(DatabaseReference ref, Node node, Index index) @internal
+  toJson(): Object
+class DatabaseEvent
+  final previousChildKey: String
+  final snapshot: DataSnapshot
+  final type: DatabaseEventType
+  new DatabaseEvent.internal(DatabaseEventType type, DataSnapshot snapshot, {String previousChildKey}) @internal
+enum DatabaseEventType
+  new DatabaseEventType(int #index, String #name)
+  static final childAdded: DatabaseEventType
+  static final childChanged: DatabaseEventType
+  static final childMoved: DatabaseEventType
+  static final childRemoved: DatabaseEventType
+  static final value: DatabaseEventType
+  static final values: List<DatabaseEventType>
+enum DatabaseLogLevel
+  new DatabaseLogLevel(int #index, String #name)
+  static final debug: DatabaseLogLevel
+  static final error: DatabaseLogLevel
+  static final info: DatabaseLogLevel
+  static final values: List<DatabaseLogLevel>
+  static final warning: DatabaseLogLevel
+typedef DatabaseLogger = void Function(DatabaseLogLevel level, String message)
+class DatabasePersistence
+class DatabaseReference extends Query
+  child(String path): DatabaseReference
+  get key: String
+  get onDisconnect: OnDisconnect
+  get parent: DatabaseReference
+  get root: DatabaseReference
+  new DatabaseReference.internal(FirebaseDatabase database, QuerySpec spec) @internal
+  push(): DatabaseReference
+  remove(): Future<void>
+  runTransaction((dart.core.Object) -> .Transaction handler, {bool applyLocally}): Future<TransactionResult>
+  set(Object value, {Object priority}): Future<void>
+  setPriority(Object priority): Future<void>
+  update(Map<String, Object> values): Future<void>
+class FirebaseDatabase
+  close(): Future<void>
+  final app: FirebaseApp
+  get databaseUrl: Uri
+  get estimatedServerTime: DateTime
+  get isConnected: bool
+  get onConnected: Stream<bool>
+  get persistenceEnabled: bool
+  get serverTimeOffset: Duration
+  goOffline(): void
+  goOnline(): void
+  new FirebaseDatabase(FirebaseApp app, {String databaseUrl, String emulatorHost, String mockUserToken, DatabasePersistence persistence, (.DatabaseLogLevel, dart.core.String) -> void logger, () -> dart.core.DateTime clock, () -> dart.core.double random})
+  purgeOutstandingWrites(): Future<void>
+  ref([String path]): DatabaseReference
+  refFromUrl(String url): DatabaseReference
+  static get emulatorHostFromEnvironment: String
+class FirebaseDatabaseException extends FirebaseException
+  final cause: Object
+  final serverStatus: String
+  new FirebaseDatabaseException({String code, String message, String serverStatus, Object cause, StackTrace stackTrace})
+  toString(): String
+class OnDisconnect
+  cancel(): Future<void>
+  final reference: DatabaseReference @internal
+  new OnDisconnect.internal(DatabaseReference reference) @internal
+  remove(): Future<void>
+  set(Object value, {Object priority}): Future<void>
+  update(Map<String, Object> values): Future<void>
+class Query
+  ==(Object other): bool
+  endAt(Object value, {String key}): Query
+  endBefore(Object value, {String key}): Query
+  equalTo(Object value, {String key}): Query
+  final database: FirebaseDatabase
+  final spec: QuerySpec @internal
+  get hashCode: int
+  get onChildAdded: Stream<DatabaseEvent>
+  get onChildChanged: Stream<DatabaseEvent>
+  get onChildEvents: Stream<DatabaseEvent>
+  get onChildMoved: Stream<DatabaseEvent>
+  get onChildRemoved: Stream<DatabaseEvent>
+  get onValue: Stream<DatabaseEvent>
+  get path: String
+  get ref: DatabaseReference
+  get url: Uri
+  get(): Future<DataSnapshot>
+  keepSynced(bool value): Future<void>
+  limitToFirst(int limit): Query
+  limitToLast(int limit): Query
+  new Query.internal(FirebaseDatabase database, QuerySpec spec) @internal
+  once([DatabaseEventType type]): Future<DatabaseEvent>
+  orderByChild(String path): Query
+  orderByKey(): Query
+  orderByPriority(): Query
+  orderByValue(): Query
+  startAfter(Object value, {String key}): Query
+  startAt(Object value, {String key}): Query
+abstract class ServerValue
+  new ServerValue()
+  static final timestamp: Object
+  static increment(num delta): Object
+class Transaction
+  new Transaction.abort()
+  new Transaction.success(Object value, {Object priority})
+typedef TransactionHandler = Transaction Function(Object? currentValue)
+class TransactionResult
+  final committed: bool
+  final snapshot: DataSnapshot
+  new TransactionResult.internal({bool committed, DataSnapshot snapshot}) @internal
+mockUserTokenFor(String uid, {String projectId, Map<String, Object> claims}): String

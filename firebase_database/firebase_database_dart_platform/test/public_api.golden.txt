@@ -1,0 +1,25 @@
+typedef AppCheckProviderFactory = dart_app.AppCheckTokenProvider? Function(core.FirebaseApp app)
+class DartFirebaseDatabase extends DatabasePlatform
+  @visibleForTesting static DatabaseClientFactory clientFactory
+  DartFirebaseDatabase() : super()
+  DatabasePlatform delegateFor({required FirebaseApp app, String? databaseURL})
+  DatabaseReferencePlatform ref([String? path])
+  Future<void> goOffline()
+  Future<void> goOnline()
+  Future<void> purgeOutstandingWrites()
+  bool get started
+  fs.FirebaseDatabase get client
+  static DartDatabaseConfig config
+  static DartFirebaseDatabase forApp(FirebaseApp app, String? databaseURL)
+  static bool get anyStarted
+  void setLoggingEnabled(bool enabled)
+  void setPersistenceCacheSizeBytes(int cacheSize)
+  void setPersistenceEnabled(bool enabled)
+  void useDatabaseEmulator(String host, int port)
+typedef DatabasePersistenceFactory = fs.DatabasePersistence Function(int cacheSizeBytes)
+abstract final class FirebaseDatabaseDart
+  static bool get isRegistered
+  static fs.FirebaseDatabase clientFor(FirebaseApp app, {String? databaseURL})
+  static void registerWith()
+  static void use({TokenProviderFactory? tokenProviderFor, AppCheckProviderFactory? appCheckProviderFor, DatabasePersistenceFactory? persistenceFor, bool? useDartCore})
+typedef TokenProviderFactory = dart_app.AuthTokenProvider? Function(core.FirebaseApp app)

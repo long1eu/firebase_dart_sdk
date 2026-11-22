@@ -1,0 +1,231 @@
+class ChildKey
+  ==(Object other): bool
+  compareTo(ChildKey other): int
+  final intValue: int
+  final name: String
+  get hashCode: int
+  get isInt: bool
+  get isPriorityKey: bool
+  new ChildKey(String name)
+  static final info: ChildKey
+  static final max: ChildKey
+  static final min: ChildKey
+  static final priority: ChildKey
+  toString(): String
+class CompoundWrite
+  ==(Object other): bool
+  addChildWrite(ChildKey key, Node node): CompoundWrite
+  addWrite(Path path, Node node): CompoundWrite
+  addWrites(Path path, CompoundWrite updates): CompoundWrite
+  apply(Node node): Node
+  childCompoundWrite(Path path): CompoundWrite
+  childCompoundWrites(): Map<ChildKey, CompoundWrite>
+  final writeTree: ImmutableTree<Node>
+  get entries: Iterable<MapEntry<Path, Node>>
+  get hashCode: int
+  get isEmpty: bool
+  getCompleteChildren(): List<NamedNode>
+  getCompleteNode(Path path): Node
+  hasCompleteWrite(Path path): bool
+  new CompoundWrite(ImmutableTree<Node> writeTree)
+  new CompoundWrite.fromChildMerge(Map<ChildKey, Node> merge)
+  new CompoundWrite.fromPathMerge(Map<Path, Node> merge)
+  new CompoundWrite.fromValue(Map<String, Object> merge)
+  removeWrite(Path path): CompoundWrite
+  rootWrite(): Node
+  static get empty: CompoundWrite
+  toJson({bool exportFormat}): Map<String, Object>
+  toString(): String
+class ImmutableTree
+  ==(Object other): bool
+  containsMatchingValue((dynamic) -> dart.core.bool predicate): bool
+  final children: SortedMap<ChildKey, ImmutableTree<X0>>
+  final value: X0
+  findOnPath(Path path, (.Path, dynamic) -> dynamic fn): dynamic
+  findRootMostMatchingPathAndValue(Path relativePath, (dynamic) -> dart.core.bool predicate): Record
+  findRootMostValueAndPath(Path relativePath): Record
+  fold((.Path, dynamic, dart.core.Map) -> dynamic fn): dynamic
+  foldValues(dynamic initial, (.Path, dynamic, dynamic) -> dynamic fn): dynamic
+  forEach((.Path, dynamic) -> void fn): void
+  forEachChild((.ChildKey, dynamic) -> void fn): void
+  forEachOnPath(Path path, (.Path, dynamic) -> void fn): ImmutableTree<X0>
+  get entries: Iterable<MapEntry<Path, X0>>
+  get hashCode: int
+  get isEmpty: bool
+  get(Path relativePath): X0
+  getChild(ChildKey key): ImmutableTree<X0>
+  leafMostValue(Path relativePath): X0
+  leafMostValueMatching(Path relativePath, (dynamic) -> dart.core.bool predicate): X0
+  new ImmutableTree(dynamic value, [SortedMap<ChildKey, ImmutableTree<dynamic>> children])
+  new ImmutableTree.empty()
+  new ImmutableTree.fromMap(Map<Path, dynamic> values)
+  remove(Path relativePath): ImmutableTree<X0>
+  rootMostValue(Path relativePath): X0
+  rootMostValueMatching(Path relativePath, (dynamic) -> dart.core.bool predicate): X0
+  set(Path relativePath, X0 toSet): ImmutableTree<X0>
+  setTree(Path relativePath, ImmutableTree<X0> newTree): ImmutableTree<X0>
+  subtree(Path relativePath): ImmutableTree<X0>
+  toString(): String
+class InMemoryPersistenceStorageEngine
+  beginTransaction(): void
+  close(): void
+  degrade(): void
+  deleteTrackedQuery(int trackedQueryId): void
+  disableTransactionCheck: bool
+  endTransaction(): void
+  get isDurable: bool
+  loadTrackedQueries(): List<TrackedQuery>
+  loadTrackedQueryKeys(Set<int> trackedQueryIds): Set<ChildKey>
+  loadUserWrites(): List<UserWriteRecord>
+  logger: (.DatabaseLogLevel, dart.core.String) -> void
+  mergeIntoServerCache(Path path, Node node): void
+  mergeIntoServerCacheWrite(Path path, CompoundWrite children): void
+  new InMemoryPersistenceStorageEngine([List<UserWriteRecord> initialWrites])
+  overwriteServerCache(Path path, Node node): void
+  pruneCache(Path root, PruneForest pruneForest): void
+  removeAllUserWrites(): void
+  removeUserWrite(int writeId): void
+  resetPreviouslyActiveTrackedQueries(int lastUse): void
+  saveTrackedQuery(TrackedQuery trackedQuery): void
+  saveTrackedQueryKeys(int trackedQueryId, Set<ChildKey> keys): void
+  saveUserMerge(Path path, CompoundWrite children, int writeId): void
+  saveUserOverwrite(Path path, Node node, int writeId): void
+  serverCache(Path path): Node
+  serverCacheEstimatedSizeInBytes(): int
+  setTransactionSuccessful(): void
+  updateTrackedQueryKeys(int trackedQueryId, Set<ChildKey> added, Set<ChildKey> removed): void
+abstract class Node
+  forEachChild(Index index, (.ChildKey, .Node) -> dart.core.bool action): bool
+  get isEmpty: bool
+  get isLeafNode: bool
+  get numChildren: int
+  get priority: Node
+  get value: Object
+  getChild(Path path): Node
+  getImmediateChild(ChildKey key): Node
+  getPredecessorChildKey(ChildKey key, Node child, Index index): ChildKey
+  hasChild(ChildKey key): bool
+  hash(): String
+  isIndexed(Index index): bool
+  new Node()
+  toJson({bool exportFormat}): Object
+  updateChild(Path path, Node newChild): Node
+  updateImmediateChild(ChildKey key, Node newChild): Node
+  updatePriority(Node newPriority): Node
+  withIndex(Index index): Node
+class Path
+  ==(Object other): bool
+  child(ChildKey key): Path
+  childPath(Path other): Path
+  compareTo(Path other): int
+  contains(Path other): bool
+  final segments: List<ChildKey>
+  get back: ChildKey
+  get front: ChildKey
+  get hashCode: int
+  get isEmpty: bool
+  get length: int
+  get parent: Path
+  new Path(String pathString)
+  new Path.fromKeys(List<ChildKey> segments)
+  new Path.fromStrings(List<String> segments)
+  popFront(): Path
+  static final empty: Path
+  static relative(Path outer, Path inner): Path
+  toString(): String
+  toStringList(): List<String>
+  toUrlEncodedString(): String
+class PersistenceKey
+  ==(Object other): bool
+  final appName: String
+  final databaseUrl: Uri
+  get hashCode: int
+  new PersistenceKey({String appName, Uri databaseUrl})
+  toString(): String
+abstract class PersistenceStorageEngine
+  beginTransaction(): void
+  close(): void
+  deleteTrackedQuery(int trackedQueryId): void
+  endTransaction(): void
+  get isDurable: bool
+  loadTrackedQueries(): List<TrackedQuery>
+  loadTrackedQueryKeys(Set<int> trackedQueryIds): Set<ChildKey>
+  loadUserWrites(): List<UserWriteRecord>
+  mergeIntoServerCache(Path path, Node node): void
+  mergeIntoServerCacheWrite(Path path, CompoundWrite children): void
+  new PersistenceStorageEngine()
+  overwriteServerCache(Path path, Node node): void
+  pruneCache(Path root, PruneForest pruneForest): void
+  removeAllUserWrites(): void
+  removeUserWrite(int writeId): void
+  resetPreviouslyActiveTrackedQueries(int lastUse): void
+  saveTrackedQuery(TrackedQuery trackedQuery): void
+  saveTrackedQueryKeys(int trackedQueryId, Set<ChildKey> keys): void
+  saveUserMerge(Path path, CompoundWrite children, int writeId): void
+  saveUserOverwrite(Path path, Node node, int writeId): void
+  serverCache(Path path): Node
+  serverCacheEstimatedSizeInBytes(): int
+  setTransactionSuccessful(): void
+  updateTrackedQueryKeys(int trackedQueryId, Set<ChildKey> added, Set<ChildKey> removed): void
+typedef PersistenceStorageEngineOpener = Future<PersistenceStorageEngine> Function(PersistenceKey key, {DatabaseLogger? logger})
+class PruneForest
+  ==(Object other): bool
+  affectsPath(Path path): bool
+  child(ChildKey key): PruneForest
+  childAtPath(Path path): PruneForest
+  final forest: ImmutableTree<bool>
+  foldKeptNodes(dynamic initial, (.Path, dynamic) -> dynamic fn): dynamic
+  get hashCode: int
+  keep(Path path): PruneForest
+  keepAll(Path path, Set<ChildKey> children): PruneForest
+  new PruneForest()
+  new PruneForest.fromTree(ImmutableTree<bool> forest)
+  prune(Path path): PruneForest
+  pruneAll(Path path, Set<ChildKey> children): PruneForest
+  prunesAnything(): bool
+  shouldKeep(Path path): bool
+  shouldPruneUnkeptDescendants(Path path): bool
+  toString(): String
+class QuerySpec
+  ==(Object other): bool
+  final params: QueryParams
+  final path: Path
+  get hashCode: int
+  get index: Index
+  get isDefault: bool
+  get loadsAllData: bool
+  new QuerySpec(Path path, QueryParams params)
+  new QuerySpec.defaultAt(Path path)
+  new QuerySpec.fromPathAndWireObject(Path path, Map<String, Object> wire)
+  toListenSpec(): ListenSpec
+  toString(): String
+class TrackedQuery
+  ==(Object other): bool
+  final active: bool
+  final complete: bool
+  final id: int
+  final lastUse: int
+  final querySpec: QuerySpec
+  get hashCode: int
+  new TrackedQuery({int id, QuerySpec querySpec, int lastUse, bool complete, bool active})
+  toString(): String
+  withActiveState(bool active): TrackedQuery
+  withComplete(): TrackedQuery
+  withLastUse(int lastUse): TrackedQuery
+class UserWriteRecord
+  ==(Object other): bool
+  final merge: CompoundWrite
+  final overwrite: Node
+  final path: Path
+  final visible: bool
+  final writeId: int
+  get hashCode: int
+  get isMerge: bool
+  get isOverwrite: bool
+  new UserWriteRecord.merge(int writeId, Path path, CompoundWrite merge)
+  new UserWriteRecord.overwrite(int writeId, Path path, Node overwrite, {bool visible})
+  toString(): String
+databasePersistence({(.PersistenceKey, {logger: dart.core.(.DatabaseLogLevel, dart.core.String) -> void}) -> dart.async.Future opener, int cacheSizeBytes, bool cacheServerData}): DatabasePersistence
+estimateSerializedNodeSize(Node node): int
+var keyIndex: KeyIndex
+nodeFromJson(Object json, [Object priority]): Node

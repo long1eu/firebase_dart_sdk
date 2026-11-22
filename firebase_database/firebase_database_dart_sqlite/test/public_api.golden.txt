@@ -1,0 +1,12 @@
+class ClearPersistenceException
+  final failures: List<FileSystemException>
+  new ClearPersistenceException(List<FileSystemException> failures)
+  toString(): String
+class SqlitePersistence
+  clear(PersistenceKey key): Future<void>
+  final directory: String
+  new SqlitePersistence(String directory, {SqliteStoreOptions options})
+  open(PersistenceKey key, {(.DatabaseLogLevel, dart.core.String) -> void logger}): Future<PersistenceStorageEngine>
+  pathOf(PersistenceKey key): String
+clearSqlitePersistence(String directory, {String appName, Uri databaseUrl}): Future<void>
+sqlitePersistence(String directory, {int cacheSizeBytes, bool cacheServerData}): DatabasePersistence
