@@ -986,10 +986,11 @@ void main() {
     });
 
     test('helloDelay holds the hello back', () async {
-      server = FakeRtdbServer(helloDelay: const Duration(milliseconds: 30));
+      // Wide margins: in a browser the open alone can take tens of milliseconds.
+      server = FakeRtdbServer(helloDelay: const Duration(milliseconds: 400));
       await open();
       expect(_messages(events), isEmpty);
-      await Future<void>.delayed(const Duration(milliseconds: 60));
+      await Future<void>.delayed(const Duration(milliseconds: 800));
       expect(_messages(events), hasLength(1));
     });
   });

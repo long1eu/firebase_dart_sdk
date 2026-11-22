@@ -115,8 +115,15 @@ void main() {
         expect(wired.auth.calls, <bool>[false]);
         expect(wired.appCheck.calls, <bool>[false]);
         final ConnectAttempt attempt = wired.connector.attempts.single;
-        expect(attempt.headers['X-Firebase-GMPID'], '1:123:dart:abc');
-        expect(attempt.headers['X-Firebase-AppCheck'], 'app-check-token');
+        // A browser WebSocket carries no headers: there both travel in the query.
+        if (_isWeb) {
+          expect(attempt.url.queryParameters['p'], '1:123:dart:abc');
+          expect(attempt.url.queryParameters['ac'], 'app-check-token');
+          expect(attempt.headers, isEmpty);
+        } else {
+          expect(attempt.headers['X-Firebase-GMPID'], '1:123:dart:abc');
+          expect(attempt.headers['X-Firebase-AppCheck'], 'app-check-token');
+        }
         final FakeWsChannel channel = wired.connector.last;
         expect(channel.lastRequest('auth')?['b'], <String, Object?>{
           'cred': _jwt,
@@ -275,10 +282,18 @@ void main() {
         await tooBig;
         final http.Request request = requests.single;
         expect(request.url.queryParameters['auth'], _jwt);
-        expect(request.headers['X-Firebase-AppCheck'], 'app-check-token');
+        if (_isWeb) {
+          expect(request.url.queryParameters['ac'], 'app-check-token');
+          expect(request.headers.containsKey('X-Firebase-AppCheck'), isFalse);
+        } else {
+          expect(request.headers['X-Firebase-AppCheck'], 'app-check-token');
+        }
         expect(request.url.host, 'test-ns.firebaseio.com');
         await client.shutdown();
       },
     );
   });
 }
+
+/// Whether the tests run compiled for a browser (no `dart:io`).
+const bool _isWeb = bool.fromEnvironment('dart.library.js_interop');

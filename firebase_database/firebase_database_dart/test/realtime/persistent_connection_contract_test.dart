@@ -20,7 +20,12 @@ const Set<String> _contractActions = <String>{
   'oc',
 };
 const Set<String> _credentialActions = <String>{'auth', 'gauth', 'appcheck'};
-const Duration _requestTimeout = Duration(milliseconds: 60);
+
+/// Real time. A browser clamps nested timers to 4 ms, so the 20 zero-delay turns of one
+/// `pumpEventQueue` alone take about 80 ms there: 60 ms would call a healthy link silent.
+const Duration _requestTimeout = Duration(
+  milliseconds: bool.fromEnvironment('dart.library.js_interop') ? 600 : 60,
+);
 
 /// Plays the server for a PersistentConnection built over a FakeRtdbServer. Responses are held:
 /// the contract answers what it wants, the harness answers the credentials of every connection.
