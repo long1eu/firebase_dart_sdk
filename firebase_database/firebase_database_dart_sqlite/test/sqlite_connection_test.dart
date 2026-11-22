@@ -245,16 +245,55 @@ void main() {
       },
     );
 
-    test('M5 normal work waits 1 s for a lock', () async {
-      final SqliteConnection store = await fixture.open();
-      addTearDown(store.close);
+    test(
+      'M5 normal work waits about 1 s for a lock; closing does not wait',
+      () async {
+        // Fails if the opener's `PRAGMA busy_timeout = $busyTimeoutMs` is dropped (no wait) or the
+        // timeout goes back to 5 s, or if SqliteConnection.close runs its clean-up without
+        // `_withoutBusyWait`. Bounds are wide for slow machines.
+        final SqliteConnection store = await fixture.open();
+        addTearDown(store.close);
+        final sqlite.Database other = fixture.raw();
+        addTearDown(() => StoreFixture.closeRaw(other));
+        other.execute('BEGIN IMMEDIATE');
 
-      expect(
-        StoreFixture.scalar(store.debugDatabase!, 'PRAGMA busy_timeout'),
-        busyTimeoutMs,
-      );
-      expect(busyTimeoutMs, 1000);
-    });
+        final Stopwatch waited = Stopwatch()..start();
+        expect(store.begin(), isFalse);
+        waited.stop();
+        store.rollback();
+        expect(waited.elapsedMilliseconds, greaterThanOrEqualTo(800));
+        expect(waited.elapsedMilliseconds, lessThan(4000));
+
+        final Stopwatch closing = Stopwatch()..start();
+        store.close();
+        closing.stop();
+        expect(closing.elapsedMilliseconds, lessThan(500));
+        other.execute('ROLLBACK');
+      },
+    );
+
+    test(
+      'a close on a busy file keeps the lease row; the next open takes it after one observation',
+      () async {
+        // The busy branch of SqliteLease.release (sqlite_lease.dart:291): the failed delete is
+        // rolled back quietly and close does not throw.
+        final SqliteConnection store = await fixture.open();
+        addTearDown(store.close);
+        final sqlite.Database other = fixture.raw();
+        addTearDown(() => StoreFixture.closeRaw(other));
+        other.execute('BEGIN IMMEDIATE');
+
+        store.close();
+        other.execute('ROLLBACK');
+
+        expect(store.state, StoreState.closed);
+        expect(SqliteLease.read(other)?.ownerId, 'owner-1');
+        final SqliteConnection next = await fixture.open();
+        addTearDown(next.close);
+        expect(next.state, StoreState.durable);
+        expect(fixture.clock.delays, <Duration>[SqliteLease.observation]);
+      },
+    );
 
     test(
       'L9 a close inside a transaction leaves the end of the transaction harmless',

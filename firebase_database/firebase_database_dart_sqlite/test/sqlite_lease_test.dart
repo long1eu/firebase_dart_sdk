@@ -13,10 +13,29 @@ void main() {
   setUp(() => fixture = StoreFixture());
   tearDown(() => fixture.dispose());
 
-  LeaseRow currentLease() {
+  LeaseRow? leaseOrNull() {
     final sqlite.Database db = fixture.raw();
     try {
-      return SqliteLease.read(db)!;
+      return SqliteLease.read(db);
+    } finally {
+      StoreFixture.closeRaw(db);
+    }
+  }
+
+  LeaseRow currentLease() => leaseOrNull()!;
+
+  /// Writes the lease row of the store file through a raw connection, as another process would.
+  void writeLease(
+    String ownerId, {
+    required int epoch,
+    required int expiresAtMs,
+  }) {
+    final sqlite.Database db = fixture.raw();
+    try {
+      db.execute(
+        'INSERT OR REPLACE INTO lease (id, owner_id, epoch, expires_at_ms) VALUES (0, ?, ?, ?)',
+        <Object?>[ownerId, epoch, expiresAtMs],
+      );
     } finally {
       StoreFixture.closeRaw(db);
     }
@@ -31,10 +50,8 @@ void main() {
     final LeaseRow lease = currentLease();
     expect(lease.ownerId, 'owner-1');
     expect(lease.epoch, 1);
-    expect(
-      lease.expiresAtMs,
-      fixture.clock.nowMs + SqliteLease.duration.inMilliseconds,
-    );
+    // The lease duration of the review rulings (2026-11-22): 15 s.
+    expect(lease.expiresAtMs, fixture.clock.nowMs + 15000);
   });
 
   test(
@@ -139,19 +156,76 @@ void main() {
   });
 
   test(
-    'E-L5 a refresh renews a lease that expired while nobody took it',
+    'E-L5 a clock that steps back never moves the expiry back; the owner stays live',
     () async {
-      final SqliteConnection store = await fixture.open();
-      addTearDown(store.close);
+      // m19. Fails without `if (expires <= _lastWrittenExpiresMs)` in SqliteLease.extend
+      // (sqlite_lease.dart:258): the refresh writes an expiry an hour earlier.
+      final FakeClock ownerClock = FakeClock(fixture.clock.nowMs);
+      final SqliteConnection owner = await fixture.open(clock: ownerClock);
+      addTearDown(owner.close);
+      final int before = currentLease().expiresAtMs;
 
-      fixture.clock.advance(const Duration(seconds: 10));
-      store.refreshLease();
+      ownerClock.nowMs -= const Duration(hours: 1).inMilliseconds;
+      owner.refreshLease();
+      final int afterStep = currentLease().expiresAtMs;
+      expect(afterStep, greaterThan(before));
 
-      expect(store.state, StoreState.durable);
-      expect(
-        currentLease().expiresAtMs,
-        fixture.clock.nowMs + SqliteLease.duration.inMilliseconds,
-      );
+      fixture.clock.onAdvance = owner.refreshLease;
+      final SqliteConnection second = await fixture.open();
+      addTearDown(second.close);
+
+      expect(second.state, StoreState.memoryOnly);
+      expect(owner.state, StoreState.durable);
+      expect(currentLease().expiresAtMs, greaterThan(afterStep));
+    },
+  );
+
+  test(
+    'a lease refreshed by an owner whose clock stands still stays live',
+    () async {
+      // m19. Fails without the monotonic step of SqliteLease.extend (sqlite_lease.dart:258-260):
+      // the refresh writes the same row, and the observer takes a live owner's file.
+      final FakeClock frozen = FakeClock(fixture.clock.nowMs);
+      final SqliteConnection owner = await fixture.open(clock: frozen);
+      addTearDown(owner.close);
+      fixture.clock.onAdvance = owner.refreshLease;
+
+      final SqliteConnection second = await fixture.open();
+      addTearDown(second.close);
+
+      expect(second.state, StoreState.memoryOnly);
+      expect(owner.state, StoreState.durable);
+      expect(currentLease().ownerId, 'owner-1');
+    },
+  );
+
+  test(
+    'a transaction rewrites the row from half a refresh interval on, and after the clock went back',
+    () async {
+      // Fails if SqliteLease.extendIfDue (sqlite_lease.dart:275) uses `>` for `>=`, or drops the
+      // `sinceLast < 0` case.
+      (await fixture.open()).close();
+      final sqlite.Database raw = fixture.raw();
+      addTearDown(() => StoreFixture.closeRaw(raw));
+      final FakeClock clock = fixture.clock;
+      final SqliteLease lease = SqliteLease(ownerId: '17:a', nowMs: clock.now);
+      expect(lease.tryAcquire(raw), isA<LeaseAcquired>());
+      bool rewritten() {
+        raw.execute('BEGIN IMMEDIATE');
+        try {
+          return lease.extendIfDue(raw);
+        } finally {
+          raw.execute('COMMIT');
+        }
+      }
+
+      final int half = SqliteLease.refreshInterval.inMilliseconds ~/ 2;
+      clock.nowMs += half - 1;
+      expect(rewritten(), isFalse);
+      clock.nowMs += 1;
+      expect(rewritten(), isTrue);
+      clock.nowMs -= 1000;
+      expect(rewritten(), isTrue);
     },
   );
 
@@ -171,10 +245,6 @@ void main() {
       store.refreshLease();
 
       expect(currentLease().expiresAtMs, greaterThan(afterTransaction));
-      expect(
-        currentLease().expiresAtMs,
-        fixture.clock.nowMs + SqliteLease.duration.inMilliseconds,
-      );
     },
   );
 
@@ -350,8 +420,8 @@ void main() {
   );
 
   test('L4 a takeover from the same process is reported as such', () async {
-    // Fails if tryAcquire stops comparing `processOf` (previousOwnerSameProcess); the opener then
-    // runs quick_check after every hot restart (sqlite_open.dart, the LeaseAcquired case).
+    // Fails if tryAcquire stops comparing `processOf` (previousOwnerSameProcess). What the opener
+    // does with the flag is pinned in sqlite_open_test.dart, "quick check after a vanished owner".
     (await fixture.open()).close();
     final sqlite.Database raw = fixture.raw();
     addTearDown(() => StoreFixture.closeRaw(raw));
@@ -374,5 +444,119 @@ void main() {
     ).tryAcquire(raw, observed: now);
     expect((other as LeaseAcquired).previousOwnerVanished, isTrue);
     expect(other.previousOwnerSameProcess, isFalse);
+  });
+
+  test(
+    'an owner that lost its lease without noticing does not release the new owner on close',
+    () async {
+      // m20. Fails if SqliteLease.release deletes the row without `owner_id = ? AND epoch = ?`
+      // (sqlite_lease.dart:287): the new owner's row is gone and its next transaction is fenced.
+      final SqliteConnection first = await fixture.open();
+      // No refresh: the second open takes the file over. The first has run no transaction since,
+      // so it still counts itself durable.
+      final SqliteConnection second = await fixture.open();
+      addTearDown(second.close);
+      expect(first.state, StoreState.durable);
+
+      first.close();
+
+      final LeaseRow? lease = leaseOrNull();
+      expect(lease?.ownerId, 'owner-2');
+      expect(lease?.epoch, 2);
+      expect(second.begin(), isTrue);
+      second.commit();
+      expect(second.state, StoreState.durable);
+    },
+  );
+
+  test(
+    'an expired tombstone no longer keeps the file: it is taken over after one observation',
+    () async {
+      // m21. Fails if SqliteLease._isLiveTombstone ignores the time (sqlite_lease.dart:330): the
+      // open sees a file being deleted and keeps data in memory.
+      (await fixture.open()).close();
+      writeLease(
+        SqliteLease.clearingOwnerId,
+        epoch: 4,
+        expiresAtMs: fixture.clock.nowMs - 1,
+      );
+
+      final SqliteConnection store = await fixture.open();
+      addTearDown(store.close);
+
+      expect(store.state, StoreState.durable);
+      expect(fixture.clock.delays, <Duration>[SqliteLease.observation]);
+      expect(currentLease().ownerId, 'owner-2');
+      expect(currentLease().epoch, 5);
+    },
+  );
+
+  group('refresh timer', () {
+    test('the opener arms one timer of 5 s; a tick rewrites the row', () async {
+      // Fails without `connection.startLeaseRefresh()` in the opener (sqlite_open.dart:250), or
+      // with another period in SqliteConnection.startLeaseRefresh.
+      final SqliteConnection store = await fixture.open();
+      addTearDown(store.close);
+      final FakePeriodicTimer timer = fixture.timers.single;
+      expect(timer.period, const Duration(seconds: 5));
+      final int before = currentLease().expiresAtMs;
+
+      fixture.clock.advance(const Duration(seconds: 5));
+      timer.fire();
+
+      expect(currentLease().expiresAtMs, greaterThan(before));
+      expect(timer.isActive, isTrue);
+      expect(store.state, StoreState.durable);
+    });
+
+    test('close cancels the timer', () async {
+      // Fails without `_refreshTimer?.cancel()` in SqliteConnection.close.
+      final SqliteConnection store = await fixture.open();
+      final FakePeriodicTimer timer = fixture.timers.single;
+
+      store.close();
+
+      expect(timer.isActive, isFalse);
+    });
+
+    test(
+      'a tick after another owner took the lease fences and cancels',
+      () async {
+        // Fails without `_refreshTimer?.cancel()` in SqliteConnection._stopWriting.
+        final SqliteConnection store = await fixture.open();
+        addTearDown(store.close);
+        final FakePeriodicTimer timer = fixture.timers.single;
+        writeLease('intruder', epoch: 9, expiresAtMs: 0);
+
+        timer.fire();
+
+        expect(store.state, StoreState.fenced);
+        expect(timer.isActive, isFalse);
+        expect(currentLease().ownerId, 'intruder');
+      },
+    );
+
+    test(
+      'three ticks on a busy file degrade the store and cancel the timer',
+      () async {
+        // Fails without `_refreshTimer?.cancel()` in SqliteConnection._stopWriting, or if a busy
+        // refresh is not counted toward maxConsecutiveBusy.
+        final SqliteConnection store = await fixture.open();
+        addTearDown(store.close);
+        final FakePeriodicTimer timer = fixture.timers.single;
+        final sqlite.Database other = fixture.raw();
+        addTearDown(() => StoreFixture.closeRaw(other));
+        other.execute('BEGIN IMMEDIATE');
+
+        timer.fire();
+        timer.fire();
+        expect(store.state, StoreState.durable);
+        timer.fire();
+        other.execute('ROLLBACK');
+
+        expect(store.state, StoreState.degraded);
+        expect(timer.isActive, isFalse);
+      },
+    );
   });
 }

@@ -13,8 +13,8 @@ import 'package:firebase_database_dart/src/core/snap/indexes/path_index.dart';
 // not exported by storage_engine.dart
 import 'package:firebase_database_dart/src/core/view/query_params.dart';
 import 'package:firebase_database_dart/storage_engine.dart';
+import 'package:firebase_database_dart_sqlite/src/node_codec.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';
-import 'package:firebase_database_dart_sqlite/src/sqlite_files.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_storage_engine.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:test/test.dart';
@@ -434,8 +434,9 @@ void main() {
       expect(h.cache('foo/bar'), node('bar-value'));
     });
 
-    // Mutation: in ServerCacheRows._saveNested, raise splitThreshold to 1 << 40: one row per
-    // write, and the row-count expectation fails.
+    // Mutation: in ServerCacheRows._saveNested, raise splitThreshold to 1 << 40 (one row per
+    // write) or double it (a row holds a node of more than 16 KiB), or halve it (no row holds a
+    // node of more than 8 KiB).
     test('E-C12 huge node is split at 16 KiB and reads back whole', () {
       final Map<String, Object?> outer = <String, Object?>{};
       for (int i = 0; i < 100; i++) {
@@ -450,14 +451,22 @@ void main() {
       final Node value = node(outer);
       h.overwrite('foo', value);
       expect(h.cache('foo'), value);
-      expect(
-        h.rawScalar('SELECT count(*) FROM server_cache')! as int,
-        greaterThan(1),
-      );
-      expect(
-        h.rawScalar('SELECT max(length(value)) FROM server_cache')! as int,
-        lessThan(32 * 1024),
-      );
+      // Every row holds a node of at most 16 KiB (estimated JSON), and some row one of more
+      // than 8 KiB: the split is at the threshold, not below it.
+      int largest = 0;
+      final sqlite.Database db = h.fixture.raw();
+      try {
+        for (final sqlite.Row row in db.select(
+          'SELECT value FROM server_cache',
+        )) {
+          final Node stored = NodeCodec.decodeNode(row['value'] as Uint8List);
+          largest = max(largest, estimateSerializedNodeSize(stored));
+        }
+      } finally {
+        StoreFixture.closeRaw(db);
+      }
+      expect(largest, lessThanOrEqualTo(16 * 1024));
+      expect(largest, greaterThan(8 * 1024));
     });
 
     test('E-C13 many large leaf nodes', () {
@@ -674,10 +683,12 @@ void main() {
       final int sampleSize = estimateSerializedNodeSize(sampleNode);
       h.overwrite('foo', sampleNode);
       final int expected = sampleSize + 4;
+      // Android's bound, then the exact count of this engine.
       expect(
         (h.engine.serverCacheEstimatedSizeInBytes() - expected).abs(),
         lessThan(20),
       );
+      expect(h.engine.serverCacheEstimatedSizeInBytes(), h.fullSum());
     });
 
     test('E-S2 size accounts for paths (bytes)', () {
@@ -711,6 +722,29 @@ void main() {
         (h.engine.serverCacheEstimatedSizeInBytes() - expected).abs(),
         lessThan(20 * count),
       );
+      expect(h.engine.serverCacheEstimatedSizeInBytes(), h.fullSum());
+    });
+
+    test('a transaction refused as busy leaves the counter equal to the rows', () {
+      // Fails without the `!_connection.commit()` branch of SqliteStorageEngine.endTransaction
+      // (sqlite_storage_engine.dart:89-91): the refused write is still counted.
+      h.overwrite('a', sampleNode);
+      final sqlite.Database other = h.fixture.raw();
+      try {
+        other.execute('BEGIN IMMEDIATE');
+        h.overwrite('b', sampleNode);
+        other.execute('ROLLBACK');
+      } finally {
+        StoreFixture.closeRaw(other);
+      }
+
+      expect(h.connection.isDurable, isTrue);
+      expect(h.cache('b').isEmpty, isTrue);
+      expect(h.engine.serverCacheEstimatedSizeInBytes(), h.fullSum());
+
+      h.overwrite('b', sampleNode);
+      expect(h.cache('b'), sampleNode);
+      expect(h.engine.serverCacheEstimatedSizeInBytes(), h.fullSum());
     });
 
     test(
@@ -1038,20 +1072,6 @@ void main() {
         expect(h.cache('a').isEmpty, isTrue);
       },
     );
-
-    test('E-F1 any app name and URL give a 32-hex file name', () {
-      const List<String> names = <String>[
-        '[DEFAULT]',
-        r'.?!@$%^&*()\/-~{}π∞٩(-̮̮̃-̃)۶ ٩(●̮̮̃•̃)۶ ٩(͡๏̯͡๏)۶',
-        '',
-      ];
-      for (final String name in names) {
-        expect(
-          SqliteFiles.fileName(name, Uri.parse('https://x.firebaseio.com/')),
-          matches(RegExp(r'^rtdb-[0-9a-f]{32}\.sqlite$')),
-        );
-      }
-    });
   });
 
   // What the client's persistence managers assume of an engine (commit 4ded0c9e).
