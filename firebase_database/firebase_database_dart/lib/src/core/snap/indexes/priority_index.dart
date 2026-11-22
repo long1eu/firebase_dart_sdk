@@ -2,7 +2,9 @@
 library;
 
 import 'package:firebase_database_dart/src/core/snap/child_key.dart';
+import 'package:firebase_database_dart/src/core/snap/children_node.dart';
 import 'package:firebase_database_dart/src/core/snap/indexes/index.dart';
+import 'package:firebase_database_dart/src/core/snap/leaf_node.dart';
 import 'package:firebase_database_dart/src/core/snap/named_node.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
 
@@ -12,30 +14,34 @@ final class PriorityIndex extends Index {
   const PriorityIndex();
 
   @override
-  int compare(NamedNode a, NamedNode b) => throw UnimplementedError();
+  int compare(NamedNode a, NamedNode b) {
+    final int indexCmp = a.node.priority.compareTo(b.node.priority);
+    return indexCmp == 0 ? a.name.compareTo(b.name) : indexCmp;
+  }
 
   @override
-  bool isDefinedOn(Node node) => throw UnimplementedError();
+  bool isDefinedOn(Node node) => !node.priority.isEmpty;
 
   @override
   bool indexedValueChanged(Node oldNode, Node newNode) =>
-      throw UnimplementedError();
+      oldNode.priority != newNode.priority;
 
   @override
-  NamedNode get minPost => throw UnimplementedError();
+  NamedNode get minPost => NamedNode.min;
 
   @override
-  NamedNode get maxPost => throw UnimplementedError();
+  NamedNode get maxPost =>
+      NamedNode(ChildKey.max, LeafNode('[PRIORITY-POST]', MaxNode.instance));
 
   @override
   NamedNode makePost(Node indexValue, ChildKey name) =>
-      throw UnimplementedError();
+      NamedNode(name, LeafNode('[PRIORITY-POST]', indexValue));
 
   @override
-  String get queryDefinition => throw UnimplementedError();
+  String get queryDefinition => '.priority';
 
   @override
-  String toString() => throw UnimplementedError();
+  String toString() => queryDefinition;
 }
 
 /// The single instance.

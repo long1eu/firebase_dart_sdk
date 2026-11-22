@@ -8,6 +8,8 @@
 
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_database_dart/firebase_database_dart.dart';
+import 'package:firebase_database_dart/src/api/firebase_database_exception.dart';
+import 'package:firebase_database_dart/src/core/database_error.dart';
 import 'package:firebase_database_dart/storage_engine.dart';
 import 'package:firebase_database_dart/testing.dart';
 import 'package:test/test.dart';
@@ -31,6 +33,73 @@ void main() {
       _testingLibrary,
       _storageEngineLibrary,
     ], hasLength(8));
+  });
+
+  test('the exception codes are those of C19', () {
+    expect(firebaseDatabaseExceptionCodes, <String>[
+      'permission-denied',
+      'disconnected',
+      'max-retries',
+      'overridden-by-set',
+      'unavailable',
+      'network-error',
+      'write-canceled',
+      'index-not-defined',
+      'operation-failed',
+      'too-big',
+      'read-only',
+      'database-closed',
+      'unknown',
+    ]);
+    // Every core code is public (with this code) or internal (null); a code added to or removed from
+    // the core enum fails this switch.
+    for (final DatabaseErrorCode c in DatabaseErrorCode.values) {
+      final String? public = switch (c) {
+        DatabaseErrorCode.dataStale => null,
+        DatabaseErrorCode.userCodeException => null,
+        DatabaseErrorCode.operationFailed => 'operation-failed',
+        DatabaseErrorCode.permissionDenied => 'permission-denied',
+        DatabaseErrorCode.disconnected => 'disconnected',
+        DatabaseErrorCode.maxRetries => 'max-retries',
+        DatabaseErrorCode.overriddenBySet => 'overridden-by-set',
+        DatabaseErrorCode.unavailable => 'unavailable',
+        DatabaseErrorCode.tooBig => 'too-big',
+        DatabaseErrorCode.networkError => 'network-error',
+        DatabaseErrorCode.writeCanceled => 'write-canceled',
+        DatabaseErrorCode.readOnly => 'read-only',
+        DatabaseErrorCode.indexNotDefined => 'index-not-defined',
+        DatabaseErrorCode.databaseClosed => 'database-closed',
+        DatabaseErrorCode.unknown => 'unknown',
+      };
+      if (public == null) {
+        expect(firebaseDatabaseExceptionCodes, isNot(contains(c.code)));
+      } else {
+        expect(c.code, public);
+        expect(firebaseDatabaseExceptionCodes, contains(public));
+      }
+    }
+  });
+
+  test('server statuses map to public codes', () {
+    expect(publicCodeForServerStatus('no_index'), 'index-not-defined');
+    expect(publicCodeForServerStatus('too_big'), 'too-big');
+    expect(publicCodeForServerStatus('failure'), 'operation-failed');
+    expect(publicCodeForServerStatus('permission_denied'), 'permission-denied');
+    for (final String other in <String>[
+      'invalid_parameters',
+      'internal_error',
+      'unknown',
+      'expired_token',
+      'invalid_token',
+    ]) {
+      expect(publicCodeForServerStatus(other), 'unknown');
+    }
+    final FirebaseDatabaseException e = exceptionFromServerStatus(
+      'internal_error',
+      'boom',
+    );
+    expect(e.code, 'unknown');
+    expect(e.serverStatus, 'internal_error: boom');
   });
 }
 
@@ -250,21 +319,27 @@ void _testingLibrary(FirebaseApp app, FakeDatabaseServer server) {
 
 // Section 7.2.
 void _storageEngineLibrary(
+  PersistenceStorageEngineOpener opener,
   PersistenceKey key,
   PersistenceStorageEngine e,
   UserWriteRecord w,
   TrackedQuery t,
 ) {
   final _Same<
-    DatabasePersistence Function(
-      Future<PersistenceStorageEngine> Function(PersistenceKey), {
-      int cacheSizeBytes,
+    DatabasePersistence Function({
+      required PersistenceStorageEngineOpener opener,
+      int? cacheSizeBytes,
     })
   >
   _ = databasePersistence.exact;
-  final DatabasePersistence _ = databasePersistence(
-    (PersistenceKey k) async => e,
-  );
+  final _Same<
+    Future<PersistenceStorageEngine> Function(
+      PersistenceKey, {
+      DatabaseLogger? logger,
+    })
+  >
+  _ = opener.exact;
+  final DatabasePersistence _ = databasePersistence(opener: opener);
 
   final _Same<String> _ = key.appName.exact;
   final _Same<Uri> _ = key.databaseUrl.exact;

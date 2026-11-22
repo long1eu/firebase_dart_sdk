@@ -38,7 +38,8 @@ export 'src/api/data_snapshot.dart' show DataSnapshot;
 export 'src/api/database_event.dart' show DatabaseEvent;
 export 'src/api/database_event_type.dart' show DatabaseEventType;
 export 'src/api/database_logger.dart' show DatabaseLogLevel, DatabaseLogger;
-export 'src/api/database_persistence.dart' show DatabasePersistence;
+export 'src/core/persistence/database_persistence.dart'
+    show DatabasePersistence;
 export 'src/api/database_reference.dart' show DatabaseReference;
 export 'src/api/firebase_database.dart' show FirebaseDatabase;
 export 'src/api/firebase_database_exception.dart'

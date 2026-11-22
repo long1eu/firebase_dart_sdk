@@ -1,9 +1,9 @@
 /// A listener registered on a query. JS: `core/view/EventRegistration.ts` (`EventRegistration`);
 /// Android: `core/EventRegistration.java`, `core/EventRegistrationZombieListener.java`.
 ///
-/// The public API later implements it for value and child listeners (Android
-/// `ValueEventRegistration`, `ChildEventRegistration`; JS `ValueEventRegistration`,
-/// `ChildEventRegistration` in `api/Reference_impl.ts`).
+/// The public layer uses one concrete subclass for value and child listeners,
+/// `CallbackEventRegistration` (`core/callback_event_registration.dart`); the sync tree has its
+/// own `KeepSyncedEventRegistration`.
 library;
 
 import 'package:firebase_database_dart/src/core/database_error.dart';

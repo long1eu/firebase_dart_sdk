@@ -1,134 +1,123 @@
-// Contract of PersistenceStorageEngine (lib/src/core/persistence/persistence_storage_engine.dart).
-//
-// Every engine (SQLite, IndexedDB-backed image, ...) must pass persistenceStorageEngineContract;
-// main runs it against InMemoryPersistenceStorageEngine. Needs the data layer filled.
-import 'package:firebase_database_dart/src/core/compound_write.dart';
+// Runs the storage engine contract (persistence_storage_engine_contract.dart) against
+// InMemoryPersistenceStorageEngine, then the reference engine's own checks: what only stored data
+// can get wrong is a StateError there while it is durable (a reference-engine check, not a
+// requirement on engines), and pruneCache warns and skips instead.
 import 'package:firebase_database_dart/src/core/path.dart';
-import 'package:firebase_database_dart/src/core/persistence/persistence_storage_engine.dart';
+import 'package:firebase_database_dart/src/core/persistence/prune_forest.dart';
 import 'package:firebase_database_dart/src/core/persistence/tracked_query.dart';
 import 'package:firebase_database_dart/src/core/snap/child_key.dart';
 import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
-import 'package:firebase_database_dart/src/core/user_write_record.dart';
+import 'package:firebase_database_dart/src/core/util/logger.dart';
 import 'package:firebase_database_dart/src/core/view/query_spec.dart';
 import 'package:firebase_database_dart/src/testing/in_memory_persistence_storage_engine.dart';
 import 'package:test/test.dart';
 
-/// The contract.
-void persistenceStorageEngineContract(
-  PersistenceStorageEngine Function() create,
-) {
-  late PersistenceStorageEngine engine;
+import 'persistence_storage_engine_contract.dart';
 
-  setUp(() => engine = create());
-  tearDown(() => engine.close());
-
-  void inTransaction(void Function() body) {
-    engine.beginTransaction();
-    try {
-      body();
-      engine.setTransactionSuccessful();
-    } finally {
-      engine.endTransaction();
-    }
-  }
-
-  test('a freshly opened engine is durable', () {
-    expect(engine.isDurable, isTrue);
+void main() {
+  group('InMemoryPersistenceStorageEngine', () {
+    runStorageEngineContract(InMemoryPersistenceStorageEngine.new);
   });
 
-  test('user writes load in write-id order', () {
-    inTransaction(() {
-      engine.saveUserMerge(
-        Path('/b'),
-        CompoundWrite.fromValue(<String, Object?>{'x': 1}),
-        2,
-      );
-      engine.saveUserOverwrite(Path('/a'), nodeFromJson('A'), 1);
+  group('InMemoryPersistenceStorageEngine reference checks', () {
+    late InMemoryPersistenceStorageEngine engine;
+    late List<String> warnings;
+
+    setUp(() {
+      warnings = <String>[];
+      engine = InMemoryPersistenceStorageEngine()
+        ..logger = (DatabaseLogLevel level, String message) {
+          if (level == DatabaseLogLevel.warning) {
+            warnings.add(message);
+          }
+        };
     });
-    final List<UserWriteRecord> writes = engine.loadUserWrites();
-    expect(writes.map((UserWriteRecord w) => w.writeId), <int>[1, 2]);
-    expect(writes.first.isOverwrite, isTrue);
-    expect(writes.first.overwrite, nodeFromJson('A'));
-    expect(writes.last.isMerge, isTrue);
-  });
 
-  test('removeUserWrite and removeAllUserWrites', () {
-    inTransaction(() {
-      engine.saveUserOverwrite(Path('/a'), nodeFromJson(1), 1);
-      engine.saveUserOverwrite(Path('/b'), nodeFromJson(2), 2);
-      engine.removeUserWrite(1);
-    });
-    expect(engine.loadUserWrites().single.writeId, 2);
-    inTransaction(engine.removeAllUserWrites);
-    expect(engine.loadUserWrites(), isEmpty);
-  });
-
-  test('a transaction without setTransactionSuccessful is rolled back', () {
-    engine.beginTransaction();
-    engine.saveUserOverwrite(Path('/a'), nodeFromJson(1), 1);
-    engine.endTransaction();
-    expect(engine.loadUserWrites(), isEmpty);
-  });
-
-  test('nested transactions are refused', () {
-    engine.beginTransaction();
-    expect(engine.beginTransaction, throwsA(anything));
-    engine.endTransaction();
-  });
-
-  test('server cache overwrite, merge and read below', () {
-    inTransaction(() {
-      engine.overwriteServerCache(
-        Path('/a'),
-        nodeFromJson(<String, Object?>{'b': 1, 'c': 2}),
-      );
-      engine.mergeIntoServerCache(
-        Path('/a'),
-        nodeFromJson(<String, Object?>{'c': 3, 'd': 4}),
-      );
-    });
-    expect(engine.serverCache(Path('/a')).toJson(), <String, Object?>{
-      'b': 1,
-      'c': 3,
-      'd': 4,
-    });
-    expect(engine.serverCache(Path('/a/b')).toJson(), 1);
-    expect(engine.serverCache(Path('/x')).isEmpty, isTrue);
-    expect(engine.serverCacheEstimatedSizeInBytes(), greaterThan(0));
-  });
-
-  test('tracked queries and their keys', () {
-    final TrackedQuery query = TrackedQuery(
-      id: 1,
-      querySpec: QuerySpec.defaultAt(Path('/a')),
+    TrackedQuery tracked(int id, String path) => TrackedQuery(
+      id: id,
+      querySpec: QuerySpec.defaultAt(Path(path)),
       lastUse: 100,
       complete: false,
       active: true,
     );
-    inTransaction(() {
-      engine.saveTrackedQuery(query);
-      engine.saveTrackedQueryKeys(1, <ChildKey>{ChildKey('x'), ChildKey('y')});
-      engine.updateTrackedQueryKeys(
-        1,
-        <ChildKey>{ChildKey('z')},
-        <ChildKey>{ChildKey('x')},
-      );
-    });
-    expect(engine.loadTrackedQueries(), <TrackedQuery>[query]);
-    expect(engine.loadTrackedQueryKeys(<int>{1}), <ChildKey>{
-      ChildKey('y'),
-      ChildKey('z'),
-    });
-    engine.resetPreviouslyActiveTrackedQueries(200);
-    expect(engine.loadTrackedQueries().single.active, isFalse);
-    expect(engine.loadTrackedQueries().single.lastUse, 200);
-    inTransaction(() => engine.deleteTrackedQuery(1));
-    expect(engine.loadTrackedQueries(), isEmpty);
-  });
-}
 
-void main() {
-  group('InMemoryPersistenceStorageEngine', () {
-    persistenceStorageEngineContract(InMemoryPersistenceStorageEngine.new);
+    void inTransaction(void Function() body) {
+      engine.beginTransaction();
+      try {
+        body();
+        engine.setTransactionSuccessful();
+      } finally {
+        engine.endTransaction();
+      }
+    }
+
+    void expectStateError(void Function() body) {
+      engine.beginTransaction();
+      try {
+        expect(body, throwsStateError);
+      } finally {
+        engine.endTransaction();
+      }
+    }
+
+    test('unknown ids and keys are a StateError while durable', () {
+      inTransaction(() => engine.saveTrackedQuery(tracked(1, '/a')));
+      expectStateError(() => engine.removeUserWrite(7));
+      expectStateError(
+        () => engine.saveTrackedQueryKeys(2, <ChildKey>{ChildKey('x')}),
+      );
+      expectStateError(
+        () => engine.updateTrackedQueryKeys(2, <ChildKey>{}, <ChildKey>{}),
+      );
+      expectStateError(
+        () => engine.updateTrackedQueryKeys(1, <ChildKey>{}, <ChildKey>{
+          ChildKey('missing'),
+        }),
+      );
+      expect(() => engine.loadTrackedQueryKeys(<int>{2}), throwsStateError);
+      expectStateError(() => engine.saveTrackedQuery(tracked(1, '/b')));
+      expectStateError(() => engine.saveTrackedQuery(tracked(2, '/a')));
+    });
+
+    test('the same calls pass once degraded', () {
+      inTransaction(() => engine.saveTrackedQuery(tracked(1, '/a')));
+      engine.degrade();
+      inTransaction(() {
+        engine.removeUserWrite(7);
+        engine.saveTrackedQueryKeys(2, <ChildKey>{ChildKey('x')});
+        engine.updateTrackedQueryKeys(1, <ChildKey>{}, <ChildKey>{
+          ChildKey('missing'),
+        });
+        engine.saveTrackedQuery(tracked(2, '/a'));
+      });
+      expect(engine.loadTrackedQueryKeys(<int>{3}), isEmpty);
+    });
+
+    test('pruneCache skips data stored above its root with a warning', () {
+      inTransaction(
+        () => engine.overwriteServerCache(
+          Path('/a'),
+          nodeFromJson(<String, Object?>{
+            'b': <String, Object?>{'c': 1},
+          }),
+        ),
+      );
+      inTransaction(
+        () => engine.pruneCache(Path('/a/b'), PruneForest().prune(Path.empty)),
+      );
+      expect(warnings, hasLength(1));
+      expect(engine.serverCache(Path('/a/b/c')).toJson(), 1);
+    });
+
+    test('pruneCache skips data neither pruned nor kept with a warning', () {
+      inTransaction(
+        () => engine.overwriteServerCache(Path('/x/y'), nodeFromJson(1)),
+      );
+      inTransaction(
+        () => engine.pruneCache(Path.empty, PruneForest().prune(Path('/a'))),
+      );
+      expect(warnings, hasLength(1));
+      expect(engine.serverCache(Path('/x/y')).toJson(), 1);
+    });
   });
 }

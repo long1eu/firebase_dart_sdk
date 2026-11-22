@@ -19,17 +19,27 @@ import 'package:firebase_database_dart/src/core/sync_tree_api.dart';
 import 'package:firebase_database_dart/src/core/tag.dart';
 import 'package:firebase_database_dart/src/core/transaction_data.dart';
 import 'package:firebase_database_dart/src/core/util/clock.dart';
+import 'package:firebase_database_dart/src/core/util/logger.dart';
 import 'package:firebase_database_dart/src/core/view/event.dart';
-import 'package:firebase_database_dart/src/core/view/event_queue.dart';
+import 'package:firebase_database_dart/src/core/view/event_dispatcher.dart';
 import 'package:firebase_database_dart/src/core/view/query_spec.dart';
+import 'package:meta/meta.dart';
 
 /// Called once when a write, update or onDisconnect request finishes: [error] null on success.
 typedef WriteCompletion = void Function(DatabaseError? error);
 
 /// Creates the connection for a Repo; the connection team supplies it (tests pass a
-/// `FakeServerActions`).
+/// `FakeServerActions`). The connection gets its token source from the factory's closure, not
+/// from Repo, and logs through [logger] (null: dropped).
 typedef ServerActionsFactory =
-    ServerActions Function(ServerActionsDelegate delegate);
+    ServerActions Function(
+      ServerActionsDelegate delegate,
+      DatabaseLogger? logger,
+    );
+
+/// How long a `get` waits for the server before answering from the persisted cache when
+/// persistence is on (Android `Repo.java:64`). Runs on a plain `Timer`, so `fake_async` drives it.
+const Duration getPersistedFallbackDelay = Duration(seconds: 3);
 
 /// The interrupt reason of goOffline/goOnline.
 const String interruptReason = 'repo_interrupt';
@@ -43,14 +53,21 @@ const String interruptReason = 'repo_interrupt';
 /// unresolved export-form JSON; local events use data with server values resolved against
 /// [serverClock].
 final class Repo implements ServerActionsDelegate {
-  /// Creates the Repo for [repoInfo], builds its connection with [connectionFactory], restores
-  /// persisted writes, and starts connecting.
+  /// Creates the Repo for [repoInfo] and builds its connection with [connectionFactory].
+  ///
+  /// The start order lives here: load the persisted user writes from [persistenceManager],
+  /// [restoreWrites] them, and only then `connection.initialize()`. A user write made before the
+  /// restore would reuse a restored write id.
+  ///
+  /// Events go to [dispatcher] (a fresh [EventDispatcher] by default, one per Repo); messages go
+  /// to [logger] (null: dropped), which is also handed to the connection.
   factory Repo({
     required RepoInfo repoInfo,
     required ServerActionsFactory connectionFactory,
     PersistenceManager? persistenceManager,
     Clock? clock,
-    EventTarget? eventTarget,
+    EventDispatcher? dispatcher,
+    DatabaseLogger? logger,
   }) => throw UnimplementedError();
 
   /// Where the database is.
@@ -95,7 +112,8 @@ final class Repo implements ServerActionsDelegate {
   }) => throw UnimplementedError();
 
   /// The value of [query]: from an active listen when complete, else a server `get` (while
-  /// offline, the persisted cache), with a short keepSynced bracket so the result is cached.
+  /// offline, the persisted cache, after [getPersistedFallbackDelay] without an answer), with a
+  /// short keepSynced bracket so the result is cached.
   Future<Node> getValue(QuerySpec query) => throw UnimplementedError();
 
   /// Registers an onDisconnect overwrite of [path] with [newValue] and remembers it locally.
@@ -153,14 +171,16 @@ final class Repo implements ServerActionsDelegate {
   }) => throw UnimplementedError();
 
   /// Replays the persisted writes into the server tree (unpersisted) and re-sends them; called by
-  /// the constructor.
+  /// the factory before the connection starts, never by users.
+  @visibleForTesting
   void restoreWrites() => throw UnimplementedError();
 
   /// For tests: send a wrong hash with transaction puts.
   void setHijackHash(bool hijackHash) => throw UnimplementedError();
 
-  /// Shuts the connection down and drops listeners; later calls fail.
-  void close() => throw UnimplementedError();
+  /// Shuts the connection down (awaiting [ServerActions.shutdown]) and drops listeners; later
+  /// calls fail.
+  Future<void> close() => throw UnimplementedError();
 
   @override
   void onDataUpdate(
@@ -201,6 +221,7 @@ final class Repo implements ServerActionsDelegate {
 
 /// The server tree's [ListenProvider]: turns [QuerySpec] into a `ListenSpec` and [Tag] into an
 /// int, calls [connection], and posts the events of the completion through [postEvents].
+/// [startListening] returns no events.
 final class RepoListenProvider implements ListenProvider {
   /// Creates the provider.
   const RepoListenProvider(this.connection, this.postEvents);
@@ -212,7 +233,7 @@ final class RepoListenProvider implements ListenProvider {
   final void Function(List<Event> events) postEvents;
 
   @override
-  void startListening(
+  List<Event> startListening(
     QuerySpec query,
     Tag? tag,
     ListenHashProvider hash,
@@ -223,20 +244,25 @@ final class RepoListenProvider implements ListenProvider {
   void stopListening(QuerySpec query, Tag? tag) => throw UnimplementedError();
 }
 
-/// The `.info` tree's [ListenProvider]: never touches the network; a listen is answered at once
-/// with the current [infoData] (no event for an absent value).
+/// The `.info` tree's [ListenProvider]: never touches the network. [startListening] applies the
+/// current [infoData] at the query's path to [syncTree] as a server overwrite and returns those
+/// events (none for an absent value), then completes the listen asynchronously (JS
+/// `Repo.ts` `repoStart`, `infoSyncTree_` provider).
 final class InfoListenProvider implements ListenProvider {
-  /// Creates the provider.
-  const InfoListenProvider(this.infoData, this.postEvents);
+  /// Creates the provider; Repo sets [syncTree] right after building the `.info` tree.
+  InfoListenProvider(this.infoData, this.postEvents);
 
   /// The `.info` data.
   final SnapshotHolder infoData;
+
+  /// The `.info` tree this provider serves.
+  late final SyncTreeApi syncTree;
 
   /// Raises events.
   final void Function(List<Event> events) postEvents;
 
   @override
-  void startListening(
+  List<Event> startListening(
     QuerySpec query,
     Tag? tag,
     ListenHashProvider hash,

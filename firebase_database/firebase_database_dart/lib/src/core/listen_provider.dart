@@ -3,7 +3,7 @@
 ///
 /// Internal seam between the sync tree and Repo: Repo implements it over `ServerActions`
 /// (converting [QuerySpec] to a `ListenSpec` and [Tag] to an int); the info tree's provider
-/// does nothing.
+/// answers from `.info` data.
 library;
 
 import 'package:firebase_database_dart/src/core/connection/listen_hash_provider.dart';
@@ -26,9 +26,13 @@ abstract interface class ListenProvider {
   /// when the server answers; on a later revoke it is called with the error (a listen is
   /// completed at most once with an error).
   ///
-  /// Called from inside sync tree operations: implementations must not call back into the sync
-  /// tree synchronously.
-  void startListening(
+  /// Returns the events raised at once (JS `SyncTree.ts:91-96`): the `.info` provider applies the
+  /// current `.info` value to its tree and returns those events, so they stay inside
+  /// `addEventRegistration`'s result. The server provider returns an empty list.
+  ///
+  /// Called from inside sync tree operations: apart from that synchronous `.info` overwrite,
+  /// implementations must not call back into the sync tree synchronously.
+  List<Event> startListening(
     QuerySpec query,
     Tag? tag,
     ListenHashProvider hash,

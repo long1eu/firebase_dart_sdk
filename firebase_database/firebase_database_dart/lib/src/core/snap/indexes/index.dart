@@ -14,17 +14,21 @@ abstract base class Index {
   int compare(NamedNode a, NamedNode b);
 
   /// [compare] as a [Comparator], for sorted maps.
-  Comparator<NamedNode> get comparator => throw UnimplementedError();
+  Comparator<NamedNode> get comparator => compare;
 
   /// Whether [node] has a value under this index (for example a priority).
   bool isDefinedOn(Node node);
 
   /// Whether the indexed value differs between [oldNode] and [newNode].
   bool indexedValueChanged(Node oldNode, Node newNode) =>
-      throw UnimplementedError();
+      compare(
+        NamedNode(ChildKey.min, oldNode),
+        NamedNode(ChildKey.min, newNode),
+      ) !=
+      0;
 
   /// The post before every child.
-  NamedNode get minPost => throw UnimplementedError();
+  NamedNode get minPost => NamedNode.min;
 
   /// The post after every child.
   NamedNode get maxPost;
@@ -34,4 +38,8 @@ abstract base class Index {
 
   /// The wire name of the index: `.priority`, `.key`, `.value` or the child path (`a/b`).
   String get queryDefinition;
+
+  /// The [queryDefinition], which is also the key of the index in an `IndexMap` (JS `toString`).
+  @override
+  String toString() => queryDefinition;
 }

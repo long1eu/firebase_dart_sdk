@@ -27,11 +27,11 @@ final class ServerCall {
   });
 
   /// The method name: `initialize`, `shutdown`, `listen`, `unlisten`, `get`, `put`, `merge`,
-  /// `onDisconnectPut`, `onDisconnectMerge`, `onDisconnectCancel`, `refreshAuthToken`,
-  /// `refreshAppCheckToken`, `purgeOutstandingWrites`, `interrupt`, `resume`.
+  /// `onDisconnectPut`, `onDisconnectMerge`, `onDisconnectCancel`, `purgeOutstandingWrites`,
+  /// `interrupt`, `resume`.
   final String action;
 
-  /// The path of a write (`/a/b`), or the reason of interrupt/resume, or the token of a refresh.
+  /// The path of a write (`/a/b`), or the reason of interrupt/resume.
   final String? path;
 
   /// The data of a write.
@@ -74,9 +74,20 @@ final class ServerCall {
 /// (puts with a hash) are answered with [statusDisconnect] before the delegate hears of it; other
 /// unanswered writes stay pending. Nothing is called back synchronously from inside a
 /// [ServerActions] method.
+///
+/// Server pushes take the path as the server sends it (`a/b`, `""` for the root) and reach the
+/// delegate normalised to `/a/b` (`/`), as a real connection does. A failed [get] fails with a
+/// [ServerActionsException].
 final class FakeServerActions implements ServerActions {
   /// Creates a fake; set [delegate] before delivering anything.
-  FakeServerActions([this.delegate]);
+  FakeServerActions([this.delegate]) : readOnly = false;
+
+  /// Creates a read-only fake, as the REST client is: every write and onDisconnect request is
+  /// recorded and completed with [statusReadOnly] in a microtask.
+  FakeServerActions.readOnly([this.delegate]) : readOnly = true;
+
+  /// Whether writes and onDisconnect requests are refused with [statusReadOnly].
+  final bool readOnly;
 
   /// The receiver of server pushes, normally the Repo.
   ServerActionsDelegate? delegate;
@@ -88,12 +99,6 @@ final class FakeServerActions implements ServerActions {
   final Map<ListenSpec, ServerCall> activeListens = <ListenSpec, ServerCall>{};
 
   final Set<String> _interruptReasons = <String>{};
-
-  /// The last auth token given (null: signed out).
-  String? authToken;
-
-  /// The last App Check token given.
-  String? appCheckToken;
 
   /// Whether [shutdown] was called.
   bool isShutdown = false;
@@ -123,8 +128,23 @@ final class FakeServerActions implements ServerActions {
 
   ServerCall _record(ServerCall call) {
     calls.add(call);
+    if (readOnly && _writeActions.contains(call.action)) {
+      scheduleMicrotask(() {
+        if (!call._answered) {
+          respond(
+            call,
+            status: statusReadOnly,
+            data: 'This database is read-only here.',
+          );
+        }
+      });
+    }
     return call;
   }
+
+  /// The wire path form of the seam: `/a/b`, `/` for the root, from the server's `a/b` or `""`.
+  static String normalizePath(String path) =>
+      path.startsWith('/') ? path : '/$path';
 
   ServerActionsDelegate get _delegate {
     final ServerActionsDelegate? value = delegate;
@@ -138,7 +158,7 @@ final class FakeServerActions implements ServerActions {
   void initialize() => _record(ServerCall('initialize'));
 
   @override
-  void shutdown() {
+  Future<void> shutdown() async {
     _record(ServerCall('shutdown'));
     isShutdown = true;
     activeListens.clear();
@@ -246,18 +266,6 @@ final class FakeServerActions implements ServerActions {
       );
 
   @override
-  void refreshAuthToken(String? token) {
-    _record(ServerCall('refreshAuthToken', path: token));
-    authToken = token;
-  }
-
-  @override
-  void refreshAppCheckToken(String? token) {
-    _record(ServerCall('refreshAppCheckToken', path: token));
-    appCheckToken = token;
-  }
-
-  @override
   void purgeOutstandingWrites() {
     _record(ServerCall('purgeOutstandingWrites'));
     for (final ServerCall call in pendingWrites) {
@@ -289,7 +297,7 @@ final class FakeServerActions implements ServerActions {
   // The server side, driven by the test.
 
   /// Answers [call] with [status] and [data]; a failed listen leaves the listen table, a get
-  /// completes its future (with an error unless [status] is `ok`).
+  /// completes its future (with a [ServerActionsException] unless [status] is `ok`).
   void respond(ServerCall call, {String status = statusOk, Object? data}) {
     if (call._answered) {
       throw StateError('$call was already answered.');
@@ -300,7 +308,9 @@ final class FakeServerActions implements ServerActions {
       if (status == statusOk) {
         completer.complete(data);
       } else {
-        completer.completeError(StateError('$status: $data'));
+        completer.completeError(
+          ServerActionsException(status, data?.toString()),
+        );
       }
       return;
     }
@@ -330,20 +340,26 @@ final class FakeServerActions implements ServerActions {
     data: "Client doesn't have permission to access the desired data.",
   );
 
-  /// Pushes `d` ([isMerge] false) or `m` at [path], tagged with [tag].
+  /// Pushes `d` ([isMerge] false) or `m` at [path] (either form), tagged with [tag]; merge keys
+  /// are passed on unchanged.
   void deliverDataUpdate(
     String path,
     Object? data, {
     bool isMerge = false,
     int? tag,
-  }) => _delegate.onDataUpdate(path, data, isMerge: isMerge, tag: tag);
+  }) => _delegate.onDataUpdate(
+    normalizePath(path),
+    data,
+    isMerge: isMerge,
+    tag: tag,
+  );
 
-  /// Pushes `rm` at [path].
+  /// Pushes `rm` at [path] (either form).
   void deliverRangeMerge(
     String path,
     List<WireRangeMerge> merges, {
     int? tag,
-  }) => _delegate.onRangeMergeUpdate(path, merges, tag: tag);
+  }) => _delegate.onRangeMergeUpdate(normalizePath(path), merges, tag: tag);
 
   /// Reports the connection up (after the replay).
   void connect() {

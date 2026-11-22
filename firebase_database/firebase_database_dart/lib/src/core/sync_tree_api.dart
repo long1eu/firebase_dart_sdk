@@ -7,12 +7,12 @@ library;
 import 'package:firebase_database_dart/src/core/compound_write.dart';
 import 'package:firebase_database_dart/src/core/database_error.dart';
 import 'package:firebase_database_dart/src/core/event_registration.dart';
+import 'package:firebase_database_dart/src/core/listen_provider.dart';
 import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:firebase_database_dart/src/core/persistence/persistence_manager.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
 import 'package:firebase_database_dart/src/core/snap/range_merge.dart';
 import 'package:firebase_database_dart/src/core/tag.dart';
-import 'package:firebase_database_dart/src/core/util/clock.dart';
 import 'package:firebase_database_dart/src/core/view/cache_node.dart';
 import 'package:firebase_database_dart/src/core/view/event.dart';
 import 'package:firebase_database_dart/src/core/view/query_spec.dart';
@@ -20,7 +20,7 @@ import 'package:firebase_database_dart/src/core/write_id.dart';
 
 /// Repo's view of the sync tree. Every method is synchronous, runs in one
 /// [PersistenceManager.runInTransaction], and returns the events to raise (Repo raises them
-/// through its event queue at the affected path); none raises events itself.
+/// by appending them to its `EventDispatcher`); none raises events itself.
 abstract interface class SyncTreeApi {
   /// Whether no query is registered.
   bool get isEmpty;
@@ -49,12 +49,13 @@ abstract interface class SyncTreeApi {
 
   /// The server acknowledged ([revert] false) or rejected ([revert] true) write [writeId].
   /// When [persist], the write leaves the persisted log and an acknowledged write moves into the
-  /// persisted server cache, with server values resolved against [serverClock].
+  /// persisted server cache, with server values resolved against [serverValues] (Repo passes
+  /// `generateServerValues()`; the sync tree reads no clock).
   List<Event> ackUserWrite(
     WriteId writeId, {
     required bool revert,
     required bool persist,
-    required ServerClock serverClock,
+    required Map<String, Object?> serverValues,
   });
 
   /// Removes every pending write (purgeOutstandingWrites) and returns the revert events.
@@ -95,7 +96,8 @@ abstract interface class SyncTreeApi {
   /// Registers [registration] and returns its initial events. Starts a server listen unless
   /// [skipListenerSetup] or a covering listen exists. [preloadedServerCache] is server data an
   /// asynchronous persistence engine loaded beforehand; when given it is used instead of asking
-  /// the persistence manager.
+  /// the persistence manager. The events [ListenProvider.startListening] returns (the `.info`
+  /// value) are part of the result.
   List<Event> addEventRegistration(
     EventRegistration registration, {
     bool skipListenerSetup = false,

@@ -20,6 +20,7 @@ final class ListenSpec {
     required this.isDefault,
     required this.loadsAllData,
     required this.indexName,
+    required this.restParams,
   });
 
   /// The path in wire form: `/a/b`, `/` for the root.
@@ -27,6 +28,7 @@ final class ListenSpec {
 
   /// The query wire object (`sp`, `sn`, `sin`, `ep`, `en`, `ein`, `l`, `vf`, `i`); `{}` for the
   /// default query. Sent as `q` of a listen only together with a tag; always sent as `q` of a get.
+  /// Unmodifiable.
   final Map<String, Object?> queryObject;
 
   /// `default` for the default query, else the canonical JSON of [queryObject] (sorted keys, no
@@ -43,6 +45,11 @@ final class ListenSpec {
   /// The index wire name (`.priority`, `.key`, `.value` or a child path), for the "Using an
   /// unspecified index" warning when the listen response carries `w: ['no_index']`.
   final String indexName;
+
+  /// The REST query string parameters (`orderBy`, `startAt`, `limitToFirst`, ...), from
+  /// `QueryParams.toRestQueryStringParameters()`; `{}` for the default query. Used by the REST
+  /// client. Unmodifiable.
+  final Map<String, String> restParams;
 
   @override
   bool operator ==(Object other) => throw UnimplementedError();

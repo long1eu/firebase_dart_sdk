@@ -17,18 +17,17 @@ import 'package:meta/meta.dart';
 /// | --- | --- |
 /// | `permission-denied` | the security rules refused the read or write |
 /// | `disconnected` | the connection dropped while a sent transaction waited for its answer |
-/// | `expired-token` | the auth token has expired |
-/// | `invalid-token` | the auth token was refused |
 /// | `max-retries` | a transaction ran more than 25 times without committing |
 /// | `overridden-by-set` | a later `set` at the location replaced a running transaction |
 /// | `unavailable` | the server is unavailable, or `Query.get` found no connection and no cache |
 /// | `network-error` | the request failed for a network reason |
 /// | `write-canceled` | `FirebaseDatabase.purgeOutstandingWrites` removed the write or transaction |
-/// | `index-not-defined` | the query orders by a child that has no `.indexOn` rule |
-/// | `operation-failed` | the server reported that the operation failed |
-/// | `too-big` | the data is larger than the server accepts in one request |
+/// | `index-not-defined` | the query orders by a child that has no `.indexOn` rule (server status `no_index`) |
+/// | `operation-failed` | the server reported that the operation failed (server status `failure`) |
+/// | `too-big` | the data is larger than the server accepts in one request (server status `too_big`) |
+/// | `read-only` | the connection is read only and refused a write or onDisconnect request |
 /// | `database-closed` | the `FirebaseDatabase` was closed, or its app deleted |
-/// | `unknown` | anything else; see [serverStatus] |
+/// | `unknown` | any other server status (`invalid_parameters`, `internal_error`, ...); the raw status is in [serverStatus] |
 ///
 /// FlutterFire spells `write-canceled` as `write-cancelled`; the FlutterFire shim maps it.
 ///
@@ -77,8 +76,6 @@ final class FirebaseDatabaseException extends FirebaseException {
 const List<String> firebaseDatabaseExceptionCodes = <String>[
   'permission-denied',
   'disconnected',
-  'expired-token',
-  'invalid-token',
   'max-retries',
   'overridden-by-set',
   'unavailable',
@@ -87,12 +84,14 @@ const List<String> firebaseDatabaseExceptionCodes = <String>[
   'index-not-defined',
   'operation-failed',
   'too-big',
+  'read-only',
   'database-closed',
   'unknown',
 ];
 
 /// The public exception for a core [error]: the kebab-case code of [DatabaseError.code], its message, and
-/// the wire status followed by the server's reason as [FirebaseDatabaseException.serverStatus].
+/// the wire status followed by the server's reason as [FirebaseDatabaseException.serverStatus] (none for
+/// [DatabaseErrorCode.databaseClosed], which is local).
 @internal
 FirebaseDatabaseException exceptionFromDatabaseError(
   DatabaseError error, {
@@ -103,7 +102,41 @@ FirebaseDatabaseException exceptionFromDatabaseError(
   return FirebaseDatabaseException(
     code: error.code.code,
     message: error.message,
-    serverStatus: details == null ? status : '$status: $details',
+    serverStatus: error.code == DatabaseErrorCode.databaseClosed
+        ? null
+        : details == null
+        ? status
+        : '$status: $details',
     stackTrace: stackTrace,
   );
 }
+
+/// The public code for a server [status]: `no_index` is `index-not-defined`, `too_big` is `too-big`,
+/// `failure` is `operation-failed`, the other statuses the client knows map to their own code, and any
+/// other status (`invalid_parameters`, `internal_error`, `unknown`, ...) is `unknown`; the caller keeps
+/// the raw status in [FirebaseDatabaseException.serverStatus].
+@internal
+String publicCodeForServerStatus(String status) {
+  for (final DatabaseErrorCode code in DatabaseErrorCode.values) {
+    if (code.wireStatus == status &&
+        firebaseDatabaseExceptionCodes.contains(code.code)) {
+      return code.code;
+    }
+  }
+  return 'unknown';
+}
+
+/// The public exception for a failed server request with [status] and the server's optional [reason]:
+/// the code of [publicCodeForServerStatus], and `status: reason` as
+/// [FirebaseDatabaseException.serverStatus].
+@internal
+FirebaseDatabaseException exceptionFromServerStatus(
+  String status, [
+  String? reason,
+  StackTrace? stackTrace,
+]) => FirebaseDatabaseException(
+  code: publicCodeForServerStatus(status),
+  message: reason ?? status,
+  serverStatus: reason == null ? status : '$status: $reason',
+  stackTrace: stackTrace,
+);

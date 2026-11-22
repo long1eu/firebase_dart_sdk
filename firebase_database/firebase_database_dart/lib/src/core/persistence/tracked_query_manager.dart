@@ -11,8 +11,15 @@ import 'package:firebase_database_dart/src/core/util/clock.dart';
 import 'package:firebase_database_dart/src/core/view/query_spec.dart';
 
 /// Keeps the tracked queries in memory and in the storage engine: activity, completeness, pruning.
+///
+/// Owns the one-id-per-query rule: it hands out ids (one above the largest loaded) and keeps one
+/// record per normalized query, asserting that a cached record keeps its id (Android
+/// `TrackedQueryManager.java:398-399`, `cacheTrackedQuery`). A violation is a [StateError] here;
+/// storage engines are not required to check it.
 final class TrackedQueryManager {
-  /// Loads the tracked queries of [storageLayer] and resets the previously active ones.
+  /// Resets the previously active tracked queries of [storageLayer] in a transaction of its own,
+  /// then loads them; a loaded query that repeats another query's spec under a different id is a
+  /// [StateError] (Android `TrackedQueryManager.java:97-124`).
   factory TrackedQueryManager(
     PersistenceStorageEngine storageLayer,
     Clock clock,

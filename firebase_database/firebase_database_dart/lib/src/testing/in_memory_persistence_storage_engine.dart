@@ -16,12 +16,18 @@ import 'package:firebase_database_dart/src/core/snap/children_node.dart';
 import 'package:firebase_database_dart/src/core/snap/indexes/priority_index.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
 import 'package:firebase_database_dart/src/core/user_write_record.dart';
+import 'package:firebase_database_dart/src/core/util/logger.dart';
 import 'package:firebase_database_dart/src/core/util/node_size_estimator.dart';
 import 'package:firebase_database_dart/src/core/write_id.dart';
 
 /// Keeps everything in maps; a transaction that ends without [setTransactionSuccessful] is
 /// rolled back. Mutations outside a transaction throw a [StateError] unless
 /// [disableTransactionCheck].
+///
+/// While [isDurable] is true it also checks what only stored data can get wrong (unknown write and
+/// tracked query ids, removed keys that are not stored, one id per query): reference-engine
+/// checks, not requirements on engines, so the contract does not test them; once degraded or
+/// closed it skips them, as a real degraded engine reads as empty.
 final class InMemoryPersistenceStorageEngine
     implements PersistenceStorageEngine {
   /// Creates an engine holding [initialWrites].
@@ -35,6 +41,9 @@ final class InMemoryPersistenceStorageEngine
 
   /// Lets tests mutate outside a transaction.
   bool disableTransactionCheck = false;
+
+  /// Receives the warnings of [pruneCache] (null: dropped).
+  DatabaseLogger? logger;
 
   Map<WriteId, UserWriteRecord> _writes = <WriteId, UserWriteRecord>{};
   Map<int, TrackedQuery> _trackedQueries = <int, TrackedQuery>{};
@@ -59,8 +68,9 @@ final class InMemoryPersistenceStorageEngine
     }
   }
 
+  /// A reference-engine check, not a requirement on engines; only while [isDurable].
   void _verifyTracked(int trackedQueryId) {
-    if (!_trackedQueries.containsKey(trackedQueryId)) {
+    if (isDurable && !_trackedQueries.containsKey(trackedQueryId)) {
       throw StateError("Can't track keys for an untracked query.");
     }
   }
@@ -85,7 +95,7 @@ final class InMemoryPersistenceStorageEngine
   @override
   void removeUserWrite(WriteId writeId) {
     _verifyInsideTransaction();
-    if (_writes.remove(writeId) == null) {
+    if (_writes.remove(writeId) == null && isDurable) {
       throw StateError("Tried to remove write that doesn't exist.");
     }
   }
@@ -134,18 +144,21 @@ final class InMemoryPersistenceStorageEngine
   @override
   void saveTrackedQuery(TrackedQuery trackedQuery) {
     _verifyInsideTransaction();
-    final TrackedQuery? existing = _trackedQueries[trackedQuery.id];
-    if (existing != null && existing.querySpec != trackedQuery.querySpec) {
-      throw StateError(
-        'Tracked query id ${trackedQuery.id} reused for another query.',
-      );
-    }
-    for (final TrackedQuery query in _trackedQueries.values) {
-      if (query.querySpec == trackedQuery.querySpec &&
-          query.id != trackedQuery.id) {
+    if (isDurable) {
+      // A reference-engine check, not a requirement on engines: TrackedQueryManager owns it.
+      final TrackedQuery? existing = _trackedQueries[trackedQuery.id];
+      if (existing != null && existing.querySpec != trackedQuery.querySpec) {
         throw StateError(
-          'Query ${trackedQuery.querySpec} is tracked under another id.',
+          'Tracked query id ${trackedQuery.id} reused for another query.',
         );
+      }
+      for (final TrackedQuery query in _trackedQueries.values) {
+        if (query.querySpec == trackedQuery.querySpec &&
+            query.id != trackedQuery.id) {
+          throw StateError(
+            'Query ${trackedQuery.querySpec} is tracked under another id.',
+          );
+        }
       }
     }
     _trackedQueries[trackedQuery.id] = trackedQuery;
@@ -165,6 +178,18 @@ final class InMemoryPersistenceStorageEngine
 
   @override
   void resetPreviouslyActiveTrackedQueries(int lastUse) {
+    if (!_insideTransaction && !disableTransactionCheck) {
+      // Its own transaction when called outside one.
+      beginTransaction();
+      try {
+        resetPreviouslyActiveTrackedQueries(lastUse);
+        setTransactionSuccessful();
+      } finally {
+        endTransaction();
+      }
+      return;
+    }
+    _verifyInsideTransaction();
     for (final MapEntry<int, TrackedQuery> entry
         in _trackedQueries.entries.toList()) {
       if (entry.value.active) {
@@ -194,7 +219,7 @@ final class InMemoryPersistenceStorageEngine
       trackedQueryId,
       () => <ChildKey>{},
     );
-    if (!keys.containsAll(removed)) {
+    if (isDurable && !keys.containsAll(removed)) {
       throw StateError("Can't remove keys that don't exist.");
     }
     keys
@@ -218,7 +243,12 @@ final class InMemoryPersistenceStorageEngine
     for (final MapEntry<Path, Node> write in _serverCache.entries.toList()) {
       final Path absoluteDataPath = write.key;
       if (root != absoluteDataPath && absoluteDataPath.contains(root)) {
-        throw StateError('Pruning at $root but we found data higher up.');
+        logger?.call(
+          DatabaseLogLevel.warning,
+          'We are pruning at $root but we have data stored higher up at '
+          '$absoluteDataPath. Ignoring.',
+        );
+        continue;
       }
       if (!root.contains(absoluteDataPath)) {
         continue;
@@ -237,8 +267,11 @@ final class InMemoryPersistenceStorageEngine
             .removeWrite(absoluteDataPath)
             .addWrites(absoluteDataPath, kept);
       } else if (!pruneForest.shouldKeep(dataPath)) {
-        throw StateError(
-          'We have data at $dataPath that is neither pruned nor kept.',
+        // Android: SqlPersistenceStorageEngine.java:672-680.
+        logger?.call(
+          DatabaseLogLevel.warning,
+          'We are pruning at $root and have data at $absoluteDataPath that '
+          "isn't marked for pruning or keeping. Ignoring.",
         );
       }
     }

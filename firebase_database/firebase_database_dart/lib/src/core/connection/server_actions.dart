@@ -7,6 +7,11 @@
 /// null), in the export form for writes (`.priority`, `.value`, server values `{'.sv': ...}` left
 /// unresolved). No `Path`, `Node` or `QuerySpec` crosses it. The protocol is specified in
 /// `rtdb/from_boss/rtdb_protocol.md`.
+///
+/// Errors: the only error vocabulary is the core's `DatabaseErrorCode` / `DatabaseError`; the
+/// connection hands over wire status strings and declares no exception class of its own for
+/// server statuses, except [ServerActionsException] for a failed [ServerActions.get]. The public
+/// `FirebaseDatabaseException` is defined once, in the public API layer.
 library;
 
 import 'package:firebase_database_dart/src/core/connection/listen_hash_provider.dart';
@@ -20,6 +25,29 @@ const String statusOk = 'ok';
 /// drops; produced locally by the connection, never by the server.
 const String statusDisconnect = 'disconnect';
 
+/// The status a read-only [ServerActions] (the REST client) completes every write and
+/// onDisconnect request with; maps to `DatabaseErrorCode.readOnly`.
+const String statusReadOnly = 'read_only';
+
+/// The failure of [ServerActions.get]: the wire [status] (`permission_denied`, ...) and the
+/// server's optional [reason]. JS: the `Error` `PersistentConnection.get` rejects with; Android:
+/// `PersistentConnection.get`'s failed task.
+final class ServerActionsException implements Exception {
+  /// Creates the exception.
+  const ServerActionsException(this.status, [this.reason]);
+
+  /// The wire status.
+  final String status;
+
+  /// The server's human-readable reason, if any.
+  final String? reason;
+
+  /// Shows [status] and [reason] only.
+  @override
+  String toString() =>
+      'ServerActionsException($status${reason == null ? '' : ': $reason'})';
+}
+
 /// Completion of a request: [status] is `ok`, a server error status (`permission_denied`,
 /// `datastale`, `too_big`, `unavailable`, ...) or the local [statusDisconnect]; [data] is the
 /// response `d`: on error the human-readable reason (`String?`), on a successful listen the
@@ -31,6 +59,19 @@ typedef RequestResultCallback = void Function(String status, Object? data);
 
 /// What Repo asks of the connection. One instance per Repo; the connection owns the socket,
 /// handshake, framing, tokens, backoff and replay.
+///
+/// Tokens belong to the connection: each implementation gets its token source in its
+/// constructor (`PersistentConnection` takes a `RealtimeTokenSource`, an adapter over the app's
+/// `AuthTokenProvider` and `AppCheckTokenProvider`, and builds its own `AuthSession`; the REST
+/// client takes the same source) and subscribes to token changes itself. Repo never pushes
+/// tokens, so no token is sent twice.
+///
+/// Paths cross this seam as `/a/b`, root `/`, in both directions. The server pushes `a/b` and
+/// `""` for the root; the connection normalises before calling the delegate.
+///
+/// A read-only implementation (the REST client) completes every write and onDisconnect request
+/// ([put], [merge], [onDisconnectPut], [onDisconnectMerge], [onDisconnectCancel]) with
+/// [statusReadOnly].
 ///
 /// Reconnect contract: after a reconnect the connection replays by itself, in this order: `auth`,
 /// `appcheck`, every listen still registered (with a freshly computed hash), every put and merge
@@ -44,7 +85,8 @@ abstract interface class ServerActions {
   void initialize();
 
   /// Closes the connection for good and drops every pending callback; later calls are ignored.
-  void shutdown();
+  /// Completes when the socket is closed; `Repo.close()` awaits it.
+  Future<void> shutdown();
 
   /// Sends `q`: listen at [spec]. The listen always carries `h` = [ListenHashProvider.simpleHash]
   /// (and `ch` when [ListenHashProvider.shouldIncludeCompoundHash]). [tag] is non-null only for
@@ -67,8 +109,8 @@ abstract interface class ServerActions {
   void unlisten(ListenSpec spec, {int? tag});
 
   /// Sends `g` with `p` and `q` (always, `{}` for the default query) and completes with the
-  /// decoded `d`, or fails with the error status and reason. Not cancelled by a disconnect: it is
-  /// re-sent after the reconnect. No timeout.
+  /// decoded `d`, or fails with a [ServerActionsException] carrying the error status and
+  /// reason. Not cancelled by a disconnect: it is re-sent after the reconnect. No timeout.
   Future<Object?> get(ListenSpec spec);
 
   /// Sends `p`: overwrite [path] with [data] (export form, null removes). With [hash] it is a
@@ -108,13 +150,6 @@ abstract interface class ServerActions {
   /// Sends `oc`: cancel the onDisconnect operations at and below [path]. Queued while offline.
   void onDisconnectCancel(String path, {RequestResultCallback? onComplete});
 
-  /// The auth token changed: [token] null signs out (`unauth` when connected); otherwise sends
-  /// `auth` (JWT) or `gauth` on the current connection, without reconnecting.
-  void refreshAuthToken(String? token);
-
-  /// The App Check token changed: null removes it, otherwise sends `appcheck`.
-  void refreshAppCheckToken(String? token);
-
   /// Drops every put and merge not yet acknowledged, completing each with `write_canceled`
   /// (Repo's `purgeOutstandingWrites`).
   void purgeOutstandingWrites();
@@ -135,6 +170,10 @@ abstract interface class ServerActions {
 abstract interface class ServerActionsDelegate {
   /// A `d` (overwrite, [isMerge] false) or `m` (merge, [isMerge] true) push at [path]. For a
   /// merge, [data] is a map of child keys or relative paths to values, null meaning delete.
+  ///
+  /// [path] is always `/a/b` (`/` for the root), normalised by the connection from the server's
+  /// `a/b` (`""` for the root). Merge maps are handed over with their keys as the server sent
+  /// them.
   /// [tag] is the listen tag for data of a filtered query, else null.
   void onDataUpdate(
     String path,
@@ -144,6 +183,7 @@ abstract interface class ServerActionsDelegate {
   });
 
   /// An `rm` push at [path] (only after a listen sent a compound hash); [merges] is never empty.
+  /// [path] is normalised to `/a/b` (`/` for the root) as for [onDataUpdate].
   void onRangeMergeUpdate(String path, List<WireRangeMerge> merges, {int? tag});
 
   /// The connection is up and the replay (see [ServerActions]) has been sent:

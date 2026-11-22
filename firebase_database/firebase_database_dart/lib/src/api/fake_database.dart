@@ -4,7 +4,7 @@ library;
 
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_database_dart/src/api/database_logger.dart';
-import 'package:firebase_database_dart/src/api/database_persistence.dart';
+import 'package:firebase_database_dart/src/core/persistence/database_persistence.dart';
 import 'package:firebase_database_dart/src/api/fake_database_server.dart';
 import 'package:firebase_database_dart/src/api/firebase_database.dart';
 

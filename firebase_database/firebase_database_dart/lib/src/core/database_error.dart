@@ -1,5 +1,9 @@
 /// Error codes and the internal error value. JS: `core/util/util.ts` (`errorForServerCode`),
 /// `core/Repo.ts` (`repoCallOnCompleteCallback`); Android: `DatabaseError.java`.
+///
+/// The one error vocabulary of the client: the realtime half maps wire status strings to
+/// [DatabaseErrorCode] and declares no exception class of its own for server statuses; the public
+/// `FirebaseDatabaseException` is defined once, in the public API layer.
 library;
 
 /// A Realtime Database error code: the public kebab-case [code] and the [wireStatus] the server or
@@ -16,12 +20,6 @@ enum DatabaseErrorCode {
 
   /// The operation had to be aborted due to a network disconnect.
   disconnected('disconnected', 'disconnected'),
-
-  /// The supplied auth token has expired.
-  expiredToken('expired-token', 'expired_token'),
-
-  /// The supplied auth token was invalid.
-  invalidToken('invalid-token', 'invalid_token'),
 
   /// The transaction had too many retries.
   maxRetries('max-retries', 'maxretries'),
@@ -43,6 +41,17 @@ enum DatabaseErrorCode {
 
   /// The write was canceled by the user (purgeOutstandingWrites).
   writeCanceled('write-canceled', 'write_canceled'),
+
+  /// The database is read-only here: a read-only connection (the REST client) completes every
+  /// write and onDisconnect request with this status.
+  readOnly('read-only', 'read_only'),
+
+  /// The query orders by a child the security rules give no `.indexOn` (the server's `no_index`).
+  indexNotDefined('index-not-defined', 'no_index'),
+
+  /// The database instance was closed (or its app deleted); every later asynchronous call fails with
+  /// this code. Local only: the server never sends it.
+  databaseClosed('database-closed', 'database_closed'),
 
   /// An unknown error occurred.
   unknown('unknown', 'unknown');
