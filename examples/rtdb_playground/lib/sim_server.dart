@@ -32,6 +32,9 @@ final class SimServer {
   /// Whether the next write is refused with `permission_denied`.
   bool rejectNext = false;
 
+  /// Called after a write was refused because of [rejectNext], which is false again by then.
+  void Function()? onReject;
+
   Timer? _timer;
   int _seen = 0;
   final List<_Intent> _intents = <_Intent>[];
@@ -142,6 +145,7 @@ final class SimServer {
         rejectNext = false;
         fake.failLastWrite('permission_denied');
         log('refused ${write.action} /${write.path}: permission_denied');
+        onReject?.call();
       } else {
         fake.ackLastWrite();
         accepted.insert(0, write);

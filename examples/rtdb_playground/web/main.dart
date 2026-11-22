@@ -1,7 +1,7 @@
 // The playground page: the real client against a small simulated server in the page.
 //
 // The client comes from databaseWithFakeServer; SimServer (lib/sim_server.dart) answers it. Nothing leaves
-// the page: its Content-Security-Policy has connect-src 'none'. See README.md.
+// the page: its Content-Security-Policy has connect-src 'self' (the wasm build fetches main.wasm from its own origin). See README.md.
 
 import 'dart:async';
 import 'dart:convert';
@@ -24,6 +24,15 @@ final Map<int, String> _pending = <int, String>{};
 int _nextId = 0;
 int _eventCount = 0;
 
+/// Shows on the reject button whether the next write will be rejected.
+void _showReject() {
+  final web.Element button = _byId('reject');
+  button.setAttribute('aria-pressed', '${_sim.rejectNext}');
+  button.textContent = _sim.rejectNext
+      ? 'Next write will be rejected (click to cancel)'
+      : 'Server rejects next write';
+}
+
 void main() {
   final FakeDatabaseServer fake = FakeDatabaseServer();
   _sim = SimServer(fake, (String line) => _line('server-log', line, ''))
@@ -33,7 +42,8 @@ void main() {
         'a': <String, Object?>{'title': 'Read the docs', 'done': false},
       },
     }
-    ..onChange = _renderServer;
+    ..onChange = _renderServer
+    ..onReject = _showReject;
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: 'demo-key',
@@ -64,11 +74,7 @@ void main() {
   });
   _byId<web.HTMLButtonElement>('reject').onClick.listen((_) {
     _sim.rejectNext = !_sim.rejectNext;
-    final web.Element button = _byId('reject');
-    button.setAttribute('aria-pressed', '${_sim.rejectNext}');
-    button.textContent = _sim.rejectNext
-        ? 'Next write will be rejected (click to cancel)'
-        : 'Server rejects next write';
+    _showReject();
   });
   _form('f-set', _set);
   _form('f-update', _update);

@@ -168,6 +168,7 @@ Future<void> _connect(AppConfig config) async {
 
 void _listen(FirebaseDatabase db, int generation) {
   final DatabaseReference items = db.ref(_itemsPath);
+  final Query ordered = items.orderByChild('at');
   void guard<T>(Stream<T> stream, void Function(T) onData) {
     _subs.add(
       stream.listen(
@@ -183,19 +184,25 @@ void _listen(FirebaseDatabase db, int generation) {
 
   guard<bool>(db.onConnected, _setConnected);
   guard<DatabaseEvent>(
-    items.orderByChild('at').onChildAdded,
+    ordered.onChildAdded,
     (DatabaseEvent e) => _upsert(e.snapshot, e.previousChildKey),
+  );
+  // A server timestamp replaces the local estimate and can move the item.
+  guard<DatabaseEvent>(
+    ordered.onChildMoved,
+    (DatabaseEvent e) => _place(_rows[e.snapshot.key!], e.previousChildKey),
   );
   guard<DatabaseEvent>(
     items.onChildChanged,
-    (DatabaseEvent e) => _upsert(e.snapshot, null),
+    (DatabaseEvent e) => _upsert(e.snapshot, null, place: false),
   );
   guard<DatabaseEvent>(items.onChildRemoved, (DatabaseEvent e) {
     _rows.remove(e.snapshot.key)?.remove();
   });
 }
 
-void _upsert(DataSnapshot snapshot, String? previousKey) {
+/// Shows [snapshot] as a row; with [place] the row goes after [previousKey] (see [_place]).
+void _upsert(DataSnapshot snapshot, String? previousKey, {bool place = true}) {
   final String key = snapshot.key!;
   final Object? value = snapshot.value;
   final String text = value is Map ? '${value['text']}' : '$value';
@@ -204,16 +211,18 @@ void _upsert(DataSnapshot snapshot, String? previousKey) {
   row.textContent = text;
   // A write made here and not confirmed yet is shown in italics.
   row.className = _unconfirmed.contains(key) ? 'local' : '';
+  if (place) _place(row, previousKey);
+}
+
+/// Puts [row] right after the row of [previousKey], or first when there is none, unless it is there.
+void _place(HTMLLIElement? row, String? previousKey) {
+  if (row == null) return;
   final HTMLUListElement list = _el('items');
-  if (row.parentNode == null) {
-    final HTMLLIElement? before = previousKey == null
-        ? null
-        : _rows[previousKey];
-    if (before == null) {
-      list.prepend(row);
-    } else {
-      list.insertBefore(row, before.nextSibling);
-    }
+  final HTMLLIElement? before = previousKey == null ? null : _rows[previousKey];
+  if (before == null) {
+    if (row.parentNode == null || list.firstChild != row) list.prepend(row);
+  } else if (row.parentNode == null || before.nextSibling != row) {
+    list.insertBefore(row, before.nextSibling);
   }
 }
 

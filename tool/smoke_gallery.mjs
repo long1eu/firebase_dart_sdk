@@ -346,6 +346,7 @@ async function webApp(browser, opts, rid, compiler) {
     await webAppLive(c);
     await webAppOffline(c);
     await webAppPanel(c);
+    await webAppSkew(c);
     await webAppRules(c);
   } finally {
     try {
@@ -389,7 +390,7 @@ async function webAppContext(browser, opts, rid, compiler) {
     return key;
   };
   const four = ['second', 'third', 'from tab 2', 'offline item'];
-  return { browser, opts, compiler, group, other, db, url, backend, tab1, tab2: null, pages, add,
+  return { browser, opts, compiler, rid, group, other, db, url, backend, tab1, tab2: null, pages, add,
     items, idle, ready, keyOf, four };
 }
 
@@ -535,6 +536,50 @@ async function webAppPanel(c) {
     await tab1.waitUntil(WA, (s) => s.error === 'Stored settings removed.', 5000, showWa);
     const stored = await tab1.eval(`return localStorage.getItem('rtdb_web_app.settings');`);
     check(stored === null, `localStorage still has ${stored}`);
+  });
+}
+
+// Step 13: a late handshake makes the server time offset too small, so a local ServerValue.timestamp
+// estimate sorts before an item the server already stamped, and the real value moves it later
+// (onChildMoved). The page is not changed: a script added before the page loads makes the first
+// WebSocket message handler of each socket busy-wait 300 ms.
+async function webAppSkew(c) {
+  const { browser, opts, compiler, group, pages, rid } = c;
+  const project = `demo-smoke-${rid}-${compiler}-skew`;
+  const compilerName = compiler === 'js' ? 'dart2js' : 'dart2wasm';
+  await step(group, '13 server time offset skew', 'with a 300 ms stall on the first WebSocket ' +
+    'message, items added one after the other end in order one, two (the row is moved when the ' +
+    'server timestamp arrives)', async () => {
+    const page = await Page.open(browser, 'skew');
+    pages.push(page);
+    await page.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+      const add = EventTarget.prototype.addEventListener;
+      EventTarget.prototype.addEventListener = function (type, fn, ...rest) {
+        if (type === 'message' && this instanceof WebSocket && typeof fn === 'function') {
+          let first = true;
+          const wrapped = function (...args) {
+            if (first) {
+              first = false;
+              const end = performance.now() + 300;
+              while (performance.now() < end);
+            }
+            return fn.apply(this, args);
+          };
+          return add.call(this, type, wrapped, ...rest);
+        }
+        return add.call(this, type, fn, ...rest);
+      };
+    })();` });
+    await page.goto(`${opts.base}/rtdb_web_app/?emulator=${opts.emulator}&project=${project}` +
+      `&compiler=${compiler}`);
+    await page.waitUntil(WA, (s) => s && s.compiler === compilerName &&
+      s.connected === 'Connected' && s.pending === 'No writes waiting', 15000, showWa);
+    await page.eval(`setVal('text', 'one'); submitForm('add'); return true;`);
+    await page.waitUntil(WA, (s) => s.items.join() === 'one' && s.classes[0] === '', 10000, showWa);
+    await page.eval(`setVal('text', 'two'); submitForm('add'); return true;`);
+    await page.waitUntil(WA, (s) => s.items.join() === 'one,two' &&
+      s.pending === 'No writes waiting', 10000, showWa);
+    await page.waitUntil(WA, (s) => s.items.join() === 'one,two', 1000, showWa);
   });
 }
 
