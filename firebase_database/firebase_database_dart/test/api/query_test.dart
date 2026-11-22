@@ -106,25 +106,84 @@ void main() {
       });
     }
 
-    test('invalid query throws in release mode', () {
-      // The checks are not asserts: they run whatever the mode.
-      withDb((FirebaseDatabase db) {
-        expect(() => db.ref('q').orderByKey().orderByValue(), throwsStateError);
-        expect(() => db.ref('q').limitToFirst(0), throwsArgumentError);
-      });
-    });
-
-    test('valid combinations build', () {
+    test('valid combinations build and reach the wire object', () {
       withDb((FirebaseDatabase db) {
         final DatabaseReference r = db.ref('q');
-        r.orderByKey().startAt('a').endAt('z').limitToFirst(3);
-        r.orderByKey().startAfter('a').endBefore('z');
-        r.orderByKey().equalTo('a');
-        r.orderByValue().startAt(1, key: 'k').endAt(9).limitToLast(2);
-        r.orderByChild('a/b').equalTo('x', key: 'k');
-        r.orderByPriority().startAt(null).endAt('p');
-        r.startAt(1).endAt(2).limitToFirst(1).orderByValue();
-        r.limitToLast(1).orderByChild('a');
+        expect(
+          wire(r.orderByKey().startAt('a').endAt('z').limitToFirst(3)),
+          <String, Object?>{
+            'sp': 'a',
+            'sin': true,
+            'ep': 'z',
+            'ein': true,
+            'l': 3,
+            'vf': 'l',
+            'i': '.key',
+          },
+        );
+        expect(
+          wire(r.orderByKey().startAfter('a').endBefore('z')),
+          <String, Object?>{
+            'sp': 'a',
+            'sin': false,
+            'ep': 'z',
+            'ein': false,
+            'i': '.key',
+          },
+        );
+        expect(wire(r.orderByKey().equalTo('a')), <String, Object?>{
+          'sp': 'a',
+          'sin': true,
+          'ep': 'a',
+          'ein': true,
+          'i': '.key',
+        });
+        expect(
+          wire(r.orderByValue().startAt(1, key: 'k').endAt(9).limitToLast(2)),
+          <String, Object?>{
+            'sp': 1,
+            'sn': 'k',
+            'sin': true,
+            'ep': 9,
+            'ein': true,
+            'l': 2,
+            'vf': 'r',
+            'i': '.value',
+          },
+        );
+        expect(
+          wire(r.orderByChild('a/b').equalTo('x', key: 'k')),
+          <String, Object?>{
+            'sp': 'x',
+            'sn': 'k',
+            'sin': true,
+            'ep': 'x',
+            'en': 'k',
+            'ein': true,
+            'i': 'a/b',
+          },
+        );
+        expect(
+          wire(r.orderByPriority().startAt(null).endAt('p')),
+          <String, Object?>{'sp': null, 'sin': true, 'ep': 'p', 'ein': true},
+        );
+        expect(
+          wire(r.startAt(1).endAt(2).limitToFirst(1).orderByValue()),
+          <String, Object?>{
+            'sp': 1,
+            'sin': true,
+            'ep': 2,
+            'ein': true,
+            'l': 1,
+            'vf': 'l',
+            'i': '.value',
+          },
+        );
+        expect(wire(r.limitToLast(1).orderByChild('a')), <String, Object?>{
+          'l': 1,
+          'vf': 'r',
+          'i': 'a',
+        });
       });
     });
   });

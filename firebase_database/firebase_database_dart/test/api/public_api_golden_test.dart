@@ -7,6 +7,8 @@
 //
 // The listing is built by support/public_api_describer.dart with dart:mirrors,
 // so it works under `dart test` (JIT), not in AOT.
+@TestOn('vm')
+library;
 
 import 'dart:io';
 

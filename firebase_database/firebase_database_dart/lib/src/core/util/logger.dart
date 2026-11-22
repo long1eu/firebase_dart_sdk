@@ -21,5 +21,6 @@ enum DatabaseLogLevel {
   error,
 }
 
-/// Receives log messages; never given tokens.
+/// Receives log messages. Messages hold database paths and the texts the server sent, never
+/// tokens and never the values you read or write.
 typedef DatabaseLogger = void Function(DatabaseLogLevel level, String message);

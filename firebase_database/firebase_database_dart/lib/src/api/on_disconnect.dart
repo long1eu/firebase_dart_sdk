@@ -64,6 +64,9 @@ final class OnDisconnect {
 
   /// On disconnect, writes each entry of [values] below the location, leaving other children alone. Keys
   /// may be multi-segment paths (`'a/b'`).
+  ///
+  /// An empty [values] map registers nothing and completes the Future in a microtask, with no
+  /// request.
   Future<void> update(Map<String, Object?> values) {
     const String fnName = 'OnDisconnect.update';
     final Path path = reference.spec.path;
@@ -84,9 +87,11 @@ final class OnDisconnect {
   /// On disconnect, removes the location's data: the same as `set(null)`.
   Future<void> remove() => _set('OnDisconnect.remove', null, null);
 
-  /// Cancels every onDisconnect write registered at this location and below it.
+  /// Cancels every onDisconnect write registered at this location and below it. Throws an
+  /// [ArgumentError] under `.info`, as [set] does.
   Future<void> cancel() {
     final Path path = reference.spec.path;
+    validateWritablePath('OnDisconnect.cancel', path);
     return reference.database.write(
       (Repo repo, WriteCompletion done) =>
           repo.onDisconnectCancel(path, onComplete: done),

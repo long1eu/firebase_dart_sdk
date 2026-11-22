@@ -1,7 +1,5 @@
 class DataSnapshot
   child(String path): DataSnapshot
-  final index: Index @internal
-  final node: Node @internal
   final ref: DatabaseReference
   get children: Iterable<DataSnapshot>
   get childrenCount: int
@@ -11,7 +9,7 @@ class DataSnapshot
   get priority: Object
   get value: Object
   hasChild(String path): bool
-  new DataSnapshot.internal(DatabaseReference ref, Node node, Index index) @internal
+  new DataSnapshot.internal(DatabaseReference ref, Node _node, Index _index) @internal
   toJson(): Object
 class DatabaseEvent
   final previousChildKey: String

@@ -22,6 +22,19 @@ void main() {
     });
   }
 
+  /// Expects each of [writes] to return without throwing and its Future not to fail while time
+  /// runs (the fake server never answers, so the Future stays pending).
+  void expectAccepted(FakeTime time, List<Future<void> Function()> writes) {
+    final List<Object> errors = <Object>[];
+    for (final Future<void> Function() write in writes) {
+      late final Future<void> future;
+      expect(() => future = write(), returnsNormally);
+      future.catchError((Object e) => errors.add(e));
+    }
+    time.elapse(const Duration(seconds: 5));
+    expect(errors, isEmpty);
+  }
+
   Map<String, Object?> nested(int depth) {
     Object? value = 1;
     for (int i = 0; i < depth; i++) {
@@ -73,12 +86,14 @@ void main() {
     });
 
     test('accepts depth 32, .priority, .value and lists', () {
-      withDb((FirebaseDatabase db, FakeTime _) {
-        db.ref('x').set(nested(31));
-        db.ref('x').set(<String, Object?>{'.value': 1, '.priority': 2});
-        db.ref('x').set(<String, Object?>{'a': 1, '.priority': 'p'});
-        db.ref('x').set(<Object?>[1, 2, null, 4]);
-        db.ref('x').set(<String, Object?>{'a': 'b' * 1000});
+      withDb((FirebaseDatabase db, FakeTime time) {
+        expectAccepted(time, <Future<void> Function()>[
+          () => db.ref('x').set(nested(31)),
+          () => db.ref('x').set(<String, Object?>{'.value': 1, '.priority': 2}),
+          () => db.ref('x').set(<String, Object?>{'a': 1, '.priority': 'p'}),
+          () => db.ref('x').set(<Object?>[1, 2, null, 4]),
+          () => db.ref('x').set(<String, Object?>{'a': 'b' * 1000}),
+        ]);
       });
     });
 
@@ -116,11 +131,13 @@ void main() {
     }
 
     test('null, numbers, strings and server values are priorities', () {
-      withDb((FirebaseDatabase db, FakeTime _) {
-        db.ref('x').setPriority(null);
-        db.ref('x').setPriority(1.5);
-        db.ref('x').setPriority('p');
-        db.ref('x').set(1, priority: ServerValue.timestamp);
+      withDb((FirebaseDatabase db, FakeTime time) {
+        expectAccepted(time, <Future<void> Function()>[
+          () => db.ref('x').setPriority(null),
+          () => db.ref('x').setPriority(1.5),
+          () => db.ref('x').setPriority('p'),
+          () => db.ref('x').set(1, priority: ServerValue.timestamp),
+        ]);
       });
     });
   });
@@ -212,11 +229,14 @@ void main() {
     });
 
     test('accepts ServerValue.timestamp and ServerValue.increment', () {
-      withDb((FirebaseDatabase db, FakeTime _) {
-        db.ref('x').set(ServerValue.timestamp);
-        db.ref('x').set(ServerValue.increment(1));
-        db.ref('x').set(ServerValue.increment(1.5));
-        db.ref('x').update(<String, Object?>{'a': ServerValue.timestamp});
+      withDb((FirebaseDatabase db, FakeTime time) {
+        expectAccepted(time, <Future<void> Function()>[
+          () => db.ref('x').set(ServerValue.timestamp),
+          () => db.ref('x').set(ServerValue.increment(1)),
+          () => db.ref('x').set(ServerValue.increment(1.5)),
+          () =>
+              db.ref('x').update(<String, Object?>{'a': ServerValue.timestamp}),
+        ]);
       });
     });
   });
@@ -241,8 +261,10 @@ void main() {
     });
 
     test('accepts a .priority path and refuses an invalid priority there', () {
-      withDb((FirebaseDatabase db, FakeTime _) {
-        db.ref('x').update(<String, Object?>{'a/.priority': 1});
+      withDb((FirebaseDatabase db, FakeTime time) {
+        expectAccepted(time, <Future<void> Function()>[
+          () => db.ref('x').update(<String, Object?>{'a/.priority': 1}),
+        ]);
         expect(
           () => db.ref('x').update(<String, Object?>{'a/.priority': true}),
           throwsArgumentError,
@@ -251,8 +273,14 @@ void main() {
     });
 
     test('accepts multi-segment paths that do not overlap', () {
-      withDb((FirebaseDatabase db, FakeTime _) {
-        db.ref('x').update(<String, Object?>{'a/b': 1, 'a/c': 2, 'd': null});
+      withDb((FirebaseDatabase db, FakeTime time) {
+        expectAccepted(time, <Future<void> Function()>[
+          () => db.ref('x').update(<String, Object?>{
+            'a/b': 1,
+            'a/c': 2,
+            'd': null,
+          }),
+        ]);
       });
     });
   });

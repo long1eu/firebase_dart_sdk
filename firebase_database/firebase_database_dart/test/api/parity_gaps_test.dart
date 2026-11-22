@@ -124,9 +124,6 @@ void main() {
           );
         });
       },
-      skip:
-          'DEFECT: the constructor parses the URL with _ParsedUrl (firebase_database.dart:640), '
-          'which drops the path; parseDatabaseUrl, which refuses it, has no caller in lib/.',
     );
 
     test('a URL that ends in / is the root and is accepted', () {
@@ -382,54 +379,39 @@ void main() {
       expect(seen, <Object?>[1]);
     });
 
-    wired(
-      'Transaction.success without a priority keeps the current one',
-      (_Wire w) {
-        answerT(w, <String, Object?>{'.value': 1, '.priority': 'p7'});
-        w.track(
-          'T',
-          w.db
-              .ref('t')
-              .runTransaction((Object? v) => const Transaction.success(2)),
-        );
-        w.settle();
-        expect(w.server.callsOf('put').single.data, <String, Object?>{
-          '.value': 2,
-          '.priority': 'p7',
-        });
-        expect(w.log, <String>['S1:2/p7']);
-        w.server.ackLastWrite();
-        w.settle();
-        expect(w.log, <String>['S1:2/p7', 'T:committed(2/p7)']);
-      },
-      skip:
-          'DEFECT: the new node is built with nodeFromJson(outcome.value) and no priority '
-          '(repo_transactions.dart:116 first run, :331 rerun), so the priority is dropped; '
-          'JS keeps '
-          'the current priority when the value has no .priority (core/Repo.ts:996-1013 and '
-          ':1303-1310).',
-    );
+    wired('Transaction.success without a priority keeps the current one', (
+      _Wire w,
+    ) {
+      answerT(w, <String, Object?>{'.value': 1, '.priority': 'p7'});
+      w.track(
+        'T',
+        w.db
+            .ref('t')
+            .runTransaction((Object? v) => const Transaction.success(2)),
+      );
+      w.settle();
+      expect(w.server.callsOf('put').single.data, <String, Object?>{
+        '.value': 2,
+        '.priority': 'p7',
+      });
+      expect(w.log, <String>['S1:2/p7']);
+      w.server.ackLastWrite();
+      w.settle();
+      expect(w.log, <String>['S1:2/p7', 'T:committed(2/p7)']);
+    });
   });
 
   group('emu.cloudWorkstation', () {
-    test(
-      'an emulator on *.cloudworkstations.dev is reached over TLS',
-      () {
-        fakeTime((FakeTime time) {
-          final FirebaseDatabase db = FirebaseDatabase(
-            newTestApp(),
-            emulatorHost: '9000-x.cloudworkstations.dev:443',
-          );
-          expect(db.databaseUrl.scheme, 'https');
-          expect(db.databaseUrl.host, '9000-x.cloudworkstations.dev');
-        });
-      },
-      skip:
-          'DEFECT: _Target.resolve sets secure: false for every emulatorHost '
-          '(firebase_database.dart:721-731); emulatorDatabase in realtime/database_url.dart, which '
-          'makes *.cloudworkstations.dev secure, has no caller in lib/. JS: isCloudWorkstation '
-          'makes the emulator use TLS (api/Database.ts:393-396).',
-    );
+    test('an emulator on *.cloudworkstations.dev is reached over TLS', () {
+      fakeTime((FakeTime time) {
+        final FirebaseDatabase db = FirebaseDatabase(
+          newTestApp(),
+          emulatorHost: '9000-x.cloudworkstations.dev:443',
+        );
+        expect(db.databaseUrl.scheme, 'https');
+        expect(db.databaseUrl.host, '9000-x.cloudworkstations.dev');
+      });
+    });
   });
 
   group('dart.estimatedServerTime', () {

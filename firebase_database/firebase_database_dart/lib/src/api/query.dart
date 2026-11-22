@@ -45,13 +45,15 @@ import 'package:meta/meta.dart';
 /// when the database closes (error `database-closed`, then done) or when the server cancels the listen
 /// (error, for example `permission-denied`, then done). A lost connection is never a stream error.
 ///
-/// Delivery. No listener runs inside the call that caused it: events go through one queue per database,
-/// drained in a microtask. Inside one change, events come child removed, added, moved, changed, then value;
-/// deeper locations before shallower ones. Changes are delivered in the order they were applied. Pausing a
-/// subscription buffers its events without bound; nothing is dropped. Order across subscriptions holds only
-/// for `listen` callbacks that are not paused: `await for` pauses after each event, so it loses order
-/// relative to other streams (use [onChildEvents] to keep the order of child events). An exception thrown
-/// by a listener goes to that listener's zone; its subscription stays open.
+/// Delivery. No listener runs inside the call that caused it, except in [FirebaseDatabase.close],
+/// which delivers the `database-closed` error to every open stream before it returns: events go
+/// through one queue per database, drained in a microtask. Inside one change, events come child
+/// removed, added, moved, changed, then value; deeper locations before shallower ones. Changes are
+/// delivered in the order they were applied. Pausing a subscription buffers its events without
+/// bound; nothing is dropped. Order across subscriptions holds only for `listen` callbacks that are
+/// not paused: `await for` pauses after each event, so it loses order relative to other streams
+/// (use [onChildEvents] to keep the order of child events). An exception thrown by a listener goes
+/// to that listener's zone; its subscription stays open.
 ///
 /// Cache. A new listener on a location whose data is held complete (by another listener, or by a pending
 /// local write) gets its initial events from that data with no round trip. Two queries are equal when they
@@ -85,12 +87,23 @@ base class Query {
   /// The path of the location: `'/a/b'`, or `'/'` at the root.
   String get path => spec.path.toString();
 
-  /// The database URL followed by the percent-encoded [path].
+  /// The scheme, host and percent-encoded [path] of this location, for example
+  /// `https://my-project-default-rtdb.firebaseio.com/a/b`. Unlike [FirebaseDatabase.databaseUrl] it
+  /// never has the `?ns=` query of an emulator.
   Uri get url => database.urlFor(spec.path);
 
-  /// Orders by the value of the child at [path] (which may have several segments) of each child. Children
-  /// without it come first. Ordering by a child the server has no `.indexOn` rule for downloads all data in
-  /// development and fails with `index-not-defined` where the rules require an index.
+  /// Orders by the value of the child at [path] (which may have several segments) of each child.
+  /// Children without it come first.
+  ///
+  /// With no range and no limit the client asks the server for all the data at this location and
+  /// orders it here, as [get] and the `on<Thing>` streams do, so no `.indexOn` rule is needed. With
+  /// [startAt], [startAfter], [endAt], [endBefore], [equalTo] or a limit the query is sent as it
+  /// is, and the server fails it with `index-not-defined` when the rules have no `.indexOn` for
+  /// [path].
+  ///
+  /// ```dart
+  /// final Query adults = db.ref('users').orderByChild('age').startAt(18);
+  /// ```
   Query orderByChild(String path) {
     if (path == r'$key') {
       throw ArgumentError(
@@ -288,6 +301,13 @@ base class Query {
   /// 4. When the connection drops while the request is out, case 3 applies from then.
   /// 5. When the server refuses the read it fails with `permission-denied`, never with a cached answer.
   ///
+  /// 6. A `.info` path answers from the local state at once.
+  ///
+  /// Other failures keep their code: `network-error` after two connections that each fell silent,
+  /// `index-not-defined` for a filtered query the rules cannot serve, `database-closed` after
+  /// [FirebaseDatabase.close]. Without `persistence` there is no persisted cache, so case 3 ends in
+  /// `unavailable`.
+  ///
   /// Outside case 1 the answer does not include this client's pending writes.
   ///
   /// A query with an order but no range and no limit asks the server for all the data at its path and
@@ -312,9 +332,14 @@ base class Query {
     });
   }
 
-  /// The first event of [type], after which the registration is removed inside that event's delivery.
+  /// Completes with the first event of [type] and stops listening.
   ///
-  /// It may answer from the cache and includes pending local writes; `onValue.first` behaves the same.
+  /// This is a listener, not a read. It answers from data the client already holds (pending local
+  /// writes included), else it waits for the server with no timeout, also while offline; [get]
+  /// fails with `unavailable` after 3 seconds instead. With a child type it completes with the
+  /// first child event, so it waits until a child exists or changes. It fails with the error of the
+  /// stream (`permission-denied` when the rules refuse the listen, `database-closed` after
+  /// [FirebaseDatabase.close]).
   ///
   /// ```dart
   /// final DatabaseEvent e = await db.ref('config').once();
@@ -353,11 +378,14 @@ base class Query {
   Stream<DatabaseEvent> _stream(Set<EventType> types) =>
       database.eventStream(this, types);
 
-  /// The value of the query: its current data first, then again after every change.
+  /// The value of the query: its current data first, then again after every change. An empty
+  /// location gives a first event whose snapshot has `exists` false. While offline the first event
+  /// comes from data the client already holds, else it waits for the server; the loss of the
+  /// connection is not an error of the stream (see [FirebaseDatabase.onConnected]).
   Stream<DatabaseEvent> get onValue => _stream(<EventType>{EventType.value});
 
   /// A [DatabaseEventType.childAdded] event per child, first for each existing child, then for each new
-  /// one.
+  /// one. An empty location gives no event until a child appears.
   Stream<DatabaseEvent> get onChildAdded =>
       _stream(<EventType>{EventType.childAdded});
 
@@ -387,7 +415,14 @@ base class Query {
   /// false.
   ///
   /// It is a flag, not a counter: calling it with true twice and false once turns it off. Without
-  /// persistence it keeps the in-memory data and the server listen.
+  /// persistence it keeps the in-memory data and the server listen. The Future completes when the
+  /// flag has been applied here, not when the data has arrived; after [FirebaseDatabase.close] it
+  /// fails with `database-closed`. A `.info` path throws an [ArgumentError] at the call, not
+  /// through the Future.
+  ///
+  /// ```dart
+  /// await db.ref('scores').orderByValue().limitToLast(10).keepSynced(true);
+  /// ```
   Future<void> keepSynced(bool value) {
     if (spec.path.front == ChildKey.info) {
       throw ArgumentError("keepSynced() can't be called on .info paths.");

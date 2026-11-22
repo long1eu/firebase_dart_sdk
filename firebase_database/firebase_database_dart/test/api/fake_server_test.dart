@@ -192,7 +192,7 @@ void main() {
       h.settle();
       h.server.ackLastWrite();
       h.settle();
-      expect(h.log.last, 'S1:V(21)');
+      expect(h.log, <String>['S1:V(21)']);
     });
 
     // A stated behaviour, as the JS SDK: the sum of two finite doubles that leaves the double

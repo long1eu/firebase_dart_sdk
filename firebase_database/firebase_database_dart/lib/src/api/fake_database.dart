@@ -9,7 +9,6 @@ import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:firebase_database_dart/src/core/persistence/database_persistence.dart';
 import 'package:firebase_database_dart/src/api/fake_database_server.dart';
 import 'package:firebase_database_dart/src/api/firebase_database.dart';
-import 'package:firebase_database_dart/src/core/persistence/persistence_storage_engine.dart';
 import 'package:firebase_database_dart/src/core/persistence/persistence_storage_engine_opener.dart';
 import 'package:firebase_database_dart/src/core/persistence/tracked_query.dart';
 import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
@@ -61,16 +60,22 @@ FirebaseDatabase databaseWithFakeServer(
 /// Persistence over an in-memory engine whose server cache starts as [serverCache] (paths to JSON values),
 /// as if a previous session had stored it. Durable for the life of the engine.
 ///
+/// Every database given the same value shares one engine. A database created after the previous one
+/// closed reopens it with its data, as an app restarted on the same disk would.
+///
 /// Each entry is stored as server data and as a complete, inactive tracked default query at its path, so
 /// `Query.get` can answer from it offline.
 DatabasePersistence fakePersistence({
   Map<String, Object?> serverCache = const {},
 }) {
-  PersistenceStorageEngine? engine;
+  InMemoryPersistenceStorageEngine? engine;
   return databasePersistence(
     opener: (PersistenceKey key, {DatabaseLogger? logger}) async {
-      final PersistenceStorageEngine? existing = engine;
+      final InMemoryPersistenceStorageEngine? existing = engine;
       if (existing != null) {
+        if (existing.isClosed) {
+          existing.reopen();
+        }
         return existing;
       }
       final InMemoryPersistenceStorageEngine created =

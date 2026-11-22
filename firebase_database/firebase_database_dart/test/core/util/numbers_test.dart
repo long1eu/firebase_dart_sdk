@@ -56,7 +56,6 @@ void main() {
       final int big = int.parse('9007199254740993');
       expect(identical(normalizeNumber(big), big), isTrue);
       expect(normalizeNumber(big).toString(), big.toString());
-      expect(tryParseJsonNumber('9007199254740993'), big);
       // A double beyond the safe range stays a double.
       expect(
         normalizeNumber(9007199254740992.0).toString(),
@@ -127,34 +126,6 @@ void main() {
       expect(tryParseIntKey('--1'), isNull);
       expect(tryParseIntKey('a'), isNull);
       expect(tryParseIntKey('١'), isNull); // Arabic-Indic one.
-    });
-  });
-
-  group('tryParseJsonNumber', () {
-    test('accepts the Java forms the server sends', () {
-      expect(tryParseJsonNumber('1.0E21'), 1e21);
-      expect(isIntegral(tryParseJsonNumber('1.0E21')!), isFalse);
-      expect(tryParseJsonNumber('4.9E-324'), 5e-324);
-      expect(tryParseJsonNumber('1.0'), 1);
-      expect(tryParseJsonNumber('1e3'), 1000);
-      expect(tryParseJsonNumber('-2.5'), -2.5);
-      expect(tryParseJsonNumber('12'), 12);
-    });
-
-    test('keeps a negative zero', () {
-      expect(tryParseJsonNumber('-0')!.isNegative, isTrue);
-      expect(tryParseJsonNumber('-0.0')!.isNegative, isTrue);
-    });
-
-    test('refuses non-JSON forms', () {
-      expect(tryParseJsonNumber(''), isNull);
-      expect(tryParseJsonNumber('NaN'), isNull);
-      expect(tryParseJsonNumber('Infinity'), isNull);
-      expect(tryParseJsonNumber('1e400'), isNull);
-      expect(tryParseJsonNumber('0x10'), isNull);
-      expect(tryParseJsonNumber('+1'), isNull);
-      expect(tryParseJsonNumber('.5'), isNull);
-      expect(tryParseJsonNumber(' 1'), isNull);
     });
   });
 

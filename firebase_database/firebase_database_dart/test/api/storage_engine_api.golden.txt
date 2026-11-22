@@ -73,6 +73,7 @@ class InMemoryPersistenceStorageEngine
   deleteTrackedQuery(int trackedQueryId): void
   disableTransactionCheck: bool
   endTransaction(): void
+  get isClosed: bool
   get isDurable: bool
   loadTrackedQueries(): List<TrackedQuery>
   loadTrackedQueryKeys(Set<int> trackedQueryIds): Set<ChildKey>
@@ -85,6 +86,7 @@ class InMemoryPersistenceStorageEngine
   pruneCache(Path root, PruneForest pruneForest): void
   removeAllUserWrites(): void
   removeUserWrite(int writeId): void
+  reopen(): void
   resetPreviouslyActiveTrackedQueries(int lastUse): void
   saveTrackedQuery(TrackedQuery trackedQuery): void
   saveTrackedQueryKeys(int trackedQueryId, Set<ChildKey> keys): void

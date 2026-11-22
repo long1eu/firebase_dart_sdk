@@ -8,6 +8,8 @@
 // The listing is built with dart:mirrors by the generator of the client package
 // (it has no name of its own hard-coded), so it works under `dart test` (JIT),
 // not in AOT.
+@TestOn('vm')
+library;
 
 import 'dart:io';
 

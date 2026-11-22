@@ -33,6 +33,7 @@ import 'package:firebase_database_dart/src/core/util/push_id.dart';
 import 'package:firebase_database_dart/src/core/util/validation.dart';
 import 'package:firebase_database_dart/src/core/view/event.dart';
 import 'package:firebase_database_dart/src/core/view/query_spec.dart';
+import 'package:firebase_database_dart/src/realtime/database_url.dart';
 import 'package:firebase_database_dart/src/realtime/server_actions_factories.dart';
 import 'package:meta/meta.dart';
 
@@ -55,21 +56,31 @@ const String _emulatorHostVariable = 'FIREBASE_DATABASE_EMULATOR_HOST';
 final class FirebaseDatabase {
   /// Creates the database of [app].
   ///
-  /// [databaseUrl] defaults to the app's `databaseURL`, then to `https://<projectId>-default-rtdb.firebaseio.com`;
-  /// with neither and no project id it throws an [ArgumentError].
+  /// [databaseUrl] defaults to the app's `databaseURL`, then to
+  /// `https://<projectId>-default-rtdb.firebaseio.com`; with neither and no project id it throws an
+  /// [ArgumentError]. The URL must be the root of a database over TLS (`https://` or `wss://`): a
+  /// plain `http://` URL, a path, user info, a port other than 443 on a host that is not loopback,
+  /// a custom domain without `?ns=` and an invalid namespace each throw an [ArgumentError] here,
+  /// with or without [persistence]. The message does not quote the URL.
   ///
   /// [emulatorHost] (`'host:port'` or `'[ipv6]:port'`) connects to the Database emulator over plain
-  /// WebSocket, with the database URL's namespace (by default `<projectId>-default-rtdb`). See
-  /// [emulatorHostFromEnvironment]. [mockUserToken] is sent to the emulator as it is: build a user's token
-  /// with `mockUserTokenFor`. A string that is not such a token (the literal `'owner'` included) is an
-  /// admin credential for the emulator and bypasses the rules. Passing it without [emulatorHost], or
-  /// empty, throws an [ArgumentError].
+  /// WebSocket (over TLS for a `*.cloudworkstations.dev` host), with the database URL's namespace
+  /// (by default `<projectId>-default-rtdb`); the URL's scheme and host are not used then. See
+  /// [emulatorHostFromEnvironment]. [mockUserToken] is sent to the emulator as it is: build a
+  /// user's token with `mockUserTokenFor`. A string that is not such a token (the literal `'owner'`
+  /// included) is an admin credential for the emulator and bypasses the rules. Passing it without
+  /// [emulatorHost], or empty, throws an [ArgumentError].
   ///
   /// [persistence] turns on disk persistence (memory only when null). [logger] receives log messages
   /// (silent when null).
   ///
-  /// The constructor is synchronous, also with persistence: opening the store and restoring writes happen in
-  /// the background, and calls made meanwhile wait for it, in call order.
+  /// The constructor is synchronous, also with persistence: opening the store and restoring writes
+  /// happen in the background, and calls made meanwhile wait for it, in call order. If the start
+  /// fails after the store opened, every waiting and later call fails with that error.
+  ///
+  /// The persisted cache is keyed by the app name and [databaseUrl], which is normalised: every
+  /// spelling of one URL shares one cache, two namespaces on one host never do, and the same
+  /// emulator named by two hosts (`localhost` and `127.0.0.1`) has two.
   ///
   /// [clock] and [random] replace the wall clock and the random source (push ids, backoff), for tests.
   FirebaseDatabase(
@@ -150,6 +161,10 @@ final class FirebaseDatabase {
   PersistenceStorageEngine? _engine;
   bool _openFailed = false;
 
+  /// The error that stopped the start after persistence opened; every call fails with it.
+  Object? _startError;
+  StackTrace? _startStackTrace;
+
   bool _closed = false;
   Future<void>? _closeFuture;
   StreamSubscription<String>? _deleteSubscription;
@@ -177,7 +192,13 @@ final class FirebaseDatabase {
       unawaited(close());
     });
     if (persistence == null) {
-      _startRepo(null);
+      try {
+        _startRepo(null);
+      } on Object {
+        unawaited(_deleteSubscription?.cancel());
+        _deleteSubscription = null;
+        rethrow;
+      }
     } else {
       _opening = _openPersistence(persistence);
     }
@@ -216,7 +237,31 @@ final class FirebaseDatabase {
     if (_closed) {
       return;
     }
-    _startRepo(manager);
+    try {
+      _startRepo(manager);
+    } on Object catch (error, stackTrace) {
+      _failStart(error, stackTrace);
+    }
+  }
+
+  /// Fails every queued call, open stream and pending Future with [error], and every later call
+  /// too.
+  void _failStart(Object error, StackTrace stackTrace) {
+    _startError = error;
+    _startStackTrace = stackTrace;
+    _queue.clear();
+    _logger?.call(
+      DatabaseLogLevel.error,
+      'The database could not start (${error.runtimeType}); every call fails with that error.',
+    );
+    for (final _Listener listener in List<_Listener>.of(_listeners)) {
+      listener.end(error);
+    }
+    for (final _Pending<Object?> pending in List<_Pending<Object?>>.of(
+      _pending,
+    )) {
+      pending.fail(error, stackTrace);
+    }
   }
 
   void _startRepo(PersistenceManager? manager) {
@@ -235,7 +280,7 @@ final class FirebaseDatabase {
 
   /// Runs [op] on the Repo now, or after the Repo started and the calls before it ran.
   void _withRepo(void Function(Repo repo) op) {
-    if (_closed) {
+    if (_closed || _startError != null) {
       return;
     }
     final Repo? repo = _repo;
@@ -256,6 +301,10 @@ final class FirebaseDatabase {
   Future<T> _request<T>(void Function(Repo repo, _Pending<T> pending) start) {
     if (_closed) {
       return Future<T>.error(_closedError());
+    }
+    final Object? startError = _startError;
+    if (startError != null) {
+      return Future<T>.error(startError, _startStackTrace);
     }
     final _Pending<T> pending = _Pending<T>(_pending);
     _withRepo((Repo repo) => start(repo, pending));
@@ -278,9 +327,10 @@ final class FirebaseDatabase {
     Query query,
     Set<EventType> types,
   ) => Stream<DatabaseEvent>.multi((MultiStreamController<DatabaseEvent> c) {
-    if (_closed) {
+    final Object? failure = _closed ? _closedError() : _startError;
+    if (failure != null) {
       c
-        ..addError(_closedError())
+        ..addError(failure)
         ..close();
       return;
     }
@@ -362,12 +412,18 @@ final class FirebaseDatabase {
     return node.value;
   }
 
-  /// The URL of the database.
+  /// The URL of the database, normalised: `https://<host>` with the host in lowercase and without
+  /// the default port, followed by `?ns=<namespace>` when the host does not name the namespace (a
+  /// custom domain, or a `?ns=` that differs from the first host label). With an emulator it is
+  /// `http://<emulatorHost>?ns=<namespace>` (`https` for `*.cloudworkstations.dev`). Every spelling
+  /// of one database gives the same value, two databases never share one, and it keys the persisted
+  /// cache (pass it to `clearSqlitePersistence`).
   Uri get databaseUrl => _target.databaseUrl;
 
-  /// The reference at [path]. `''`, `'a/b'` and `'/a/b'` are accepted and empty segments are dropped
-  /// (`'a//b'` is `a/b`). The `.info` paths work too, for example `ref('.info/connected').onValue`, but
-  /// writes under `.info` throw an [ArgumentError]. Makes no request, and still works after [close].
+  /// The reference at [path]. `''`, `'a/b'` and `'/a/b'` are accepted and empty segments are
+  /// dropped (`'a//b'` is `a/b`). The `.info` paths work too, for example
+  /// `ref('.info/connected').onValue`, but writes under `.info` throw an [ArgumentError]. An
+  /// invalid key throws an [ArgumentError]. Makes no request, and still works after [close].
   DatabaseReference ref([String path = '']) {
     if (path.replaceAll('/', '').isNotEmpty) {
       validateRootPathString('ref', 'path', path);
@@ -376,8 +432,9 @@ final class FirebaseDatabase {
   }
 
   /// The reference for a full [url] of this database (for example
-  /// `https://my-project-default-rtdb.firebaseio.com/a/b`). Throws an [ArgumentError] when [url] names
-  /// another database.
+  /// `https://my-project-default-rtdb.firebaseio.com/a/b`). Throws an [ArgumentError] when [url]
+  /// cannot be parsed, or, outside an emulator, when it names another host. With an emulator the
+  /// host is not compared and only the path is used.
   DatabaseReference refFromUrl(String url) {
     final _ParsedUrl parsed = _ParsedUrl.parse(url);
     if (!_target.info.isUsingEmulator && parsed.host != _target.info.host) {
@@ -398,8 +455,13 @@ final class FirebaseDatabase {
   /// instance stays offline until it is recreated.
   void goOnline() => _withRepo((Repo repo) => repo.resume());
 
-  /// Removes every pending local write, with events reverting them, fails their Futures with
-  /// `write-canceled`, and aborts every running transaction with `write-canceled`.
+  /// Cancels every write the server has not acknowledged, and every running transaction.
+  ///
+  /// Local events revert the writes, and their Futures and the transactions fail with
+  /// `write-canceled`. A write that was already sent can still be applied by the server: its
+  /// acknowledgement is ignored here. onDisconnect registrations are not touched. The returned
+  /// Future completes at once, after the local revert and with no round trip; after [close] it
+  /// fails with `database-closed`.
   Future<void> purgeOutstandingWrites() =>
       _request<void>((Repo repo, _Pending<void> pending) {
         repo.purgeOutstandingWrites();
@@ -442,9 +504,13 @@ final class FirebaseDatabase {
 
   /// Closes the instance. Idempotent.
   ///
-  /// Every open stream gets the error `database-closed` and ends, then every pending write Future fails with
-  /// `database-closed`, then the returned Future completes. Afterwards every asynchronous call fails with
-  /// `database-closed`, [ref] still works (it makes no request), and [goOnline] and [goOffline] do nothing.
+  /// Every open stream gets the error `database-closed` and ends, inside this call; then every
+  /// pending write and transaction Future fails with `database-closed`; then the returned Future
+  /// completes. Writes that were not acknowledged fail here; with persistence they stay on disk and
+  /// the next instance sends them. Closing ends the connection, so the server applies the
+  /// onDisconnect writes this client registered. Afterwards every asynchronous call fails with
+  /// `database-closed`, [ref] still works (it makes no request), and [goOnline] and [goOffline] do
+  /// nothing.
   Future<void> close() => _closeFuture ??= _close();
 
   Future<void> _close() async {
@@ -698,46 +764,80 @@ final class _Target {
         'mockUserToken is only allowed together with emulatorHost.',
       );
     }
-    String? url = databaseUrl ?? app.options.databaseURL;
-    if (url == null || url.isEmpty) {
-      final String? projectId = app.options.projectId;
-      if (projectId == null || projectId.isEmpty) {
-        throw ArgumentError(
-          "Can't determine Firebase Database URL. Be sure to include a Project ID "
-          'or a databaseUrl.',
-        );
-      }
-      url = 'https://$projectId-default-rtdb.firebaseio.com';
-    }
-    final _ParsedUrl parsed = _ParsedUrl.parse(url);
+    final String? url = databaseUrl ?? app.options.databaseURL;
     if (emulatorHost != null) {
-      if (emulatorHost.isEmpty) {
-        throw ArgumentError.value(
-          emulatorHost,
-          'emulatorHost',
-          'Must be host:port.',
-        );
-      }
-      return _Target(
-        RepoInfo(
-          host: emulatorHost,
-          namespace: parsed.namespace,
-          secure: false,
-          isUsingEmulator: true,
-        ),
-        Uri.parse(
-          'http://$emulatorHost',
-        ).replace(queryParameters: <String, String>{'ns': parsed.namespace}),
+      return _Target._emulator(app, url, emulatorHost);
+    }
+    final RepoInfo info = url == null || url.isEmpty
+        ? _defaultDatabase(app)
+        : _argument('databaseUrl', () => parseDatabaseUrl(url));
+    final Uri root = Uri.parse('https://${info.host}');
+    // The namespace is in the URL when the host does not name it (a custom domain or `?ns=`).
+    return _Target(
+      info,
+      info.namespace == info.host.split('.').first
+          ? root
+          : root.replace(
+              queryParameters: <String, String>{'ns': info.namespace},
+            ),
+    );
+  }
+
+  /// The target of the emulator at [emulatorHost], with the namespace of [url] (any scheme, a
+  /// `?ns=` or the first host label) or of the project's default database.
+  factory _Target._emulator(FirebaseApp app, String? url, String emulatorHost) {
+    if (emulatorHost.isEmpty) {
+      throw ArgumentError.value(
+        emulatorHost,
+        'emulatorHost',
+        'Must be host:port.',
       );
     }
+    final String namespace;
+    if (url == null || url.isEmpty) {
+      namespace = _defaultDatabase(app).namespace;
+    } else {
+      final _ParsedUrl parsed = _ParsedUrl.parse(url);
+      if (parsed.path.isNotEmpty) {
+        throw ArgumentError(_rootOnly, 'databaseUrl');
+      }
+      namespace = parsed.namespace;
+    }
+    final RepoInfo info = _argument('emulatorHost', () {
+      final ({String host, int port}) address = parseEmulatorHost(emulatorHost);
+      return emulatorDatabase(address.host, address.port, namespace: namespace);
+    });
     return _Target(
-      RepoInfo(
-        host: parsed.host,
-        namespace: parsed.namespace,
-        secure: parsed.secure,
-      ),
-      Uri.parse('${parsed.secure ? 'https' : 'http'}://${parsed.host}'),
+      info,
+      Uri.parse(
+        '${info.secure ? 'https' : 'http'}://${info.host}',
+      ).replace(queryParameters: <String, String>{'ns': info.namespace}),
     );
+  }
+
+  static const String _rootOnly =
+      'Database URL must not have a path: give the database root and use ref(path)';
+
+  /// The default database of the app's project id; throws an [ArgumentError] without one.
+  static RepoInfo _defaultDatabase(FirebaseApp app) {
+    final String? projectId = app.options.projectId;
+    if (projectId == null || projectId.isEmpty) {
+      throw ArgumentError(
+        "Can't determine Firebase Database URL. Be sure to include a Project ID "
+        'or a databaseUrl.',
+      );
+    }
+    return defaultDatabase(projectId);
+  }
+
+  /// The value of [parse], with a [FormatException] turned into an [ArgumentError] on [name]. The
+  /// message never quotes the URL, which can hold a credential by mistake.
+  static RepoInfo _argument(String name, RepoInfo Function() parse) {
+    try {
+      return parse();
+    } on FormatException catch (e) {
+      throw ArgumentError(e.message, name);
+    }
   }
 
   final RepoInfo info;

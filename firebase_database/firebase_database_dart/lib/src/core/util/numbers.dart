@@ -144,28 +144,3 @@ int? tryParseIntKey(String key) {
   }
   return value <= int32Max ? value : null;
 }
-
-final RegExp _fractionOrExponent = RegExp('[.eE]');
-
-final RegExp _jsonNumber = RegExp(r'^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$');
-
-/// Parses a JSON number as the server sends it, including the Java forms `1.0E21` and
-/// `4.9E-324`, and normalises it with [normalizeNumber]; null when [text] is not a JSON number.
-num? tryParseJsonNumber(String text) {
-  if (!_jsonNumber.hasMatch(text)) {
-    return null;
-  }
-  if (!text.contains(_fractionOrExponent)) {
-    // Integer form: exact on the VM up to 64 bits; larger values fall through to a double.
-    final int? integer = int.tryParse(text);
-    // "-0" goes on to the double path, which keeps the sign.
-    if (integer != null && integer != 0) {
-      return normalizeNumber(integer);
-    }
-  }
-  final double value = double.parse(text);
-  if (value.isInfinite) {
-    return null;
-  }
-  return normalizeNumber(value);
-}
