@@ -1,3 +1,8 @@
+## 0.2.2
+
+- Documentation: an `AuthTokenChange` is a signal. An empty token means signed out; a token that is not empty may
+  be a placeholder, so callers take the token from `AuthTokenProvider.getAccessToken`. No change in behaviour.
+
 ## 0.2.1
 
 - `GetTokenResult.signInSecondFactor`: the second factor of the sign-in (`firebase.sign_in_second_factor`), or null.

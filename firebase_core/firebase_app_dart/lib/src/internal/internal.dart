@@ -68,10 +68,18 @@ abstract class AuthTokenProvider {
 
   /// Emits after a sign-in, a sign-out (an empty token) and a refresh of the token. A provider
   /// without users can return an empty stream.
+  ///
+  /// An event is a signal, not the token to send: see [AuthTokenChange]. By the time a listener
+  /// runs, [uid] and [getAccessToken] already answer for the new state.
   Stream<AuthTokenChange> get onTokenChanged;
 }
 
-/// An event of `AuthTokenProvider.onTokenChanged`: the new token, empty after a sign-out.
+/// An event of `AuthTokenProvider.onTokenChanged`: a signal that the token changed.
+///
+/// Read only one thing from [token]: an empty one means that nobody is signed in. A token that is
+/// not empty may be the new token or a placeholder (a provider that learns of a change without the
+/// token emits one), so never send it: call `AuthTokenProvider.getAccessToken` for the token and
+/// read `AuthTokenProvider.uid` for the user.
 ///
 /// [toString] does not show the token.
 ///
@@ -81,10 +89,10 @@ abstract class AuthTokenProvider {
 /// const AuthTokenChange signedOut = AuthTokenChange('');
 /// ```
 class AuthTokenChange {
-  /// Creates a result holding [token].
+  /// Creates an event holding [token].
   const AuthTokenChange(this.token);
 
-  /// The raw token.
+  /// Empty after a sign-out; otherwise the new token or a placeholder for it. Not for sending.
   final String token;
 
   @override
