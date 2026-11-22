@@ -594,9 +594,17 @@ void main() {
       h.trackValue('G', h.ref('a').get());
       h.db.close().then((_) => h.log.add('closed2'));
       h.settle();
+      // The streams and Futures made after close are independent: only their entries are pinned.
+      expect(
+        h.log,
+        unorderedEquals(<String>[
+          'S2:E(database-closed)',
+          'S2:done',
+          'G:E(database-closed)',
+          'closed2',
+        ]),
+      );
       expect(h.named('S2'), <String>['S2:E(database-closed)', 'S2:done']);
-      expect(h.named('G'), <String>['G:E(database-closed)']);
-      expect(h.log, contains('closed2'));
     });
 
     scenario('D32 close() fails an outstanding get', (Harness h) {
@@ -639,7 +647,8 @@ void main() {
       h.settle();
       h.server.ackLastWrite();
       h.settle();
-      expect(h.log, <String>['returned', 'H(0)', 'S1:V(1)', 'T:committed(1)']);
+      // The handler runs inside the call, as in JS and Android; its events wait for the queue.
+      expect(h.log, <String>['H(0)', 'returned', 'S1:V(1)', 'T:committed(1)']);
     });
 
     scenario('D35 rerun after data-stale', (Harness h) {
@@ -746,8 +755,7 @@ void main() {
         onError: (Object error) => failure = error,
       );
       h.settle();
-      expect(h.log.first, 'H(0)');
-      expect(h.named('S1'), isEmpty);
+      expect(h.log, <String>['H(0)', 'T:E(Bad state: boom)']);
       expect(identical(failure, e), isTrue);
       expect(h.server.requests, isNot(contains('p /c')));
     });
@@ -1021,7 +1029,7 @@ void main() {
     scenario('get() of a limited ordered query sends its query', (Harness h) {
       h.trackValue('G', h.ref('l').orderByChild('x').limitToLast(2).get());
       h.settle();
-      expect(h.server.requests.last, startsWith('g /l {'));
+      expect(h.server.requests.last, 'g /l {"i":"x","l":2,"vf":"r"}');
       h.server.failGet('l', 'no_index');
       h.settle();
       expect(h.log, <String>['G:E(index-not-defined)']);
@@ -1072,11 +1080,16 @@ void main() {
       expect(h.log, <String>['G:={a:1}', '5', '5']);
     });
 
-    scenario('D58 sign-out cancels the listen', (Harness h) {
+    scenario('D58 sign-out: the listen sent again without auth is refused', (
+      Harness h,
+    ) {
       h.listenAnswered('S1', h.ref('s').onValue, 's', 1);
       h.log.clear();
 
-      h.server.cancelListen('s', 'permission_denied');
+      h.server.revokeAuth();
+      h.reconnect();
+      expect(h.server.requests.where((String r) => r == 'q /s'), hasLength(2));
+      h.server.failListen('s', 'permission_denied');
       h.settle();
       expect(h.log, <String>['S1:E(permission-denied)', 'S1:done']);
     });

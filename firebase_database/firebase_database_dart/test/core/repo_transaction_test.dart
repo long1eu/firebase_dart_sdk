@@ -43,14 +43,14 @@ void main() {
     expect(named('T:'), <String>['T:E(write-canceled)']);
   });
 
-  test('D34 the first run is a microtask after the call', () async {
+  test('D34 the first run happens inside the call', () async {
     final RepoHarness h = await withCounter();
     h.transaction('c', increment);
     h.log.add('returned');
     await settle();
     h.server.ackLastWrite();
     await settle();
-    expect(h.log, <String>['returned', 'H(0)', 'S1:V(1)', 'T:committed(1)']);
+    expect(h.log, <String>['H(0)', 'returned', 'S1:V(1)', 'T:committed(1)']);
     final ServerCall put = h.server.callsOf('put').single;
     expect(put.path, '/c');
     expect(put.data, 1);

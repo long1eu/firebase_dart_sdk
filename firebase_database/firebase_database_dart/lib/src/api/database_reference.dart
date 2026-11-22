@@ -81,7 +81,8 @@ final class DatabaseReference extends Query {
   }
 
   /// A new child with a unique key made on this device, ordered by creation time. It only makes the
-  /// reference: nothing is written until you call [set] on it.
+  /// reference: nothing is written until you call [set] on it. Throws an [ArgumentError] under
+  /// `.info`.
   ///
   /// ```dart
   /// await db.ref('messages').push().set(<String, Object?>{'text': 'hi'});
@@ -94,9 +95,11 @@ final class DatabaseReference extends Query {
     );
   }
 
-  /// Replaces the data at this location with [value], and its priority with [priority] when given. A
-  /// `null` [value] removes the data. Fires local events before the Future completes; see the class
-  /// documentation for completion, rollback and value rules.
+  /// Replaces the data at this location with [value], and its priority with [priority] when given.
+  /// A `null` [value] removes the data. Fires local events before the Future completes; see the
+  /// class documentation for completion, rollback and value rules. With `persistence` the write is
+  /// stored on disk and sent again after a restart; the Future of the run that made it is gone
+  /// then.
   Future<void> set(Object? value, {Object? priority}) =>
       _set('set', value, priority);
 
@@ -118,6 +121,8 @@ final class DatabaseReference extends Query {
   /// Writes each entry of [values] below this location, leaving other children alone. Keys may be
   /// multi-segment paths (`'a/b'`), which makes one atomic write to several places; a `null` value removes
   /// that child. Two keys where one is a prefix of the other throw an [ArgumentError].
+  ///
+  /// An empty [values] map writes nothing and completes the Future in a microtask, with no request.
   Future<void> update(Map<String, Object?> values) {
     final Path path = spec.path;
     validateWritablePath('update', path);
@@ -131,7 +136,9 @@ final class DatabaseReference extends Query {
     );
   }
 
-  /// Sets the priority of this location: null, a `num` or a `String`.
+  /// Sets the priority of this location: null, a `num` or a `String`. With `persistence` the write
+  /// is stored on disk and sent again after a restart; the Future of the run that made it is gone
+  /// then.
   Future<void> setPriority(Object? priority) {
     final Path path = spec.path;
     validateWritablePath('setPriority', path);
@@ -149,16 +156,23 @@ final class DatabaseReference extends Query {
 
   /// Atomically changes the data at this location with [handler].
   ///
-  /// The handler's first run happens in a microtask after this call returns, never inside it; it may run
-  /// again when the server's value differs (see [TransactionHandler]). With [applyLocally] each run raises
-  /// local events, which a later run or an abort may revert; with [applyLocally] false there are no local
-  /// events before the server answers.
+  /// The handler's first run happens inside this call, on the value the client holds, as in the JS and
+  /// Android SDKs, so a [set] made right after this call comes after the transaction. Events and the Future
+  /// still wait for a later microtask. While the database is still opening its persistence, the first run
+  /// happens once it has opened. The handler returns a [Transaction], never a `Future`: it cannot wait. It
+  /// may run again when the server's value differs (see [TransactionHandler]). A write the handler makes to
+  /// this location, above or below it aborts this transaction with `overridden-by-set`. With
+  /// [applyLocally] each run raises local events, which a later run or an abort may revert; with
+  /// [applyLocally] false there are no local events before the server answers.
   ///
-  /// Completes with `committed` true when the server took the value, or false when the handler aborted.
-  /// Fails with the handler's own error when it throws, `max-retries` after more than 25 runs,
-  /// `disconnected` when the connection drops after the value was sent, `overridden-by-set` when a later
-  /// [set] replaces it, and `write-canceled` after [FirebaseDatabase.purgeOutstandingWrites]. Transactions
-  /// are kept in memory only, also with persistence.
+  /// Completes with `committed` true when the server took the value, or false when the handler
+  /// aborted. Fails with the handler's own error when it throws, `max-retries` when the handler has
+  /// run 25 times and the server still refuses the value, `disconnected` when the connection drops
+  /// after the value was sent, `overridden-by-set` when a later [set] replaces it, and
+  /// `write-canceled` after [FirebaseDatabase.purgeOutstandingWrites]. While offline the handler
+  /// runs on the local value (with [applyLocally] its result raises local events) and the Future
+  /// stays pending until the connection returns; there is no timeout. Transactions are kept in
+  /// memory only, also with persistence.
   ///
   /// ```dart
   /// final TransactionResult r = await db.ref('seats/left').runTransaction((Object? v) {

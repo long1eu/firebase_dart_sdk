@@ -15,8 +15,6 @@
 /// * The events of a server update or an ack are queued before the transactions they touch are
 ///   rerun, as contract rule 4.2 requires (changes arrive in the order applied); Android and JS
 ///   rerun first and so raise the update's older events after the rerun's newer ones.
-/// * A transaction's first run is a microtask after [Repo.startTransaction] returns (JS runs it
-///   inside the call; contract rule 4.13).
 /// * `get` follows contract C25: no timer while connected, a 3 s wait for a connection while
 ///   disconnected, a refusal never answered from the cache.
 library;
@@ -474,11 +472,11 @@ final class Repo implements ServerActionsDelegate {
   }
 
   /// Starts a transaction at [path]: watches the path, runs [update] on the latest local value,
-  /// sends a put with the hash of the input, reruns on `datastale` or a disconnect (up to
-  /// [maxTransactionRetries]), and calls [onComplete] once.
+  /// sends a put with the hash of the input, reruns on `datastale` (up to
+  /// [maxTransactionRetries]), aborts on a disconnect, and calls [onComplete] once.
   ///
-  /// Android `Repo.startTransaction`; JS `repoStartTransaction`. The first run is a microtask
-  /// after this call returns (contract rule 4.13).
+  /// Android `Repo.startTransaction`; JS `repoStartTransaction`. The first run happens inside
+  /// this call, as in both; its events and callback are queued, never delivered in the call.
   void startTransaction(
     Path path,
     TransactionUpdate update, {

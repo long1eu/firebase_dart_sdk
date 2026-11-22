@@ -88,8 +88,9 @@ typedef RequestResultCallback = void Function(String status, Object? data);
 /// not yet acknowledged, onDisconnect requests not yet sent, and every outstanding [get]. Only then
 /// does it call [ServerActionsDelegate.onConnect]. Exception: a put sent with a `hash` (a
 /// transaction put) that was already sent is NOT replayed; its [RequestResultCallback] is called
-/// with [statusDisconnect] and Repo reruns the transaction. Acknowledged onDisconnect requests are
-/// not replayed (the server forgot them with the old connection).
+/// with [statusDisconnect] and Repo aborts the transaction with `disconnected` (as JS and Android
+/// do). Acknowledged onDisconnect requests are not replayed (the server forgot them with the old
+/// connection).
 abstract interface class ServerActions {
   /// Starts connecting (the first connection starts when Repo is created, not on first use).
   void initialize();

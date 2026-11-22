@@ -38,6 +38,12 @@ final class _TransactionWatch extends EventRegistration {
       other is _TransactionWatch && identical(other._token, _token);
 }
 
+/// The transactions whose first run is in progress, per Repo. They are not in the queue tree
+/// yet; [_RepoTransactions._abortTransactions] marks one that a write or purge from inside its
+/// handler overlaps.
+final Expando<List<TransactionData>> _firstRuns =
+    Expando<List<TransactionData>>('transaction first runs');
+
 extension _RepoTransactions on Repo {
   /// The body of [Repo.startTransaction] (Android `Repo.startTransaction`).
   void _startTransaction(
@@ -80,23 +86,40 @@ extension _RepoTransactions on Repo {
         }
       },
     );
-    scheduleMicrotask(() => _runTransactionFirstTime(transaction));
+    _runTransactionFirstTime(transaction);
   }
 
-  /// The first run: abort, or queue the result, apply it locally and send what is ready.
+  /// The first run, inside [Repo.startTransaction] as in JS: abort, or queue the result, apply it
+  /// locally and send what is ready. A write or purge the handler makes that overlaps its path
+  /// aborts the transaction (`overridden-by-set`, `write-canceled`), as it does on a rerun.
   void _runTransactionFirstTime(TransactionData transaction) {
-    if (_closed) {
-      transaction.status = TransactionStatus.completed;
-      transaction.onComplete?.call(Repo._closedError(), false, null);
-      return;
-    }
     final Path path = transaction.path;
     final Node currentState = _latestState(path);
     transaction.currentInputSnapshot = currentState;
+    final List<TransactionData> running = _firstRuns[this] ??=
+        <TransactionData>[];
+    running.add(transaction);
     final (TransactionOutcome outcome, DatabaseError? error) = _runUpdate(
       transaction,
       currentState,
     );
+    running.remove(transaction);
+    if (_closed) {
+      // The handler closed the database.
+      transaction.status = TransactionStatus.completed;
+      scheduleMicrotask(
+        () => transaction.onComplete?.call(Repo._closedError(), false, null),
+      );
+      return;
+    }
+    if (transaction.status == TransactionStatus.completed) {
+      transaction.unwatcher();
+      final DatabaseError? abortReason = transaction.abortReason;
+      _postCallback(
+        () => transaction.onComplete?.call(abortReason, false, null),
+      );
+      return;
+    }
     if (outcome is! TransactionSuccess) {
       transaction
         ..currentOutputSnapshotRaw = null
@@ -113,8 +136,9 @@ extension _RepoTransactions on Repo {
       path,
     );
     queueNode.value = <TransactionData>[...?queueNode.value, transaction];
-    final Node newNodeUnresolved = _normalizeUserNode(
-      nodeFromJson(outcome.value),
+    final Node newNodeUnresolved = _transactionOutput(
+      outcome.value,
+      currentState,
     );
     final Node newNode = server_values.resolveDeferredValueSnapshot(
       newNodeUnresolved,
@@ -136,6 +160,15 @@ extension _RepoTransactions on Repo {
       ),
     );
     _sendAllReadyTransactions();
+  }
+
+  /// The node of a transaction's [value]: normalised, and with the priority of [current] when
+  /// [value] gives none (JS `repoStartTransaction`, `repoRerunTransactionQueue`).
+  Node _transactionOutput(Object? value, Node current) {
+    final Node node = _normalizeUserNode(nodeFromJson(value));
+    final bool explicitPriority =
+        value is Map<Object?, Object?> && value.containsKey('.priority');
+    return explicitPriority ? node : node.updatePriority(current.priority);
   }
 
   /// Runs the update function on a fresh mutable copy of [current] (without priority, JS
@@ -297,11 +330,8 @@ extension _RepoTransactions on Repo {
       return;
     }
     final List<void Function()> callbacks = <void Function()>[];
-    // All sets of this queue are ignored, but not the new ones the rerun makes.
-    final List<WriteId> setsToIgnore = <WriteId>[
-      for (final TransactionData t in queue) t.currentWriteId!,
-    ];
-    for (final TransactionData transaction in queue) {
+    for (int i = 0; i < queue.length; i++) {
+      final TransactionData transaction = queue[i];
       assert(path.contains(transaction.path));
       bool abortTransaction = false;
       DatabaseError? abortReason;
@@ -320,16 +350,28 @@ extension _RepoTransactions on Repo {
           );
           events.addAll(_revert(transaction.currentWriteId!));
         } else {
-          final Node currentNode = _latestState(transaction.path, setsToIgnore);
+          // Every set of this queue is ignored except the new ones this rerun made; counted
+          // here, since a handler's own write may have rerun part of the queue already.
+          final Node currentNode = _latestState(transaction.path, <WriteId>[
+            for (int j = 0; j < queue.length; j++)
+              if (j >= i || queue[j].status != TransactionStatus.run)
+                ?queue[j].currentWriteId,
+          ]);
           transaction.currentInputSnapshot = currentNode;
           final (TransactionOutcome outcome, DatabaseError? error) = _runUpdate(
             transaction,
             currentNode,
           );
+          if (transaction.status != TransactionStatus.run) {
+            // The handler wrote or purged over its own path: that abort already reverted the
+            // write and queued the callback.
+            continue;
+          }
           if (outcome is TransactionSuccess) {
             final WriteId oldWriteId = transaction.currentWriteId!;
-            final Node newDataNode = _normalizeUserNode(
-              nodeFromJson(outcome.value),
+            final Node newDataNode = _transactionOutput(
+              outcome.value,
+              currentNode,
             );
             final Node newNodeResolved = server_values
                 .resolveDeferredValueSnapshot(
@@ -341,7 +383,6 @@ extension _RepoTransactions on Repo {
               ..currentOutputSnapshotRaw = newDataNode
               ..currentOutputSnapshotResolved = newNodeResolved
               ..currentWriteId = _nextWriteId++;
-            setsToIgnore.remove(oldWriteId);
             events
               ..addAll(
                 _serverSyncTree.applyUserOverwrite(
@@ -419,6 +460,15 @@ extension _RepoTransactions on Repo {
   /// `writeCanceled`) and returns the path of the root-most queue (Android
   /// `Repo.abortTransactions`).
   Path _abortTransactions(Path path, DatabaseErrorCode reason) {
+    for (final TransactionData running
+        in _firstRuns[this] ?? const <TransactionData>[]) {
+      if (running.status == TransactionStatus.run &&
+          (running.path.contains(path) || path.contains(running.path))) {
+        running
+          ..status = TransactionStatus.completed
+          ..abortReason = DatabaseError.fromStatus(reason.wireStatus);
+      }
+    }
     final Path affectedPath = _ancestorTransactionNode(path).path;
     final Tree<List<TransactionData>> transactionNode = _transactionQueueTree
         .subTree(path);
@@ -453,7 +503,9 @@ extension _RepoTransactions on Repo {
     for (int i = 0; i < queue.length; i++) {
       final TransactionData transaction = queue[i];
       if (transaction.status == TransactionStatus.sentNeedsAbort) {
-        // Already marked.
+        // Already marked: keep waiting for its answer (JS `repoAbortTransactionsOnNode`).
+        assert(lastSent == i - 1, 'All sent items should be first');
+        lastSent = i;
       } else if (transaction.status == TransactionStatus.sent) {
         assert(lastSent == i - 1, 'All sent items should be first');
         lastSent = i;
@@ -490,4 +542,29 @@ extension _RepoTransactions on Repo {
       }
     }
   }
+}
+
+/// Read-only views of Repo's write and transaction state, for tests of the transaction code.
+@visibleForTesting
+extension RepoTransactionDebug on Repo {
+  /// The ids of the user writes neither acknowledged nor reverted yet, oldest first.
+  List<WriteId> get debugPendingWriteIds {
+    final SyncTreeApi tree = _serverSyncTree;
+    if (tree is! SyncTree) {
+      throw StateError(
+        'debugPendingWriteIds needs the SyncTree Repo builds itself.',
+      );
+    }
+    return <WriteId>[
+      for (WriteId id = 0; id < _nextWriteId; id++)
+        if (tree.pendingWriteTree.getWrite(id) != null) id,
+    ];
+  }
+
+  /// Whether the transaction queue tree holds no transaction.
+  bool get debugTransactionQueueEmpty =>
+      _buildTransactionQueue(_transactionQueueTree).isEmpty;
+
+  /// Whether no listener, the user's or a transaction's, is registered in the server sync tree.
+  bool get debugServerSyncTreeEmpty => _serverSyncTree.isEmpty;
 }
