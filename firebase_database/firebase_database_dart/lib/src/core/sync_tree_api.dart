@@ -79,10 +79,18 @@ abstract interface class SyncTreeApi {
   List<Event> applyTaggedQueryOverwrite(Path path, Node snap, Tag tag);
 
   /// Server merge for the tagged query [tag].
-  List<Event> applyTaggedQueryMerge(Path path, Map<Path, Node> changedChildren, Tag tag);
+  List<Event> applyTaggedQueryMerge(
+    Path path,
+    Map<Path, Node> changedChildren,
+    Tag tag,
+  );
 
   /// Server range merges for the tagged query [tag].
-  List<Event> applyTaggedRangeMerges(Path path, List<RangeMerge> rangeMerges, Tag tag);
+  List<Event> applyTaggedRangeMerges(
+    Path path,
+    List<RangeMerge> rangeMerges,
+    Tag tag,
+  );
 
   /// Registers [registration] and returns its initial events. Starts a server listen unless
   /// [skipListenerSetup] or a covering listen exists. [preloadedServerCache] is server data an
@@ -96,13 +104,20 @@ abstract interface class SyncTreeApi {
 
   /// Removes [registration] (all registrations of its query when it matches none specifically)
   /// and stops listens no longer needed; [skipDedup] skips the check for a covering listen.
-  List<Event> removeEventRegistration(EventRegistration registration, {bool skipDedup = false});
+  List<Event> removeEventRegistration(
+    EventRegistration registration, {
+    bool skipDedup = false,
+  });
 
   /// Removes every registration of [query] with [error] and returns their cancel events.
   List<Event> removeAllEventRegistrations(QuerySpec query, DatabaseError error);
 
   /// Keeps [query] listened to (and cached) without a user listener, or stops doing so.
-  void keepSynced(QuerySpec query, {required bool keep, bool skipDedup = false});
+  void keepSynced(
+    QuerySpec query, {
+    required bool keep,
+    bool skipDedup = false,
+  });
 
   /// The complete server data of [query] if the tree has it (for `get` without a round trip),
   /// else null.
@@ -119,7 +134,10 @@ abstract interface class SyncTreeApi {
 
   /// The complete event cache at [path] (server data with pending writes, including hidden
   /// ones) excluding [writeIdsToExclude], or null; used by transactions and server values.
-  Node? calcCompleteEventCache(Path path, {List<WriteId> writeIdsToExclude = const <WriteId>[]});
+  Node? calcCompleteEventCache(
+    Path path, {
+    List<WriteId> writeIdsToExclude = const <WriteId>[],
+  });
 
   /// Like [calcCompleteEventCache] but starting from the root view's cache.
   Node? calcCompleteEventCacheFromRoot(

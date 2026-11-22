@@ -75,7 +75,12 @@ abstract interface class ServerActions {
   /// transaction put (`h` = hash of the data the transaction read): the server answers
   /// `datastale` when the data changed, and a dropped connection completes it with
   /// [statusDisconnect]. Without [hash] it is replayed after a reconnect until acknowledged.
-  void put(String path, Object? data, {String? hash, RequestResultCallback? onComplete});
+  void put(
+    String path,
+    Object? data, {
+    String? hash,
+    RequestResultCallback? onComplete,
+  });
 
   /// Sends `m`: merge [data] (keys are child keys or relative paths) into [path]. Replayed after
   /// a reconnect until acknowledged.
@@ -87,7 +92,11 @@ abstract interface class ServerActions {
   });
 
   /// Sends `o`: on disconnect, overwrite [path] with [data]. Queued while offline.
-  void onDisconnectPut(String path, Object? data, {RequestResultCallback? onComplete});
+  void onDisconnectPut(
+    String path,
+    Object? data, {
+    RequestResultCallback? onComplete,
+  });
 
   /// Sends `om`: on disconnect, merge [data] into [path]. Queued while offline.
   void onDisconnectMerge(
@@ -127,7 +136,12 @@ abstract interface class ServerActionsDelegate {
   /// A `d` (overwrite, [isMerge] false) or `m` (merge, [isMerge] true) push at [path]. For a
   /// merge, [data] is a map of child keys or relative paths to values, null meaning delete.
   /// [tag] is the listen tag for data of a filtered query, else null.
-  void onDataUpdate(String path, Object? data, {required bool isMerge, int? tag});
+  void onDataUpdate(
+    String path,
+    Object? data, {
+    required bool isMerge,
+    int? tag,
+  });
 
   /// An `rm` push at [path] (only after a listen sent a compound hash); [merges] is never empty.
   void onRangeMergeUpdate(String path, List<WireRangeMerge> merges, {int? tag});

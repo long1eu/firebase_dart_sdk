@@ -24,7 +24,8 @@ final class QueryParams {
   static QueryParams get defaultParams => throw UnimplementedError();
 
   /// Parses the wire object (the inverse of [toWireObject]), as persisted tracked queries store it.
-  factory QueryParams.fromWireObject(Map<String, Object?> wire) => throw UnimplementedError();
+  factory QueryParams.fromWireObject(Map<String, Object?> wire) =>
+      throw UnimplementedError();
 
   /// The index.
   Index get index => throw UnimplementedError();
@@ -82,16 +83,20 @@ final class QueryParams {
   QueryParams limitToLast(int limit) => throw UnimplementedError();
 
   /// With an inclusive start bound.
-  QueryParams startAt(Node indexValue, [ChildKey? key]) => throw UnimplementedError();
+  QueryParams startAt(Node indexValue, [ChildKey? key]) =>
+      throw UnimplementedError();
 
   /// With an exclusive start bound.
-  QueryParams startAfter(Node indexValue, [ChildKey? key]) => throw UnimplementedError();
+  QueryParams startAfter(Node indexValue, [ChildKey? key]) =>
+      throw UnimplementedError();
 
   /// With an inclusive end bound.
-  QueryParams endAt(Node indexValue, [ChildKey? key]) => throw UnimplementedError();
+  QueryParams endAt(Node indexValue, [ChildKey? key]) =>
+      throw UnimplementedError();
 
   /// With an exclusive end bound.
-  QueryParams endBefore(Node indexValue, [ChildKey? key]) => throw UnimplementedError();
+  QueryParams endBefore(Node indexValue, [ChildKey? key]) =>
+      throw UnimplementedError();
 
   /// Ordered by [index].
   QueryParams orderBy(Index index) => throw UnimplementedError();
@@ -104,7 +109,8 @@ final class QueryParams {
   String toQueryIdentifier() => throw UnimplementedError();
 
   /// The REST query parameters (`orderBy`, `startAt`, ..., `limitToFirst`).
-  Map<String, String> toRestQueryStringParameters() => throw UnimplementedError();
+  Map<String, String> toRestQueryStringParameters() =>
+      throw UnimplementedError();
 
   @override
   bool operator ==(Object other) => throw UnimplementedError();

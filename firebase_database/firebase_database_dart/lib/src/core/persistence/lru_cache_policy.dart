@@ -16,7 +16,8 @@ final class LruCachePolicy implements CachePolicy {
       throw UnimplementedError();
 
   @override
-  bool shouldCheckCacheSize(int serverUpdatesSinceLastCheck) => throw UnimplementedError();
+  bool shouldCheckCacheSize(int serverUpdatesSinceLastCheck) =>
+      throw UnimplementedError();
 
   @override
   double get percentOfQueriesToPruneAtOnce => throw UnimplementedError();

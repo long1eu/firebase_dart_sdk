@@ -23,7 +23,8 @@ final class IndexMap {
   final Map<String, Index> indexSet;
 
   /// The sorted children of index [indexKey], or null.
-  SortedMap<NamedNode, Node>? get(String indexKey) => throw UnimplementedError();
+  SortedMap<NamedNode, Node>? get(String indexKey) =>
+      throw UnimplementedError();
 
   /// Whether [index] is present.
   bool hasIndex(Index index) => throw UnimplementedError();
@@ -33,10 +34,14 @@ final class IndexMap {
       throw UnimplementedError();
 
   /// A map with [namedNode] added to every index; [existingChildren] are the old children.
-  IndexMap addToIndexes(NamedNode namedNode, SortedMap<ChildKey, Node> existingChildren) =>
-      throw UnimplementedError();
+  IndexMap addToIndexes(
+    NamedNode namedNode,
+    SortedMap<ChildKey, Node> existingChildren,
+  ) => throw UnimplementedError();
 
   /// A map with [namedNode] removed from every index.
-  IndexMap removeFromIndexes(NamedNode namedNode, SortedMap<ChildKey, Node> existingChildren) =>
-      throw UnimplementedError();
+  IndexMap removeFromIndexes(
+    NamedNode namedNode,
+    SortedMap<ChildKey, Node> existingChildren,
+  ) => throw UnimplementedError();
 }

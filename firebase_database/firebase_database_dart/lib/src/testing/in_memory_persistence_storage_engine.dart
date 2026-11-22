@@ -22,9 +22,12 @@ import 'package:firebase_database_dart/src/core/write_id.dart';
 /// Keeps everything in maps; a transaction that ends without [setTransactionSuccessful] is
 /// rolled back. Mutations outside a transaction throw a [StateError] unless
 /// [disableTransactionCheck].
-final class InMemoryPersistenceStorageEngine implements PersistenceStorageEngine {
+final class InMemoryPersistenceStorageEngine
+    implements PersistenceStorageEngine {
   /// Creates an engine holding [initialWrites].
-  InMemoryPersistenceStorageEngine([List<UserWriteRecord> initialWrites = const <UserWriteRecord>[]]) {
+  InMemoryPersistenceStorageEngine([
+    List<UserWriteRecord> initialWrites = const <UserWriteRecord>[],
+  ]) {
     for (final UserWriteRecord record in initialWrites) {
       _writes[record.writeId] = record;
     }
@@ -65,7 +68,12 @@ final class InMemoryPersistenceStorageEngine implements PersistenceStorageEngine
   @override
   void saveUserOverwrite(Path path, Node node, WriteId writeId) {
     _verifyInsideTransaction();
-    _writes[writeId] = UserWriteRecord.overwrite(writeId, path, node, visible: true);
+    _writes[writeId] = UserWriteRecord.overwrite(
+      writeId,
+      path,
+      node,
+      visible: true,
+    );
   }
 
   @override
@@ -83,9 +91,10 @@ final class InMemoryPersistenceStorageEngine implements PersistenceStorageEngine
   }
 
   @override
-  List<UserWriteRecord> loadUserWrites() =>
-      _writes.values.toList()
-        ..sort((UserWriteRecord a, UserWriteRecord b) => a.writeId.compareTo(b.writeId));
+  List<UserWriteRecord> loadUserWrites() => _writes.values.toList()
+    ..sort(
+      (UserWriteRecord a, UserWriteRecord b) => a.writeId.compareTo(b.writeId),
+    );
 
   @override
   void removeAllUserWrites() {
@@ -94,7 +103,8 @@ final class InMemoryPersistenceStorageEngine implements PersistenceStorageEngine
   }
 
   @override
-  Node serverCache(Path path) => _serverCache.childCompoundWrite(path).apply(ChildrenNode.empty);
+  Node serverCache(Path path) =>
+      _serverCache.childCompoundWrite(path).apply(ChildrenNode.empty);
 
   @override
   void overwriteServerCache(Path path, Node node) {
@@ -126,11 +136,16 @@ final class InMemoryPersistenceStorageEngine implements PersistenceStorageEngine
     _verifyInsideTransaction();
     final TrackedQuery? existing = _trackedQueries[trackedQuery.id];
     if (existing != null && existing.querySpec != trackedQuery.querySpec) {
-      throw StateError('Tracked query id ${trackedQuery.id} reused for another query.');
+      throw StateError(
+        'Tracked query id ${trackedQuery.id} reused for another query.',
+      );
     }
     for (final TrackedQuery query in _trackedQueries.values) {
-      if (query.querySpec == trackedQuery.querySpec && query.id != trackedQuery.id) {
-        throw StateError('Query ${trackedQuery.querySpec} is tracked under another id.');
+      if (query.querySpec == trackedQuery.querySpec &&
+          query.id != trackedQuery.id) {
+        throw StateError(
+          'Query ${trackedQuery.querySpec} is tracked under another id.',
+        );
       }
     }
     _trackedQueries[trackedQuery.id] = trackedQuery;
@@ -150,9 +165,12 @@ final class InMemoryPersistenceStorageEngine implements PersistenceStorageEngine
 
   @override
   void resetPreviouslyActiveTrackedQueries(int lastUse) {
-    for (final MapEntry<int, TrackedQuery> entry in _trackedQueries.entries.toList()) {
+    for (final MapEntry<int, TrackedQuery> entry
+        in _trackedQueries.entries.toList()) {
       if (entry.value.active) {
-        _trackedQueries[entry.key] = entry.value.withActiveState(false).withLastUse(lastUse);
+        _trackedQueries[entry.key] = entry.value
+            .withActiveState(false)
+            .withLastUse(lastUse);
       }
     }
   }
@@ -165,10 +183,17 @@ final class InMemoryPersistenceStorageEngine implements PersistenceStorageEngine
   }
 
   @override
-  void updateTrackedQueryKeys(int trackedQueryId, Set<ChildKey> added, Set<ChildKey> removed) {
+  void updateTrackedQueryKeys(
+    int trackedQueryId,
+    Set<ChildKey> added,
+    Set<ChildKey> removed,
+  ) {
     _verifyInsideTransaction();
     _verifyTracked(trackedQueryId);
-    final Set<ChildKey> keys = _trackedQueryKeys.putIfAbsent(trackedQueryId, () => <ChildKey>{});
+    final Set<ChildKey> keys = _trackedQueryKeys.putIfAbsent(
+      trackedQueryId,
+      () => <ChildKey>{},
+    );
     if (!keys.containsAll(removed)) {
       throw StateError("Can't remove keys that don't exist.");
     }
@@ -178,15 +203,14 @@ final class InMemoryPersistenceStorageEngine implements PersistenceStorageEngine
   }
 
   @override
-  Set<ChildKey> loadTrackedQueryKeys(int trackedQueryId) {
-    _verifyTracked(trackedQueryId);
-    return Set<ChildKey>.of(_trackedQueryKeys[trackedQueryId] ?? const <ChildKey>{});
+  Set<ChildKey> loadTrackedQueryKeys(Set<int> trackedQueryIds) {
+    final Set<ChildKey> keys = <ChildKey>{};
+    for (final int id in trackedQueryIds) {
+      _verifyTracked(id);
+      keys.addAll(_trackedQueryKeys[id] ?? const <ChildKey>{});
+    }
+    return keys;
   }
-
-  @override
-  Set<ChildKey> loadTrackedQueryKeysForAll(Set<int> trackedQueryIds) => <ChildKey>{
-    for (final int id in trackedQueryIds) ...loadTrackedQueryKeys(id),
-  };
 
   @override
   void pruneCache(Path root, PruneForest pruneForest) {
@@ -209,9 +233,13 @@ final class InMemoryPersistenceStorageEngine implements PersistenceStorageEngine
               (Path keepPath, CompoundWrite accumulator) =>
                   accumulator.addWrite(keepPath, dataNode.getChild(keepPath)),
             );
-        _serverCache = _serverCache.removeWrite(absoluteDataPath).addWrites(absoluteDataPath, kept);
+        _serverCache = _serverCache
+            .removeWrite(absoluteDataPath)
+            .addWrites(absoluteDataPath, kept);
       } else if (!pruneForest.shouldKeep(dataPath)) {
-        throw StateError('We have data at $dataPath that is neither pruned nor kept.');
+        throw StateError(
+          'We have data at $dataPath that is neither pruned nor kept.',
+        );
       }
     }
   }
@@ -263,10 +291,23 @@ final class InMemoryPersistenceStorageEngine implements PersistenceStorageEngine
 
   @override
   void close() => _closed = true;
+
+  @override
+  bool get isDurable => !_closed && !_degraded;
+
+  bool _degraded = false;
+
+  /// Simulates a run-time storage failure: the engine becomes degraded for good.
+  void degrade() => _degraded = true;
 }
 
 final class _Snapshot {
-  _Snapshot(this.writes, this.trackedQueries, this.trackedQueryKeys, this.serverCache);
+  _Snapshot(
+    this.writes,
+    this.trackedQueries,
+    this.trackedQueryKeys,
+    this.serverCache,
+  );
 
   final Map<WriteId, UserWriteRecord> writes;
   final Map<int, TrackedQuery> trackedQueries;

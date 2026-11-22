@@ -17,13 +17,16 @@ final class CompoundWrite {
   static CompoundWrite get empty => throw UnimplementedError();
 
   /// A write of a JSON `update` map whose keys are relative paths.
-  factory CompoundWrite.fromValue(Map<String, Object?> merge) => throw UnimplementedError();
+  factory CompoundWrite.fromValue(Map<String, Object?> merge) =>
+      throw UnimplementedError();
 
   /// A write of one node per child key.
-  factory CompoundWrite.fromChildMerge(Map<ChildKey, Node> merge) => throw UnimplementedError();
+  factory CompoundWrite.fromChildMerge(Map<ChildKey, Node> merge) =>
+      throw UnimplementedError();
 
   /// A write of one node per relative path.
-  factory CompoundWrite.fromPathMerge(Map<Path, Node> merge) => throw UnimplementedError();
+  factory CompoundWrite.fromPathMerge(Map<Path, Node> merge) =>
+      throw UnimplementedError();
 
   /// The tree of written nodes.
   final ImmutableTree<Node> writeTree;
@@ -32,10 +35,12 @@ final class CompoundWrite {
   CompoundWrite addWrite(Path path, Node node) => throw UnimplementedError();
 
   /// This write with [node] written at child [key].
-  CompoundWrite addChildWrite(ChildKey key, Node node) => throw UnimplementedError();
+  CompoundWrite addChildWrite(ChildKey key, Node node) =>
+      throw UnimplementedError();
 
   /// This write with every write of [updates] added below [path].
-  CompoundWrite addWrites(Path path, CompoundWrite updates) => throw UnimplementedError();
+  CompoundWrite addWrites(Path path, CompoundWrite updates) =>
+      throw UnimplementedError();
 
   /// This write without the writes at and below [path].
   CompoundWrite removeWrite(Path path) => throw UnimplementedError();
@@ -56,7 +61,8 @@ final class CompoundWrite {
   CompoundWrite childCompoundWrite(Path path) => throw UnimplementedError();
 
   /// The writes per immediate child.
-  Map<ChildKey, CompoundWrite> childCompoundWrites() => throw UnimplementedError();
+  Map<ChildKey, CompoundWrite> childCompoundWrites() =>
+      throw UnimplementedError();
 
   /// Whether nothing is written.
   bool get isEmpty => throw UnimplementedError();
@@ -65,7 +71,8 @@ final class CompoundWrite {
   Node apply(Node node) => throw UnimplementedError();
 
   /// The writes as a JSON map from path strings to values (export form when [exportFormat]).
-  Map<String, Object?> toJson({bool exportFormat = false}) => throw UnimplementedError();
+  Map<String, Object?> toJson({bool exportFormat = false}) =>
+      throw UnimplementedError();
 
   /// Every write with its path.
   Iterable<MapEntry<Path, Node>> get entries => throw UnimplementedError();

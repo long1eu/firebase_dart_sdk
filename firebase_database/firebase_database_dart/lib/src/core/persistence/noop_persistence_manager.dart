@@ -19,7 +19,8 @@ final class NoopPersistenceManager implements PersistenceManager {
   NoopPersistenceManager();
 
   @override
-  void saveUserOverwrite(Path path, Node node, WriteId writeId) => throw UnimplementedError();
+  void saveUserOverwrite(Path path, Node node, WriteId writeId) =>
+      throw UnimplementedError();
 
   @override
   void saveUserMerge(Path path, CompoundWrite children, WriteId writeId) =>
@@ -32,10 +33,12 @@ final class NoopPersistenceManager implements PersistenceManager {
   void removeAllUserWrites() => throw UnimplementedError();
 
   @override
-  void applyUserWriteToServerCache(Path path, Node node) => throw UnimplementedError();
+  void applyUserWriteToServerCache(Path path, Node node) =>
+      throw UnimplementedError();
 
   @override
-  void applyUserMergeToServerCache(Path path, CompoundWrite merge) => throw UnimplementedError();
+  void applyUserMergeToServerCache(Path path, CompoundWrite merge) =>
+      throw UnimplementedError();
 
   @override
   List<UserWriteRecord> loadUserWrites() => throw UnimplementedError();
@@ -44,10 +47,12 @@ final class NoopPersistenceManager implements PersistenceManager {
   CacheNode serverCache(QuerySpec query) => throw UnimplementedError();
 
   @override
-  void updateServerCache(QuerySpec query, Node node) => throw UnimplementedError();
+  void updateServerCache(QuerySpec query, Node node) =>
+      throw UnimplementedError();
 
   @override
-  void updateServerCacheWithMerge(Path path, CompoundWrite children) => throw UnimplementedError();
+  void updateServerCacheWithMerge(Path path, CompoundWrite children) =>
+      throw UnimplementedError();
 
   @override
   void setQueryActive(QuerySpec query) => throw UnimplementedError();
@@ -59,11 +64,18 @@ final class NoopPersistenceManager implements PersistenceManager {
   void setQueryComplete(QuerySpec query) => throw UnimplementedError();
 
   @override
-  void setTrackedQueryKeys(QuerySpec query, Set<ChildKey> keys) => throw UnimplementedError();
+  void setTrackedQueryKeys(QuerySpec query, Set<ChildKey> keys) =>
+      throw UnimplementedError();
 
   @override
-  void updateTrackedQueryKeys(QuerySpec query, Set<ChildKey> added, Set<ChildKey> removed) =>
-      throw UnimplementedError();
+  void updateTrackedQueryKeys(
+    QuerySpec query,
+    Set<ChildKey> added,
+    Set<ChildKey> removed,
+  ) => throw UnimplementedError();
+
+  @override
+  bool get isDurable => throw UnimplementedError();
 
   @override
   T runInTransaction<T>(T Function() body) => throw UnimplementedError();

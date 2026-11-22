@@ -15,13 +15,17 @@ import 'package:firebase_database_dart/src/core/view/view.dart';
 import 'package:firebase_database_dart/src/core/write_tree_ref.dart';
 
 /// The queries removed by a removal and the cancel events it produced.
-typedef SyncPointRemoval = ({List<QuerySpec> removed, List<Event> cancelEvents});
+typedef SyncPointRemoval = ({
+  List<QuerySpec> removed,
+  List<Event> cancelEvents,
+});
 
 /// The views of every query registered at one path; tracks the child keys of filtered queries
 /// through [persistenceManager].
 final class SyncPoint {
   /// Creates an empty sync point.
-  factory SyncPoint(PersistenceManager persistenceManager) => throw UnimplementedError();
+  factory SyncPoint(PersistenceManager persistenceManager) =>
+      throw UnimplementedError();
 
   /// The persistence hooks.
   PersistenceManager get persistenceManager => throw UnimplementedError();
@@ -37,8 +41,11 @@ final class SyncPoint {
   ) => throw UnimplementedError();
 
   /// The view of [query], creating one from [serverCache] and the writes when missing.
-  View getView(QuerySpec query, WriteTreeRef writesCache, CacheNode serverCache) =>
-      throw UnimplementedError();
+  View getView(
+    QuerySpec query,
+    WriteTreeRef writesCache,
+    CacheNode serverCache,
+  ) => throw UnimplementedError();
 
   /// Adds [registration] (creating its view) and returns its initial events.
   List<DataEvent> addEventRegistration(

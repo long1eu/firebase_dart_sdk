@@ -25,7 +25,11 @@ abstract interface class NodeFilter {
   );
 
   /// [newSnap] filtered, reporting the changes from [oldSnap].
-  Node updateFullNode(Node oldSnap, Node newSnap, ChildChangeAccumulator? accumulator);
+  Node updateFullNode(
+    Node oldSnap,
+    Node newSnap,
+    ChildChangeAccumulator? accumulator,
+  );
 
   /// [oldSnap] with [newPriority].
   Node updatePriority(Node oldSnap, Node newPriority);

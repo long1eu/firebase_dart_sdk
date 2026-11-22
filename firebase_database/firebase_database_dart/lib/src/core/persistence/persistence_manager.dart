@@ -77,7 +77,16 @@ abstract interface class PersistenceManager {
   void setTrackedQueryKeys(QuerySpec query, Set<ChildKey> keys);
 
   /// Adds and removes child keys of a filtered [query].
-  void updateTrackedQueryKeys(QuerySpec query, Set<ChildKey> added, Set<ChildKey> removed);
+  void updateTrackedQueryKeys(
+    QuerySpec query,
+    Set<ChildKey> added,
+    Set<ChildKey> removed,
+  );
+
+  /// Whether what this manager stores survives a restart: false for [NoopPersistenceManager],
+  /// otherwise the engine's `isDurable` (false once it is degraded). Storage errors never throw
+  /// from any method here; they degrade the engine and this turns false.
+  bool get isDurable;
 
   /// Runs [body] in one storage transaction and returns its result; an exception from [body]
   /// rolls the transaction back and is rethrown.

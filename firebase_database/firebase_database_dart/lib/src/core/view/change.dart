@@ -9,7 +9,13 @@ import 'package:firebase_database_dart/src/core/view/event.dart';
 /// One change of a view: its [eventType], the new [node], the old one for child changes, the
 /// [childKey] for child changes and the [prevName] once known.
 final class Change {
-  const Change._(this.eventType, this.node, {this.oldNode, this.childKey, this.prevName});
+  const Change._(
+    this.eventType,
+    this.node, {
+    this.oldNode,
+    this.childKey,
+    this.prevName,
+  });
 
   /// The value changed to [node].
   const Change.value(Node node) : this._(EventType.value, node);

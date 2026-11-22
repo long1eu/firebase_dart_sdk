@@ -107,7 +107,10 @@ final class FakeServerActions implements ServerActions {
 
   /// The writes (put, merge, onDisconnect) not answered yet, in order.
   List<ServerCall> get pendingWrites => calls
-      .where((ServerCall call) => _writeActions.contains(call.action) && !call.answered)
+      .where(
+        (ServerCall call) =>
+            _writeActions.contains(call.action) && !call.answered,
+      )
       .toList();
 
   static const Set<String> _writeActions = <String>{
@@ -177,8 +180,20 @@ final class FakeServerActions implements ServerActions {
   }
 
   @override
-  void put(String path, Object? data, {String? hash, RequestResultCallback? onComplete}) =>
-      _record(ServerCall('put', path: path, data: data, hash: hash, onComplete: onComplete));
+  void put(
+    String path,
+    Object? data, {
+    String? hash,
+    RequestResultCallback? onComplete,
+  }) => _record(
+    ServerCall(
+      'put',
+      path: path,
+      data: data,
+      hash: hash,
+      onComplete: onComplete,
+    ),
+  );
 
   @override
   void merge(
@@ -186,22 +201,49 @@ final class FakeServerActions implements ServerActions {
     Map<String, Object?> data, {
     String? hash,
     RequestResultCallback? onComplete,
-  }) => _record(ServerCall('merge', path: path, data: data, hash: hash, onComplete: onComplete));
+  }) => _record(
+    ServerCall(
+      'merge',
+      path: path,
+      data: data,
+      hash: hash,
+      onComplete: onComplete,
+    ),
+  );
 
   @override
-  void onDisconnectPut(String path, Object? data, {RequestResultCallback? onComplete}) =>
-      _record(ServerCall('onDisconnectPut', path: path, data: data, onComplete: onComplete));
+  void onDisconnectPut(
+    String path,
+    Object? data, {
+    RequestResultCallback? onComplete,
+  }) => _record(
+    ServerCall(
+      'onDisconnectPut',
+      path: path,
+      data: data,
+      onComplete: onComplete,
+    ),
+  );
 
   @override
   void onDisconnectMerge(
     String path,
     Map<String, Object?> data, {
     RequestResultCallback? onComplete,
-  }) => _record(ServerCall('onDisconnectMerge', path: path, data: data, onComplete: onComplete));
+  }) => _record(
+    ServerCall(
+      'onDisconnectMerge',
+      path: path,
+      data: data,
+      onComplete: onComplete,
+    ),
+  );
 
   @override
   void onDisconnectCancel(String path, {RequestResultCallback? onComplete}) =>
-      _record(ServerCall('onDisconnectCancel', path: path, onComplete: onComplete));
+      _record(
+        ServerCall('onDisconnectCancel', path: path, onComplete: onComplete),
+      );
 
   @override
   void refreshAuthToken(String? token) {
@@ -220,7 +262,11 @@ final class FakeServerActions implements ServerActions {
     _record(ServerCall('purgeOutstandingWrites'));
     for (final ServerCall call in pendingWrites) {
       if (call.action == 'put' || call.action == 'merge') {
-        respond(call, status: 'write_canceled', data: 'The write was canceled by the user.');
+        respond(
+          call,
+          status: 'write_canceled',
+          data: 'The write was canceled by the user.',
+        );
       }
     }
   }
@@ -265,7 +311,11 @@ final class FakeServerActions implements ServerActions {
   }
 
   /// Answers the listen of [spec] (see [respond]).
-  void respondToListen(ListenSpec spec, {String status = statusOk, Object? data}) {
+  void respondToListen(
+    ListenSpec spec, {
+    String status = statusOk,
+    Object? data,
+  }) {
     final ServerCall? call = activeListens[spec];
     if (call == null) {
       throw StateError('No active listen for $spec.');
@@ -281,12 +331,19 @@ final class FakeServerActions implements ServerActions {
   );
 
   /// Pushes `d` ([isMerge] false) or `m` at [path], tagged with [tag].
-  void deliverDataUpdate(String path, Object? data, {bool isMerge = false, int? tag}) =>
-      _delegate.onDataUpdate(path, data, isMerge: isMerge, tag: tag);
+  void deliverDataUpdate(
+    String path,
+    Object? data, {
+    bool isMerge = false,
+    int? tag,
+  }) => _delegate.onDataUpdate(path, data, isMerge: isMerge, tag: tag);
 
   /// Pushes `rm` at [path].
-  void deliverRangeMerge(String path, List<WireRangeMerge> merges, {int? tag}) =>
-      _delegate.onRangeMergeUpdate(path, merges, tag: tag);
+  void deliverRangeMerge(
+    String path,
+    List<WireRangeMerge> merges, {
+    int? tag,
+  }) => _delegate.onRangeMergeUpdate(path, merges, tag: tag);
 
   /// Reports the connection up (after the replay).
   void connect() {
@@ -307,8 +364,8 @@ final class FakeServerActions implements ServerActions {
   }
 
   /// Reports the server's time offset.
-  void deliverServerTimeOffset(int offsetMillis) =>
-      _delegate.onServerInfoUpdate(<String, Object?>{'serverTimeOffset': offsetMillis});
+  void deliverServerTimeOffset(int offsetMillis) => _delegate
+      .onServerInfoUpdate(<String, Object?>{'serverTimeOffset': offsetMillis});
 
   /// Reports an auth status (`ok` or a revoke status).
   void deliverAuthStatus(String status, {String? explanation}) =>
@@ -319,5 +376,6 @@ final class FakeServerActions implements ServerActions {
       _delegate.onAppCheckStatus(status, explanation: explanation);
 
   /// Shuts the client down from the server side.
-  void deliverServerShutdown(String reason) => _delegate.onServerShutdown(reason);
+  void deliverServerShutdown(String reason) =>
+      _delegate.onServerShutdown(reason);
 }

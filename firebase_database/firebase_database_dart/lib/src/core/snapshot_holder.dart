@@ -13,5 +13,6 @@ final class SnapshotHolder {
   Node getNode(Path path) => throw UnimplementedError();
 
   /// Replaces the node at [path] with [newSnapshotNode].
-  void updateSnapshot(Path path, Node newSnapshotNode) => throw UnimplementedError();
+  void updateSnapshot(Path path, Node newSnapshotNode) =>
+      throw UnimplementedError();
 }

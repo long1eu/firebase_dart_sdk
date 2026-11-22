@@ -8,4 +8,5 @@ import 'package:firebase_database_dart/src/core/snap/node.dart';
 
 /// The node of [json] (export form accepted: `.priority`, `.value`; other keys starting with `.`
 /// ignored), with [priority] when given.
-Node nodeFromJson(Object? json, [Object? priority]) => throw UnimplementedError();
+Node nodeFromJson(Object? json, [Object? priority]) =>
+    throw UnimplementedError();

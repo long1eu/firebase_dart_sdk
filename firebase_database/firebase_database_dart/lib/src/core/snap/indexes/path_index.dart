@@ -23,7 +23,8 @@ final class PathIndex extends Index {
   bool isDefinedOn(Node node) => throw UnimplementedError();
 
   @override
-  NamedNode makePost(Node indexValue, ChildKey name) => throw UnimplementedError();
+  NamedNode makePost(Node indexValue, ChildKey name) =>
+      throw UnimplementedError();
 
   @override
   NamedNode get maxPost => throw UnimplementedError();

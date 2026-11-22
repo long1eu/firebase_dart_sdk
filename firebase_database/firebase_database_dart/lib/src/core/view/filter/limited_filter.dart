@@ -27,11 +27,15 @@ final class LimitedFilter implements NodeFilter {
   ) => throw UnimplementedError();
 
   @override
-  Node updateFullNode(Node oldSnap, Node newSnap, ChildChangeAccumulator? accumulator) =>
-      throw UnimplementedError();
+  Node updateFullNode(
+    Node oldSnap,
+    Node newSnap,
+    ChildChangeAccumulator? accumulator,
+  ) => throw UnimplementedError();
 
   @override
-  Node updatePriority(Node oldSnap, Node newPriority) => throw UnimplementedError();
+  Node updatePriority(Node oldSnap, Node newPriority) =>
+      throw UnimplementedError();
 
   @override
   bool get filtersNodes => throw UnimplementedError();

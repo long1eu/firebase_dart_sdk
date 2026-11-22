@@ -27,7 +27,8 @@ final class ViewOperationResult {
 /// The caches, registrations and processor of one query.
 final class View {
   /// Creates a view of [query] starting from [initialViewCache].
-  factory View(QuerySpec query, ViewCache initialViewCache) => throw UnimplementedError();
+  factory View(QuerySpec query, ViewCache initialViewCache) =>
+      throw UnimplementedError();
 
   /// The query.
   QuerySpec get query => throw UnimplementedError();
@@ -54,7 +55,8 @@ final class View {
   bool get isEmpty => throw UnimplementedError();
 
   /// Adds [registration].
-  void addEventRegistration(EventRegistration registration) => throw UnimplementedError();
+  void addEventRegistration(EventRegistration registration) =>
+      throw UnimplementedError();
 
   /// Removes [registration] (all when null); with [cancelError] removes all and returns their
   /// cancel events.
@@ -71,5 +73,6 @@ final class View {
   ) => throw UnimplementedError();
 
   /// The events a new [registration] gets for the current data.
-  List<DataEvent> initialEvents(EventRegistration registration) => throw UnimplementedError();
+  List<DataEvent> initialEvents(EventRegistration registration) =>
+      throw UnimplementedError();
 }

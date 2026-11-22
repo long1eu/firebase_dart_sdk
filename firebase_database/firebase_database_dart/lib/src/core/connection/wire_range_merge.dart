@@ -7,7 +7,11 @@ library;
 /// One element of the `d` list of an `rm` push: `{"s": start, "e": end, "m": data}`.
 final class WireRangeMerge {
   /// Creates a range merge.
-  const WireRangeMerge({this.exclusiveStart, this.inclusiveEnd, required this.data});
+  const WireRangeMerge({
+    this.exclusiveStart,
+    this.inclusiveEnd,
+    required this.data,
+  });
 
   /// The exclusive start path in wire form (`/a/b`), or null for minus infinity.
   final String? exclusiveStart;

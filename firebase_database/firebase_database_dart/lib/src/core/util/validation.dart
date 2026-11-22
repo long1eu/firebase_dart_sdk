@@ -28,38 +28,63 @@ bool isValidRootPathString(String pathString) => throw UnimplementedError();
 bool isValidPriority(Object? priority) => throw UnimplementedError();
 
 /// Validates [data] for a write at [path] by [fnName].
-void validateFirebaseDataArg(String fnName, Object? data, Path path, {bool optional = false}) =>
-    throw UnimplementedError();
+void validateFirebaseDataArg(
+  String fnName,
+  Object? data,
+  Path path, {
+  bool optional = false,
+}) => throw UnimplementedError();
 
 /// Validates [data] below [path], recursively.
-void validateFirebaseData(String errorPrefix, Object? data, ValidationPath path) =>
-    throw UnimplementedError();
+void validateFirebaseData(
+  String errorPrefix,
+  Object? data,
+  ValidationPath path,
+) => throw UnimplementedError();
 
 /// Validates that no path of [mergePaths] is a prefix of another.
 void validateFirebaseMergePaths(String errorPrefix, List<Path> mergePaths) =>
     throw UnimplementedError();
 
 /// Validates the argument of `update` at [path].
-void validateFirebaseMergeDataArg(String fnName, Object? data, Path path, {bool optional = false}) =>
-    throw UnimplementedError();
+void validateFirebaseMergeDataArg(
+  String fnName,
+  Object? data,
+  Path path, {
+  bool optional = false,
+}) => throw UnimplementedError();
 
 /// Validates a priority argument.
-void validatePriority(String fnName, Object? priority, {bool optional = false}) =>
-    throw UnimplementedError();
+void validatePriority(
+  String fnName,
+  Object? priority, {
+  bool optional = false,
+}) => throw UnimplementedError();
 
 /// Validates a key argument named [argumentName].
-void validateKey(String fnName, String argumentName, String? key, {bool optional = false}) =>
-    throw UnimplementedError();
+void validateKey(
+  String fnName,
+  String argumentName,
+  String? key, {
+  bool optional = false,
+}) => throw UnimplementedError();
 
 /// Validates a path argument named [argumentName].
-void validatePathString(String fnName, String argumentName, String? pathString,
-        {bool optional = false}) =>
-    throw UnimplementedError();
+void validatePathString(
+  String fnName,
+  String argumentName,
+  String? pathString, {
+  bool optional = false,
+}) => throw UnimplementedError();
 
 /// Validates a root path argument (may start with `.info`).
-void validateRootPathString(String fnName, String argumentName, String? pathString,
-        {bool optional = false}) =>
-    throw UnimplementedError();
+void validateRootPathString(
+  String fnName,
+  String argumentName,
+  String? pathString, {
+  bool optional = false,
+}) => throw UnimplementedError();
 
 /// Throws if [path] is under `.info`, which cannot be written.
-void validateWritablePath(String fnName, Path path) => throw UnimplementedError();
+void validateWritablePath(String fnName, Path path) =>
+    throw UnimplementedError();

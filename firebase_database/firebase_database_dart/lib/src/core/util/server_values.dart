@@ -10,10 +10,12 @@ import 'package:firebase_database_dart/src/core/write_id.dart';
 
 /// Computes the complete event cache at a path excluding some writes; Repo passes
 /// `SyncTree.calcCompleteEventCache` so this file does not depend on the sync tree.
-typedef CompleteEventCacheFn = Node? Function(Path path, List<WriteId> writeIdsToExclude);
+typedef CompleteEventCacheFn =
+    Node? Function(Path path, List<WriteId> writeIdsToExclude);
 
 /// The values server values resolve to: `{'timestamp': <server time ms>}`.
-Map<String, Object?> generateServerValues({required int timestamp}) => throw UnimplementedError();
+Map<String, Object?> generateServerValues({required int timestamp}) =>
+    throw UnimplementedError();
 
 /// Gives the existing value a deferred value is resolved against, lazily.
 sealed class ValueProvider {
@@ -69,8 +71,11 @@ Object resolveDeferredLeafValue(
 ) => throw UnimplementedError();
 
 /// Resolves every server value in [node] against [existing].
-Node resolveDeferredValueSnapshot(Node node, Node existing, Map<String, Object?> serverValues) =>
-    throw UnimplementedError();
+Node resolveDeferredValueSnapshot(
+  Node node,
+  Node existing,
+  Map<String, Object?> serverValues,
+) => throw UnimplementedError();
 
 /// Resolves every server value in [node] written at [path], reading existing data lazily
 /// through [calcCompleteEventCache].

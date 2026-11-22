@@ -47,10 +47,12 @@ final class PruneForest {
   PruneForest keep(Path path) => throw UnimplementedError();
 
   /// With each of [children] of [path] kept.
-  PruneForest keepAll(Path path, Set<ChildKey> children) => throw UnimplementedError();
+  PruneForest keepAll(Path path, Set<ChildKey> children) =>
+      throw UnimplementedError();
 
   /// With each of [children] of [path] pruned.
-  PruneForest pruneAll(Path path, Set<ChildKey> children) => throw UnimplementedError();
+  PruneForest pruneAll(Path path, Set<ChildKey> children) =>
+      throw UnimplementedError();
 
   @override
   bool operator ==(Object other) => throw UnimplementedError();

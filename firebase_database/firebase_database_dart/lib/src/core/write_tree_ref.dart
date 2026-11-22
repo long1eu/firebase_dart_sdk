@@ -30,7 +30,8 @@ final class WriteTreeRef {
   }) => throw UnimplementedError();
 
   /// See [WriteTree.calcCompleteEventChildren].
-  Node calcCompleteEventChildren(Node completeServerChildren) => throw UnimplementedError();
+  Node calcCompleteEventChildren(Node completeServerChildren) =>
+      throw UnimplementedError();
 
   /// See [WriteTree.calcEventCacheAfterServerOverwrite].
   Node? calcEventCacheAfterServerOverwrite(

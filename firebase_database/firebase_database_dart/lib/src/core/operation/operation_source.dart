@@ -6,13 +6,20 @@ import 'package:firebase_database_dart/src/core/view/query_params.dart';
 
 /// The origin of an operation: the user, or the server (optionally for one tagged query).
 final class OperationSource {
-  const OperationSource._({required this.fromUser, required this.tagged}) : queryParams = null;
+  const OperationSource._({required this.fromUser, required this.tagged})
+    : queryParams = null;
 
   /// A user write.
-  static const OperationSource user = OperationSource._(fromUser: true, tagged: false);
+  static const OperationSource user = OperationSource._(
+    fromUser: true,
+    tagged: false,
+  );
 
   /// Server data for untagged listens.
-  static const OperationSource server = OperationSource._(fromUser: false, tagged: false);
+  static const OperationSource server = OperationSource._(
+    fromUser: false,
+    tagged: false,
+  );
 
   /// Server data for the tagged query with [queryParams].
   const OperationSource.forServerTaggedQuery(QueryParams this.queryParams)

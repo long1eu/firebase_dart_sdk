@@ -9,7 +9,11 @@ import 'package:firebase_database_dart/src/core/snap/node.dart';
 /// A [node] (indexed for its view) and whether it is [fullyInitialized] and [filtered].
 final class CacheNode {
   /// Creates a cache node.
-  const CacheNode(this.node, {required this.fullyInitialized, required this.filtered});
+  const CacheNode(
+    this.node, {
+    required this.fullyInitialized,
+    required this.filtered,
+  });
 
   /// The data.
   final Node node;

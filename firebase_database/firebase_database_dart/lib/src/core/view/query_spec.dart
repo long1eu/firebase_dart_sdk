@@ -16,8 +16,10 @@ final class QuerySpec {
   factory QuerySpec.defaultAt(Path path) => throw UnimplementedError();
 
   /// The query at [path] with the parameters of a wire object.
-  factory QuerySpec.fromPathAndWireObject(Path path, Map<String, Object?> wire) =>
-      throw UnimplementedError();
+  factory QuerySpec.fromPathAndWireObject(
+    Path path,
+    Map<String, Object?> wire,
+  ) => throw UnimplementedError();
 
   /// The path.
   final Path path;

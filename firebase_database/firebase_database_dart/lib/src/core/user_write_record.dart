@@ -11,8 +11,12 @@ import 'package:firebase_database_dart/src/core/write_id.dart';
 /// tree and in persistence.
 final class UserWriteRecord {
   /// An overwrite; [visible] is false for transactions with `applyLocally: false`.
-  const UserWriteRecord.overwrite(this.writeId, this.path, Node this.overwrite, {required this.visible})
-    : merge = null;
+  const UserWriteRecord.overwrite(
+    this.writeId,
+    this.path,
+    Node this.overwrite, {
+    required this.visible,
+  }) : merge = null;
 
   /// A merge (always visible).
   const UserWriteRecord.merge(this.writeId, this.path, CompoundWrite this.merge)

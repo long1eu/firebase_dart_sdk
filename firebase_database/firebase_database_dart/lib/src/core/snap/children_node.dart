@@ -51,7 +51,8 @@ class ChildrenNode implements Node {
       throw UnimplementedError();
 
   @override
-  Node updateImmediateChild(ChildKey key, Node newChild) => throw UnimplementedError();
+  Node updateImmediateChild(ChildKey key, Node newChild) =>
+      throw UnimplementedError();
 
   @override
   Node updateChild(Path path, Node newChild) => throw UnimplementedError();
@@ -66,7 +67,8 @@ class ChildrenNode implements Node {
   int get numChildren => throw UnimplementedError();
 
   @override
-  bool forEachChild(Index index, ChildVisitor action) => throw UnimplementedError();
+  bool forEachChild(Index index, ChildVisitor action) =>
+      throw UnimplementedError();
 
   @override
   Object? toJson({bool exportFormat = false}) => throw UnimplementedError();
@@ -87,13 +89,16 @@ class ChildrenNode implements Node {
   NamedNode? lastChild(Index index) => throw UnimplementedError();
 
   /// The children in [index] order.
-  Iterable<NamedNode> childrenInOrder(Index index) => throw UnimplementedError();
+  Iterable<NamedNode> childrenInOrder(Index index) =>
+      throw UnimplementedError();
 
   /// The children in [index] order starting at the first post not smaller than [start].
-  Iterable<NamedNode> childrenFrom(NamedNode start, Index index) => throw UnimplementedError();
+  Iterable<NamedNode> childrenFrom(NamedNode start, Index index) =>
+      throw UnimplementedError();
 
   /// The children in reverse [index] order.
-  Iterable<NamedNode> reverseChildren(Index index) => throw UnimplementedError();
+  Iterable<NamedNode> reverseChildren(Index index) =>
+      throw UnimplementedError();
 
   /// The children in reverse [index] order starting at the last post not greater than [start].
   Iterable<NamedNode> reverseChildrenFrom(NamedNode start, Index index) =>

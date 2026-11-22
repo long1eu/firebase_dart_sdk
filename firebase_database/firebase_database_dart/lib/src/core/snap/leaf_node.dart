@@ -26,7 +26,8 @@ enum LeafType {
 final class LeafNode implements Node {
   /// Creates a leaf of [value] (`bool`, `num`, `String` or a server value `Map`) with
   /// [priorityNode] (empty by default).
-  factory LeafNode(Object value, [Node? priorityNode]) => throw UnimplementedError();
+  factory LeafNode(Object value, [Node? priorityNode]) =>
+      throw UnimplementedError();
 
   /// The value; numbers are `num` normalised by `normalizeNumber`.
   Object get value => throw UnimplementedError();
@@ -54,7 +55,8 @@ final class LeafNode implements Node {
       throw UnimplementedError();
 
   @override
-  Node updateImmediateChild(ChildKey key, Node newChild) => throw UnimplementedError();
+  Node updateImmediateChild(ChildKey key, Node newChild) =>
+      throw UnimplementedError();
 
   @override
   Node updateChild(Path path, Node newChild) => throw UnimplementedError();
@@ -69,7 +71,8 @@ final class LeafNode implements Node {
   int get numChildren => throw UnimplementedError();
 
   @override
-  bool forEachChild(Index index, ChildVisitor action) => throw UnimplementedError();
+  bool forEachChild(Index index, ChildVisitor action) =>
+      throw UnimplementedError();
 
   @override
   Object? toJson({bool exportFormat = false}) => throw UnimplementedError();

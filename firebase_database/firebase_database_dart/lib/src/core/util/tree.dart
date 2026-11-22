@@ -21,7 +21,8 @@ final class TreeNode<T> {
 /// are removed from their parent).
 final class Tree<T> {
   /// Creates a tree; the root has no name and no parent.
-  Tree({this.name, this.parent, TreeNode<T>? node}) : node = node ?? TreeNode<T>();
+  Tree({this.name, this.parent, TreeNode<T>? node})
+    : node = node ?? TreeNode<T>();
 
   /// The key under the parent, or null for the root.
   final ChildKey? name;
@@ -48,7 +49,8 @@ final class Tree<T> {
   bool get isEmpty => throw UnimplementedError();
 
   /// Calls [action] on each child.
-  void forEachChild(void Function(Tree<T> child) action) => throw UnimplementedError();
+  void forEachChild(void Function(Tree<T> child) action) =>
+      throw UnimplementedError();
 
   /// Calls [action] on each descendant, depth first.
   void forEachDescendant(
@@ -58,12 +60,15 @@ final class Tree<T> {
   }) => throw UnimplementedError();
 
   /// Calls [action] on each ancestor until it returns true; returns whether it did.
-  bool forEachAncestor(bool Function(Tree<T> tree) action, {bool includeSelf = false}) =>
-      throw UnimplementedError();
+  bool forEachAncestor(
+    bool Function(Tree<T> tree) action, {
+    bool includeSelf = false,
+  }) => throw UnimplementedError();
 
   /// Calls [action] on the nearest descendants that have a value.
-  void forEachImmediateDescendantWithValue(void Function(Tree<T> tree) action) =>
-      throw UnimplementedError();
+  void forEachImmediateDescendantWithValue(
+    void Function(Tree<T> tree) action,
+  ) => throw UnimplementedError();
 
   /// The path from the root.
   Path get path => throw UnimplementedError();

@@ -16,7 +16,11 @@ abstract interface class CompleteChildSource {
   Node? getCompleteChild(ChildKey key);
 
   /// The complete child after [child] in [index] order ([reverse]: before), or null.
-  NamedNode? getChildAfterChild(Index index, NamedNode child, {required bool reverse});
+  NamedNode? getChildAfterChild(
+    Index index,
+    NamedNode child, {
+    required bool reverse,
+  });
 }
 
 /// The source that knows nothing.
@@ -28,8 +32,11 @@ final class NoCompleteChildSource implements CompleteChildSource {
   Node? getCompleteChild(ChildKey key) => throw UnimplementedError();
 
   @override
-  NamedNode? getChildAfterChild(Index index, NamedNode child, {required bool reverse}) =>
-      throw UnimplementedError();
+  NamedNode? getChildAfterChild(
+    Index index,
+    NamedNode child, {
+    required bool reverse,
+  }) => throw UnimplementedError();
 }
 
 /// The single [NoCompleteChildSource].
@@ -38,7 +45,11 @@ const CompleteChildSource noCompleteChildSource = NoCompleteChildSource();
 /// A source over the pending writes, the view cache and an optional complete server cache.
 final class WriteTreeCompleteChildSource implements CompleteChildSource {
   /// Creates the source.
-  const WriteTreeCompleteChildSource(this.writes, this.viewCache, this.optCompleteServerCache);
+  const WriteTreeCompleteChildSource(
+    this.writes,
+    this.viewCache,
+    this.optCompleteServerCache,
+  );
 
   /// The writes at the view's path.
   final WriteTreeRef writes;
@@ -53,6 +64,9 @@ final class WriteTreeCompleteChildSource implements CompleteChildSource {
   Node? getCompleteChild(ChildKey key) => throw UnimplementedError();
 
   @override
-  NamedNode? getChildAfterChild(Index index, NamedNode child, {required bool reverse}) =>
-      throw UnimplementedError();
+  NamedNode? getChildAfterChild(
+    Index index,
+    NamedNode child, {
+    required bool reverse,
+  }) => throw UnimplementedError();
 }

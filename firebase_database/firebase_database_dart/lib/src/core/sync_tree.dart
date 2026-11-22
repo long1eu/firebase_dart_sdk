@@ -77,7 +77,8 @@ final class SyncTree implements SyncTreeApi {
   List<Event> removeAllWrites() => throw UnimplementedError();
 
   @override
-  List<Event> applyServerOverwrite(Path path, Node newData) => throw UnimplementedError();
+  List<Event> applyServerOverwrite(Path path, Node newData) =>
+      throw UnimplementedError();
 
   @override
   List<Event> applyServerMerge(Path path, Map<Path, Node> changedChildren) =>
@@ -98,12 +99,18 @@ final class SyncTree implements SyncTreeApi {
       throw UnimplementedError();
 
   @override
-  List<Event> applyTaggedQueryMerge(Path path, Map<Path, Node> changedChildren, Tag tag) =>
-      throw UnimplementedError();
+  List<Event> applyTaggedQueryMerge(
+    Path path,
+    Map<Path, Node> changedChildren,
+    Tag tag,
+  ) => throw UnimplementedError();
 
   @override
-  List<Event> applyTaggedRangeMerges(Path path, List<RangeMerge> rangeMerges, Tag tag) =>
-      throw UnimplementedError();
+  List<Event> applyTaggedRangeMerges(
+    Path path,
+    List<RangeMerge> rangeMerges,
+    Tag tag,
+  ) => throw UnimplementedError();
 
   @override
   List<Event> addEventRegistration(
@@ -113,16 +120,23 @@ final class SyncTree implements SyncTreeApi {
   }) => throw UnimplementedError();
 
   @override
-  List<Event> removeEventRegistration(EventRegistration registration, {bool skipDedup = false}) =>
-      throw UnimplementedError();
+  List<Event> removeEventRegistration(
+    EventRegistration registration, {
+    bool skipDedup = false,
+  }) => throw UnimplementedError();
 
   @override
-  List<Event> removeAllEventRegistrations(QuerySpec query, DatabaseError error) =>
-      throw UnimplementedError();
+  List<Event> removeAllEventRegistrations(
+    QuerySpec query,
+    DatabaseError error,
+  ) => throw UnimplementedError();
 
   @override
-  void keepSynced(QuerySpec query, {required bool keep, bool skipDedup = false}) =>
-      throw UnimplementedError();
+  void keepSynced(
+    QuerySpec query, {
+    required bool keep,
+    bool skipDedup = false,
+  }) => throw UnimplementedError();
 
   @override
   Node? getServerValue(QuerySpec query) => throw UnimplementedError();
@@ -165,7 +179,8 @@ final class KeepSyncedEventRegistration extends EventRegistration {
   bool respondsTo(EventType type) => throw UnimplementedError();
 
   @override
-  DataEvent createEvent(Change change, QuerySpec query) => throw UnimplementedError();
+  DataEvent createEvent(Change change, QuerySpec query) =>
+      throw UnimplementedError();
 
   @override
   void fireEvent(DataEvent event) => throw UnimplementedError();

@@ -21,7 +21,8 @@ final class EventQueue {
   void queueEvents(List<Event> events) => throw UnimplementedError();
 
   /// Queues [events] and raises the queued events whose path is exactly [path].
-  void raiseEventsAtPath(Path path, List<Event> events) => throw UnimplementedError();
+  void raiseEventsAtPath(Path path, List<Event> events) =>
+      throw UnimplementedError();
 
   /// Queues [events] and raises the queued events at, above or below [changedPath].
   void raiseEventsForChangedPath(Path changedPath, List<Event> events) =>

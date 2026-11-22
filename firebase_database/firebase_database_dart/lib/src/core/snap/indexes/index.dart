@@ -20,7 +20,8 @@ abstract base class Index {
   bool isDefinedOn(Node node);
 
   /// Whether the indexed value differs between [oldNode] and [newNode].
-  bool indexedValueChanged(Node oldNode, Node newNode) => throw UnimplementedError();
+  bool indexedValueChanged(Node oldNode, Node newNode) =>
+      throw UnimplementedError();
 
   /// The post before every child.
   NamedNode get minPost => throw UnimplementedError();

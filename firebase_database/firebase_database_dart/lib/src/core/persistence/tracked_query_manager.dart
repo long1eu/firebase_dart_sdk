@@ -13,8 +13,10 @@ import 'package:firebase_database_dart/src/core/view/query_spec.dart';
 /// Keeps the tracked queries in memory and in the storage engine: activity, completeness, pruning.
 final class TrackedQueryManager {
   /// Loads the tracked queries of [storageLayer] and resets the previously active ones.
-  factory TrackedQueryManager(PersistenceStorageEngine storageLayer, Clock clock) =>
-      throw UnimplementedError();
+  factory TrackedQueryManager(
+    PersistenceStorageEngine storageLayer,
+    Clock clock,
+  ) => throw UnimplementedError();
 
   /// The record for [query], or null.
   TrackedQuery? findTrackedQuery(QuerySpec query) => throw UnimplementedError();
@@ -38,11 +40,13 @@ final class TrackedQueryManager {
   bool isQueryComplete(QuerySpec query) => throw UnimplementedError();
 
   /// Chooses the queries to prune under [cachePolicy] and removes their records.
-  PruneForest pruneOldQueries(CachePolicy cachePolicy) => throw UnimplementedError();
+  PruneForest pruneOldQueries(CachePolicy cachePolicy) =>
+      throw UnimplementedError();
 
   /// The keys of complete filtered queries at [path], or null when a complete default query
   /// covers it.
-  Set<ChildKey>? getKnownCompleteChildren(Path path) => throw UnimplementedError();
+  Set<ChildKey>? getKnownCompleteChildren(Path path) =>
+      throw UnimplementedError();
 
   /// Tracks a complete default query at [path] if none exists.
   void ensureCompleteTrackedQuery(Path path) => throw UnimplementedError();

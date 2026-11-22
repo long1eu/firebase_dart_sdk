@@ -18,7 +18,8 @@ final class ValueIndex extends Index {
   bool isDefinedOn(Node node) => throw UnimplementedError();
 
   @override
-  bool indexedValueChanged(Node oldNode, Node newNode) => throw UnimplementedError();
+  bool indexedValueChanged(Node oldNode, Node newNode) =>
+      throw UnimplementedError();
 
   @override
   NamedNode get minPost => throw UnimplementedError();
@@ -27,7 +28,8 @@ final class ValueIndex extends Index {
   NamedNode get maxPost => throw UnimplementedError();
 
   @override
-  NamedNode makePost(Node indexValue, ChildKey name) => throw UnimplementedError();
+  NamedNode makePost(Node indexValue, ChildKey name) =>
+      throw UnimplementedError();
 
   @override
   String get queryDefinition => throw UnimplementedError();

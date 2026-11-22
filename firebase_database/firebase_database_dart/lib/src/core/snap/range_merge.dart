@@ -13,7 +13,8 @@ final class RangeMerge {
   const RangeMerge(this.exclusiveStart, this.inclusiveEnd, this.snap);
 
   /// Converts the wire form.
-  factory RangeMerge.fromWire(WireRangeMerge merge) => throw UnimplementedError();
+  factory RangeMerge.fromWire(WireRangeMerge merge) =>
+      throw UnimplementedError();
 
   /// The exclusive start, or null for minus infinity.
   final Path? exclusiveStart;

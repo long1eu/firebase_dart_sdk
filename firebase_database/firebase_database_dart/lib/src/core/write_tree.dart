@@ -22,8 +22,12 @@ final class WriteTree {
   WriteTreeRef childWrites(Path path) => throw UnimplementedError();
 
   /// Records an overwrite; ids must increase.
-  void addOverwrite(Path path, Node snap, WriteId writeId, {required bool visible}) =>
-      throw UnimplementedError();
+  void addOverwrite(
+    Path path,
+    Node snap,
+    WriteId writeId, {
+    required bool visible,
+  }) => throw UnimplementedError();
 
   /// Records a merge; ids must increase.
   void addMerge(Path path, CompoundWrite changedChildren, WriteId writeId) =>
@@ -64,8 +68,11 @@ final class WriteTree {
   ) => throw UnimplementedError();
 
   /// The complete child [childKey] at [treePath], or null.
-  Node? calcCompleteChild(Path treePath, ChildKey childKey, CacheNode existingServerSnap) =>
-      throw UnimplementedError();
+  Node? calcCompleteChild(
+    Path treePath,
+    ChildKey childKey,
+    CacheNode existingServerSnap,
+  ) => throw UnimplementedError();
 
   /// The write shadowing [path] entirely, or null.
   Node? shadowingWrite(Path path) => throw UnimplementedError();

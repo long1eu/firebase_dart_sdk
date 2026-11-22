@@ -58,7 +58,8 @@ enum DatabaseErrorCode {
   /// The code for a wire [status]; JS-only local statuses map as follows: `disconnect` to
   /// [disconnected], `maxretry` to [maxRetries], `set` to [overriddenBySet], anything else to
   /// [unknown].
-  static DatabaseErrorCode fromWireStatus(String status) => throw UnimplementedError();
+  static DatabaseErrorCode fromWireStatus(String status) =>
+      throw UnimplementedError();
 }
 
 /// An error raised by the database core: a [code], a human-readable [message] and optional
@@ -69,7 +70,8 @@ final class DatabaseError {
 
   /// Creates the error for a wire [status] with the server's optional [reason], as Repo does for
   /// a failed request.
-  factory DatabaseError.fromStatus(String status, [String? reason]) => throw UnimplementedError();
+  factory DatabaseError.fromStatus(String status, [String? reason]) =>
+      throw UnimplementedError();
 
   /// The error code.
   final DatabaseErrorCode code;

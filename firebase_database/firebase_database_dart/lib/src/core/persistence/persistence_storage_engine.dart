@@ -20,6 +20,12 @@ import 'package:firebase_database_dart/src/core/write_id.dart';
 ///
 /// Mutations happen between [beginTransaction] and [endTransaction]; they are committed only if
 /// [setTransactionSuccessful] was called in between. Reads may happen at any time.
+///
+/// Programming errors (a mutation outside a transaction, a nested [beginTransaction]) throw a
+/// [StateError]. Storage errors at run time (disk full, I/O error, corruption, a lost lease) never
+/// throw: the engine rolls back, becomes degraded ([isDurable] turns false for good), and from
+/// then on stores nothing and reads as empty, while the sync tree's memory state stays
+/// authoritative for the session.
 abstract interface class PersistenceStorageEngine {
   /// Stores an overwrite.
   void saveUserOverwrite(Path path, Node node, WriteId writeId);
@@ -67,13 +73,14 @@ abstract interface class PersistenceStorageEngine {
   void saveTrackedQueryKeys(int trackedQueryId, Set<ChildKey> keys);
 
   /// Adds and removes keys of [trackedQueryId]; the query must exist.
-  void updateTrackedQueryKeys(int trackedQueryId, Set<ChildKey> added, Set<ChildKey> removed);
+  void updateTrackedQueryKeys(
+    int trackedQueryId,
+    Set<ChildKey> added,
+    Set<ChildKey> removed,
+  );
 
-  /// The keys of [trackedQueryId].
-  Set<ChildKey> loadTrackedQueryKeys(int trackedQueryId);
-
-  /// The union of the keys of [trackedQueryIds].
-  Set<ChildKey> loadTrackedQueryKeysForAll(Set<int> trackedQueryIds);
+  /// The union of the keys of [trackedQueryIds] (one id: a set of one); each must exist.
+  Set<ChildKey> loadTrackedQueryKeys(Set<int> trackedQueryIds);
 
   /// Deletes the cached data below [root] that [pruneForest] prunes and does not keep.
   void pruneCache(Path root, PruneForest pruneForest);
@@ -89,4 +96,9 @@ abstract interface class PersistenceStorageEngine {
 
   /// Releases the store.
   void close();
+
+  /// Whether data written now survives a restart: true after a successful open, false once the
+  /// engine is degraded or fenced (or closed). Never turns true again in the same session; the
+  /// public `persistenceEnabled` reads it.
+  bool get isDurable;
 }

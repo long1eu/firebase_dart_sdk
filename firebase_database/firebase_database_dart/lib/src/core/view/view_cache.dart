@@ -16,12 +16,18 @@ final class ViewCache {
   final CacheNode serverCache;
 
   /// With a new event cache.
-  ViewCache updateEventSnap(Node eventSnap, {required bool complete, required bool filtered}) =>
-      throw UnimplementedError();
+  ViewCache updateEventSnap(
+    Node eventSnap, {
+    required bool complete,
+    required bool filtered,
+  }) => throw UnimplementedError();
 
   /// With a new server cache.
-  ViewCache updateServerSnap(Node serverSnap, {required bool complete, required bool filtered}) =>
-      throw UnimplementedError();
+  ViewCache updateServerSnap(
+    Node serverSnap, {
+    required bool complete,
+    required bool filtered,
+  }) => throw UnimplementedError();
 
   /// The event cache node if fully initialised, else null.
   Node? get completeEventSnap => throw UnimplementedError();

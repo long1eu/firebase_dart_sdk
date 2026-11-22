@@ -10,7 +10,8 @@ String sha1Base64(String text) => throw UnimplementedError();
 int utf8Length(String text) => throw UnimplementedError();
 
 /// Splits [text] into pieces of at most [segmentSize] UTF-16 code units.
-List<String> splitStringBySize(String text, int segmentSize) => throw UnimplementedError();
+List<String> splitStringBySize(String text, int segmentSize) =>
+    throw UnimplementedError();
 
 /// [text] in the V2 hash form of the compound hash: JSON-quoted with only `\` and `"` escaped.
 String stringHashV2Representation(String text) => throw UnimplementedError();

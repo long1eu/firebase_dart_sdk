@@ -4,7 +4,8 @@ library;
 import 'dart:math';
 
 /// The 64 characters of push ids, in ascending ASCII order.
-const String pushChars = '-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz';
+const String pushChars =
+    '-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz';
 
 /// The longest key [successor] and [predecessor] produce.
 const int maxKeyLength = 786;

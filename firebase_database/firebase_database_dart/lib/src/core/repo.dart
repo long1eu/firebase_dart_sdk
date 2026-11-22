@@ -28,7 +28,8 @@ typedef WriteCompletion = void Function(DatabaseError? error);
 
 /// Creates the connection for a Repo; the connection team supplies it (tests pass a
 /// `FakeServerActions`).
-typedef ServerActionsFactory = ServerActions Function(ServerActionsDelegate delegate);
+typedef ServerActionsFactory =
+    ServerActions Function(ServerActionsDelegate delegate);
 
 /// The interrupt reason of goOffline/goOnline.
 const String interruptReason = 'repo_interrupt';
@@ -98,8 +99,11 @@ final class Repo implements ServerActionsDelegate {
   Future<Node> getValue(QuerySpec query) => throw UnimplementedError();
 
   /// Registers an onDisconnect overwrite of [path] with [newValue] and remembers it locally.
-  void onDisconnectSetValue(Path path, Node newValue, {WriteCompletion? onComplete}) =>
-      throw UnimplementedError();
+  void onDisconnectSetValue(
+    Path path,
+    Node newValue, {
+    WriteCompletion? onComplete,
+  }) => throw UnimplementedError();
 
   /// Registers an onDisconnect merge into [path].
   void onDisconnectUpdate(
@@ -110,17 +114,23 @@ final class Repo implements ServerActionsDelegate {
   }) => throw UnimplementedError();
 
   /// Cancels the onDisconnect operations at and below [path].
-  void onDisconnectCancel(Path path, {WriteCompletion? onComplete}) => throw UnimplementedError();
+  void onDisconnectCancel(Path path, {WriteCompletion? onComplete}) =>
+      throw UnimplementedError();
 
   /// Adds a listener; `.info` queries go to the info tree.
-  void addEventCallback(EventRegistration registration) => throw UnimplementedError();
+  void addEventCallback(EventRegistration registration) =>
+      throw UnimplementedError();
 
   /// Removes a listener.
-  void removeEventCallback(EventRegistration registration) => throw UnimplementedError();
+  void removeEventCallback(EventRegistration registration) =>
+      throw UnimplementedError();
 
   /// Keeps [query] synced (or stops).
-  void keepSynced(QuerySpec query, {required bool keep, bool skipDedup = false}) =>
-      throw UnimplementedError();
+  void keepSynced(
+    QuerySpec query, {
+    required bool keep,
+    bool skipDedup = false,
+  }) => throw UnimplementedError();
 
   /// goOffline: interrupts the connection with [interruptReason].
   void interrupt() => throw UnimplementedError();
@@ -153,12 +163,19 @@ final class Repo implements ServerActionsDelegate {
   void close() => throw UnimplementedError();
 
   @override
-  void onDataUpdate(String path, Object? data, {required bool isMerge, int? tag}) =>
-      throw UnimplementedError();
+  void onDataUpdate(
+    String path,
+    Object? data, {
+    required bool isMerge,
+    int? tag,
+  }) => throw UnimplementedError();
 
   @override
-  void onRangeMergeUpdate(String path, List<WireRangeMerge> merges, {int? tag}) =>
-      throw UnimplementedError();
+  void onRangeMergeUpdate(
+    String path,
+    List<WireRangeMerge> merges, {
+    int? tag,
+  }) => throw UnimplementedError();
 
   @override
   void onConnect() => throw UnimplementedError();
@@ -167,16 +184,19 @@ final class Repo implements ServerActionsDelegate {
   void onDisconnect() => throw UnimplementedError();
 
   @override
-  void onAuthStatus(String status, {String? explanation}) => throw UnimplementedError();
+  void onAuthStatus(String status, {String? explanation}) =>
+      throw UnimplementedError();
 
   @override
-  void onAppCheckStatus(String status, {String? explanation}) => throw UnimplementedError();
+  void onAppCheckStatus(String status, {String? explanation}) =>
+      throw UnimplementedError();
 
   @override
   void onServerShutdown(String reason) => throw UnimplementedError();
 
   @override
-  void onServerInfoUpdate(Map<String, Object?> updates) => throw UnimplementedError();
+  void onServerInfoUpdate(Map<String, Object?> updates) =>
+      throw UnimplementedError();
 }
 
 /// The server tree's [ListenProvider]: turns [QuerySpec] into a `ListenSpec` and [Tag] into an
