@@ -342,37 +342,56 @@ void main() {
       );
     });
 
-    test('numbers arrive unchanged: 1.0, 2^53+1, int64 max, -0.0 (probe '
-        'addendum A)', () async {
+    test('numbers the server holds arrive unchanged through a listen and a '
+        'get: 1.0, 2^53+1, int64 max, -0.0 (probe addendum A: written as raw '
+        'lexemes, echoed with their lexeme class)', () async {
       final EmulatorRig rig = EmulatorRig.create();
-      final RigClient client = await rig.open();
-      expect(
-        (await client.first(client.listen(defaultSpec('/n')))).status,
-        statusOk,
+      await rig.writeRaw(
+        '/n',
+        '{"one":1.0,"big":9007199254740993,'
+            '"max":9223372036854775807,"negzero":-0.0}',
       );
-      final Map<String, Object?> numbers = <String, Object?>{
+      expect(await rig.readRaw('/n/one'), '1.0');
+      expect(await rig.readRaw('/n/negzero'), '-0.0');
+      final Map<String, Object?> expected = <String, Object?>{
         'one': 1.0,
         'big': 9007199254740993,
         'max': 9223372036854775807,
         'negzero': -0.0,
       };
-      for (final MapEntry<String, Object?> entry in numbers.entries) {
-        expect(
-          (await client.put('/n/${entry.key}', entry.value)).status,
-          statusOk,
-        );
-      }
-      for (final String key in numbers.keys) {
-        final Object? pushed = client.updatesAt('/n/$key').single.data;
+      final RigClient client = await rig.open();
+      expect(
+        (await client.first(client.listen(defaultSpec('/n')))).status,
+        statusOk,
+      );
+      final Map<String, Object?> pushed =
+          client.updatesAt('/n').single.data! as Map<String, Object?>;
+      for (final String key in expected.keys) {
         final Object? got = await client.connection.get(defaultSpec('/n/$key'));
-        for (final Object? value in <Object?>[pushed, got]) {
-          _expectSameNumber(value, numbers[key], key);
-        }
+        _expectSameNumber(pushed[key], expected[key], '$key (push)');
+        _expectSameNumber(got, expected[key], '$key (get)');
       }
-      expect(await rig.readRaw('/n/one'), '1.0');
-      expect(await rig.readRaw('/n/big'), '9007199254740993');
-      expect(await rig.readRaw('/n/max'), '9223372036854775807');
-      expect(await rig.readRaw('/n/negzero'), '-0.0');
+    });
+
+    test('the connection writes an integral double as an integer and zero '
+        'without a sign (the core jsStringify rule): 1.0 and -0.0 read back as '
+        '1 and 0', () async {
+      final EmulatorRig rig = EmulatorRig.create();
+      final RigClient client = await rig.open();
+      expect((await client.put('/e/one', 1.0)).status, statusOk);
+      expect((await client.put('/e/negzero', -0.0)).status, statusOk);
+      expect(await rig.readRaw('/e/one'), '1');
+      expect(await rig.readRaw('/e/negzero'), '0');
+      _expectSameNumber(
+        await client.connection.get(defaultSpec('/e/one')),
+        1,
+        'one',
+      );
+      _expectSameNumber(
+        await client.connection.get(defaultSpec('/e/negzero')),
+        0,
+        'negzero',
+      );
     });
 
     test('a 1 MiB string is written and read back (probe "Frame and message '

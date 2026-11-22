@@ -36,7 +36,10 @@ WsConnector createWsConnector({required int maxMessageBytes}) =>
 /// An attempt that has no open channel after [upgradeTimeout] (TCP, TLS and the upgrade answer
 /// together), or whose `abort` future completes first, aborts its pending request, closes a client
 /// of its own with force and fails with [WsConnectFailure.other]: a server that accepts and stays
-/// silent leaves no socket behind (review M2).
+/// silent leaves no socket behind (review M2), with one limit of dart:io: an attempt that stalls
+/// inside the TLS handshake keeps its socket until the peer or the OS closes it, because dart:io
+/// offers no handle before the handshake completes (`SecureSocket.secure` detaches the socket,
+/// after which `Socket.destroy` is a no-op); the socket is destroyed as soon as the handshake ends.
 WsConnector ioWsConnector({
   HttpClient? httpClient,
   required int maxMessageBytes,
@@ -89,10 +92,9 @@ final class _IoConnector {
       );
     }
     final HttpClient? shared = _httpClient;
-    final _UpgradeAttempt attempt = _UpgradeAttempt(
-      shared ?? (HttpClient()..connectionTimeout = _upgradeTimeout),
-      ownsClient: shared == null,
-    );
+    final _UpgradeAttempt attempt = shared != null
+        ? _UpgradeAttempt.shared(shared)
+        : _UpgradeAttempt.owned(_upgradeTimeout);
     final Timer timer = Timer(
       _upgradeTimeout,
       () => attempt.stop('the WebSocket upgrade timed out'),
@@ -147,12 +149,31 @@ WsConnectException? _connectFailure(Object e) => switch (e) {
 };
 
 /// One upgrade in flight: its client and pending request, and whether it was stopped (review M2).
+///
+/// With a client of its own, the attempt opens the TCP socket and runs the TLS handshake itself
+/// (through `HttpClient.connectionFactory`), so a stop cancels the TCP connect, destroys the socket
+/// while it waits for TLS or for the upgrade answer, and destroys a socket whose handshake ends
+/// after the stop. Inside the handshake itself dart:io gives no handle (see [ioWsConnector]). With
+/// a shared client it can only abort the request once `openUrl` has returned one; the client's
+/// own `connectionTimeout` bounds the rest.
 final class _UpgradeAttempt {
-  _UpgradeAttempt(this._client, {required bool ownsClient})
-    : _ownsClient = ownsClient;
+  _UpgradeAttempt.shared(HttpClient client)
+    : _client = client,
+      _ownsClient = false;
+
+  _UpgradeAttempt.owned(Duration timeout)
+    : _client = HttpClient(),
+      _ownsClient = true {
+    _client
+      ..connectionTimeout = timeout
+      ..findProxy = ((Uri _) => 'DIRECT')
+      ..connectionFactory = _connectSocket;
+  }
 
   final HttpClient _client;
   final bool _ownsClient;
+  final List<ConnectionTask<Socket>> _tcpTasks = <ConnectionTask<Socket>>[];
+  final List<Socket> _rawSockets = <Socket>[];
   HttpClientRequest? _request;
   bool _finished = false;
   final Completer<Socket> _stopSignal = Completer<Socket>();
@@ -163,8 +184,62 @@ final class _UpgradeAttempt {
   /// The failure of a stopped attempt (timed out or aborted), or null while it runs.
   WsConnectException? stopped;
 
-  /// Stops the attempt with [why] unless it already ended: aborts the pending request and closes
-  /// a client of its own with force, which also cancels a TCP or TLS connect in progress.
+  /// The connection factory of a client of its own: a TCP connect, then TLS for `https`, with the
+  /// raw socket kept for [stop] (until TLS takes it over, see [ioWsConnector]). The client is direct,
+  /// so there is never a proxy.
+  Future<ConnectionTask<Socket>> _connectSocket(
+    Uri url,
+    String? proxyHost,
+    int? proxyPort,
+  ) async {
+    final ConnectionTask<Socket> tcp = await Socket.startConnect(
+      url.host,
+      url.port,
+    );
+    _tcpTasks.add(tcp);
+    if (stopped != null) {
+      tcp.cancel();
+    }
+    final Future<Socket> connected = tcp.socket.then((Socket raw) {
+      _rawSockets.add(raw);
+      final WsConnectException? stoppedMeanwhile = stopped;
+      if (stoppedMeanwhile != null) {
+        raw.destroy();
+        throw stoppedMeanwhile;
+      }
+      if (url.scheme != 'https') {
+        return raw;
+      }
+      // After this call `raw.destroy()` does nothing: dart:io moves the native socket into the
+      // RawSecureSocket it builds and returns no handle before the handshake ends. So a socket
+      // stalled in the handshake can only be dropped when the handshake completes or fails.
+      return SecureSocket.secure(raw, host: url.host).then((
+        SecureSocket secured,
+      ) {
+        _rawSockets.add(secured);
+        final WsConnectException? stoppedLate = stopped;
+        if (stoppedLate != null) {
+          secured.destroy();
+          throw stoppedLate;
+        }
+        return secured;
+      });
+    });
+    return ConnectionTask.fromSocket(connected, _dropSockets);
+  }
+
+  void _dropSockets() {
+    for (final ConnectionTask<Socket> task in _tcpTasks) {
+      task.cancel();
+    }
+    for (final Socket socket in _rawSockets) {
+      socket.destroy();
+    }
+  }
+
+  /// Stops the attempt with [why] unless it already ended: aborts the pending request and, with a
+  /// client of its own, cancels the TCP connect, destroys the socket (a socket inside the TLS
+  /// handshake as soon as the handshake ends) and closes the client with force.
   void stop(String why) {
     if (_finished || stopped != null) {
       return;
@@ -177,6 +252,7 @@ final class _UpgradeAttempt {
     _stopSignal.completeError(failure);
     _request?.abort(failure);
     if (_ownsClient) {
+      _dropSockets();
       _client.close(force: true);
     }
   }

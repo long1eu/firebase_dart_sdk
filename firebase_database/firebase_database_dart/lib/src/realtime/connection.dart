@@ -131,11 +131,7 @@ final class RealtimeConnection {
   /// message, the count frame, and a frame that turns out to be malformed (binary frames are
   /// ignored). The persistent connection re-arms its request timers here: a request timer
   /// measures silence of the link, not the age of a request (rulings, H1). Set it before [open];
-  /// it may close the connection.
-  ///
-  /// MERGE: P: set `connection.onInboundFrame` on the connection the factory returns. It is a
-  /// field, not a [RealtimeDelegate] member, so the delegates of P and of the emulator rig keep
-  /// compiling.
+  /// it may close the connection. The persistent connection sets it on every connection it opens.
   void Function()? onInboundFrame;
   StreamSubscription<WsEvent>? _subscription;
   FrameAssembler? _assembler;
@@ -189,9 +185,8 @@ final class RealtimeConnection {
   /// Probes a connected link at once (a resume or a network change may have killed it silently):
   /// a ping now, and a close with [DisconnectReason.deadLink] if nothing arrives within
   /// `ConnectionTimings.idleProbeTimeout`. A no-op while connecting, after a close, and while a
-  /// probe is outstanding, so it never starts a second reconnect.
-  ///
-  /// MERGE: P: call probeNow() on a connectivity hint when connected.
+  /// probe is outstanding, so it never starts a second reconnect. The persistent connection calls
+  /// it on a connectivity hint while connected.
   void probeNow() {
     if (_state == _State.connected) {
       _liveness?.probeNow();

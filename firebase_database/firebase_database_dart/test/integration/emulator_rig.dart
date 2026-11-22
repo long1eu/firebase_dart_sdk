@@ -188,6 +188,17 @@ final class EmulatorRig {
     expect(response.statusCode, 200, reason: response.body);
   }
 
+  /// Writes the JSON [text] at [path] through REST as the owner, byte for byte (no Dart
+  /// encoding in between: the lexeme `1.0` or `-0.0` reaches the server as written).
+  Future<void> writeRaw(String path, String text) async {
+    final http.Response response = await _http.put(
+      _rest(path),
+      headers: _owner,
+      body: text,
+    );
+    expect(response.statusCode, 200, reason: response.body);
+  }
+
   /// The raw JSON text at [path], read through REST as the owner.
   Future<String> readRaw(String path) async {
     final http.Response response = await _http.get(
@@ -310,12 +321,8 @@ final class RigClient {
       String? appCheckToken,
     }) => RealtimeConnection(
       target,
-      // As production wires it (RealtimeConnectionFactory's doc): every inbound frame reaches
-      // the persistent connection's link-silence timer (review H1).
-      tapInboundFrames(
-        platformWsConnector(maxMessageBytes: timings.maxMessageBytes),
-        () => connection.inboundFrame(),
-      ),
+      // The persistent connection sets onInboundFrame on this connection itself (review H1).
+      platformWsConnector(maxMessageBytes: timings.maxMessageBytes),
       timings,
       _ReasonRecorder(inner, disconnectReasons),
       lastSessionId: lastSessionId,

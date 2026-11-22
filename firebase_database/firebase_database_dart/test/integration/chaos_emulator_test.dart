@@ -197,27 +197,60 @@ void main() {
       tags: 'emulator-slow',
     );
 
-    test('a put the server never answers (unknown server value) times out '
-        'twice and completes with network_error (probe "Server values": '
-        'control error, no answer)', () async {
+    test('a put the server never answers (unknown server value) is never '
+        'failed: each silence closes the connection and the same put is sent '
+        'again on the next one (timeout rule of the review rulings, H1; probe '
+        '"Server values": control error, no answer)', () async {
       final EmulatorRig rig = EmulatorRig.create();
+      final ChaosProxy proxy = await rig.proxy();
+      final WsFrameTap tap = WsFrameTap(proxy);
+      final List<Object?> sentBodies = <Object?>[];
+      final StreamSubscription<TapMessage> sent = tap.messages.listen((
+        TapMessage m,
+      ) {
+        final Map<String, Object?>? d = dataOf(m);
+        if (m.direction == ChaosDirection.up &&
+            d != null &&
+            isRequest(d, 'p', 'nx')) {
+          sentBodies.add((d['b']! as Map<String, Object?>)['d']);
+        }
+      });
+      addTearDown(sent.cancel);
       final RigClient client = await rig.open(
+        proxy: proxy,
         timings: const ConnectionTimings(
           reconnectMin: Duration(milliseconds: 50),
           reconnectMax: Duration(milliseconds: 500),
           requestTimeout: Duration(seconds: 1),
         ),
       );
-      final Ack ack = await client.put('/nx', <String, Object?>{
+      final (RequestResultCallback callback, List<Ack> acks) = client
+          .recorder();
+      client.connection.put('/nx', <String, Object?>{
         '.sv': 'bogus',
-      }, timeout: const Duration(seconds: 8));
-      expect(ack.status, statusNetworkError);
+      }, onComplete: callback);
+      // Two rounds: sent, silence, closed, re-sent; silence, closed, re-sent.
+      await eventually(
+        () => sentBodies.length >= 3 && client.disconnectReasons.length >= 2
+            ? true
+            : null,
+        what: 'two closes after silence and two re-sends',
+        timeout: const Duration(seconds: 8),
+      );
+      expect(acks, isEmpty, reason: 'a write is never failed by a timeout');
       expect(
-        client.disconnectReasons,
-        isNotEmpty,
-        reason: 'the first timeout closes',
+        sentBodies,
+        everyElement(<String, Object?>{'.sv': 'bogus'}),
+        reason: 'the same put each time',
+      );
+      expect(
+        client.delegate.callsOf('connect').length,
+        greaterThanOrEqualTo(3),
       );
       expect(await rig.read('/nx'), isNull);
+      client.connection.purgeOutstandingWrites();
+      final Ack purged = await client.first(acks);
+      expect(purged.status, 'write_canceled');
     });
 
     test('a get whose answers are lost times out twice and fails with '

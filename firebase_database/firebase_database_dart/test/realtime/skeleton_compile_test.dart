@@ -122,7 +122,6 @@ final List<Object?> _topLevel = <Object?>[
   // persistent_connection.dart
   RealtimeConnectionFactory,
   PersistentConnection.new,
-  tapInboundFrames,
   // realtime_error.dart
   noIndexWarning,
   restErrorPrefix,
@@ -215,7 +214,6 @@ List<Object?> _members({
   final ServerActions actions = persistent;
   final ServerActions readOnly = rest;
   return <Object?>[
-    persistent.inboundFrame,
     source.authToken,
     source.appCheckToken,
     source.authChanges,

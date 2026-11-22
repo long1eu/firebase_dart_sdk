@@ -19,7 +19,6 @@ import 'package:firebase_database_dart/src/realtime/reconnect_backoff.dart';
 import 'package:firebase_database_dart/src/realtime/replay.dart';
 import 'package:firebase_database_dart/src/realtime/request_table.dart';
 import 'package:firebase_database_dart/src/realtime/server_message.dart';
-import 'package:firebase_database_dart/src/realtime/transport/ws_channel.dart';
 
 /// Creates the [RealtimeConnection] of the next attempt for [delegate] (test plan section 5).
 /// Production passes a closure over `RealtimeConnection` and the platform connector; tests pass
@@ -32,48 +31,6 @@ typedef RealtimeConnectionFactory =
       String? appId,
       String? appCheckToken,
     });
-
-/// A connector whose channels call [onFrame] for every text or binary frame they receive, before
-/// the frame reaches the connection (the input of the link-silence timer, review H1).
-///
-/// Not needed any more: the persistent connection sets `RealtimeConnection.onInboundFrame`
-/// itself (addendum 7).
-// MERGE: U: test/integration/emulator_rig.dart still wraps its connector with this; drop that
-// wrapping, then delete tapInboundFrames, _TappedChannel and PersistentConnection.inboundFrame.
-WsConnector tapInboundFrames(WsConnector connector, void Function() onFrame) =>
-    (
-      Uri url, {
-      Map<String, String> headers = const <String, String>{},
-      Future<void>? abort,
-    }) async => _TappedChannel(
-      await connector(url, headers: headers, abort: abort),
-      onFrame,
-    );
-
-final class _TappedChannel implements WsChannel {
-  _TappedChannel(this._inner, this._onFrame);
-
-  final WsChannel _inner;
-  final void Function() _onFrame;
-
-  @override
-  Stream<WsEvent> get events => _inner.events.map((WsEvent event) {
-    if (event is WsText || event is WsBinary) {
-      _onFrame();
-    }
-    return event;
-  });
-
-  @override
-  void sendText(String frame) => _inner.sendText(frame);
-
-  @override
-  Future<void> close([int code = 1000, String? reason]) =>
-      _inner.close(code, reason);
-
-  @override
-  void abandon() => _inner.abandon();
-}
 
 /// The WebSocket implementation of [ServerActions] (test plan section 5, P gives the Repo half).
 ///
@@ -241,15 +198,6 @@ final class PersistentConnection implements ServerActions {
     ];
     _subscriptions.clear();
     unawaited(Future.wait(cancels));
-  }
-
-  /// A frame arrived on the live connection. The connection reports its frames itself through
-  /// `RealtimeConnection.onInboundFrame` (addendum 7); this entry stays only for the emulator
-  /// rig's [tapInboundFrames] (see the MERGE note there).
-  void inboundFrame() {
-    if (_connection != null) {
-      _requests.linkActivity();
-    }
   }
 
   // ---------------------------------------------------------------------------------------------

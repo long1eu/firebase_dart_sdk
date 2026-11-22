@@ -481,8 +481,14 @@ void main() {
   test(
     'addendum 7: a hint while connected sends exactly one ping and starts no connection',
     () async {
+      // The connection must be healthy (both credentials answered), or the 3.4 health rule
+      // pings again on every pong (liveness.dart onResponse); and the link is held silent, or a
+      // pong re-arms the idle probe and a second hint after it probes again (both correct).
       final PRig rig = PRig();
       await rig.start();
+      await rig.answerCredentials();
+      final FakeWsChannel channel = rig.server.connector.last;
+      channel.goSilent();
       bool isPing(String frame) {
         final Object? decoded = jsonDecode(frame);
         if (decoded is! Map<String, Object?> || decoded['t'] != 'c') {
@@ -492,7 +498,7 @@ void main() {
         return control is Map<String, Object?> && control['t'] == 'p';
       }
 
-      int pings() => rig.server.connector.last.sentFrames
+      int pings() => channel.sentFrames
           .where((SentFrame f) => f.text != '0' && isPing(f.text))
           .length;
       expect(pings(), 0);
@@ -504,6 +510,7 @@ void main() {
       await rig.settle();
       expect(rig.attemptTimes, hasLength(1));
       expect(rig.delegate.methods, isNot(contains('disconnect')));
+      channel.resume();
       await rig.connection.shutdown();
     },
   );
