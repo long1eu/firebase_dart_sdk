@@ -329,8 +329,8 @@ await queued;
 
 `onConnected` is `.info/connected`; its first event is the current state, `false` until the first connection is up.
 `isConnected`, `serverTimeOffset` and `estimatedServerTime` are plain getters. `purgeOutstandingWrites()` rolls back
-every pending write, fails their Futures with `write-canceled`, and aborts transactions; `onDisconnect`
-registrations are not touched. A transaction already sent is not undone by `purgeOutstandingWrites()` when the server has accepted it:
+every pending write, fails their Futures with `write-canceled`, and aborts transactions. It also cancels
+`onDisconnect` operations that are still queued locally; those the server has already registered are not undone. A transaction already sent is not undone by `purgeOutstandingWrites()` when the server has accepted it:
 it completes as committed with the server's value.
 
 A new instance does not connect: the first read, listener (also on `.info`), write, transaction, `get`, onDisconnect

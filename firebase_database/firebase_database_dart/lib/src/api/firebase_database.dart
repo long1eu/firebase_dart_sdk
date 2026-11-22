@@ -466,9 +466,10 @@ final class FirebaseDatabase {
   ///
   /// Local events revert the writes, and their Futures and the transactions fail with
   /// `write-canceled`. A write that was already sent can still be applied by the server: its
-  /// acknowledgement is ignored here. onDisconnect registrations are not touched. The returned
-  /// Future completes at once, after the local revert and with no round trip; after [close] it
-  /// fails with `database-closed`.
+  /// acknowledgement is ignored here. onDisconnect operations still queued locally are cancelled
+  /// and their Futures fail with `write-canceled`; those the server has already registered are not
+  /// undone. The returned Future completes at once, after the local revert and with no round trip;
+  /// after [close] it fails with `database-closed`.
   Future<void> purgeOutstandingWrites() =>
       _request<void>((Repo repo, _Pending<void> pending) {
         repo.purgeOutstandingWrites();
