@@ -38,24 +38,23 @@ final class LeafNode implements Node {
   /// them in the normalised form and [hash] goes through the double form, so `1` and `1.0` hash
   /// the same.
   factory LeafNode(Object value, [Node? priorityNode]) {
-    final LeafType type;
+    final Node priority = priorityNode ?? ChildrenNode.empty;
     if (value is Map) {
-      type = LeafType.deferredValue;
-    } else if (value is bool) {
-      type = LeafType.boolean;
-    } else if (value is num) {
-      type = LeafType.number;
-    } else if (value is String) {
-      type = LeafType.string;
-    } else {
+      validatePriorityNode(priority);
+      return _DeferredLeafNode(value, priority);
+    }
+    if (value is! bool && value is! num && value is! String) {
       throw ArgumentError.value(value, 'value', 'Unsupported leaf value type');
     }
-    final Node priority = priorityNode ?? ChildrenNode.empty;
     validatePriorityNode(priority);
-    return LeafNode._(value, type, priority);
+    return LeafNode._(value, priority);
   }
 
-  LeafNode._(this._raw, this.leafType, this._priority);
+  LeafNode._(this._raw, this._priority);
+
+  // Three fields: a large snapshot is mostly leaves, and every field here is 8 bytes in each
+  // of them. The kind is read from the value, the hash code is computed on demand, and only a
+  // server value (its own class below) keeps a second form of its value.
 
   /// The value as stored (numbers as given).
   final Object _raw;
@@ -63,17 +62,14 @@ final class LeafNode implements Node {
   final Node _priority;
 
   String? _lazyHash;
-  Object? _lazyValue;
-  int? _lazyHashCode;
 
-  /// The value, memoised: numbers in the read form (`int` when integral within 2^53, negative
-  /// zero kept), a server value map unmodifiable at every depth.
+  /// The value: numbers in the read form (`int` when integral within 2^53, negative zero kept),
+  /// a server value map unmodifiable at every depth (the same object on every read).
   @override
-  Object get value => _lazyValue ??= switch (_raw) {
-    final num n => _readNumber(n),
-    final Map<Object?, Object?> m => _freeze(m)!,
-    _ => _raw,
-  };
+  Object get value {
+    final Object raw = _raw;
+    return raw is num ? _readNumber(raw) : raw;
+  }
 
   static Object? _freeze(Object? json) => switch (json) {
     final Map<Object?, Object?> m =>
@@ -95,7 +91,17 @@ final class LeafNode implements Node {
   };
 
   /// The kind of [value].
-  final LeafType leafType;
+  LeafType get leafType {
+    final Object raw = _raw;
+    if (raw is String) {
+      return LeafType.string;
+    } else if (raw is num) {
+      return LeafType.number;
+    } else if (raw is bool) {
+      return LeafType.boolean;
+    }
+    return LeafType.deferredValue;
+  }
 
   @override
   bool get isLeafNode => true;
@@ -272,7 +278,7 @@ final class LeafNode implements Node {
   }
 
   @override
-  int get hashCode => _lazyHashCode ??= Object.hash(
+  int get hashCode => Object.hash(
     _raw is num ? _raw.toDouble() : _raw,
     _priority.isEmpty ? 0 : _priority.hashCode,
   );
@@ -281,4 +287,16 @@ final class LeafNode implements Node {
   String toString() => _priority.isEmpty
       ? 'LeafNode($_raw)'
       : 'LeafNode($_raw, priority: $_priority)';
+}
+
+/// A leaf holding a server value map; [value] is its unmodifiable form, made once.
+final class _DeferredLeafNode extends LeafNode {
+  _DeferredLeafNode(Map<Object?, Object?> super.raw, super.priority)
+    : super._();
+
+  Object? _lazyValue;
+
+  @override
+  Object get value =>
+      _lazyValue ??= LeafNode._freeze(_raw as Map<Object?, Object?>)!;
 }
