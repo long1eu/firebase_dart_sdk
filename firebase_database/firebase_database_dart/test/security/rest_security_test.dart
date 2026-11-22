@@ -50,8 +50,8 @@ void main() {
       expect(headers.values, isNot(contains(authMarker)));
     });
 
-    test('App Check goes in the X-Firebase-AppCheck header, never in the '
-        'URL', () async {
+    test('VM form (headers): App Check goes in the X-Firebase-AppCheck '
+        'header, never in the URL (B-10.1)', () async {
       final ScriptedServer server = ScriptedServer.always(200, '1');
       final RestClient client = restClientFor(
         server,
@@ -63,6 +63,48 @@ void main() {
       expect(lowerCaseHeaders(request)['x-firebase-appcheck'], appCheckMarker);
       expect(request.url.queryParameters.containsKey('ac'), isFalse);
       expect(request.url.toString(), isNot(contains(appCheckMarker)));
+      expect(request.url.queryParametersAll.keys.toList(), <String>[
+        'ns',
+        'format',
+        'auth',
+      ]);
+    });
+
+    test('web form (no headers): App Check goes in ac=, after auth, and in no '
+        'header (B-10.1)', () async {
+      final ScriptedServer server = ScriptedServer.always(200, '1');
+      final RestClient client = restClientFor(
+        server,
+        delegate: delegate,
+        tokens: markers(),
+        useHeaders: false,
+      );
+      await client.get(defaultSpecAt('/a'));
+      final http.BaseRequest request = server.received.single.request;
+      expect(request.url.queryParameters['ac'], appCheckMarker);
+      expect(request.url.queryParameters['auth'], authMarker);
+      expect(request.url.queryParametersAll.keys.toList(), <String>[
+        'ns',
+        'format',
+        'auth',
+        'ac',
+      ]);
+      expect(request.headers, isEmpty);
+    });
+
+    test('web form: no ac where the target says tokens may not go', () async {
+      final ScriptedServer server = ScriptedServer.always(200, '1');
+      final RestClient client = restClientFor(
+        server,
+        delegate: delegate,
+        tokens: markers(),
+        target: plainHttpTarget(useHeaders: false),
+        useHeaders: false,
+      );
+      await client.get(defaultSpecAt('/a'));
+      final Uri url = server.received.single.url;
+      expect(url.queryParameters.containsKey('ac'), isFalse);
+      expect(url.queryParameters.containsKey('auth'), isFalse);
     });
 
     test('the emulator target gets both tokens over http', () async {
@@ -182,12 +224,17 @@ void main() {
   });
 
   group('no query or token in a log line or an error', () {
+    late ScriptedServer server;
+
     Future<List<String>> texts(
       Future<http.StreamedResponse> Function(http.BaseRequest request) answer, {
+      required bool useHeaders,
       Duration requestTimeout = const Duration(seconds: 60),
     }) async {
+      server = ScriptedServer(answer);
       final RestClient client = restClientFor(
-        ScriptedServer(answer),
+        server,
+        useHeaders: useHeaders,
         delegate: delegate,
         tokens: markers(),
         logger: logger,
@@ -219,56 +266,70 @@ void main() {
         isNot(contains(authMarker)),
         isNot(contains(appCheckMarker)),
         isNot(contains('auth=')),
+        isNot(contains('ac=')),
         isNot(contains('?')),
       ),
     );
 
-    test('on success, with requests logged as contents hidden', () async {
-      final List<String> seen = await texts(
-        (http.BaseRequest _) async => respond(200, '1'),
-      );
-      expect(seen, holdsNoSecret);
-      expect(
-        logger.lines.where((String line) => line.startsWith('debug: GET')),
-        everyElement(endsWith('(contents hidden)')),
-      );
-    });
+    for (final bool useHeaders in <bool>[true, false]) {
+      group(useHeaders ? 'VM form (App Check header)' : 'web form (ac=)', () {
+        test('on success, with requests logged as contents hidden', () async {
+          final List<String> seen = await texts(
+            useHeaders: useHeaders,
+            (http.BaseRequest _) async => respond(200, '1'),
+          );
+          expect(seen, holdsNoSecret);
+          // The token really was in this request's URL (web) or header (VM).
+          expect(
+            server.received.first.url.queryParameters.containsKey('ac'),
+            !useHeaders,
+          );
+          expect(
+            logger.lines.where((String line) => line.startsWith('debug: GET')),
+            everyElement(endsWith('(contents hidden)')),
+          );
+        });
 
-    test('on 401, 500 and a body that is not JSON', () async {
-      for (final (int status, String body) in <(int, String)>[
-        (401, '{"error" : "Permission denied"}'),
-        (500, 'boom'),
-        (200, '{'),
-      ]) {
-        logger.lines.clear();
-        final List<String> seen = await texts(
-          (http.BaseRequest _) async => respond(status, body),
-        );
-        expect(seen, holdsNoSecret, reason: 'status $status');
-      }
-    });
+        test('on 401, 500 and a body that is not JSON', () async {
+          for (final (int status, String body) in <(int, String)>[
+            (401, '{"error" : "Permission denied"}'),
+            (500, 'boom'),
+            (200, '{'),
+          ]) {
+            logger.lines.clear();
+            final List<String> seen = await texts(
+              useHeaders: useHeaders,
+              (http.BaseRequest _) async => respond(status, body),
+            );
+            expect(seen, holdsNoSecret, reason: 'status $status');
+          }
+        });
 
-    test('on a ClientException whose message holds the URL and the '
-        'tokens', () async {
-      final List<String> seen = await texts(
-        (http.BaseRequest request) async => throw http.ClientException(
-          'failed: ${request.url} ${request.url.query} $authMarker '
-          '$appCheckMarker',
-          request.url,
-        ),
-      );
-      expect(seen, holdsNoSecret);
-      expect(seen.join('\n'), contains('failed'));
-    });
+        test('on a ClientException whose message holds the URL and the '
+            'tokens', () async {
+          final List<String> seen = await texts(
+            useHeaders: useHeaders,
+            (http.BaseRequest request) async => throw http.ClientException(
+              'failed: ${request.url} ${request.url.query} $authMarker '
+              '$appCheckMarker',
+              request.url,
+            ),
+          );
+          expect(seen, holdsNoSecret);
+          expect(seen.join('\n'), contains('failed'));
+        });
 
-    test('on a timeout', () async {
-      final List<String> seen = await texts(
-        (http.BaseRequest _) => Completer<http.StreamedResponse>().future,
-        requestTimeout: const Duration(milliseconds: 20),
-      );
-      expect(seen, holdsNoSecret);
-      expect(seen.join('\n'), contains('network_error'));
-    });
+        test('on a timeout', () async {
+          final List<String> seen = await texts(
+            useHeaders: useHeaders,
+            (http.BaseRequest _) => Completer<http.StreamedResponse>().future,
+            requestTimeout: const Duration(milliseconds: 20),
+          );
+          expect(seen, holdsNoSecret);
+          expect(seen.join('\n'), contains('network_error'));
+        });
+      });
+    }
 
     test('on a failed auth token fetch', () async {
       final RestClient client = restClientFor(

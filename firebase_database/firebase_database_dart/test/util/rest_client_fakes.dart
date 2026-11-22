@@ -94,34 +94,34 @@ final class RecordingLogger {
 }
 
 /// The emulator at `127.0.0.1:9000`, namespace `demo-test-default-rtdb`.
-RealtimeTarget emulatorTarget() => RealtimeTarget(
+RealtimeTarget emulatorTarget({bool useHeaders = true}) => RealtimeTarget(
   const RepoInfo(
     host: '127.0.0.1:9000',
     namespace: 'demo-test-default-rtdb',
     secure: false,
     isUsingEmulator: true,
   ),
-  useHeaders: true,
+  useHeaders: useHeaders,
 );
 
 /// A production database over TLS.
-RealtimeTarget productionTarget() => RealtimeTarget(
+RealtimeTarget productionTarget({bool useHeaders = true}) => RealtimeTarget(
   const RepoInfo(
     host: 'demo-db.firebaseio.com',
     namespace: 'demo-db',
     secure: true,
   ),
-  useHeaders: true,
+  useHeaders: useHeaders,
 );
 
 /// A production host reached over plain HTTP: tokens may not go there (threat model T3).
-RealtimeTarget plainHttpTarget() => RealtimeTarget(
+RealtimeTarget plainHttpTarget({bool useHeaders = true}) => RealtimeTarget(
   const RepoInfo(
     host: 'demo-db.firebaseio.com',
     namespace: 'demo-db',
     secure: false,
   ),
-  useHeaders: true,
+  useHeaders: useHeaders,
 );
 
 /// A default spec at [path].
@@ -207,7 +207,8 @@ final class CountingBody {
   }
 }
 
-/// A [RestClient] over [server] with the given tokens and limits.
+/// A [RestClient] over [server] with the given tokens and limits. [useHeaders] false is the web
+/// form (App Check in `ac`); it is also given to the default target.
 RestClient restClientFor(
   ScriptedServer server, {
   required ServerActionsDelegate delegate,
@@ -217,8 +218,9 @@ RestClient restClientFor(
   int maxResponseBytes = 1 << 20,
   Duration requestTimeout = const Duration(seconds: 60),
   int maxJsonDepth = 64,
+  bool useHeaders = true,
 }) => RestClient(
-  target: target ?? emulatorTarget(),
+  target: target ?? emulatorTarget(useHeaders: useHeaders),
   tokens: tokens ?? FixedTokenSource(),
   delegate: delegate,
   logger: logger?.call,
@@ -226,6 +228,7 @@ RestClient restClientFor(
   maxResponseBytes: maxResponseBytes,
   requestTimeout: requestTimeout,
   maxJsonDepth: maxJsonDepth,
+  useHeaders: useHeaders,
 );
 
 /// The result of a listen, once it completes.

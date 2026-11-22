@@ -31,7 +31,8 @@ const String _statusUnknown = 'unknown';
 /// Reads a database over HTTPS (or HTTP to the emulator); the second implementation of
 /// [ServerActions] (JS uses it for `forceRestClient` and crawlers, 10).
 ///
-/// [get] and [listen] send `GET <path>.json?ns=..[&query params]&format=export[&auth=..]`. The
+/// [get] and [listen] send `GET <path>.json?ns=..[&query params]&format=export[&auth=..][&ac=..]`
+/// (`ac` only on the web, see below). The
 /// query parameters are `ListenSpec.restParams` (the core's
 /// `QueryParams.toRestQueryStringParameters()`, `rtdb_seam_changes.md` A.4). A listen is one
 /// read: the data goes to [ServerActionsDelegate.onDataUpdate] at the spec's path, then
@@ -41,16 +42,22 @@ const String _statusUnknown = 'unknown';
 /// null with a warning (ReadonlyRestClient.ts:222-227); so does one nested deeper than
 /// `maxJsonDepth` or holding a number that is not finite (threat model rule 4). No answer within
 /// `requestTimeout` (to the headers, or between two chunks of the body) and a network failure
-/// are `network_error`; a success body over `maxResponseBytes` is `too_big`. Unlike JS, [get]
-/// does not also call [ServerActionsDelegate.onDataUpdate] (ReadonlyRestClient.ts:158-163 does,
-/// untagged even for a filtered query): Repo applies the result of a get itself.
+/// are `network_error`; a success body over `maxResponseBytes` is `too_big`.
+///
+/// Deliberate difference from JS: [get] does not call [ServerActionsDelegate.onDataUpdate].
+/// `ReadonlyRestClient.ts:158-163` does, with no tag even for a filtered query, which writes the
+/// partial result of a limited query over the whole path; Repo applies the result of a get
+/// itself.
 ///
 /// Writes and onDisconnect operations complete with the status `read_only` ([statusReadOnly],
 /// A.7) on the event loop, never synchronously. URLs come from [RealtimeTarget.restUri]. The ID
 /// token goes in `auth=` (the probe measured that `auth=` is the only form the emulator checks
-/// rules with: `access_token=` and `Authorization: Bearer` are admin there), the App Check token
-/// in `X-Firebase-AppCheck` (JS puts it in `ac=`, ReadonlyRestClient.ts:197-199); both only when
-/// non-empty and where [RealtimeTarget.mayReceiveTokens] allows (T3). Redirects are not followed
+/// rules with: `access_token=` and `Authorization: Bearer` are admin there). The App Check token
+/// goes in the `X-Firebase-AppCheck` header where the platform sends headers (the VM), and in
+/// the `ac` query value on the web, as JS does from a browser (ReadonlyRestClient.ts:197-199): a
+/// custom header there would make every read a CORS preflight (security rule 2 of the brief).
+/// Both tokens only when non-empty and where [RealtimeTarget.mayReceiveTokens] allows (T3).
+/// Redirects are not followed
 /// (a 3xx is `rest_error:3xx`), error bodies are read up to 16 KiB, success bodies up to
 /// `maxResponseBytes` (T23). No error message or log line holds a URL query or a token (T7, T8):
 /// `ClientException.uri` is dropped and its message is cleaned.
@@ -65,7 +72,10 @@ final class RestClient implements ServerActions {
   /// open. [maxResponseBytes] bounds a success body (`ConnectionTimings.maxMessageBytes`),
   /// [requestTimeout] the wait for an answer and every pause in its body
   /// (`ConnectionTimings.requestTimeout`), [maxJsonDepth] the nesting of the data
-  /// (`ConnectionTimings.maxJsonDepth`).
+  /// (`ConnectionTimings.maxJsonDepth`). [useHeaders] says whether App Check travels in a header
+  /// (true) or in the `ac` query value (false): pass the same value as to [RealtimeTarget.new].
+  // MERGE: T: the factory passes `wsConnectorSendsHeaders` (transport/ws_connector.dart) as
+  // [useHeaders], the switch the WebSocket side uses; not imported here.
   RestClient({
     required RealtimeTarget target,
     required RealtimeTokenSource tokens,
@@ -73,6 +83,7 @@ final class RestClient implements ServerActions {
     DatabaseLogger? logger,
     http.Client? httpClient,
     required int maxResponseBytes,
+    required bool useHeaders,
     Duration requestTimeout = const Duration(seconds: 60),
     int maxJsonDepth = 64,
   }) : _target = target,
@@ -83,7 +94,8 @@ final class RestClient implements ServerActions {
        _ownsClient = httpClient == null,
        _maxResponseBytes = maxResponseBytes,
        _requestTimeout = requestTimeout,
-       _maxJsonDepth = maxJsonDepth;
+       _maxJsonDepth = maxJsonDepth,
+       _useHeaders = useHeaders;
 
   final RealtimeTarget _target;
   final RealtimeTokenSource _tokens;
@@ -94,6 +106,7 @@ final class RestClient implements ServerActions {
   final int _maxResponseBytes;
   final Duration _requestTimeout;
   final int _maxJsonDepth;
+  final bool _useHeaders;
 
   /// The registered listens by path and query identifier (JS `getListenId_`, keyed by the
   /// identity `ListenSpec` documents).
@@ -365,7 +378,7 @@ final class RestClient implements ServerActions {
     _Credentials credentials,
     Future<void> abortTrigger,
   ) {
-    // Order as JS: query parameters, then format, then auth (ReadonlyRestClient.ts:189-197).
+    // Order as JS: query parameters, format, auth, ac (ReadonlyRestClient.ts:189-199).
     final Map<String, String> params = <String, String>{
       ...spec.restParams,
       'format': 'export',
@@ -385,6 +398,9 @@ final class RestClient implements ServerActions {
     if (authToken != null) {
       params['auth'] = authToken;
     }
+    if (appCheckToken != null && !_useHeaders) {
+      params['ac'] = appCheckToken;
+    }
     return http.AbortableRequest(
         'GET',
         _target.restUri(spec.path, params),
@@ -392,7 +408,10 @@ final class RestClient implements ServerActions {
       )
       // A redirect would carry the token in the URL and App Check in a header to another host.
       ..followRedirects = false
-      ..headers.addAll(<String, String>{'X-Firebase-AppCheck': ?appCheckToken});
+      ..headers.addAll(<String, String>{
+        if (_useHeaders && appCheckToken != null)
+          'X-Firebase-AppCheck': appCheckToken,
+      });
   }
 
   /// Sends the request of [spec] and turns its answer into a result.
