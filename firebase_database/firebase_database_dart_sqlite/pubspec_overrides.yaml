@@ -1,0 +1,7 @@
+# Local development only: use the sibling checkouts instead of the hosted
+# packages. Excluded from the published archive by .pubignore.
+dependency_overrides:
+  firebase_app_dart:
+    path: ../../firebase_core/firebase_app_dart
+  firebase_database_dart:
+    path: ../firebase_database_dart
