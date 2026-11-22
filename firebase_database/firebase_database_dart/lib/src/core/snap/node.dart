@@ -51,9 +51,17 @@ abstract interface class Node implements Comparable<Node> {
   /// Visits the children in [index] order until [action] returns true; returns whether it did.
   bool forEachChild(Index index, ChildVisitor action);
 
-  /// The JSON value: maps, numbers ([num] as `int` or `double` per the number rules), strings,
-  /// booleans or null. With [exportFormat], priorities appear as `.priority` and leaves with a
-  /// priority as `{'.value': v, '.priority': p}` (the put wire form).
+  /// The plain value (JS `val()`), memoised and unmodifiable: the first read builds it, later
+  /// reads return the same object. Maps are unmodifiable `Map<String, Object?>`, lists (keys
+  /// `0..n` with more than half present) unmodifiable `List<Object?>` with null holes, at every
+  /// depth; numbers that are integral within 2^53 read as `int` (negative zero stays `-0.0`);
+  /// null for the empty node.
+  Object? get value;
+
+  /// The JSON value as a fresh, mutable copy: maps, numbers ([num] as `int` or `double` per the
+  /// number rules), strings, booleans or null. With [exportFormat], priorities appear as
+  /// `.priority` and leaves with a priority as `{'.value': v, '.priority': p}` (the put wire
+  /// form; numbers as stored).
   Object? toJson({bool exportFormat = false});
 
   /// The base64 SHA-1 hash of the node, equal to the JS SDK's for the same data.
