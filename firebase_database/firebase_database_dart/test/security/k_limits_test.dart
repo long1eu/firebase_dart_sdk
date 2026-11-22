@@ -18,30 +18,74 @@ String _idToken() {
 }
 
 void main() {
-  test('hello-then-drop server: delays grow (T13)', () {
-    DateTime now = DateTime.utc(2026, 11, 22);
-    final ReconnectBackoff backoff = ReconnectBackoff(
-      min: const Duration(seconds: 1),
-      max: const Duration(seconds: 30),
-      multiplier: 1.3,
-      resetAfter: const Duration(seconds: 30),
-      now: () => now,
-      random: () => 1,
-    );
-    final List<int> delays = <int>[];
-    for (int i = 0; i < 20; i++) {
-      final DateTime started = now;
-      now = now.add(const Duration(milliseconds: 100));
-      final Duration delay = backoff.nextDelay(attemptStartedAt: started);
-      delays.add(delay.inMilliseconds);
-      now = now.add(delay);
-    }
-    expect(delays.first, 900);
-    for (int i = 1; i < 14; i++) {
-      expect(delays[i], greaterThan(delays[i - 1]), reason: '$delays');
-    }
-    expect(delays.last, 29900);
-  });
+  // The unit only: these two tests pin ReconnectBackoff. Whether PersistentConnection calls
+  // markEstablished at the right moment is pinned in p_limits_test.dart (hello then drop, two
+  // pushes without an ok answer) and p_server_input_test.dart (a protocol error).
+  test(
+    'ReconnectBackoff: without markEstablished the delays grow to the cap (T13)',
+    () {
+      DateTime now = DateTime.utc(2026, 11, 22);
+      final ReconnectBackoff backoff = ReconnectBackoff(
+        min: const Duration(seconds: 1),
+        max: const Duration(seconds: 30),
+        multiplier: 1.3,
+        resetAfter: const Duration(seconds: 30),
+        now: () => now,
+        random: () => 1,
+      );
+      final List<int> delays = <int>[];
+      for (int i = 0; i < 20; i++) {
+        final DateTime started = now;
+        now = now.add(const Duration(milliseconds: 100));
+        final Duration delay = backoff.nextDelay(attemptStartedAt: started);
+        delays.add(delay.inMilliseconds);
+        now = now.add(delay);
+      }
+      expect(delays.first, 900);
+      for (int i = 1; i < 14; i++) {
+        expect(delays[i], greaterThan(delays[i - 1]), reason: '$delays');
+      }
+      expect(delays.last, 29900);
+    },
+  );
+
+  test(
+    'ReconnectBackoff: markEstablished resets the bound only after resetAfter (T13)',
+    () {
+      DateTime now = DateTime.utc(2026, 11, 22);
+      ReconnectBackoff backoff() => ReconnectBackoff(
+        min: const Duration(seconds: 1),
+        max: const Duration(seconds: 30),
+        multiplier: 2,
+        resetAfter: const Duration(seconds: 30),
+        now: () => now,
+        random: () => 1,
+      );
+      Duration grow(ReconnectBackoff b) {
+        Duration last = Duration.zero;
+        for (int i = 0; i < 4; i++) {
+          last = b.nextDelay(attemptStartedAt: now);
+        }
+        return last;
+      }
+
+      final ReconnectBackoff early = backoff();
+      expect(grow(early), const Duration(seconds: 8));
+      early.markEstablished();
+      now = now.add(const Duration(seconds: 29));
+      // Established 29 s ago: no reset, the delay is the grown bound of 16 s.
+      expect(
+        early.nextDelay(attemptStartedAt: now),
+        const Duration(seconds: 16),
+      );
+
+      final ReconnectBackoff late = backoff();
+      expect(grow(late), const Duration(seconds: 8));
+      late.markEstablished();
+      now = now.add(const Duration(seconds: 31));
+      expect(late.nextDelay(attemptStartedAt: now), const Duration(seconds: 1));
+    },
+  );
 
   test('revoke loop: at most one forced refresh per minute (T14)', () async {
     DateTime now = DateTime.utc(2026, 11, 22);

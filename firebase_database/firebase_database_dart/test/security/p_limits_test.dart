@@ -107,4 +107,70 @@ void main() {
       });
     },
   );
+
+  test(
+    'hello and two pushes without an ok answer: the delays still grow (the ok half of T13)',
+    () {
+      fakeAsync((FakeAsync async) {
+        final PRig rig = _rig(async);
+        rig.connection.initialize();
+        for (int n = 1; n <= 4; n++) {
+          _elapseUntil(async, () => rig.connects == n);
+          // Two data messages make the connection healthy by count; none is an ok answer.
+          rig.server
+            ..pushData('/a', n)
+            ..pushData('/b', n);
+          async
+            ..flushMicrotasks()
+            ..elapse(const Duration(milliseconds: 1));
+          rig.server.connector.last.serverClose(1006);
+          _elapseUntil(
+            async,
+            () => rig.delegate.callsOf('disconnect').length == n,
+          );
+        }
+        _elapseUntil(async, () => rig.attemptTimes.length == 5);
+        // Breaks if `!_okOnConnection` is removed from _markEstablishedWhenHealthy
+        // (persistent_connection.dart): every gap would be the 100 ms minimum.
+        expect(_gapsMs(rig).last, inInclusiveRange(790, 810));
+        rig.connection.shutdown();
+        async.flushMicrotasks();
+      });
+    },
+  );
+
+  test(
+    'three refused auth tokens raise the next delay to its cap (T14b wiring)',
+    () {
+      fakeAsync((FakeAsync async) {
+        final PRig rig = _rig(async);
+        rig.connection.initialize();
+        for (int n = 1; n <= 3; n++) {
+          _elapseUntil(async, () => rig.connects == n);
+          _elapseUntil(
+            async,
+            () => rig.sent('auth', onConnection: n).isNotEmpty,
+          );
+          final int r = rig.sent('auth', onConnection: n).single.r!;
+          rig.server.connector.last.serverResponse(r, status: 'invalid_token');
+          _elapseUntil(
+            async,
+            () => rig.delegate.callsOf('disconnect').length == n,
+          );
+        }
+        _elapseUntil(
+          async,
+          () => rig.attemptTimes.length == 4,
+          limit: const Duration(seconds: 90),
+        );
+        final List<int> gaps = _gapsMs(rig);
+        expect(gaps[1], inInclusiveRange(190, 210));
+        // Breaks if PersistentConnection._detach stops calling _backoff.setToMax() when
+        // invalidTokenThresholdReached: the gap would be the 400 ms bound.
+        expect(gaps[2], greaterThanOrEqualTo(59000));
+        rig.connection.shutdown();
+        async.flushMicrotasks();
+      });
+    },
+  );
 }
