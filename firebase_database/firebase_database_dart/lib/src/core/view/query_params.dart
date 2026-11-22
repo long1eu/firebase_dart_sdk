@@ -429,7 +429,11 @@ String _jsNumber(num value) {
   }
   final double d = value as double;
   if (d == d.truncateToDouble() && d.abs() < 1e21) {
-    return BigInt.from(d).toString();
+    // JavaScript prints the shortest digits that read back as the same double, padded with zeros
+    // (123456789012345680000), not the exact binary value. Dart prints the same digits and adds
+    // `.0` off the web.
+    final String text = d.toString();
+    return text.endsWith('.0') ? text.substring(0, text.length - 2) : text;
   }
   return d.toString();
 }

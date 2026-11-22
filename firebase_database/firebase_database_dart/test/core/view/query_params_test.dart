@@ -126,6 +126,11 @@ void main() {
       expect(jsStringify(-0.0), '0');
       expect(jsStringify(1e21), '1e+21');
       expect(jsStringify(1e20), '100000000000000000000');
+      // Above 2^53 JavaScript prints the shortest digits, not the exact binary value.
+      expect(jsStringify(123456789012345683968.0), '123456789012345680000');
+      expect(jsStringify(-18446744073709551616.0), '-18446744073709552000');
+      expect(jsStringify(9007199254740992.0), '9007199254740992');
+      expect(jsStringify(4503599627370497.0), '4503599627370497');
       expect(jsStringify(1.5e-7), '1.5e-7');
       expect(jsStringify(double.nan), 'null');
       expect(jsStringify('\ud800'), r'"\ud800"');
