@@ -41,6 +41,9 @@ final class _Probe {
 
 const Duration _s = Duration(seconds: 1);
 
+/// The control ping as the connection sends it.
+const String _pingFrame = '{"t":"c","d":{"t":"p","d":{}}}';
+
 /// Timings where only the timer under test can fire within a few minutes.
 const ConnectionTimings _keepAliveOnly = ConnectionTimings(
   healthyTimeout: Duration(hours: 1),
@@ -193,6 +196,36 @@ void main() {
         });
       },
     );
+
+    test('exactly 10 KiB sent is not enough', () {
+      fakeAsync((FakeAsync async) {
+        final _Probe probe = _Probe(async, timings: noProbe)..liveness.start();
+        probe.liveness.onFrameSent(10 * 1024);
+        async.elapse(_s * 30);
+
+        expect(probe.closes, <(DisconnectReason, Duration)>[
+          (DisconnectReason.other, _s * 30),
+        ]);
+      });
+    });
+
+    test('bytes add up over frames, sent and received apart', () {
+      fakeAsync((FakeAsync async) {
+        final _Probe sent = _Probe(async, timings: noProbe)..liveness.start();
+        final _Probe received = _Probe(async, timings: noProbe)
+          ..liveness.start();
+        for (int i = 0; i < 2; i++) {
+          sent.liveness.onFrameSent(5 * 1024 + 1);
+          received.liveness.onFrameReceived(50 * 1024 + 1);
+        }
+        async.elapse(_s * 30);
+
+        expect(sent.closes, isEmpty);
+        expect(sent.liveness.isHealthy, isFalse);
+        expect(received.closes, isEmpty);
+        expect(received.liveness.isHealthy, isTrue);
+      });
+    });
   });
 
   group('extra ping (B-3.4b)', () {
@@ -554,6 +587,42 @@ void main() {
         expect(rig.delegate.disconnects, isEmpty);
       });
     });
+
+    test(
+      'a pong while unhealthy sends the next ping: an idle link that answers pings stays open',
+      () {
+        fakeAsync((FakeAsync async) {
+          // No token, no listen: the only responses are pongs (Connection.ts:370-373).
+          final ConnectionRig rig = ConnectionRig(
+            async,
+            timings: const ConnectionTimings(
+              idleProbeAfter: Duration(hours: 1),
+            ),
+          );
+          final RealtimeConnection connection = rig.openReady();
+          final FakeWsChannel channel = rig.fake.last;
+          channel.onClientFrame = (String frame) {
+            if (frame == _pingFrame) {
+              channel.serverControl('o');
+            }
+          };
+          List<Duration> pings() => <Duration>[
+            for (final SentFrame f in channel.sentFrames)
+              if (f.text == _pingFrame) f.at,
+          ];
+
+          async.elapse(_s * 5);
+          expect(pings(), <Duration>[_s * 5, _s * 5]);
+          async.elapse(const Duration(minutes: 1));
+
+          expect(connection.isConnected, isTrue);
+          expect(rig.delegate.disconnects, isEmpty);
+          expect(pings(), hasLength(2));
+          connection.close();
+          expect(async.pendingTimers, isEmpty);
+        });
+      },
+    );
 
     test('an unhealthy connection pings at 5 s and closes at 30 s', () {
       fakeAsync((FakeAsync async) {

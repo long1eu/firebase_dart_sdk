@@ -5,6 +5,7 @@ import 'dart:convert';
 
 import 'package:firebase_database_dart/src/core/connection/wire_range_merge.dart';
 import 'package:firebase_database_dart/src/core/database_error.dart';
+import 'package:firebase_database_dart/src/core/util/numbers.dart';
 import 'package:firebase_database_dart/src/realtime/connection_timings.dart';
 import 'package:firebase_database_dart/src/realtime/framing.dart';
 import 'package:firebase_database_dart/src/realtime/server_message.dart';

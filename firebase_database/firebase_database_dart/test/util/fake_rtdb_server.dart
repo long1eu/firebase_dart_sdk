@@ -3,6 +3,7 @@
 // emulator (`rtdb_emulator_probe.md`).
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
 import 'package:firebase_database_dart/src/realtime/framing.dart';
@@ -49,9 +50,19 @@ final class ServerSeen {
 ///   per open listen that overlaps the path (each with its own tag), then answer `""`. A `p` with
 ///   `h` is a compare-and-set: on a mismatch it answers `datastale` and writes nothing, on a match
 ///   it answers the new value. A `m` ignores `h`.
-/// - `g` answers the stored value (null when absent); `auth`/`gauth` answer
-///   `{"auth":null,"expires":null}`; `unauth` and `unappcheck` answer `"unauthenticated"`;
-///   everything else answers `""`. A request without `r` is answered with `r` 0.
+/// - `g` answers the stored value (null when absent); `unauth` and `unappcheck` answer
+///   `"unauthenticated"`; everything else answers `""`. A request without `r` is answered with
+///   `r` 0.
+/// - Credentials are answered as the emulator answers them (probe "Auth", addendum 2 items 2, 6
+///   and 14). `auth` takes a three-part JWT whose claims have `sub` and `iat` (the signature is
+///   not checked) and answers `ok` with `auth` holding `uid` (the `sub`), `token` (the claims)
+///   and `provider` `anonymous`, and `expires` null; anything else is refused `invalid_token`
+///   with the emulator's text ("Could not parse auth token.", "Missing claim 'sub' in auth
+///   token.", the same for `iat`). `gauth` takes any credential: `auth` null, `expires` the
+///   server time in seconds plus 3600. `appcheck` refuses
+///   a token that is not a JWT ("Could not parse token.") or whose `alg` is `none` ("Unsupported
+///   jwt algorithm: none"); the answer to a token the emulator would accept is not measured (no
+///   App Check token was ever accepted there), here `ok` with `""`.
 /// - A frame that is not a JSON object, an unknown control type or action, a key with `.`, `#`,
 ///   `$`, `[`, `]` or `/` (`.priority`, `.value`, `.sv` excepted) or an unknown server value gets
 ///   the control error `e` and no answer. A path with `.` or `$` in a segment (a last `.priority`
@@ -132,9 +143,10 @@ final class FakeRtdbServer {
   final Map<String, List<(String, String?)>> _failures =
       <String, List<(String, String?)>>{};
   final List<ServerSeen> _log = <ServerSeen>[];
-  final List<(_Link, int, Map<String, Object?>)> _held =
-      <(_Link, int, Map<String, Object?>)>[];
+  final List<(_Link, int, Map<String, Object?>, String)> _held =
+      <(_Link, int, Map<String, Object?>, String)>[];
   bool _holding = false;
+  bool _holdingCredentials = false;
   int _connections = 0;
   _Link? _current;
 
@@ -164,19 +176,43 @@ final class FakeRtdbServer {
     ));
   }
 
-  /// Keeps responses back (sent, not acked) until [releaseResponses]. Pushes are not held.
-  void holdResponses() {
+  /// Keeps responses back (sent, not acked) until [releaseResponses]. Pushes are not held. With
+  /// [credentials] false, the answers to the credential requests ([credentialActions]) still go
+  /// out at once.
+  void holdResponses({bool credentials = true}) {
     _holding = true;
+    _holdingCredentials = credentials;
+  }
+
+  /// The requests that carry or remove a credential.
+  static const Set<String> credentialActions = <String>{
+    'auth', 'gauth', 'unauth', 'appcheck', 'unappcheck', 'unappeck', //
+  };
+
+  /// Sends the held answers to credential requests, in order, and keeps holding the others.
+  void releaseCredentialResponses() {
+    final List<(_Link, int, Map<String, Object?>, String)> credentials =
+        <(_Link, int, Map<String, Object?>, String)>[
+          for (final (_Link, int, Map<String, Object?>, String) held in _held)
+            if (credentialActions.contains(held.$4)) held,
+        ];
+    _held.removeWhere(credentials.contains);
+    for (final (_Link link, int r, Map<String, Object?> body, _)
+        in credentials) {
+      if (!link.channel.isClosed) {
+        _sendResponse(link.channel, r, body);
+      }
+    }
   }
 
   /// Sends the held responses in order. A response whose connection has closed meanwhile is
   /// dropped: that request stays unacknowledged, as on a real server.
   void releaseResponses() {
     _holding = false;
-    final List<(_Link, int, Map<String, Object?>)> held =
-        List<(_Link, int, Map<String, Object?>)>.of(_held);
+    final List<(_Link, int, Map<String, Object?>, String)> held =
+        List<(_Link, int, Map<String, Object?>, String)>.of(_held);
     _held.clear();
-    for (final (_Link link, int r, Map<String, Object?> body) in held) {
+    for (final (_Link link, int r, Map<String, Object?> body, _) in held) {
       if (!link.channel.isClosed) {
         _sendResponse(link.channel, r, body);
       }
@@ -436,7 +472,7 @@ final class FakeRtdbServer {
             segment != '.priority' &&
             (segment.contains('.') || segment.contains(r'$')),
       )) {
-        _respond(link, r, <String, Object?>{
+        _respond(link, r, action, <String, Object?>{
           's': 'invalid_parameters',
           'd': 'Invalid token in path',
         });
@@ -449,7 +485,7 @@ final class FakeRtdbServer {
         query.isNotEmpty &&
         body['t'] == null) {
       // Measured: the namespace goes down for 30 s; here the answer, the reset and the close.
-      _respond(link, r, <String, Object?>{
+      _respond(link, r, action, <String, Object?>{
         's': 'internal_error',
         'd': 'An internal error occurred',
       });
@@ -472,7 +508,7 @@ final class FakeRtdbServer {
     final List<(String, String?)>? failures = _failures[action];
     if (failures != null && failures.isNotEmpty) {
       final (String status, String? reason) = failures.removeAt(0);
-      _respond(link, r, <String, Object?>{'s': status, 'd': reason});
+      _respond(link, r, action, <String, Object?>{'s': status, 'd': reason});
       return;
     }
     final Object? Function(Map<String, Object?> body)? handler =
@@ -480,7 +516,7 @@ final class FakeRtdbServer {
     final (String status, Object? data) = handler != null
         ? ('ok', handler(body))
         : _defaultAnswer(link, action, body);
-    _respond(link, r, <String, Object?>{'s': status, 'd': data});
+    _respond(link, r, action, <String, Object?>{'s': status, 'd': data});
   }
 
   (String, Object?) _defaultAnswer(
@@ -511,12 +547,85 @@ final class FakeRtdbServer {
       case 'm':
         _merge(path, body['d']);
         return ('ok', '');
-      case 'auth' || 'gauth':
-        return ('ok', <String, Object?>{'auth': null, 'expires': null});
+      case 'auth':
+        return _authAnswer(body['cred']);
+      case 'gauth':
+        return (
+          'ok',
+          <String, Object?>{'auth': null, 'expires': _now() ~/ 1000 + 3600},
+        );
+      case 'appcheck':
+        return _appCheckAnswer(body['token']);
       case 'unauth' || 'unappcheck' || 'unappeck':
         return ('ok', 'unauthenticated');
       default:
         return ('ok', '');
+    }
+  }
+
+  /// The emulator's answer to `auth` with [credential] (probe "Auth", addendum 2 item 14).
+  static (String, Object?) _authAnswer(Object? credential) {
+    final Map<String, Object?>? claims = credential is String
+        ? _jwtParts(credential)?.$2
+        : null;
+    if (claims == null) {
+      return ('invalid_token', 'Could not parse auth token.');
+    }
+    for (final String claim in <String>['sub', 'iat']) {
+      if (!claims.containsKey(claim)) {
+        return ('invalid_token', "Missing claim '$claim' in auth token.");
+      }
+    }
+    return (
+      'ok',
+      <String, Object?>{
+        'auth': <String, Object?>{
+          'uid': claims['sub'],
+          'token': claims,
+          'provider': 'anonymous',
+        },
+        'expires': null,
+      },
+    );
+  }
+
+  /// The answer to `appcheck` with [token]: the emulator's refusals (probe addendum 2 item 2).
+  static (String, Object?) _appCheckAnswer(Object? token) {
+    final (Map<String, Object?>, Map<String, Object?>)? parts = token is String
+        ? _jwtParts(token)
+        : null;
+    if (parts == null) {
+      return ('invalid_token', 'Could not parse token.');
+    }
+    final Object? algorithm = parts.$1['alg'];
+    if (algorithm == 'none') {
+      return ('invalid_token', 'Unsupported jwt algorithm: none');
+    }
+    return ('ok', '');
+  }
+
+  /// The header and the claims of [token] when it is three dot-separated parts whose first two
+  /// are base64url JSON objects; null otherwise. The signature is not checked.
+  static (Map<String, Object?>, Map<String, Object?>)? _jwtParts(String token) {
+    final List<String> parts = token.split('.');
+    if (parts.length != 3) {
+      return null;
+    }
+    final Object? header = _base64Json(parts[0]);
+    final Object? claims = _base64Json(parts[1]);
+    if (header is! Map<String, Object?> || claims is! Map<String, Object?>) {
+      return null;
+    }
+    return (header, claims);
+  }
+
+  static Object? _base64Json(String part) {
+    try {
+      return jsonDecode(
+        utf8.decode(base64Url.decode(base64Url.normalize(part))),
+      );
+    } on FormatException {
+      return null;
     }
   }
 
@@ -679,9 +788,10 @@ final class FakeRtdbServer {
     return true;
   }
 
-  void _respond(_Link link, int r, Map<String, Object?> body) {
-    if (_holding) {
-      _held.add((link, r, body));
+  void _respond(_Link link, int r, String action, Map<String, Object?> body) {
+    if (_holding &&
+        (_holdingCredentials || !credentialActions.contains(action))) {
+      _held.add((link, r, body, action));
       return;
     }
     _sendResponse(link.channel, r, body);

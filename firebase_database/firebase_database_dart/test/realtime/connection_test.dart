@@ -5,14 +5,24 @@ import 'dart:convert';
 
 import 'package:fake_async/fake_async.dart';
 import 'package:firebase_database_dart/src/core/util/logger.dart';
+import 'package:firebase_database_dart/src/realtime/auth_session.dart';
 import 'package:firebase_database_dart/src/realtime/connection.dart';
+import 'package:firebase_database_dart/src/realtime/connection_timings.dart';
 import 'package:firebase_database_dart/src/realtime/transport/ws_channel.dart';
 import 'package:test/test.dart';
 
 import '../util/connection_test_rig.dart';
 import '../util/fake_ws.dart';
+import '../util/fakes.dart';
 
 const Duration _connectTimeout = Duration(seconds: 30);
+
+/// An unsigned JWT whose claims have `iat`: AuthSession sends it as `auth`, not `gauth`.
+final String _userJwt = <String>[
+  base64Url.encode(utf8.encode('{"alg":"none"}')).replaceAll('=', ''),
+  base64Url.encode(utf8.encode('{"sub":"u1","iat":1}')).replaceAll('=', ''),
+  '',
+].join('.');
 
 void main() {
   group('hello (B-3.2a)', () {
@@ -680,16 +690,49 @@ void main() {
 
     test('the hello cancels the timeout', () {
       fakeAsync((FakeAsync async) {
-        final ConnectionRig rig = ConnectionRig(async);
-        final RealtimeConnection connection = rig.openReady();
-        // Keep the link busy so neither the health check nor the probe ends it.
-        for (int i = 0; i < 4; i++) {
-          rig.fake.last.serverControl('o');
-          rig.flush();
-          async.elapse(const Duration(seconds: 10));
-        }
-        expect(connection.isConnected, isTrue);
+        // 17 s: no other timer of the connection has this length.
+        const Duration timeout = Duration(seconds: 17);
+        final ConnectionRig rig = ConnectionRig(
+          async,
+          timings: const ConnectionTimings(connectTimeout: timeout),
+        );
+        Iterable<FakeTimer> connectTimers() =>
+            async.pendingTimers.where((FakeTimer t) => t.duration == timeout);
+        rig.open();
+        expect(connectTimers(), hasLength(1));
+
+        rig.fake.last.serverHello(ts: 1, h: configuredHost);
+        rig.flush();
+        expect(connectTimers(), isEmpty);
+      });
+    });
+
+    test('a socket opened after a followed reset gets its own timeout', () {
+      fakeAsync((FakeAsync async) {
+        // Only the connect timeout can end the attempt within the test.
+        final ConnectionRig rig = ConnectionRig(
+          async,
+          timings: const ConnectionTimings(healthyTimeout: Duration(hours: 1)),
+        );
+        rig.open();
+        async.elapse(const Duration(seconds: 10));
+        rig.fake.last.serverControl('r', 's-reset.firebaseio.com');
+        rig.flush();
+        expect(rig.fake.attempts, hasLength(2));
+        expect(rig.fake.attempts.last.url.host, 's-reset.firebaseio.com');
+
+        // The new host accepts the socket and never says hello.
+        async.elapse(_connectTimeout - const Duration(milliseconds: 1));
         expect(rig.delegate.disconnects, isEmpty);
+        async.elapse(const Duration(milliseconds: 1));
+
+        expect(
+          rig.delegate.disconnects.single.reason,
+          DisconnectReason.connectTimeout,
+        );
+        expect(rig.fake.last.abandoned, isTrue);
+        expect(rig.target.internalHost, configuredHost);
+        expect(async.pendingTimers, isEmpty);
       });
     });
 
@@ -1061,15 +1104,50 @@ void main() {
   });
 
   test(
-    'credentialActions is the one list of credential actions (review L6)',
+    'every action AuthSession sends is a credential action and is logged hidden '
+    '(review L6)',
     () {
-      expect(credentialActions, <String>{
-        'auth',
-        'gauth',
-        'unauth',
-        'appcheck',
-        'unappcheck',
-        'unappeck',
+      // The actions come from AuthSession itself, in production and emulator mode, so a new
+      // credential action fails here until credentialActions lists it.
+      final Set<String> sent = <String>{};
+      for (final bool emulator in <bool>[false, true]) {
+        final RecordingSender sender = RecordingSender();
+        AuthSession(
+            sender.send,
+            FakeTokenSource(),
+            invalidTokenThreshold: 3,
+            protocol: RealtimeProtocol(isUsingEmulator: emulator),
+            onAuthStatus: (_, _) {},
+            onAppCheckStatus: (_, _) {},
+          )
+          ..authChanged(_userJwt)
+          ..appCheckChanged('ac')
+          ..onConnected()
+          ..authChanged('owner')
+          ..authChanged(null)
+          ..appCheckChanged(null);
+        sent.addAll(sender.actions);
+      }
+      expect(sent, credentialActions);
+
+      fakeAsync((FakeAsync async) {
+        final ConnectionRig rig = ConnectionRig(async);
+        final RealtimeConnection connection = rig.openReady();
+        for (final String action in sent) {
+          connection.send(<String, Object?>{
+            'r': 1,
+            'a': action,
+            'b': <String, Object?>{'cred': 'CRED-MARKER'},
+          });
+          expect(rig.lines.last, '$action (contents hidden)');
+        }
+        connection.send(<String, Object?>{
+          'r': 2,
+          'a': 'q',
+          'b': <String, Object?>{'p': '/a'},
+        });
+        expect(rig.lines.last, 'send q');
+        expect(jsonEncode(rig.lines), isNot(contains('MARKER')));
       });
     },
   );

@@ -117,6 +117,10 @@ final class PersistentConnection implements ServerActions {
   late final RequestTable _requests;
   late final AuthSession _session;
 
+  /// The request numbers of the `g` requests sent and not answered: their answers are decoded
+  /// with the key check on (one walk of the data, review M6).
+  final Set<int> _getNumbers = <int>{};
+
   final ReplayQueues _queues = ReplayQueues();
   final Set<String> _interruptReasons = <String>{};
   final List<StreamSubscription<Object?>> _subscriptions =
@@ -322,6 +326,7 @@ final class PersistentConnection implements ServerActions {
       get.body,
       onResponse: (Map<String, Object?> response) =>
           _onGetResponse(get, response),
+      onNumber: _getNumbers.add,
     );
     get.sent = sent;
     return sent;
@@ -334,21 +339,13 @@ final class PersistentConnection implements ServerActions {
     final String status = _statusOf(response);
     final Object? data = response['d'];
     // Completed here, not through _emit: the completer is asynchronous, so its listeners run in a
-    // microtask scheduled now, in arrival order with the delegate calls (addendum 5).
+    // microtask scheduled now, in arrival order with the delegate calls (addendum 5). Data that is
+    // not valid server data (review M6, threat model rule 4) was refused by the decoder: the get
+    // fails with `failure` and _onDataMessage closes the connection.
     if (status != statusOk) {
       get.completer.completeError(
         ServerActionsException(status, data is String ? data : null),
       );
-      return;
-    }
-    // The decoder cannot tell a `g` answer from other answers, so it does not check keys; the
-    // data of a get reaches the core only if it is valid server data (review M6, threat model
-    // rule 4). Anything else is a protocol error.
-    if (!isValidServerData(data)) {
-      get.completer.completeError(
-        ServerActionsException(DatabaseErrorCode.operationFailed.wireStatus),
-      );
-      _protocolError('invalid data in a get answer');
       return;
     }
     get.completer.complete(data);
@@ -426,6 +423,12 @@ final class PersistentConnection implements ServerActions {
   /// `write_canceled`; a later ack of a sent put is ignored. An onDisconnect request already sent
   /// is kept, as Android keeps it (its queue holds only unsent requests, :578-586): the server
   /// may hold it, so its own answer, or `disconnect` at a drop (review H3), completes it.
+  ///
+  /// The seam's contract, as this connection keeps it: every write gets exactly one completion.
+  /// After a purge the connection drops any later answer for a write it completed with
+  /// `write_canceled` (the response callback finds the write gone from the queue). An answer
+  /// already received before the purge, whose completion is already queued, is delivered once, as
+  /// the server's status; the purge does not complete that write a second time.
   @override
   void purgeOutstandingWrites() {
     final List<RequestResultCallback?> purged = <RequestResultCallback?>[
@@ -837,13 +840,24 @@ final class PersistentConnection implements ServerActions {
     }
     _messagesOnConnection++;
     _requests.linkActivity();
-    final ServerMessage decoded = decodeServerMessage(message);
+    final ServerMessage decoded = decodeServerMessage(
+      message,
+      checkAnswerKeys: _getNumbers.remove,
+    );
     switch (decoded) {
-      case Response(:final int r, :final String status, :final Object? data):
+      case Response(
+        :final int r,
+        :final String status,
+        :final Object? data,
+        :final bool dataRefused,
+      ):
         if (status == statusOk) {
           _okOnConnection = true;
         }
         _requests.complete(r, <String, Object?>{'s': status, 'd': data});
+        if (dataRefused && identical(link, _link)) {
+          _protocolError('invalid data in an answer');
+        }
       case DataPush():
         _emit(
           () => _delegate.onDataUpdate(
@@ -1009,6 +1023,7 @@ final class PersistentConnection implements ServerActions {
     _connection = null;
     _connected = false;
     _requests.clear();
+    _getNumbers.clear();
     _pendingCredentials.clear();
     if (_shutdown) {
       return;

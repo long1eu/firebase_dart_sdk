@@ -19,7 +19,6 @@ const Set<String> _contractActions = <String>{
   'om',
   'oc',
 };
-const Set<String> _credentialActions = <String>{'auth', 'gauth', 'appcheck'};
 
 /// Real time. A browser clamps nested timers to 4 ms, so the 20 zero-delay turns of one
 /// `pumpEventQueue` alone take about 80 ms there: 60 ms would call a healthy link silent.
@@ -28,7 +27,8 @@ const Duration _requestTimeout = Duration(
 );
 
 /// Plays the server for a PersistentConnection built over a FakeRtdbServer. Responses are held:
-/// the contract answers what it wants, the harness answers the credentials of every connection.
+/// the contract answers what it wants; the server answers the credentials of every connection
+/// itself, as the emulator does.
 /// Reconnects wait an hour unless [reconnect] sends a connectivity hint, so "no new connection
 /// until [reconnect]" holds.
 final class PersistentConnectionHarness
@@ -43,6 +43,7 @@ final class PersistentConnectionHarness
   @override
   Future<ServerActions> start(ServerActionsDelegate delegate) async {
     _rig = PRig(
+      hold: true,
       delegate: delegate as RecordingServerActionsDelegate,
       timings: shrunkTimings(
         reconnectMin: const Duration(hours: 1),
@@ -51,18 +52,8 @@ final class PersistentConnectionHarness
       ),
     );
     await _rig.start();
-    await _answerCredentials();
-    return _rig.connection;
-  }
-
-  Future<void> _answerCredentials() async {
-    for (final ServerSeen seen in _rig.server.log) {
-      if (_credentialActions.contains(seen.action) &&
-          _answered.add(_key(seen))) {
-        _rig.server.connector.last.serverResponse(seen.r!);
-      }
-    }
     await _rig.settle();
+    return _rig.connection;
   }
 
   static String _key(ServerSeen seen) => '${seen.connection}/${seen.r}';
@@ -127,7 +118,7 @@ final class PersistentConnectionHarness
     final int before = _rig.connects;
     _rig.hints.add(null);
     await until(() => _rig.connects > before);
-    await _answerCredentials();
+    await _rig.settle();
   }
 
   @override

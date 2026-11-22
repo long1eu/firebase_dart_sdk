@@ -4,7 +4,7 @@ library;
 
 import 'dart:convert';
 
-import 'package:firebase_database_dart/src/realtime/server_message.dart';
+import 'package:firebase_database_dart/src/core/util/numbers.dart';
 
 /// The credential the admin SDKs send to the emulator, as `gauth` with `cred: "owner"` (2.4,
 /// AuthTokenProvider.ts:108-111, PersistentConnection.ts:383).

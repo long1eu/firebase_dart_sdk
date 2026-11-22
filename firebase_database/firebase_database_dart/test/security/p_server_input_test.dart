@@ -7,6 +7,7 @@
 // The messages are raw JSON text, so that a non-finite number (`1e400`) can be sent; on the web
 // such a number also passes `is int`, which the decoder covers.
 import 'package:fake_async/fake_async.dart';
+import 'package:firebase_database_dart/src/testing/recording_server_actions_delegate.dart';
 import 'package:test/test.dart';
 
 import '../util/persistent_connection_harness.dart';
@@ -80,34 +81,30 @@ void main() {
   _malformed.forEach((String family, List<String> messages) {
     group(family, () {
       for (final String message in messages) {
-        test(
-          '$message closes the connection and reaches no delegate',
-          () async {
-            rig = PRig();
-            await rig.start();
-            await rig.settle();
-            final int callsBefore = rig.delegate.calls.length;
+        test('$message closes the connection and reaches no delegate', () async {
+          // Nothing is answered: no credential status can reach the delegate meanwhile.
+          rig = PRig(holdCredentials: true);
+          await rig.start();
+          await rig.settle();
+          final int callsBefore = rig.delegate.calls.length;
 
-            rig.server.connector.last.serverText('{"t":"d","d":$message}');
-            await until(() => rig.delegate.callsOf('disconnect').length == 1);
-            await until(() => rig.connects == 2);
+          rig.server.connector.last.serverText('{"t":"d","d":$message}');
+          await until(() => rig.delegate.callsOf('disconnect').length == 1);
+          await until(() => rig.connects == 2);
 
-            // Breaks if the `case Ignored(isProtocolError: true)` branch of
-            // PersistentConnection._onDataMessage does not call _protocolError.
-            final List<String> after = rig.delegate.methods.sublist(
-              callsBefore,
-            );
-            expect(after.where(_inputMethods.contains), isEmpty);
-            expect(after.first, 'disconnect');
-            expect(
-              rig.logs.where(
-                (String l) => l.startsWith('warning: protocol error'),
-              ),
-              hasLength(1),
-            );
-            expect(rig.logs.join('\n'), isNot(contains('Ignored a server')));
-          },
-        );
+          // Breaks if the `case Ignored(isProtocolError: true)` branch of
+          // PersistentConnection._onDataMessage does not call _protocolError.
+          final List<String> after = rig.delegate.methods.sublist(callsBefore);
+          expect(after.where(_inputMethods.contains), isEmpty);
+          expect(after.first, 'disconnect');
+          expect(
+            rig.logs.where(
+              (String l) => l.startsWith('warning: protocol error'),
+            ),
+            hasLength(1),
+          );
+          expect(rig.logs.join('\n'), isNot(contains('Ignored a server')));
+        });
       }
     });
   });
@@ -138,13 +135,15 @@ void main() {
             // Zero: any established connection would reset the delay to 100 ms at its drop.
             reconnectResetAfter: Duration.zero,
           ),
+          holdCredentials: true,
           now: () => start.add(async.elapsed),
           elapsed: () => async.elapsed,
         );
         rig.connection.initialize();
         for (int n = 1; n <= 3; n++) {
           elapseUntil(async, () => rig.connects == n);
-          // Two ok answers: the connection is healthy and established (T13).
+          // Two ok answers (the server's own, held until now): the connection is healthy and
+          // established (T13).
           rig.answerCredentialsNow();
           async
             ..flushMicrotasks()
@@ -168,8 +167,11 @@ void main() {
         for (final int gap in gaps) {
           expect(gap, greaterThanOrEqualTo(1990), reason: '$gaps');
         }
-        rig.connection.shutdown();
-        async.flushMicrotasks();
+        expect(
+          rig.delegate.callsOf('authStatus').map((DelegateCall c) => c.status),
+          <String>['ok', 'ok', 'ok'],
+        );
+        shutDownOnFakeTime(async, rig);
       });
     },
   );

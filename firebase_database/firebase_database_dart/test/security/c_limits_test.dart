@@ -12,22 +12,30 @@ import '../util/connection_test_rig.dart';
 
 void main() {
   test(
-    'reset loop: at most 1 + maxResetsPerAttempt socket opens, then a failure (T2)',
+    'a reset storm ends the attempt after maxResetsPerAttempt resets, however slow (T2)',
     () {
+      // connection_test.dart has the storm in one turn; here each reset comes just before the
+      // socket's connect timeout, the slowest storm that still keeps the attempt connecting.
       fakeAsync((FakeAsync async) {
-        final ConnectionRig rig = ConnectionRig(async);
+        const ConnectionTimings timings = ConnectionTimings(
+          healthyTimeout: Duration(hours: 1),
+        );
+        final ConnectionRig rig = ConnectionRig(async, timings: timings);
+        final Duration justBefore =
+            timings.connectTimeout - const Duration(seconds: 1);
         rig.open();
         for (int i = 0; i < 20 && rig.delegate.disconnects.isEmpty; i++) {
-          rig.fake.last.serverControl('r', 's-storm.firebaseio.com');
+          async.elapse(justBefore);
+          rig.fake.last.serverControl('r', 's-storm$i.firebaseio.com');
           rig.flush();
         }
 
-        expect(
-          rig.fake.attempts,
-          hasLength(1 + const ConnectionTimings().maxResetsPerAttempt),
-        );
+        expect(rig.fake.attempts, hasLength(1 + timings.maxResetsPerAttempt));
         expect(rig.delegate.disconnects.single.reason, DisconnectReason.other);
+        expect(async.elapsed, justBefore * (1 + timings.maxResetsPerAttempt));
         expect(rig.delegate.readies, isEmpty);
+        expect(rig.target.internalHost, configuredHost);
+        expect(async.pendingTimers, isEmpty);
       });
     },
   );

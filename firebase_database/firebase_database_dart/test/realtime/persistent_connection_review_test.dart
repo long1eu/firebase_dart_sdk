@@ -9,7 +9,6 @@ import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
 import 'package:firebase_database_dart/src/core/repo_info.dart';
 import 'package:firebase_database_dart/src/realtime/connection_timings.dart';
 import 'package:firebase_database_dart/src/realtime/realtime_target.dart';
-import 'package:firebase_database_dart/src/realtime/transport/ws_channel.dart';
 import 'package:test/test.dart';
 
 import '../util/fake_ws.dart';
@@ -19,60 +18,14 @@ const Duration _timeout = Duration(milliseconds: 200);
 
 ConnectionTimings _timings() => shrunkTimings(requestTimeout: _timeout);
 
-/// Initializes [rig] and waits (in fake time) for connection [number], then answers its
-/// credentials.
+/// Initializes [rig] and waits (in fake time) for connection [number]; the server has answered
+/// its credentials.
 void _connect(FakeAsync async, PRig rig, int number) {
   if (number == 1) {
     rig.connection.initialize();
   }
   elapseUntil(async, () => rig.connects == number);
-  rig.answerCredentialsNow();
   async.flushMicrotasks();
-}
-
-/// A channel that throws on its `failAt`-th sent frame (a socket that died mid-send).
-final class _FailingChannel implements WsChannel {
-  _FailingChannel(this._inner, this._failAt);
-
-  final WsChannel _inner;
-  final int _failAt;
-  int _sent = 0;
-
-  @override
-  Stream<WsEvent> get events => _inner.events;
-
-  @override
-  void sendText(String frame) {
-    if (++_sent == _failAt) {
-      throw StateError('the socket is gone');
-    }
-    _inner.sendText(frame);
-  }
-
-  @override
-  Future<void> close([int code = 1000, String? reason]) =>
-      _inner.close(code, reason);
-
-  @override
-  void abandon() => _inner.abandon();
-}
-
-/// The first channel throws on its third frame; later channels are untouched.
-WsConnector Function(WsConnector) _failThirdFrameOfFirstChannel() {
-  int channels = 0;
-  return (WsConnector inner) =>
-      (
-        Uri url, {
-        Map<String, String> headers = const <String, String>{},
-        Future<void>? abort,
-      }) async {
-        final WsChannel channel = await inner(
-          url,
-          headers: headers,
-          abort: abort,
-        );
-        return ++channels == 1 ? _FailingChannel(channel, 3) : channel;
-      };
 }
 
 void main() {
@@ -81,7 +34,7 @@ void main() {
       'a 500 ms push in 50 pieces with a 200 ms timeout: one connection, listen ok, put ok',
       () {
         fakeAsync((FakeAsync async) {
-          final PRig rig = fakeTimeRig(async, timings: _timings());
+          final PRig rig = fakeTimeRig(async, timings: _timings(), hold: true);
           _connect(async, rig, 1);
           final List<String> results = <String>[];
           rig.connection.listen(
@@ -120,8 +73,7 @@ void main() {
           expect(rig.attemptTimes, hasLength(1));
           expect(rig.delegate.callsOf('dataUpdate').last.path, '/big');
           expect(rig.delegate.callsOf('dataUpdate').last.data, 'x' * 2000);
-          unawaited(rig.connection.shutdown());
-          async.flushMicrotasks();
+          shutDownOnFakeTime(async, rig);
         });
       },
     );
@@ -130,7 +82,7 @@ void main() {
       'writes and listens are never failed by a timeout: they are re-sent on every connection',
       () {
         fakeAsync((FakeAsync async) {
-          final PRig rig = fakeTimeRig(async, timings: _timings());
+          final PRig rig = fakeTimeRig(async, timings: _timings(), hold: true);
           _connect(async, rig, 1);
           final List<String> results = <String>[];
           rig.connection.put(
@@ -155,8 +107,7 @@ void main() {
             expect(rig.sent('p', onConnection: n), hasLength(1));
             expect(rig.sent('q', onConnection: n), hasLength(1));
           }
-          unawaited(rig.connection.shutdown());
-          async.flushMicrotasks();
+          shutDownOnFakeTime(async, rig);
         });
       },
     );
@@ -165,7 +116,7 @@ void main() {
       'a get fails with network_error after two silent connections, counted for that get alone',
       () {
         fakeAsync((FakeAsync async) {
-          final PRig rig = fakeTimeRig(async, timings: _timings());
+          final PRig rig = fakeTimeRig(async, timings: _timings(), hold: true);
           _connect(async, rig, 1);
           final List<String> results = <String>[];
           rig.connection
@@ -199,15 +150,18 @@ void main() {
           );
           async.flushMicrotasks();
           expect(results, <String>['a $statusNetworkError', 'b B']);
-          unawaited(rig.connection.shutdown());
-          async.flushMicrotasks();
+          shutDownOnFakeTime(async, rig);
         });
       },
     );
 
     test('L3: a server that never answers the credentials is logged once', () {
       fakeAsync((FakeAsync async) {
-        final PRig rig = fakeTimeRig(async, timings: _timings());
+        final PRig rig = fakeTimeRig(
+          async,
+          timings: _timings(),
+          holdCredentials: true,
+        );
         rig.connection.initialize();
         elapseUntil(async, () => rig.connects == 4);
         expect(
@@ -216,8 +170,7 @@ void main() {
           ),
           hasLength(1),
         );
-        unawaited(rig.connection.shutdown());
-        async.flushMicrotasks();
+        shutDownOnFakeTime(async, rig);
       });
     });
   });
@@ -243,9 +196,8 @@ void main() {
     'H3: a sent onDisconnect whose connection drops completes once with disconnect, '
     'not replayed',
     () async {
-      final PRig rig = PRig();
+      final PRig rig = PRig(hold: true);
       await rig.start();
-      await rig.answerCredentials();
       final List<String> statuses = <String>[];
       rig.connection.onDisconnectPut(
         '/p',
@@ -292,9 +244,11 @@ void main() {
         rig.connection.initialize();
         async.elapse(const Duration(seconds: 1));
         expect(rig.tokens.authCalls, hasLength(1));
-        // The fetch is bounded by connectTimeout (5 s in the shrunk timings), then retried.
+        // The fetch is bounded by connectTimeout (5 s in the shrunk timings), then retried after
+        // the backoff less the 5 s the attempt took: at once. Exactly two fetches by 7 s; a
+        // retry loop with no bound would make more.
         async.elapse(const Duration(seconds: 6));
-        expect(rig.tokens.authCalls.length, greaterThanOrEqualTo(2));
+        expect(rig.tokens.authCalls, hasLength(2));
         final int before = rig.tokens.authCalls.length;
         // A connectivity hint during a fetch restarts it at once.
         rig.hints.add(null);
@@ -302,8 +256,7 @@ void main() {
         expect(rig.tokens.authCalls.length, before + 1);
         rig.tokens.gate!.complete();
         elapseUntil(async, () => rig.connects == 1);
-        unawaited(rig.connection.shutdown());
-        async.flushMicrotasks();
+        shutDownOnFakeTime(async, rig);
       });
     },
   );
@@ -311,7 +264,10 @@ void main() {
   test(
     'M4/M5: a send failure inside the replay reports no connect and marks nothing sent',
     () async {
-      final PRig rig = PRig(wrapConnector: _failThirdFrameOfFirstChannel());
+      final PRig rig = PRig(
+        hold: true,
+        wrapConnector: failFrameOfFirstChannel(3),
+      );
       rig.server.connector.script(<AttemptBehavior>[
         const AttemptBehavior.accept(),
         const AttemptBehavior.refuse(),
@@ -346,7 +302,7 @@ void main() {
   test(
     'M6: a get answer with an invalid key fails with failure and closes the connection',
     () async {
-      final PRig rig = PRig();
+      final PRig rig = PRig(hold: true);
       await rig.start();
       final Future<Object?> result = rig.connection.get(defaultListen('/a'));
       final Future<void> failed = expectLater(
@@ -362,6 +318,13 @@ void main() {
       await rig.answer('g', data: <String, Object?>{'a.b': 1});
       await failed;
       await until(() => rig.attemptTimes.length == 2);
+      // Closed for this reason, as a protocol error, not by a later drop.
+      expect(
+        rig.logs.where((String l) => l.contains('protocol error')),
+        <String>[
+          'warning: protocol error: invalid data in an answer; reconnecting',
+        ],
+      );
       await rig.connection.shutdown();
     },
   );
@@ -385,7 +348,13 @@ void main() {
       await failed.timeout(const Duration(seconds: 1));
       await expectLater(
         rig.connection.get(defaultListen('/b')),
-        throwsA(isA<ServerActionsException>()),
+        throwsA(
+          isA<ServerActionsException>().having(
+            (ServerActionsException e) => e.status,
+            'status',
+            'database_closed',
+          ),
+        ),
       );
     },
   );
@@ -394,9 +363,8 @@ void main() {
     test(
       'after a dropped onDisconnect, the same put registered again is sent as a new request',
       () async {
-        final PRig rig = PRig();
+        final PRig rig = PRig(hold: true);
         await rig.start();
-        await rig.answerCredentials();
         final List<String> statuses = <String>[];
         rig.connection.onDisconnectPut(
           '/p',
@@ -424,7 +392,6 @@ void main() {
       () async {
         final PRig rig = PRig();
         await rig.start();
-        await rig.answerCredentials();
         rig.connection.onDisconnectPut('/p', 'off');
         await rig.settle();
         await rig.drop();
@@ -444,7 +411,7 @@ void main() {
         'a ${byPush ? 'revoked' : 'failed'} listen is never re-sent and its callback never '
         'runs again',
         () async {
-          final PRig rig = PRig();
+          final PRig rig = PRig(hold: true);
           await rig.start();
           final List<String> statuses = <String>[];
           rig.connection.listen(
@@ -480,38 +447,40 @@ void main() {
 
   test(
     'addendum 7: a hint while connected sends exactly one ping and starts no connection',
-    () async {
-      // The connection must be healthy (both credentials answered), or the 3.4 health rule
-      // pings again on every pong (liveness.dart onResponse); and the link is held silent, or a
-      // pong re-arms the idle probe and a second hint after it probes again (both correct).
-      final PRig rig = PRig();
-      await rig.start();
-      await rig.answerCredentials();
-      final FakeWsChannel channel = rig.server.connector.last;
-      channel.goSilent();
-      bool isPing(String frame) {
-        final Object? decoded = jsonDecode(frame);
-        if (decoded is! Map<String, Object?> || decoded['t'] != 'c') {
-          return false;
+    () {
+      // The connection must be healthy (the server answered both credentials), or the 3.4
+      // health rule pings again on every pong (liveness.dart onResponse); and the link is held
+      // silent, or a pong re-arms the idle probe and a second hint after it probes again (both
+      // correct). One second of virtual time is well inside the probe's 15 s timeout.
+      fakeAsync((FakeAsync async) {
+        final PRig rig = fakeTimeRig(async);
+        _connect(async, rig, 1);
+        expect(rig.delegate.callsOf('authStatus'), hasLength(1));
+        final FakeWsChannel channel = rig.server.connector.last;
+        channel.goSilent();
+        bool isPing(String frame) {
+          final Object? decoded = jsonDecode(frame);
+          if (decoded is! Map<String, Object?> || decoded['t'] != 'c') {
+            return false;
+          }
+          final Object? control = decoded['d'];
+          return control is Map<String, Object?> && control['t'] == 'p';
         }
-        final Object? control = decoded['d'];
-        return control is Map<String, Object?> && control['t'] == 'p';
-      }
 
-      int pings() => channel.sentFrames
-          .where((SentFrame f) => f.text != '0' && isPing(f.text))
-          .length;
-      expect(pings(), 0);
-      rig.hints
-        ..add(null)
-        ..add(null);
-      await rig.settle();
-      expect(pings(), 1);
-      await rig.settle();
-      expect(rig.attemptTimes, hasLength(1));
-      expect(rig.delegate.methods, isNot(contains('disconnect')));
-      channel.resume();
-      await rig.connection.shutdown();
+        int pings() => channel.sentFrames
+            .where((SentFrame f) => f.text != '0' && isPing(f.text))
+            .length;
+        expect(pings(), 0);
+        rig.hints
+          ..add(null)
+          ..add(null);
+        async.elapse(const Duration(seconds: 1));
+        expect(pings(), 1);
+        expect(rig.attemptTimes, hasLength(1));
+        expect(rig.delegate.methods, isNot(contains('disconnect')));
+        channel.resume();
+        shutDownOnFakeTime(async, rig);
+      });
     },
   );
 }
