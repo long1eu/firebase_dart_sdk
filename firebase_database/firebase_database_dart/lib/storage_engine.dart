@@ -5,7 +5,8 @@
 ///
 /// [Path], [ChildKey], [Node], [CompoundWrite], [QuerySpec] and [PruneForest] are the ports of Android's core
 /// types that the interface needs; they are exported only here, never from the main library.
-/// [InMemoryPersistenceStorageEngine] is the reference engine that every engine's behaviour is checked
+/// `nodeFromJson`, `keyIndex`, `ImmutableTree` and `estimateSerializedNodeSize` are the helpers an engine
+/// needs to read, walk and size stored data. [InMemoryPersistenceStorageEngine] is the reference engine that every engine's behaviour is checked
 /// against.
 ///
 /// ```dart
@@ -42,8 +43,12 @@ export 'src/core/persistence/persistence_storage_engine_opener.dart'
 export 'src/core/persistence/prune_forest.dart' show PruneForest;
 export 'src/core/persistence/tracked_query.dart' show TrackedQuery;
 export 'src/core/snap/child_key.dart' show ChildKey;
+export 'src/core/snap/indexes/key_index.dart' show keyIndex;
 export 'src/core/snap/node.dart' show Node;
+export 'src/core/snap/node_from_json.dart' show nodeFromJson;
 export 'src/core/user_write_record.dart' show UserWriteRecord;
+export 'src/core/util/immutable_tree.dart' show ImmutableTree;
+export 'src/core/util/node_size_estimator.dart' show estimateSerializedNodeSize;
 export 'src/core/view/query_spec.dart' show QuerySpec;
 export 'src/testing/in_memory_persistence_storage_engine.dart'
     show InMemoryPersistenceStorageEngine;
