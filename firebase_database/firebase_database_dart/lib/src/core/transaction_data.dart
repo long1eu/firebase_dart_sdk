@@ -53,6 +53,9 @@ final class TransactionAbort extends TransactionOutcome {
 
 /// The user's update function: given the current value (JSON), returns the outcome. May run
 /// several times.
+///
+/// `currentValue` is a fresh, mutable deep copy on every call (a new `Map`/`List` tree): the
+/// function may change it and return it, and nothing else sees the change.
 typedef TransactionUpdate = TransactionOutcome Function(Object? currentValue);
 
 /// Called once at the end: [error] null on success, whether it [committed], and the resulting

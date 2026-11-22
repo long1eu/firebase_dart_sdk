@@ -1,5 +1,9 @@
 /// The tree of sync points and pending writes. JS: `core/SyncTree.ts`; Android:
 /// `core/SyncTree.java` (including its inner `KeepSyncedEventRegistration` and `ListenContainer`).
+///
+/// Tags start at 1 per [SyncTree] instance (a field counter, not JS's module global): two trees,
+/// hence two Repos, each give their first filtered query tag 1. Pinned by the sync tree API
+/// contract with two instances.
 library;
 
 import 'package:firebase_database_dart/src/core/compound_write.dart';
@@ -13,7 +17,6 @@ import 'package:firebase_database_dart/src/core/snap/range_merge.dart';
 import 'package:firebase_database_dart/src/core/sync_point.dart';
 import 'package:firebase_database_dart/src/core/sync_tree_api.dart';
 import 'package:firebase_database_dart/src/core/tag.dart';
-import 'package:firebase_database_dart/src/core/util/clock.dart';
 import 'package:firebase_database_dart/src/core/util/immutable_tree.dart';
 import 'package:firebase_database_dart/src/core/view/cache_node.dart';
 import 'package:firebase_database_dart/src/core/view/change.dart';
@@ -70,7 +73,7 @@ final class SyncTree implements SyncTreeApi {
     WriteId writeId, {
     required bool revert,
     required bool persist,
-    required ServerClock serverClock,
+    required Map<String, Object?> serverValues,
   }) => throw UnimplementedError();
 
   @override

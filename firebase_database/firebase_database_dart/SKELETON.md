@@ -1,7 +1,7 @@
 # firebase_database_dart skeleton
 
 Signature-only core of the Realtime Database client. Every body is `throw UnimplementedError()` except
-constants, trivial field-holding constructors, `CachePolicy.none`, and the two files under `lib/src/testing/`
+constants, trivial field-holding constructors, `CachePolicy.none`, `ServerActionsException.toString`, and the files under `lib/src/testing/`
 (real code, frozen test support). One Dart file per upstream file; each file's first doc line names the JS
 (`packages/database/src`, a086865) and Android (`firebase-database/src/main/java/com/google/firebase/database`,
 2cfdd03) sources. `dart analyze` is clean; the `avoid_unused_constructor_parameters` lint is off in
@@ -19,13 +19,19 @@ constants, trivial field-holding constructors, `CachePolicy.none`, and the two f
 | SEAM | ListenProvider, SyncTreeApi, PersistenceManager, interfaces final | DL3 for types |
 | SYNC | operations, views, filters, write tree, sync point, sync tree, NoopPersistenceManager | data-layer freeze |
 | PERSIST | storage engine, tracked queries, pruning, managers | data-layer freeze; sync tree for the end-to-end tests |
-| REPO | Repo, transactions, onDisconnect, `.info`, event queue | SYNC |
+| REPO | Repo, transactions, onDisconnect, `.info`, event dispatcher, callback registration | SYNC |
 | FROZEN | real test support, written now | data layer, to run |
 
-Contract tests (written, not run yet): `test/contract/server_actions_contract_test.dart` (runs against
-`FakeServerActions` now; the connection team adds its harness), `persistence_storage_engine_contract_test.dart`,
-`persistence_manager_contract_test.dart` (Noop, Default, WritesOnly), `sync_tree_api_contract_test.dart`,
-`listen_provider_contract_test.dart` (RepoListenProvider over FakeServerActions). They need the data layer filled.
+Contract tests (written, not run yet). Each contract is a function file `test/contract/<x>_contract.dart` (no
+`main`, importable by other packages, imports no `*_test.dart`) plus a runner `<x>_contract_test.dart` that runs it
+against our implementation: `server_actions_contract.dart` (`runServerActionsContract`,
+`runReadOnlyServerActionsContract`; run against `FakeServerActions` and `FakeServerActions.readOnly`; the connection
+team adds its harness), `persistence_storage_engine_contract.dart` (`runStorageEngineContract`),
+`persistence_manager_contract.dart` (`runPersistenceManagerContract`: Noop, Default, WritesOnly),
+`sync_tree_api_contract.dart` (`runSyncTreeApiContract`), `listen_provider_contract.dart`
+(`runListenProviderContract`: RepoListenProvider over FakeServerActions). `test/contract/server_actions_reconnect_contract.dart`
+belongs to the connection team. `test/core/constants_test.dart` pins `getPersistedFallbackDelay` and
+`eventsPerDrainSlice`. They need the data layer filled.
 
 ## Files
 
@@ -38,6 +44,7 @@ Paths are under `lib/src/`. Android paths are relative to `com/google/firebase/d
 | `core/tag.dart` | SHARED | core/SyncTree.ts (number tags) | core/Tag.java | - |
 | `core/database_error.dart` | SHARED | core/util/util.ts errorForServerCode | DatabaseError.java | - |
 | `core/util/clock.dart` | SHARED | core/Repo.ts repoServerTime | core/utilities/Clock, OffsetClock | - |
+| `core/util/logger.dart` | SHARED | core/util/util.ts log, warn | logging/LogWrapper, Logger | - |
 | `core/util/numbers.dart` | DL1 | core/util/util.ts (part) | snapshot/LongNode, DoubleNode | - |
 | `core/util/key_order.dart` | DL1 | core/util/util.ts nameCompare | snapshot/ChildKey (compareTo) | child_key |
 | `core/util/hash.dart` | DL1 | core/util/util.ts sha1 | core/utilities/Utilities | - |
@@ -73,7 +80,7 @@ Paths are under `lib/src/`. Android paths are relative to `com/google/firebase/d
 | `core/connection/listen_hash_provider.dart` | SEAM-CONN | currentHashFn | connection/ListenHashProvider, connection/CompoundHash | - |
 | `core/connection/wire_range_merge.dart` | SEAM-CONN | - | connection/RangeMerge | - |
 | `core/listen_provider.dart` | SEAM | core/SyncTree.ts ListenProvider | core/SyncTree.ListenProvider | listen_hash_provider, database_error, tag, event, query_spec |
-| `core/sync_tree_api.dart` | SEAM | core/SyncTree.ts exports | core/SyncTree (public methods) | compound_write, database_error, event_registration, path, persistence_manager, node, range_merge, tag, clock, cache_node, event, query_spec, write_id |
+| `core/sync_tree_api.dart` | SEAM | core/SyncTree.ts exports | core/SyncTree (public methods) | compound_write, database_error, event_registration, listen_provider, path, persistence_manager, node, range_merge, tag, cache_node, event, query_spec, write_id |
 | `core/persistence/persistence_manager.dart` | SEAM | - | core/persistence/PersistenceManager | compound_write, path, noop_persistence_manager, child_key, node, user_write_record, cache_node, query_spec, write_id |
 | `core/operation/operation.dart` | SYNC | core/operation/Operation.ts | core/operation/Operation | compound_write, operation_source, path, child_key, node, immutable_tree |
 | `core/operation/operation_source.dart` | SYNC | core/operation/Operation.ts | core/operation/OperationSource | query_params |
@@ -101,10 +108,10 @@ Paths are under `lib/src/`. Android paths are relative to `com/google/firebase/d
 | `core/write_tree.dart` | SYNC | core/WriteTree.ts | core/WriteTree | compound_write, path, child_key, index, named_node, node, user_write_record, cache_node, write_id, write_tree_ref |
 | `core/write_tree_ref.dart` | SYNC | core/WriteTree.ts WriteTreeRef | core/WriteTreeRef | path, child_key, index, named_node, node, cache_node, write_id, write_tree |
 | `core/sync_point.dart` | SYNC | core/SyncPoint.ts | core/SyncPoint | database_error, event_registration, operation, path, persistence_manager, node, cache_node, event, query_params, query_spec, view, write_tree_ref |
-| `core/sync_tree.dart` | SYNC | core/SyncTree.ts | core/SyncTree (+KeepSyncedEventRegistration) | compound_write, database_error, event_registration, listen_provider, path, persistence_manager, node, range_merge, sync_point, sync_tree_api, tag, clock, immutable_tree, cache_node, change, event, query_spec, write_id, write_tree |
+| `core/sync_tree.dart` | SYNC | core/SyncTree.ts | core/SyncTree (+KeepSyncedEventRegistration) | compound_write, database_error, event_registration, listen_provider, path, persistence_manager, node, range_merge, sync_point, sync_tree_api, tag, immutable_tree, cache_node, change, event, query_spec, write_id, write_tree |
 | `core/persistence/noop_persistence_manager.dart` | SYNC | - | core/persistence/NoopPersistenceManager | compound_write, path, persistence_manager, child_key, node, user_write_record, cache_node, query_spec, write_id |
 | `core/persistence/persistence_storage_engine.dart` | PERSIST | - | core/persistence/PersistenceStorageEngine | compound_write, path, prune_forest, tracked_query, child_key, node, user_write_record, write_id |
-| `core/persistence/persistence_storage_engine_opener.dart` | PERSIST | - | core/Platform.createPersistenceManager | persistence_storage_engine |
+| `core/persistence/persistence_storage_engine_opener.dart` | PERSIST | - | core/Platform.createPersistenceManager | persistence_storage_engine, logger |
 | `core/persistence/tracked_query.dart` | PERSIST | - | core/persistence/TrackedQuery | query_spec |
 | `core/persistence/prune_forest.dart` | PERSIST | - | core/persistence/PruneForest | path, child_key, immutable_tree |
 | `core/persistence/cache_policy.dart` | PERSIST | - | core/persistence/CachePolicy | - |
@@ -112,19 +119,22 @@ Paths are under `lib/src/`. Android paths are relative to `com/google/firebase/d
 | `core/persistence/tracked_query_manager.dart` | PERSIST | - | core/persistence/TrackedQueryManager | path, cache_policy, persistence_storage_engine, prune_forest, tracked_query, child_key, clock, query_spec |
 | `core/persistence/default_persistence_manager.dart` | PERSIST | - | core/persistence/DefaultPersistenceManager | compound_write, path, cache_policy, persistence_manager, persistence_storage_engine, child_key, node, user_write_record, clock, cache_node, query_spec, write_id |
 | `core/persistence/writes_only_persistence_manager.dart` | PERSIST | - | (split of DefaultPersistenceManager, design 13a) | compound_write, path, default_persistence_manager, noop_persistence_manager, persistence_manager, persistence_storage_engine, child_key, node, user_write_record, cache_node, query_spec, write_id |
-| `core/repo.dart` | REPO | core/Repo.ts | core/Repo | compound_write, listen_hash_provider, server_actions, wire_range_merge, database_error, event_registration, listen_provider, path, noop_persistence_manager, persistence_manager, repo_info, node, snapshot_holder, sync_tree_api, tag, transaction_data, clock, event, event_queue, query_spec |
+| `core/repo.dart` | REPO | core/Repo.ts | core/Repo | compound_write, listen_hash_provider, server_actions, wire_range_merge, database_error, event_registration, listen_provider, path, noop_persistence_manager, persistence_manager, repo_info, node, snapshot_holder, sync_tree_api, tag, transaction_data, clock, logger, event, event_dispatcher, query_spec |
 | `core/repo_info.dart` | REPO | core/RepoInfo.ts (part) | core/RepoInfo | - |
 | `core/transaction_data.dart` | REPO | core/Repo.ts Transaction | core/Repo.TransactionData, Transaction.Handler | database_error, path, node, write_id |
 | `core/util/tree.dart` | REPO | core/util/Tree.ts | core/utilities/Tree, TreeNode | path, child_key |
 | `core/sparse_snapshot_tree.dart` | REPO | core/SparseSnapshotTree.ts | core/SparseSnapshotTree | path, child_key, node |
 | `core/snapshot_holder.dart` | REPO | core/SnapshotHolder.ts | core/SnapshotHolder | path, node |
-| `core/view/event_queue.dart` | REPO | core/view/EventQueue.ts | core/view/EventRaiser | path, event |
+| `core/view/event_dispatcher.dart` | REPO | core/view/EventQueue.ts (replaced) | core/view/EventRaiser | event_registration, event |
+| `core/callback_event_registration.dart` | REPO | api/Reference_impl.ts Value/ChildEventRegistration | core/ValueEventRegistration, ChildEventRegistration | database_error, event_registration, change, event, query_spec |
 | `testing/fake_server_actions.dart` | FROZEN (real) | - | - | listen_hash_provider, listen_spec, server_actions, wire_range_merge |
+| `testing/recording_server_actions_delegate.dart` | FROZEN (real) | - | - | server_actions, wire_range_merge |
 | `testing/in_memory_persistence_storage_engine.dart` | FROZEN (real) | - | testUtil MockPersistenceStorageEngine | compound_write, path, persistence_storage_engine, prune_forest, tracked_query, child_key, children_node, priority_index, node, user_write_record, node_size_estimator, write_id |
 
 `lib/firebase_database_dart.dart` is a placeholder library (no exports); the public API is a later contract.
 
-Not here on purpose: `lib/src/realtime/*`, `PersistentConnection`, the REST client (connection team); the public API
+Not here on purpose: `lib/src/realtime/*`, `PersistentConnection`, `ConnectionTarget`, `RealtimeTokenSource`, the REST
+client (connection team); the public API
 (`FirebaseDatabase`, `DatabaseReference`, `Query`, `DataSnapshot`, event streams, `OnDisconnect`, `ServerValue`);
 `io.dart` with the SQLite engine factory.
 
@@ -141,14 +151,14 @@ Not here on purpose: `lib/src/realtime/*`, `PersistentConnection`, the REST clie
 | `getNodeFilter` | in `QueryParams.ts` | in `QueryParams.java` | top-level `nodeFilterFor` in `view/filter/node_filter.dart`, so the data layer does not depend on views |
 | Server cache in `SyncPoint.getView` | `Node?` + `serverCacheComplete` | `CacheNode` | Android `CacheNode` |
 | Merges | plain maps / `ImmutableTree` | `CompoundWrite` | Android `CompoundWrite` (in the data layer) |
-| `applyUserOverwrite`/`Merge`/`ack` | no `persist`, no unresolved data, no clock | `persist`, unresolved node, `serverClock` | Android |
+| `applyUserOverwrite`/`Merge`/`ack` | no `persist`, no unresolved data, no clock | `persist`, unresolved node, `serverClock` | Android, except `ack` takes `serverValues` (no clock in the tree) |
 | `removeAllWrites`, `keepSynced`, `getServerValue`, `persistenceServerCache` | absent | present | Android |
 | Range merges and compound hash | absent | present | Android (boss answer 3) |
-| `ListenProvider.startListening` | returns `Event[]`, hash as a function | void, `ListenHashProvider` + completion returning events | Android |
+| `ListenProvider.startListening` | returns `Event[]`, hash as a function | void, `ListenHashProvider` + completion returning events | JS return (`List<Event>`, for `.info`), Android hash and completion |
 | Tag counter | module global | instance field | per instance (addendum D) |
 | Listen completion | `(status, data)` | `DatabaseError?` | Android inside the tree (`ListenCompletion(DatabaseError?)`); JS `(status, data)` across the connection seam |
 | `Event` objects | `DataEvent` holds an API `DataSnapshot` | holds `DataSnapshot` | internal: `DataEvent` holds path + `Node`; the public snapshot wraps it later |
-| Event dispatch | `EventQueue` orders by path | `EventRaiser` posts to a run loop | JS `EventQueue` with an injected `EventTarget` |
+| Event dispatch | `EventQueue` orders by path | `EventRaiser` posts to a run loop | neither: `EventDispatcher`, one FIFO per Repo, microtask drain, zombied registrations skipped, yields only between changes |
 | `EventRegistration` | `matches`, `hasAnyCallback`, `createCancelEvent` | `isSameListener`, `clone`, zombies | Android |
 | Path on the wire | `/a/b` | `a/b` | JS `/a/b` (protocol spec section 11) |
 | Seam write callback | `(status, data)` | `(errorCode?, errorMessage?)` | JS: status string always present (`ok`, server code, local `disconnect`) |

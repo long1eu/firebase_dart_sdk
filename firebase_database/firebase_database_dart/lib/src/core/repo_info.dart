@@ -1,5 +1,9 @@
-/// Where the database is. JS: `core/RepoInfo.ts` (the part Repo needs; the connection URL is the
-/// connection team's); Android: `core/RepoInfo.java`.
+/// Where the database is. JS: `core/RepoInfo.ts` (the part Repo needs); Android:
+/// `core/RepoInfo.java`.
+///
+/// The core owns the identity (host, namespace, secure, emulator). The realtime half builds its
+/// `ConnectionTarget` (`realtime/connection_target.dart`: `connectionUri`, `connectionHeaders`,
+/// `acceptServerHost`, `forgetServerHost`, `restUri`, `mayReceiveTokens`) from a [RepoInfo].
 library;
 
 /// The host, namespace and transport security of one database.
@@ -27,7 +31,11 @@ final class RepoInfo {
   /// Whether [host] is a demo host (`*.firebaseio-demo.com`), which warns about data loss.
   bool get isDemoHost => throw UnimplementedError();
 
-  /// The database URL: `https://host` (plus `?ns=` for the emulator).
+  /// The database URL: `https://host` (plus `?ns=` for the emulator); the persistence key
+  /// (`PersistenceKey.databaseUrl`) uses it.
+  Uri get databaseUrl => throw UnimplementedError();
+
+  /// [databaseUrl] as a string.
   String toUrlString() => throw UnimplementedError();
 
   @override

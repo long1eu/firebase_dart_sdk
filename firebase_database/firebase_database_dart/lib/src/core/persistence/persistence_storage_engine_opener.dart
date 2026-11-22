@@ -6,6 +6,7 @@
 library;
 
 import 'package:firebase_database_dart/src/core/persistence/persistence_storage_engine.dart';
+import 'package:firebase_database_dart/src/core/util/logger.dart';
 
 /// Identifies the cache of one database of one app: the engine derives its file or store name
 /// from it.
@@ -32,5 +33,9 @@ final class PersistenceKey {
 /// Opens the engine for [key]; called by the client once at Repo start, before the Repo's first
 /// operation runs (taking a lease may wait, hence the future). An engine that cannot be opened
 /// durably still completes, with `isDurable` false; the future fails only on programming errors.
+/// The lease, degraded mode and storage failures are reported through [logger] (null: dropped).
 typedef PersistenceStorageEngineOpener =
-    Future<PersistenceStorageEngine> Function(PersistenceKey key);
+    Future<PersistenceStorageEngine> Function(
+      PersistenceKey key, {
+      DatabaseLogger? logger,
+    });

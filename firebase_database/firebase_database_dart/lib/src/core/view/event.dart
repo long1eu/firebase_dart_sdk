@@ -36,7 +36,7 @@ enum EventType {
 sealed class Event {
   const Event();
 
-  /// The path events are grouped and ordered by in the event queue.
+  /// The path the event is about (for logging and tests; the dispatcher keeps FIFO order).
   Path get path;
 
   /// Delivers the event to its registration.

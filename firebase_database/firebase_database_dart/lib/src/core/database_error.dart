@@ -1,5 +1,9 @@
 /// Error codes and the internal error value. JS: `core/util/util.ts` (`errorForServerCode`),
 /// `core/Repo.ts` (`repoCallOnCompleteCallback`); Android: `DatabaseError.java`.
+///
+/// The one error vocabulary of the client: the realtime half maps wire status strings to
+/// [DatabaseErrorCode] and declares no exception class of its own for server statuses; the public
+/// `FirebaseDatabaseException` is defined once, in the public API layer.
 library;
 
 /// A Realtime Database error code: the public kebab-case [code] and the [wireStatus] the server or
@@ -43,6 +47,10 @@ enum DatabaseErrorCode {
 
   /// The write was canceled by the user (purgeOutstandingWrites).
   writeCanceled('write-canceled', 'write_canceled'),
+
+  /// The database is read-only here: a read-only connection (the REST client) completes every
+  /// write and onDisconnect request with this status.
+  readOnly('read-only', 'read_only'),
 
   /// An unknown error occurred.
   unknown('unknown', 'unknown');
