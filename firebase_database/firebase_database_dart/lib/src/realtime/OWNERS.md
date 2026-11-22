@@ -15,8 +15,11 @@ The seam with the core is `lib/src/core/connection/` (`ServerActions`, `ServerAc
 the connection half imports and implements them, and declares no `ListenSpec`, `QuerySpec`,
 `RepoInfo` or exception of its own. Paths cross the seam as `/a/b` (root `/`) both ways.
 
-`seam_pending.dart` holds stand-ins for decided seam items the core has not landed yet (A.1, A.2,
-A.4, A.7, A.10); it is deleted when that core commit arrives (see its header).
+The decided seam changes (A.1 to A.10) are in the core since 7cbaba84: tokens belong to the
+connection, `Future<void> shutdown()`, `ServerActionsException` for a failed `get`,
+`ListenSpec.restParams`, `statusReadOnly`, `DatabaseLogger` (`core/util/logger.dart`, nullable:
+the core's `ServerActionsFactory` passes `DatabaseLogger?`). `RealtimeTarget` is the class A.5
+calls `ConnectionTarget`.
 
 ## lib/src/realtime
 
@@ -27,20 +30,19 @@ A.4, A.7, A.10); it is deleted when that core commit arrives (see its header).
 | `transport/ws_channel_web.dart` | T | `ws_channel.dart` | 2.3 (`p`/`ac` in URL); T25, T27 |
 | `transport/ws_connector.dart` | T | `ws_channel*.dart` | conditional import (test plan 2.1) |
 | `framing.dart` | T | nothing (limits passed in) | 3.1, code-point splitting (probe: 65536-byte frames, UTF-8 split drops the message); T9, T10 |
-| `connection.dart` | C | T: `WsConnector`, `WsChannel`, `WsEvent`, `FrameSplitter`, `FrameAssembler`, `FramingException`; U: `RealtimeTarget`; C: `ConnectionTimings`, `RealtimeProtocol`, `Liveness`; K: `safeServerText`; pending: `DatabaseLogger` | 3.2, 3.3, 3.5; T1, T2, T7, T11 |
+| `connection.dart` | C | T: `WsConnector`, `WsChannel`, `WsEvent`, `FrameSplitter`, `FrameAssembler`, `FramingException`; U: `RealtimeTarget`; C: `ConnectionTimings`, `RealtimeProtocol`, `Liveness`; K: `safeServerText`; core: `DatabaseLogger` | 3.2, 3.3, 3.5; T1, T2, T7, T11 |
 | `liveness.dart` | C | C: `ConnectionTimings`, `DisconnectReason` | 3.1 (keep-alive under the 120 s idle close), 3.4, dead-link probe (pong at any time) |
 | `connection_timings.dart` | C | nothing | 1.1 to 1.4; `unappCheck` by emulator (probe); T2, T9, T10, T14 |
-| `persistent_connection.dart` | P | core: implements `ServerActions`, calls `ServerActionsDelegate`, reads `ListenSpec`, `ListenHashProvider`; C: `RealtimeConnection`, `RealtimeDelegate`, `DisconnectReason`, `ConnectionTimings`, `RealtimeProtocol`; K: `AuthSession`, `RealtimeTokenSource`, `ReconnectBackoff`, `decodeServerMessage` and its records, `wirePathFromServer`, `countsAsInvalidToken`; U: `RealtimeTarget`; P: `RequestTable`; pending: `SeamPendingTokenRefresh`, `ServerActionsException`, `DatabaseLogger` | 4, 5, 8.1, 8.2, 8.4 to 8.8; A.1 to A.3, A.6; T13, T15, T18 |
-| `request_table.dart` | P | nothing | 4 (envelope, `r` counter, per-request timeout: probe) |
+| `persistent_connection.dart` | P | core: implements `ServerActions`, calls `ServerActionsDelegate`, reads `ListenSpec`, `ListenHashProvider`; C: `RealtimeConnection`, `RealtimeDelegate`, `DisconnectReason`, `ConnectionTimings`, `RealtimeProtocol`; K: `AuthSession`, `RealtimeTokenSource`, `ReconnectBackoff`, `decodeServerMessage` and its records, `wirePathFromServer`, `countsAsInvalidToken`; U: `RealtimeTarget`; P: `RequestTable`; core: `ServerActionsException`, `DatabaseLogger` | 4, 5, 8.1, 8.2, 8.4 to 8.8; A.1 to A.3, A.6; T13, T15, T18 |
+| `request_table.dart` | P | nothing | 4 (envelope, `r` counter, per-request timeout armed only on a live socket; P counts: 2 timeouts -> `network_error`) |
 | `auth_session.dart` | K | `firebase_app_dart` (`AuthTokenProvider`, `AppCheckTokenProvider`); C: `RealtimeProtocol` | 4.6, 4.7, 4.8, 8.1, 8.3; A.1; T7, T14 |
 | `reconnect_backoff.dart` | K | nothing | 8.2; T13 |
 | `server_message.dart` | K | core: `WireRangeMerge` | 4 (responses), 5 (pushes, `rm` as measured), `wirePathFromServer` (A.3); T11 |
 | `realtime_error.dart` | K | core: `DatabaseErrorCode` | 9, 10 (status strings to `DatabaseErrorCode`, REST status); A.9; T7 (`safeServerText`) |
-| `rest_client.dart` | R | core: implements `ServerActions` read-only, reads `ListenSpec` (`restParams`); U: `RealtimeTarget.restUri`, `RealtimeTarget.mayReceiveTokens`; K: `RealtimeTokenSource`, `restListenStatus`; `package:http`; pending: `SeamPendingTokenRefresh`, `SeamPendingRestParams`, `ServerActionsException`, `statusReadOnly`, `DatabaseLogger` | 6.4, 9, 10; A.2, A.4, A.7; T7, T8, T23 |
+| `rest_client.dart` | R | core: implements `ServerActions` read-only, reads `ListenSpec` (`restParams`); U: `RealtimeTarget.restUri`, `RealtimeTarget.mayReceiveTokens`; K: `RealtimeTokenSource`, `restListenStatus`; `package:http`; core: `ServerActionsException`, `statusReadOnly`, `DatabaseLogger` | 6.4, 9, 10; A.2, A.4, A.7; T7, T8, T23 |
 | `database_url.dart` | U | core: `RepoInfo` | 1.1, 2.1, 2.4 (env value); T3, T6; bad URL = `FormatException`/`ArgumentError` |
 | `realtime_target.dart` | U | core: `RepoInfo` | 2.2, 2.3, 2.4, 10 (REST URL); A.5; T1, T3, T6 |
 | `emulator_token.dart` | U | nothing | 2.4; T3 |
-| `seam_pending.dart` | lead (temporary) | core: `ListenSpec` | stand-ins for A.1, A.2, A.4, A.7, A.10 |
 
 ## test
 
@@ -51,9 +53,15 @@ A.4, A.7, A.10); it is deleted when that core commit arrives (see its header).
 | `test/util/fakes.dart` | K | K: `RequestSender`; `firebase_app_dart` | test plan 2.4, 2.4a |
 | `test/util/chaos_proxy.dart` | U | `dart:io` (copy of the Firestore proxy) | test plan 2.5 |
 | `test/util/ws_tap.dart` | U | U: `chaos_proxy.dart` | test plan 2.5 |
+| `test/contract/server_actions_reconnect_contract.dart` | P | core: `ServerActionsHarness` (`server_actions_contract.dart`), `ServerActions` | reconnect contract: replay order, revoked/failed listens, offline onDisconnect queue, typed `get` error, two timeouts -> `network_error`, re-auth after revoke |
+| `test/realtime/persistent_connection_contract_test.dart` | P | core: `runServerActionsContract`; P: `runServerActionsReconnectContract`; T: `FakeRtdbServer` | the seam contract against `PersistentConnection` |
+| `test/realtime/rest_client_contract_test.dart` | R | core: `runReadOnlyServerActionsContract`; `MockClient` | the read-only seam contract against `RestClient` |
 | `test/realtime/skeleton_compile_test.dart` | lead | every lib file but `ws_channel_web.dart` | references every public symbol; a builder who adds or renames a public symbol updates it |
 
-The recording `ServerActionsDelegate` for the tests of P and R comes from the core (A.8).
+The recording `ServerActionsDelegate` for the tests of P and R is the core's
+`lib/src/testing/recording_server_actions_delegate.dart` (A.8). P and R run the core's
+`runServerActionsContract` (R also `runReadOnlyServerActionsContract`) with harnesses over
+`FakeRtdbServer` and a `MockClient`.
 
 ## Rules for every file
 

@@ -8,7 +8,6 @@ library;
 import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
 import 'package:firebase_database_dart/src/realtime/auth_session.dart';
 import 'package:firebase_database_dart/src/realtime/connection.dart';
-import 'package:firebase_database_dart/src/realtime/realtime_target.dart';
 import 'package:firebase_database_dart/src/realtime/connection_timings.dart';
 import 'package:firebase_database_dart/src/realtime/database_url.dart';
 import 'package:firebase_database_dart/src/realtime/emulator_token.dart';
@@ -16,10 +15,10 @@ import 'package:firebase_database_dart/src/realtime/framing.dart';
 import 'package:firebase_database_dart/src/realtime/liveness.dart';
 import 'package:firebase_database_dart/src/realtime/persistent_connection.dart';
 import 'package:firebase_database_dart/src/realtime/realtime_error.dart';
+import 'package:firebase_database_dart/src/realtime/realtime_target.dart';
 import 'package:firebase_database_dart/src/realtime/reconnect_backoff.dart';
 import 'package:firebase_database_dart/src/realtime/request_table.dart';
 import 'package:firebase_database_dart/src/realtime/rest_client.dart';
-import 'package:firebase_database_dart/src/realtime/seam_pending.dart';
 import 'package:firebase_database_dart/src/realtime/server_message.dart';
 import 'package:firebase_database_dart/src/realtime/transport/ws_channel.dart';
 import 'package:firebase_database_dart/src/realtime/transport/ws_connector.dart';
@@ -126,12 +125,6 @@ final List<Object?> _topLevel = <Object?>[
   RequestTable.new,
   // rest_client.dart
   RestClient.new,
-  // seam_pending.dart
-  SeamPendingTokenRefresh,
-  ServerActionsException.new,
-  statusReadOnly,
-  DatabaseLogLevel.values,
-  DatabaseLogger,
   // server_message.dart
   ServerMessage,
   Response.new,
@@ -264,8 +257,6 @@ List<Object?> _members({
     liveness.stop,
     actions,
     readOnly,
-    persistent.refreshAuthToken,
-    persistent.refreshAppCheckToken,
     backoff.min,
     backoff.max,
     backoff.multiplier,

@@ -2,9 +2,9 @@
 /// dispatch, close and the connect timeout (`rtdb_protocol.md` 3.2 to 3.5).
 library;
 
-import 'package:firebase_database_dart/src/realtime/realtime_target.dart';
+import 'package:firebase_database_dart/src/core/util/logger.dart';
 import 'package:firebase_database_dart/src/realtime/connection_timings.dart';
-import 'package:firebase_database_dart/src/realtime/seam_pending.dart';
+import 'package:firebase_database_dart/src/realtime/realtime_target.dart';
 import 'package:firebase_database_dart/src/realtime/transport/ws_channel.dart';
 
 /// Why a [RealtimeConnection] ended (test plan section 5, interface C to P).
@@ -54,7 +54,7 @@ final class RealtimeConnection {
   /// [lastSessionId] becomes `ls` of the URL (2.3); [appId] and [appCheckToken] go into the
   /// headers or the URL as [target] decides. [now] and [random] replace the clock and the random
   /// source (test plan 2.4). [logger] gets the `e` control errors, unknown control types and the
-  /// version warning, cleaned by `safeServerText` (threat model T7).
+  /// version warning, cleaned by `safeServerText` (threat model T7); null drops them.
   RealtimeConnection(
     RealtimeTarget target,
     WsConnector connector,
@@ -63,7 +63,7 @@ final class RealtimeConnection {
     String? lastSessionId,
     String? appId,
     String? appCheckToken,
-    required DatabaseLogger logger,
+    DatabaseLogger? logger,
     required DateTime Function() now,
     required double Function() random,
   }) {

@@ -6,12 +6,12 @@ library;
 import 'package:firebase_database_dart/src/core/connection/listen_hash_provider.dart';
 import 'package:firebase_database_dart/src/core/connection/listen_spec.dart';
 import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
+import 'package:firebase_database_dart/src/core/util/logger.dart';
 import 'package:firebase_database_dart/src/realtime/auth_session.dart';
 import 'package:firebase_database_dart/src/realtime/connection.dart';
 import 'package:firebase_database_dart/src/realtime/connection_timings.dart';
 import 'package:firebase_database_dart/src/realtime/realtime_target.dart';
 import 'package:firebase_database_dart/src/realtime/reconnect_backoff.dart';
-import 'package:firebase_database_dart/src/realtime/seam_pending.dart';
 
 /// Creates the [RealtimeConnection] of the next attempt for [delegate] (test plan section 5).
 /// Production passes a closure over `RealtimeConnection` and the platform connector; tests return a
@@ -43,13 +43,17 @@ typedef RealtimeConnectionFactory =
 /// given [RealtimeTokenSource] (8.1, A.1: it subscribes to token changes itself); its results
 /// reach [ServerActionsDelegate.onAuthStatus] and [ServerActionsDelegate.onAppCheckStatus]. The
 /// only external reconnect trigger is the `connectivityHints` stream (test plan B-8.7).
-final class PersistentConnection
-    with SeamPendingTokenRefresh
-    implements ServerActions {
+///
+/// Request timeouts (lead's decision): a request times out only while sent on a live connection
+/// (`RequestTable`); the first timeout closes the connection and the request is replayed; after
+/// `ConnectionTimings.maxRequestTimeouts` (2) it completes with `network_error` and is dropped
+/// from the replay (a `get` fails with a [ServerActionsException] of that status).
+final class PersistentConnection implements ServerActions {
   /// Creates the connection; nothing happens before [initialize].
   ///
   /// [now] and [random] replace the clock and the random source (test plan 2.4); [appId] goes to
-  /// every connection (2.3); [logger] gets every log line, never a token (threat model T7, A.10).
+  /// every connection (2.3); [logger] gets every log line, never a token (threat model T7, A.10);
+  /// null drops them (the core's `ServerActionsFactory` passes a nullable logger).
   PersistentConnection({
     required RealtimeTarget target,
     required RealtimeConnectionFactory connectionFactory,
@@ -58,7 +62,7 @@ final class PersistentConnection
     required ServerActionsDelegate delegate,
     ConnectionTimings timings = const ConnectionTimings(),
     String? appId,
-    required DatabaseLogger logger,
+    DatabaseLogger? logger,
     required DateTime Function() now,
     required double Function() random,
     Stream<void>? connectivityHints,

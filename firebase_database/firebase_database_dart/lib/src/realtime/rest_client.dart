@@ -5,9 +5,9 @@ library;
 import 'package:firebase_database_dart/src/core/connection/listen_hash_provider.dart';
 import 'package:firebase_database_dart/src/core/connection/listen_spec.dart';
 import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
+import 'package:firebase_database_dart/src/core/util/logger.dart';
 import 'package:firebase_database_dart/src/realtime/auth_session.dart';
 import 'package:firebase_database_dart/src/realtime/realtime_target.dart';
-import 'package:firebase_database_dart/src/realtime/seam_pending.dart';
 import 'package:http/http.dart' as http;
 
 /// Reads a database over HTTPS (or HTTP to the emulator); the second implementation of
@@ -29,16 +29,17 @@ import 'package:http/http.dart' as http;
 /// [RealtimeTarget.mayReceiveTokens] allows (T3). Redirects are not followed (a 3xx is an
 /// error), error bodies are read up to 16 KiB, success bodies up to `maxResponseBytes` (T23). No
 /// error message or log line holds a URL query (T7, T8): `ClientException.uri` is dropped.
-final class RestClient with SeamPendingTokenRefresh implements ServerActions {
+final class RestClient implements ServerActions {
   /// Creates a client of [target] reading tokens from [tokens] (A.1) and reporting to [delegate];
-  /// [logger] gets the warnings of 10 (parse failures, `rest_error`), never a URL query (T7).
+  /// [logger] gets the warnings of 10 (parse failures, `rest_error`), never a URL query (T7);
+  /// null drops them.
   /// [httpClient] defaults to a new `http.Client` that [shutdown] closes; a given one is left
   /// open. [maxResponseBytes] bounds a success body (`ConnectionTimings.maxMessageBytes`).
   RestClient({
     required RealtimeTarget target,
     required RealtimeTokenSource tokens,
     required ServerActionsDelegate delegate,
-    required DatabaseLogger logger,
+    DatabaseLogger? logger,
     http.Client? httpClient,
     required int maxResponseBytes,
   }) {
