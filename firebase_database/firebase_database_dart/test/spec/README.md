@@ -21,3 +21,9 @@ scenario by name:
     dart test test/spec/sync_point_spec_test.dart -N 'Deep update raises all events'
 
 (`-N` matches a plain substring; `-n` takes a regular expression.)
+
+The scenario tests read the spec from `sync_point_spec.g.dart`, a generated Dart string, so they
+also run in a browser. `sync_point_spec_embedded_test.dart` (VM only) fails when that file differs
+from the JSON; after replacing the JSON, regenerate with
+
+    UPDATE_GOLDEN=1 dart test test/spec/sync_point_spec_embedded_test.dart

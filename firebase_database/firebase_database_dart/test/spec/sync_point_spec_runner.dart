@@ -5,7 +5,6 @@
 library;
 
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:firebase_database_dart/src/core/compound_write.dart';
 import 'package:firebase_database_dart/src/core/database_error.dart';
@@ -29,6 +28,7 @@ import 'package:firebase_database_dart/src/core/write_id.dart';
 import 'package:test/test.dart';
 
 import 'spec_listen_provider.dart';
+import 'sync_point_spec.g.dart';
 
 /// The spec file, relative to the package root (the working directory of `dart test`).
 const String syncPointSpecFile = 'test/spec/syncPointSpec.json';
@@ -48,12 +48,12 @@ final class SyncPointScenario {
   final List<Map<String, Object?>> steps;
 }
 
-/// Loads the scenarios of [file], checking that names are unique.
+/// Loads the scenarios of [source] (the text of the spec; by default the copy embedded in
+/// `sync_point_spec.g.dart`, so this needs no file system), checking that names are unique.
 List<SyncPointScenario> loadSyncPointScenarios([
-  String file = syncPointSpecFile,
+  String source = syncPointSpecJson,
 ]) {
-  final List<Object?> json =
-      jsonDecode(File(file).readAsStringSync()) as List<Object?>;
+  final List<Object?> json = jsonDecode(source) as List<Object?>;
   final Set<String> names = <String>{};
   final List<SyncPointScenario> scenarios = <SyncPointScenario>[];
   for (final Object? raw in json) {
@@ -61,7 +61,7 @@ List<SyncPointScenario> loadSyncPointScenarios([
     _checkKeys(spec, const <String>{'name', 'steps', '.comment'}, 'scenario');
     final String name = spec['name']! as String;
     if (!names.add(name)) {
-      throw StateError('Duplicate scenario name in $file: "$name"');
+      throw StateError('Duplicate scenario name in the spec: "$name"');
     }
     scenarios.add(
       SyncPointScenario(name, <Map<String, Object?>>[
