@@ -25,8 +25,10 @@ const String statusOk = 'ok';
 /// drops; produced locally by the connection, never by the server.
 const String statusDisconnect = 'disconnect';
 
-/// The status a request fails with when it has timed out twice on live connections; produced
-/// locally by the connection, never by the server. Maps to `DatabaseErrorCode.networkError`.
+/// The status a `get` fails with after two connections in a row were closed for silence while it
+/// waited; produced locally by the connection, never by the server. Only a get ends this way: a
+/// write, an onDisconnect request or a listen is never failed by a timeout (a silent link is
+/// closed and the request replayed). Maps to `DatabaseErrorCode.networkError`.
 const String statusNetworkError = 'network_error';
 
 /// The status a read-only [ServerActions] (the REST client) completes every write and
@@ -58,8 +60,11 @@ final class ServerActionsException implements Exception {
 /// response `d`: on error the human-readable reason (`String?`), on a successful listen the
 /// payload (which may hold warnings `{'w': ['no_index']}`), otherwise usually null.
 ///
-/// Called at most once per request, on the caller's event loop, never synchronously from inside
-/// the call that sent the request.
+/// Called once per request, on the caller's event loop, never synchronously from inside the call
+/// that sent the request. A listen is the exception: after its `ok` the same callback is called
+/// once more if the server cancels the listen later (for example `permission_denied` after a
+/// rules or auth change), and never again after that. A sent onDisconnect request whose
+/// connection drops before the answer completes with [statusDisconnect].
 typedef RequestResultCallback = void Function(String status, Object? data);
 
 /// What Repo asks of the connection. One instance per Repo; the connection owns the socket,
@@ -115,9 +120,10 @@ abstract interface class ServerActions {
 
   /// Sends `g` with `p` and `q` (always, `{}` for the default query) and completes with the
   /// decoded `d`, or fails with a [ServerActionsException] carrying the error status and
-  /// reason. Not cancelled by a disconnect: it is re-sent after the reconnect. May
-  /// fail with `ServerActionsException(statusNetworkError)` when it timed out twice on live
-  /// connections; Repo sets no timer of its own while connected.
+  /// reason. Not cancelled by a disconnect: it is re-sent after the reconnect. Fails
+  /// with `ServerActionsException(statusNetworkError)` after two connections in a row were
+  /// closed for silence while it waited, and with status `database_closed` when the connection
+  /// is shut down; Repo sets no timer of its own while connected.
   Future<Object?> get(ListenSpec spec);
 
   /// Sends `p`: overwrite [path] with [data] (export form, null removes). With [hash] it is a
