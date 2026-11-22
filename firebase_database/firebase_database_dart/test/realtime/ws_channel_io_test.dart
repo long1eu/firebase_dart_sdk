@@ -613,8 +613,16 @@ void main() {
       await serverSawEnd.future.timeout(const Duration(seconds: 2));
       expect(sinceAnswer.elapsed, lessThan(const Duration(seconds: 1)));
     },
-    skip: Process.runSync('which', <String>['openssl']).exitCode == 0
-        ? false
-        : 'needs openssl to make a certificate',
+    skip: _hasOpenssl() ? false : 'needs openssl to make a certificate',
   );
+}
+
+/// Whether `openssl` can be run; a missing program throws a [ProcessException] (there is no `which`
+/// on Windows).
+bool _hasOpenssl() {
+  try {
+    return Process.runSync('openssl', <String>['version']).exitCode == 0;
+  } on ProcessException {
+    return false;
+  }
 }
