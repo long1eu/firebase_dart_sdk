@@ -81,34 +81,59 @@ final class ServerCacheRows {
 
   /// The node at [path], combined from every row that holds part of it.
   Node load(Path path) {
+    // Rows come ordered by path: the ancestors of [path] (and [path] itself) first, root first,
+    // then the rows below it. A row below another one was written after it.
     Node node = ChildrenNode.empty;
-    bool sawDescendant = false;
+    // An ancestor row that does not decode hides everything below it, until a deeper ancestor row
+    // (written later, covering all of [path]) replaces it.
+    bool ancestorUnreadable = false;
+    // Rows below [path] that do not decode: their subtrees read as absent.
+    final List<Path> unreadable = <Path>[];
     final Map<Path, Node> priorities = <Path, Node>{};
     int skipped = 0;
     for (final sqlite.Row row in _selectNested(path, withValues: true)) {
       final Object? key = row.columnAt(0);
-      final Node? rowNode = _decode(row.columnAt(1));
-      if (key is! String || rowNode == null) {
+      if (key is! String) {
         skipped++;
         continue;
       }
       final Path rowPath = PathKey.toPath(key);
-      if (rowPath.back?.isPriorityKey ?? false) {
+      final bool isAncestor = rowPath.contains(path);
+      if (!isAncestor && !path.contains(rowPath)) {
+        skipped++;
+        continue;
+      }
+      if (!isAncestor &&
+          (ancestorUnreadable ||
+              unreadable.any((Path hidden) => hidden.contains(rowPath)))) {
+        continue;
+      }
+      final Node? rowNode = _decode(row.columnAt(1));
+      if (rowNode == null) {
+        skipped++;
+        if (isAncestor) {
+          node = ChildrenNode.empty;
+          ancestorUnreadable = true;
+        } else {
+          // Never let an ancestor row show through: the subtree of this row is not known.
+          unreadable.add(rowPath);
+          node = node.updateChild(
+            Path.relative(path, rowPath),
+            ChildrenNode.empty,
+          );
+        }
+      } else if (isAncestor) {
+        node = rowNode.getChild(Path.relative(rowPath, path));
+        ancestorUnreadable = false;
+      } else if (rowPath.back?.isPriorityKey ?? false) {
         // Applied last: deeper rows may still fill the node the priority belongs to.
         priorities[rowPath] = rowNode;
-      } else if (rowPath.contains(path) && !sawDescendant) {
-        node = rowNode.getChild(Path.relative(rowPath, path));
-      } else if (path.contains(rowPath)) {
-        sawDescendant = true;
-        node = node.updateChild(Path.relative(path, rowPath), rowNode);
       } else {
-        skipped++;
+        node = node.updateChild(Path.relative(path, rowPath), rowNode);
       }
     }
     for (final MapEntry<Path, Node> entry in priorities.entries) {
-      if (path.contains(entry.key)) {
-        node = node.updateChild(Path.relative(path, entry.key), entry.value);
-      }
+      node = node.updateChild(Path.relative(path, entry.key), entry.value);
     }
     if (skipped > 0) {
       _log(
@@ -212,7 +237,7 @@ final class ServerCacheRows {
   }
 
   int _saveNested(Path path, Node node) {
-    if (!node.isLeafNode && estimateSerializedNodeSize(node) > splitThreshold) {
+    if (!node.isLeafNode && _estimatedSize(node) > splitThreshold) {
       int rows = 0;
       node.forEachChild(keyIndex, (ChildKey key, Node child) {
         rows += _saveNested(path.child(key), child);
@@ -229,6 +254,24 @@ final class ServerCacheRows {
     }
     _saveRow(path, node);
     return 1;
+  }
+
+  /// The estimated JSON size of [node]; 0, with a warning, when the estimator fails.
+  ///
+  /// The estimator throws on an unresolved server value (`{'.sv': ...}`), which the server cache
+  /// should never hold; such a node is then stored in one row, unresolved, and never reaches the
+  /// application as an error.
+  int _estimatedSize(Node node) {
+    try {
+      return estimateSerializedNodeSize(node);
+    } on ArgumentError {
+      _log(
+        DatabaseLogLevel.warning,
+        'Realtime Database offline cache: a node written to the server cache holds an '
+        'unresolved server value; it is stored without splitting.',
+      );
+      return 0;
+    }
   }
 
   void _saveRow(Path path, Node node) {

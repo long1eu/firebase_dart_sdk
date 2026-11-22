@@ -1,5 +1,7 @@
 // The client's storage engine contract run against the SQLite engine: builder B's first target.
 // Fails with UnimplementedError until SqliteStorageEngine is written (expected).
+// switch to storage_engine.dart (DatabaseLogger: the main library if it is not there)
+import 'package:firebase_database_dart/src/core/util/logger.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';
 import 'package:firebase_database_dart_sqlite/src/sqlite_storage_engine.dart';
 import 'package:test/test.dart';
@@ -21,7 +23,7 @@ void main() {
       final SqliteConnection connection = await fixture.open();
       opened = SqliteStorageEngine(
         connection,
-        cacheSizeBytes: 10 * 1024 * 1024,
+        logger: (DatabaseLogLevel level, String message) {},
       );
     });
     tearDown(() {

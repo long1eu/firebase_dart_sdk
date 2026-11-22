@@ -163,16 +163,31 @@ void main() {
       expect(TrackedQueryRows.encodeParams(QueryParams.defaultParams), '{}');
     });
 
-    test('a double bound stays a double', () {
-      final QueryParams params = QueryParams.defaultParams.startAt(
-        nodeFromJson(1.0),
-      );
+    // The core's number rule: an integral double within 2^53 is the same query as that int (a
+    // server cancel push must match it), so 1.0 and 1 share one wire object and one stored text.
+    QueryParams startAt(Object bound) =>
+        QueryParams.defaultParams.startAt(nodeFromJson(bound));
+
+    QueryParams decode(String text) =>
+        QueryParams.fromWireObject(jsonDecode(text) as Map<String, Object?>);
+
+    test('an integral double bound is stored as the core writes it', () {
+      final QueryParams params = startAt(1.0);
       final String text = TrackedQueryRows.encodeParams(params);
-      expect(text, contains('1.0'));
-      expect(
-        QueryParams.fromWireObject(jsonDecode(text) as Map<String, Object?>),
-        params,
-      );
+      expect(decode(text), params);
+      expect(text, TrackedQueryRows.encodeParams(startAt(1)));
+    });
+
+    test('fractional and beyond-2^53 bounds keep their exact value', () {
+      for (final Object bound in <Object>[1.5, beyondDouble]) {
+        final QueryParams params = startAt(bound);
+        final String text = TrackedQueryRows.encodeParams(params);
+        expect(decode(text), params, reason: '$bound');
+        final Map<String, Object?> wire =
+            jsonDecode(text) as Map<String, Object?>;
+        expect(wire['sp'], bound, reason: '$bound');
+        expect(wire['sp'].runtimeType, bound.runtimeType, reason: '$bound');
+      }
     });
   });
 }

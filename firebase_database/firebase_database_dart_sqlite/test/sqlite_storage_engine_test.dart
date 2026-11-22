@@ -87,7 +87,6 @@ final class Harness {
     connection = await fixture.open();
     engine = SqliteStorageEngine(
       connection,
-      cacheSizeBytes: 10 * _mib,
       logger: (DatabaseLogLevel level, String message) => warnings.add(message),
     );
   }
@@ -1136,9 +1135,61 @@ void main() {
       h.rawExecute(
         "INSERT INTO server_cache (path, value) VALUES ('/c/', x'7b7b')",
       );
-      expect(h.cache('c'), node(<String, Object?>{'d': 'd-value'}));
+      // The subtree of the unreadable row reads as absent, rows below it included; a row at or
+      // above the path asked for that decodes (written later, as it is deeper) still counts.
+      expect(h.cache('c').isEmpty, isTrue);
       expect(h.warnings.single, contains('could not be read'));
+      expect(h.cache('c/d'), node('d-value'));
     });
+
+    // Mutation: in ServerCacheRows.load, drop `node = ChildrenNode.empty;` in the unreadable
+    // ancestor branch ('big/gone' reads the stale root row), or drop the `node.updateChild(...,
+    // ChildrenNode.empty)` of the unreadable descendant branch (the root shows the stale 'big').
+    test(
+      'an unreadable split marker never lets an ancestor row show through',
+      () {
+        h.overwrite(
+          '',
+          node(<String, Object?>{
+            'other': 1,
+            'big': <String, Object?>{'c1': 'stale', 'gone': 'stale'},
+          }),
+        );
+        final Map<String, Object?> fresh = <String, Object?>{
+          for (int i = 0; i < 40; i++) 'c$i': 'v' * 1024,
+        };
+        h.overwrite('big', node(fresh));
+        expect(h.cache('big'), node(fresh));
+        h.rawExecute(
+          "UPDATE server_cache SET value = x'7b7b' WHERE path = '/big/'",
+        );
+
+        expect(h.cache(''), node(<String, Object?>{'other': 1}));
+        expect(h.cache('big').isEmpty, isTrue);
+        expect(h.cache('big/gone').isEmpty, isTrue);
+        expect(h.cache('big/c1'), node('v' * 1024));
+        expect(h.warnings, hasLength(4));
+        expect(h.warnings, everyElement(isNot(contains('stale'))));
+      },
+    );
+
+    // Mutation: in ServerCacheRows._estimatedSize, drop the `on ArgumentError` clause.
+    test(
+      'an unresolved server value in the server cache is stored, not thrown',
+      () {
+        final Node withServerValue = node(<String, Object?>{
+          't': <String, Object?>{'.sv': 'timestamp'},
+          'x': 1,
+        });
+        h.overwrite('s', withServerValue);
+        expect(
+          h.cache('s').toJson(exportFormat: true),
+          withServerValue.toJson(exportFormat: true),
+        );
+        expect(h.warnings.single, contains('unresolved server value'));
+        expect(h.engine.serverCacheEstimatedSizeInBytes(), h.fullSum());
+      },
+    );
 
     test('a 100 000-deep cached value is skipped, no stack overflow', () {
       h.overwrite('ok', node('fine'));

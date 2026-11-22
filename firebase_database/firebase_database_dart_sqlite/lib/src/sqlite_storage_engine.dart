@@ -37,20 +37,17 @@ import 'package:firebase_database_dart_sqlite/src/user_write_rows.dart';
 /// degraded (or fenced) store whose statements do nothing and whose reads are empty, and a stored
 /// row that does not decode is skipped with a warning through the logger.
 final class SqliteStorageEngine implements PersistenceStorageEngine {
-  /// An engine over [connection], whose server cache is pruned above [cacheSizeBytes]. Warnings
-  /// about stored data go to [logger] (dropped when null).
-  // MERGE: builder A: engineOverConnection (lib/src/sqlite_persistence.dart) should pass
-  // `logger: options.log` here, so that undecodable rows and prune warnings reach the client's
-  // logger; it has the options in both of its call sites.
+  /// An engine over [connection]. Warnings about stored data go to [logger].
+  ///
+  /// The engine never prunes by itself: the client's cache policy compares
+  /// [serverCacheEstimatedSizeInBytes] with the size limit of its `DatabasePersistence`.
   SqliteStorageEngine(
     SqliteConnection connection, {
-    required this.cacheSizeBytes,
-    DatabaseLogger? logger,
+    required DatabaseLogger logger,
   }) : _connection = connection {
-    final DatabaseLogger log = logger ?? _dropLog;
-    _serverCache = ServerCacheRows(connection, log);
-    _userWrites = UserWriteRows(connection, log);
-    _trackedQueries = TrackedQueryRows(connection, log);
+    _serverCache = ServerCacheRows(connection, logger);
+    _userWrites = UserWriteRows(connection, logger);
+    _trackedQueries = TrackedQueryRows(connection, logger);
   }
 
   final SqliteConnection _connection;
@@ -58,16 +55,8 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
   late final UserWriteRows _userWrites;
   late final TrackedQueryRows _trackedQueries;
 
-  /// The size above which the server cache is pruned, in bytes.
-  ///
-  /// The engine does not prune by itself: the persistence manager's cache policy compares
-  /// [serverCacheEstimatedSizeInBytes] with its own limit. Kept for the opener's signature.
-  final int cacheSizeBytes;
-
   bool _successful = false;
   int _sizeAtBegin = 0;
-
-  static void _dropLog(DatabaseLogLevel level, String message) {}
 
   void _requireTransaction() {
     if (!_connection.inTransaction) {

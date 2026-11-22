@@ -61,11 +61,12 @@ Future<void> clearSqlitePersistence(
 
 /// SEAM between builder A and builder B: the engine over an opened [connection]. Builder B owns
 /// [SqliteStorageEngine] (lib/src/sqlite_storage_engine.dart and the row files next to it).
+/// Warnings about stored data go to [logger].
 PersistenceStorageEngine engineOverConnection(
   SqliteConnection connection, {
-  required int cacheSizeBytes,
+  required DatabaseLogger logger,
 }) {
-  return SqliteStorageEngine(connection, cacheSizeBytes: cacheSizeBytes);
+  return SqliteStorageEngine(connection, logger: logger);
 }
 
 /// SQLite files of the offline cache, one per app and database URL, in one directory.
@@ -134,7 +135,7 @@ final class SqlitePersistence {
               'using it; this instance keeps data in memory only.',
           log: options.log,
         ),
-        cacheSizeBytes: cacheSizeBytes,
+        logger: options.log,
       );
     }
     _openPaths.add(path);
@@ -147,7 +148,7 @@ final class SqlitePersistence {
     if (!connection.isDurable) {
       _openPaths.remove(path);
     }
-    return engineOverConnection(connection, cacheSizeBytes: cacheSizeBytes);
+    return engineOverConnection(connection, logger: options.log);
   }
 
   /// Deletes the store files of [key]: the database file, its side files and its `.bad-` copies.
