@@ -166,6 +166,14 @@ abstract interface class ServerActions {
 
   /// Drops every put and merge not yet acknowledged, completing each with `write_canceled`
   /// (Repo's `purgeOutstandingWrites`).
+  ///
+  /// Every write gets exactly one completion. The connection completes each write it still holds
+  /// unanswered with `write_canceled` and from then on drops any answer the server sends for it.
+  /// One case remains by design: an answer the connection had already received, whose completion
+  /// is already queued when the core purges, is delivered after the purge, as ok or as the
+  /// server's error, because the server did apply or refuse that write. So the core must tolerate
+  /// a completion for a write its own purge removed. The connection never delivers two completions
+  /// for one write, and never a `write_canceled` followed by an answer.
   void purgeOutstandingWrites();
 
   /// Adds [reason] (`repo_interrupt` for goOffline) and closes the connection; no reconnect while
