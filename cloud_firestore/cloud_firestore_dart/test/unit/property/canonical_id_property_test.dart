@@ -12,11 +12,39 @@ import 'package:cloud_firestore_dart/src/firebase/firestore/core/query.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/core/target.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/field_path.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/resource_path.dart';
+import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/canonical_value.dart';
 import 'package:cloud_firestore_dart/src/firebase/firestore/model/value/field_value.dart';
 import 'package:test/test.dart';
 
 import '../../util/property.dart';
 import '../../util/property_model.dart';
+
+/// The values of [target], in the order of its canonical id: the ones of the
+/// filters, then the ones of the two bounds.
+List<FieldValue> _values(Target target) => <FieldValue>[
+  for (final Filter filter in target.filters)
+    for (final FieldFilter field in filter.flattenedFilters) field.value,
+  ...?target.startAt?.position,
+  ...?target.endAt?.position,
+];
+
+/// Whether [a] and [b], which share a canonical id, differ in a value that
+/// another type writes with the same text (an empty string and empty bytes,
+/// `1` and `'1'`). That is the quirk tested below, not a collision to report.
+bool _differByValueTypeOnly(Target a, Target b) {
+  final List<FieldValue> left = _values(a);
+  final List<FieldValue> right = _values(b);
+  if (left.length != right.length) {
+    return false;
+  }
+  for (int i = 0; i < left.length; i++) {
+    if (left[i].runtimeType != right[i].runtimeType &&
+        canonifyValue(left[i]) == canonifyValue(right[i])) {
+      return true;
+    }
+  }
+  return false;
+}
 
 void main() {
   test('equal targets have equal canonical ids and hash codes', () {
@@ -54,7 +82,7 @@ void main() {
       check: (Query query) {
         final Target target = query.toTarget();
         final Target other = byId.putIfAbsent(target.canonicalId, () => target);
-        if (other != target) {
+        if (other != target && !_differByValueTypeOnly(target, other)) {
           fail(
             'Two different targets share the canonical id '
             '${target.canonicalId}\n    $target\n    $other',
@@ -73,7 +101,8 @@ void main() {
       show: (Query query) => query.canonicalId,
       check: (Query query) {
         final Query other = byId.putIfAbsent(query.canonicalId, () => query);
-        if (other != query) {
+        if (other != query &&
+            !_differByValueTypeOnly(query.toTarget(), other.toTarget())) {
           fail(
             'Two different queries share the canonical id '
             '${query.canonicalId}\n    $query\n    $other',
@@ -108,6 +137,9 @@ void main() {
     expect(where(1), isNot(where(1.0)));
     expect(where(1).canonicalId, where(1.0).canonicalId);
     expect(where(0.0).canonicalId, where(-0.0).canonicalId);
+    // An empty string and empty bytes are both written as nothing.
+    expect(where(''), isNot(where(api.Blob(Uint8List(0)))));
+    expect(where('').canonicalId, where(api.Blob(Uint8List(0))).canonicalId);
   });
 
   group('canonical ids are stable (they are persisted)', () {
