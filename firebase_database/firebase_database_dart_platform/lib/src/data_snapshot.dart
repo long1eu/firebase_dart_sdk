@@ -9,12 +9,23 @@ import 'package:firebase_database_dart_platform/src/values.dart';
 import 'package:firebase_database_platform_interface/firebase_database_platform_interface.dart';
 
 /// The client event type of the FlutterFire [type].
-fs.DatabaseEventType clientEventType(DatabaseEventType type) =>
-    throw UnimplementedError();
+fs.DatabaseEventType clientEventType(DatabaseEventType type) => switch (type) {
+  DatabaseEventType.value => fs.DatabaseEventType.value,
+  DatabaseEventType.childAdded => fs.DatabaseEventType.childAdded,
+  DatabaseEventType.childChanged => fs.DatabaseEventType.childChanged,
+  DatabaseEventType.childMoved => fs.DatabaseEventType.childMoved,
+  DatabaseEventType.childRemoved => fs.DatabaseEventType.childRemoved,
+};
 
 /// The FlutterFire event type of the client's [type].
 DatabaseEventType flutterFireEventType(fs.DatabaseEventType type) =>
-    throw UnimplementedError();
+    switch (type) {
+      fs.DatabaseEventType.value => DatabaseEventType.value,
+      fs.DatabaseEventType.childAdded => DatabaseEventType.childAdded,
+      fs.DatabaseEventType.childChanged => DatabaseEventType.childChanged,
+      fs.DatabaseEventType.childMoved => DatabaseEventType.childMoved,
+      fs.DatabaseEventType.childRemoved => DatabaseEventType.childRemoved,
+    };
 
 /// The implementation of [DataSnapshotPlatform] over a client
 /// [fs.DataSnapshot]. The platform class reads a private data map; every
@@ -34,39 +45,44 @@ class DartDataSnapshot extends DataSnapshotPlatform {
 
   /// `DataSnapshotPlatform.ref`, typed.
   @override
-  DartReference get ref => throw UnimplementedError();
+  DartReference get ref => super.ref as DartReference;
 
   /// `DataSnapshotPlatform.key`: client `key`.
   @override
-  String? get key => throw UnimplementedError();
+  String? get key => clientSnapshot.key;
 
   /// `DataSnapshotPlatform.exists`: client `exists`.
   @override
-  bool get exists => throw UnimplementedError();
+  bool get exists => clientSnapshot.exists;
 
   /// `DataSnapshotPlatform.value`: the [mutableCopy] of the client `value`,
   /// made on the first read and the same object on every later read.
   @override
-  Object? get value => throw UnimplementedError();
+  Object? get value => _value;
+
+  late final Object? _value = mutableCopy(clientSnapshot.value);
 
   /// `DataSnapshotPlatform.priority`: client `priority`, for child snapshots
   /// too (FlutterFire native gives null for children: fixed on purpose).
   @override
-  Object? get priority => throw UnimplementedError();
+  Object? get priority => clientSnapshot.priority;
 
   /// `DataSnapshotPlatform.hasChild`: client `hasChild`.
   @override
-  bool hasChild(String path) => throw UnimplementedError();
+  bool hasChild(String path) => clientSnapshot.hasChild(path);
 
   /// `DataSnapshotPlatform.child`: client `child`; [childPath] may have
   /// several keys and list indices.
   @override
-  DartDataSnapshot child(String childPath) => throw UnimplementedError();
+  DartDataSnapshot child(String childPath) =>
+      DartDataSnapshot(ref.database, clientSnapshot.child(childPath));
 
   /// `DataSnapshotPlatform.children`: client `children`, lazy, in the query's
   /// index order, each with its own reference and priority.
   @override
-  Iterable<DartDataSnapshot> get children => throw UnimplementedError();
+  Iterable<DartDataSnapshot> get children => clientSnapshot.children.map(
+    (fs.DataSnapshot child) => DartDataSnapshot(ref.database, child),
+  );
 }
 
 /// The implementation of [DatabaseEventPlatform] over a client
@@ -90,14 +106,19 @@ class DartDatabaseEvent extends DatabaseEventPlatform {
   /// `DatabaseEventPlatform.snapshot`: a [DartDataSnapshot] of the client
   /// `snapshot`, made once.
   @override
-  DartDataSnapshot get snapshot => throw UnimplementedError();
+  DartDataSnapshot get snapshot => _snapshot;
+
+  late final DartDataSnapshot _snapshot = DartDataSnapshot(
+    database,
+    clientEvent.snapshot,
+  );
 
   /// `DatabaseEventPlatform.previousChildKey`: client `previousChildKey`.
   @override
-  String? get previousChildKey => throw UnimplementedError();
+  String? get previousChildKey => clientEvent.previousChildKey;
 
   /// `DatabaseEventPlatform.type`: [flutterFireEventType] of the client
   /// `type`.
   @override
-  DatabaseEventType get type => throw UnimplementedError();
+  DatabaseEventType get type => flutterFireEventType(clientEvent.type);
 }
