@@ -50,7 +50,7 @@ void main() {
       '"r1":{"n":{"name":1},"name":"a"},"r2":{"name":"b",".priority":2}}',
     );
     expect(node, nodeFromJson(jsonDecode(jsonEncode(json))));
-    expect(node.hash, nodeFromJson(jsonDecode(jsonEncode(json))).hash);
+    expect(node.hash(), nodeFromJson(jsonDecode(jsonEncode(json))).hash());
   });
 
   test('two calls share nothing', () {
