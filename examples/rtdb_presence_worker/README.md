@@ -4,8 +4,8 @@
 | --- | --- |
 | Product | Firebase Realtime Database |
 | Platform | Dart VM on a server or a desktop (Linux, macOS, Windows); no Flutter |
-| Backend | Realtime Database emulator (project `demo-example`), or a real database by URL |
-| Run | `FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9000 dart run bin/presence_worker.dart --id worker-a` |
+| Backend | Realtime Database emulator (project `demo-example`; start it from the repository root with `tool/start_database_emulator.sh` (port 9100)), or a real database by URL |
+| Run | `FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 dart run bin/presence_worker.dart --id worker-a` |
 | CI | none; run by hand against the emulator |
 | Web gallery | - |
 

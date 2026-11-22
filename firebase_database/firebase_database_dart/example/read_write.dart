@@ -2,7 +2,7 @@
 //
 // Shows: set replaces, update merges, null removes, plain Dart values come back.
 // Platform: Dart VM.
-// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9000 dart run example/read_write.dart
+// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 dart run example/read_write.dart
 // Backend: Realtime Database emulator, project demo-example.
 
 import 'package:firebase_database_dart/firebase_database_dart.dart';

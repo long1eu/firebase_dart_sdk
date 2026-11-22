@@ -2,7 +2,7 @@
 //
 // Shows: a FirebaseDatabase on the local emulator, set, push, get, onValue.
 // Platform: Dart VM (the package itself also runs on the web).
-// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9000 dart run example/main.dart
+// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 dart run example/main.dart
 // Backend: Realtime Database emulator, project demo-example.
 
 import 'package:firebase_database_dart/firebase_database_dart.dart';

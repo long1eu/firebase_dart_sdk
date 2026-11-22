@@ -3,7 +3,7 @@
 // Shows: orderByChild, orderByKey, orderByValue, startAt, endAt, startAfter,
 // endBefore, equalTo, limitToFirst, limitToLast.
 // Platform: Dart VM.
-// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9000 dart run example/queries.dart
+// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 dart run example/queries.dart
 // Backend: Realtime Database emulator, project demo-example.
 
 import 'package:firebase_database_dart/firebase_database_dart.dart';

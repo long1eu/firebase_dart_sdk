@@ -3,7 +3,7 @@
 // Shows: code, message, serverStatus, ArgumentError, StateError, and the
 // codes a program can meet.
 // Platform: Dart VM.
-// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9000 dart run example/error_handling.dart
+// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 dart run example/error_handling.dart
 // Backend: Realtime Database emulator, project demo-example.
 
 import 'dart:async';

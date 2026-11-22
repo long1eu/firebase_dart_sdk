@@ -3,7 +3,7 @@
 // Shows: onValue, onChildAdded, onChildChanged, onChildMoved, onChildRemoved,
 // onChildEvents, once, and cancelling a subscription.
 // Platform: Dart VM.
-// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9000 dart run example/listeners.dart
+// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 dart run example/listeners.dart
 // Backend: Realtime Database emulator, project demo-example.
 
 import 'dart:async';

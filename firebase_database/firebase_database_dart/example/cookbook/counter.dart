@@ -3,7 +3,7 @@
 // Shows: ServerValue.increment, runTransaction, and why read-then-set loses
 // updates.
 // Platform: Dart VM.
-// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9000 dart run example/cookbook/counter.dart
+// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 dart run example/cookbook/counter.dart
 // Backend: Realtime Database emulator, project demo-example.
 
 import 'package:firebase_database_dart/firebase_database_dart.dart';

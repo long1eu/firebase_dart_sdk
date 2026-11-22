@@ -2,8 +2,8 @@
 
 - **Product:** Realtime Database (`firebase_database_dart`)
 - **Platform:** web (`package:web`, no Flutter)
-- **Backend:** emulator, or your own project (none by default)
-- **Run:** `dart compile js -O2 -o build/web/main.dart.js web/main.dart`, copy `web/*` next to it, serve the folder, open `index.html?emulator=127.0.0.1:9000`
+- **Backend:** emulator (start it from the repository root with `tool/start_database_emulator.sh` (port 9100)), or your own project (none by default)
+- **Run:** `dart compile js -O2 -o build/web/main.dart.js web/main.dart`, copy `web/*` next to it, serve the folder, open `index.html?emulator=127.0.0.1:9100`
 - **CI:** compile (`dart compile js`) and `dart analyze`
 - **Web gallery:** -
 
@@ -22,7 +22,7 @@ With no parameters the page connects to nothing and asks for an emulator host. G
 
 | Parameter | Meaning |
 | --- | --- |
-| `?emulator=127.0.0.1:9000` | A Realtime Database emulator on this machine (`localhost` also works). `project=` is optional (default `demo-example`). |
+| `?emulator=127.0.0.1:9100` | A Realtime Database emulator on this machine (`localhost` also works). `project=` is optional (default `demo-example`). |
 | `?databaseUrl=...&apiKey=...&project=...` | Your project: `https://<name>.firebaseio.com` or `https://<name>.firebasedatabase.app`. |
 
 The same fields are in the panel. Nothing is stored unless you tick **Remember in this browser**

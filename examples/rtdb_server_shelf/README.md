@@ -4,8 +4,8 @@
 | --- | --- |
 | Product | Realtime Database (`firebase_database_dart`) |
 | Platform | Dart server (VM), `package:shelf` |
-| Backend | Realtime Database emulator, project `demo-example` |
-| Run | `FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9000 PORT=8000 dart run bin/server.dart` |
+| Backend | Realtime Database emulator, project `demo-example`; start it from the repository root with `tool/start_database_emulator.sh` (port 9100) |
+| Run | `FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 PORT=8000 dart run bin/server.dart` |
 | CI | not in CI yet; run by hand against the emulator |
 | Web gallery | - |
 
@@ -30,7 +30,7 @@ the database. Database errors become statuses (`permission-denied` 403, `unavail
 
 ```sh
 dart pub get
-FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9000 PORT=8000 dart run bin/server.dart
+FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 PORT=8000 dart run bin/server.dart
 ```
 
 | Variable | Meaning |

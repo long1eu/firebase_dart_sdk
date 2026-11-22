@@ -3,7 +3,7 @@
 // Shows: onConnected, isConnected, goOffline, goOnline, serverTimeOffset, and
 // what a write does while offline.
 // Platform: Dart VM.
-// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9000 dart run example/connection_state.dart
+// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 dart run example/connection_state.dart
 // Backend: Realtime Database emulator, project demo-example.
 
 import 'package:firebase_database_dart/firebase_database_dart.dart';

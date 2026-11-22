@@ -3,7 +3,7 @@
 ///
 /// Parameters (all optional):
 /// - `emulator=<host>:<port>`: a Realtime Database emulator, for example
-///   `127.0.0.1:9000`. `project=<id>` names the project (default
+///   `127.0.0.1:9100`. `project=<id>` names the project (default
 ///   `demo-example`).
 /// - `databaseUrl=<url>`, `apiKey=<key>`, `project=<id>`: your own project.
 ///

@@ -3,7 +3,7 @@
 // Shows: mockUserToken, security rules, FirebaseDatabaseException with
 // permission-denied.
 // Platform: Dart VM.
-// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9000 dart run example/auth_and_rules.dart
+// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 dart run example/auth_and_rules.dart
 // Backend: Realtime Database emulator, project demo-example, started with rules
 // such as the ones below (database.rules.json of the emulator):
 //

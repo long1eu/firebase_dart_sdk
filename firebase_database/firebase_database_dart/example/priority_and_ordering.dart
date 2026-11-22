@@ -3,7 +3,7 @@
 // Shows: set with priority, setPriority, DataSnapshot.priority,
 // orderByPriority, and how orderByValue sorts values of different types.
 // Platform: Dart VM.
-// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9000 dart run example/priority_and_ordering.dart
+// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 dart run example/priority_and_ordering.dart
 // Backend: Realtime Database emulator, project demo-example.
 
 import 'package:firebase_database_dart/firebase_database_dart.dart';

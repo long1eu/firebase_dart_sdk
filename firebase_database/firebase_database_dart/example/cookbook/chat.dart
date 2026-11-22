@@ -4,7 +4,7 @@
 // Shows: push, onChildAdded, limitToLast, ServerValue.timestamp, OnDisconnect,
 // two clients.
 // Platform: Dart VM.
-// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9000 dart run example/cookbook/chat.dart
+// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 dart run example/cookbook/chat.dart
 // Backend: Realtime Database emulator, project demo-example.
 
 import 'dart:async';

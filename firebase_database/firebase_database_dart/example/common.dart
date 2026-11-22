@@ -2,14 +2,15 @@
 // project `demo-example` and a FirebaseDatabase connected to the local
 // Realtime Database emulator.
 //
-// Start the emulator (it listens on port 9000 by default) with the Firebase
-// CLI, for example
+// Start the emulator with this repository's script, from the repository root
+// (port 9100; the Firebase CLI's own default, 9000, is refused by the script
+// because other tools use it):
 //
-//     firebase emulators:start --only database --project demo-example
+//     tool/start_database_emulator.sh
 //
 // and run any example from this package with
 //
-//     FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9000 dart run example/<name>.dart
+//     FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 dart run example/<name>.dart
 //
 // Every program needs the variable and stops with a message without it, so an
 // example can never reach a real project.
@@ -23,7 +24,7 @@ import 'package:firebase_database_dart/firebase_database_dart.dart';
 const String projectId = 'demo-example';
 
 /// The port of the Realtime Database emulator when the variable names none.
-const int defaultEmulatorPort = 9000;
+const int defaultEmulatorPort = 9100;
 
 /// A new [FirebaseApp] for the `demo-example` project. The emulator accepts
 /// any API key and application id.
@@ -38,7 +39,7 @@ FirebaseApp exampleApp([String name = defaultFirebaseAppName]) {
   );
 }
 
-/// The emulator address from `FIREBASE_DATABASE_EMULATOR_HOST`, with port 9000
+/// The emulator address from `FIREBASE_DATABASE_EMULATOR_HOST`, with port 9100
 /// added when the value has none. The program stops with a message when the
 /// variable is not set.
 String emulatorHost() {

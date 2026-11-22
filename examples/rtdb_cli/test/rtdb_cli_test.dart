@@ -4,8 +4,8 @@ import 'package:test/test.dart';
 void main() {
   group('host and path', () {
     test('parseHostPort', () {
-      expect(parseHostPort('127.0.0.1:9000'), (host: '127.0.0.1', port: 9000));
-      expect(parseHostPort('[::1]:9000'), (host: '[::1]', port: 9000));
+      expect(parseHostPort('127.0.0.1:9100'), (host: '127.0.0.1', port: 9100));
+      expect(parseHostPort('[::1]:9100'), (host: '[::1]', port: 9100));
       expect(() => parseHostPort('localhost'), throwsA(isA<UsageError>()));
       expect(() => parseHostPort('h:99999'), throwsA(isA<UsageError>()));
     });
@@ -108,19 +108,19 @@ void main() {
 
     test('the flag wins over the environment', () {
       final DatabaseTarget t = resolveTarget(
-        emulator: '127.0.0.1:9000',
+        emulator: '127.0.0.1:9100',
         environment: {'FIREBASE_DATABASE_EMULATOR_HOST': 'other:1'},
       );
-      expect(t.emulatorHost, '127.0.0.1:9000');
+      expect(t.emulatorHost, '127.0.0.1:9100');
       expect(t.projectId, 'demo-example');
       expect(t.databaseUrl, isNull);
     });
 
     test('the environment alone is enough', () {
       final DatabaseTarget t = resolveTarget(
-        environment: {'FIREBASE_DATABASE_EMULATOR_HOST': 'localhost:9000'},
+        environment: {'FIREBASE_DATABASE_EMULATOR_HOST': 'localhost:9100'},
       );
-      expect(t.emulatorHost, 'localhost:9000');
+      expect(t.emulatorHost, 'localhost:9100');
     });
 
     test('an explicit URL names the project', () {

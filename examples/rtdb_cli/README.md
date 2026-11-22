@@ -4,8 +4,8 @@
 | --- | --- |
 | Product | Firebase Realtime Database |
 | Platform | Command line (Dart VM: macOS, Linux, Windows) |
-| Backend | The Database emulator; a real database only with an explicit `--database-url` |
-| Run | `cd examples/rtdb_cli && dart pub get && dart run rtdb_cli --emulator 127.0.0.1:9000 get /` |
+| Backend | The Database emulator (start it from the repository root with `tool/start_database_emulator.sh` (port 9100)); a real database only with an explicit `--database-url` |
+| Run | `cd examples/rtdb_cli && dart pub get && dart run rtdb_cli --emulator 127.0.0.1:9100 get /` |
 | CI | `dart analyze` and `dart test` in this folder |
 | Web gallery | - |
 
@@ -43,9 +43,9 @@ Exit codes: `64` usage, `66` missing local file, `78` no backend configured, `1`
 `FirebaseDatabaseException` (printed as `code: message`).
 
 ```sh
-dart run rtdb_cli --emulator 127.0.0.1:9000 set /users/ann '{"age": 31}'
-dart run rtdb_cli --emulator 127.0.0.1:9000 get /users --order-by-child age --start-at 18
-dart run rtdb_cli --emulator 127.0.0.1:9000 export /users users.json
+dart run rtdb_cli --emulator 127.0.0.1:9100 set /users/ann '{"age": 31}'
+dart run rtdb_cli --emulator 127.0.0.1:9100 get /users --order-by-child age --start-at 18
+dart run rtdb_cli --emulator 127.0.0.1:9100 export /users users.json
 ```
 
 The second command needs `".indexOn": "age"` at `/users` in the rules: the server refuses a filtered

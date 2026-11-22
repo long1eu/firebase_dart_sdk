@@ -3,7 +3,7 @@
 // Shows: update with multi-segment keys, null to delete, why it beats several
 // set calls, and the rule on overlapping paths.
 // Platform: Dart VM.
-// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9000 dart run example/multi_path_update.dart
+// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 dart run example/multi_path_update.dart
 // Backend: Realtime Database emulator, project demo-example.
 
 import 'package:firebase_database_dart/firebase_database_dart.dart';

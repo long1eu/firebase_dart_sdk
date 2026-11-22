@@ -3,7 +3,7 @@
 // Shows: independent instances, close() and what fails afterwards, the app
 // being deleted.
 // Platform: Dart VM.
-// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9000 dart run example/lifecycle.dart
+// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 dart run example/lifecycle.dart
 // Backend: Realtime Database emulator, project demo-example.
 
 import 'dart:async';

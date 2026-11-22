@@ -4,7 +4,7 @@
 // Shows: onConnected, OnDisconnect, ServerValue.timestamp, a second client
 // watching the list.
 // Platform: Dart VM.
-// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9000 dart run example/cookbook/presence.dart
+// Run: FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 dart run example/cookbook/presence.dart
 // Backend: Realtime Database emulator, project demo-example.
 
 import 'dart:async';

@@ -1,12 +1,13 @@
 # firebase_database_dart examples
 
 Small command-line programs, one per topic. They run against the local Realtime Database emulator, never
-against a real project. Start an emulator (the Firebase CLI, port 9000 by default), then from this package:
+against a real project. Start the emulator with the repository's script (port 9100; it refuses the Firebase CLI's own default, 9000), then
+from this package:
 
 ```sh
-firebase emulators:start --only database --project demo-example
+../../tool/start_database_emulator.sh
 dart pub get
-FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9000 dart run example/main.dart
+FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 dart run example/main.dart
 ```
 
 Each program writes under the key `example-<name>-<timestamp>` and removes it at the end, then closes the
@@ -33,7 +34,7 @@ database. Without `FIREBASE_DATABASE_EMULATOR_HOST` they stop with a message. Th
 | `cookbook/chat.dart` | A chat room: push keys, a `limitToLast` window, a typing flag cleared on disconnect. |
 
 `common.dart` holds the shared setup: the `demo-example` app, `emulatorDatabase()` (reads
-`FIREBASE_DATABASE_EMULATOR_HOST`, adds port 9000 when the value has none), `freshKey()` and `runExample()`
+`FIREBASE_DATABASE_EMULATOR_HOST`, adds port 9100 when the value has none), `freshKey()` and `runExample()`
 (a database plus a fresh key, removed and closed afterwards).
 
 Every program was run against the Database emulator; none against a real database. Limits to know:
