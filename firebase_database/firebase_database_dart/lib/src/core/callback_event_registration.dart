@@ -36,26 +36,63 @@ final class CallbackEventRegistration extends EventRegistration {
   /// Receives the cancellation error.
   final void Function(DatabaseError error) onCancel;
 
+  /// Whether [type] is one of [types] (Android `ValueEventRegistration.respondsTo`,
+  /// `ChildEventRegistration.respondsTo`).
   @override
-  bool respondsTo(EventType type) => throw UnimplementedError();
+  bool respondsTo(EventType type) => types.contains(type);
+
+  /// A value event at the query path, or a child event at the child path with the previous
+  /// sibling (Android `ValueEventRegistration.createEvent`, `ChildEventRegistration.createEvent`).
+  @override
+  DataEvent createEvent(Change change, QuerySpec query) {
+    if (change.eventType == EventType.value) {
+      return DataEvent(EventType.value, this, query.path, change.node);
+    }
+    return DataEvent(
+      change.eventType,
+      this,
+      query.path.child(change.childKey!),
+      change.node,
+      previousName: change.prevName,
+    );
+  }
+
+  /// Calls [onEvent] unless zombied (Android `ChildEventRegistration.fireEvent`).
+  @override
+  void fireEvent(DataEvent event) {
+    if (isZombied) {
+      return;
+    }
+    onEvent(event);
+  }
+
+  /// Calls [onCancel] unless zombied, then zombifies, so the cancellation is the last thing the
+  /// listener gets (Android `ValueEventRegistration.fireCancelEvent` calls it unconditionally;
+  /// here the view leaves a cancelled registration alive until its cancel event fires).
+  @override
+  void fireCancelEvent(DatabaseError error) {
+    if (isZombied) {
+      return;
+    }
+    onCancel(error);
+    zombify();
+  }
+
+  /// The same callbacks and [types] on [newQuery] (Android `ValueEventRegistration.clone`).
+  @override
+  EventRegistration clone(QuerySpec newQuery) => CallbackEventRegistration(
+    newQuery,
+    types,
+    onEvent: onEvent,
+    onCancel: onCancel,
+  );
+
+  /// Whether [other] is a [CallbackEventRegistration] with the same [onEvent] (identical;
+  /// Android `ValueEventRegistration.isSameListener`).
+  @override
+  bool isSameListener(EventRegistration other) =>
+      other is CallbackEventRegistration && identical(other.onEvent, onEvent);
 
   @override
-  DataEvent createEvent(Change change, QuerySpec query) =>
-      throw UnimplementedError();
-
-  /// Calls [onEvent] unless zombied.
-  @override
-  void fireEvent(DataEvent event) => throw UnimplementedError();
-
-  /// Calls [onCancel] unless zombied.
-  @override
-  void fireCancelEvent(DatabaseError error) => throw UnimplementedError();
-
-  /// The same callbacks and [types] on [newQuery].
-  @override
-  EventRegistration clone(QuerySpec newQuery) => throw UnimplementedError();
-
-  /// Whether [other] is a [CallbackEventRegistration] with the same [onEvent] (identical).
-  @override
-  bool isSameListener(EventRegistration other) => throw UnimplementedError();
+  String toString() => 'CallbackEventRegistration($types)';
 }

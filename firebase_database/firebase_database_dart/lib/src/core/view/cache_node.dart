@@ -24,15 +24,16 @@ final class CacheNode {
   /// Whether a query filter dropped children.
   final bool filtered;
 
-  /// Whether the data at [path] is complete. Android: `CacheNode.isCompleteForPath`.
+  /// Whether the data at [path] is complete (Android `CacheNode.isCompleteForPath`).
   bool isCompleteForPath(Path path) {
-    if (path.isEmpty) {
+    final ChildKey? front = path.front;
+    if (front == null) {
       return fullyInitialized && !filtered;
     }
-    return isCompleteForChild(path.front!);
+    return isCompleteForChild(front);
   }
 
-  /// Whether child [key] is complete. Android: `CacheNode.isCompleteForChild`.
+  /// Whether child [key] is complete (Android `CacheNode.isCompleteForChild`).
   bool isCompleteForChild(ChildKey key) =>
       (fullyInitialized && !filtered) || node.hasChild(key);
 }

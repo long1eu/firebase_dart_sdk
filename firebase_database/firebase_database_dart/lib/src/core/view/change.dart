@@ -51,9 +51,16 @@ final class Change {
   /// The previous sibling.
   final ChildKey? prevName;
 
-  /// This change with [prevName].
-  Change withPrevName(ChildKey? prevName) => throw UnimplementedError();
+  /// This change with [prevName] (Android `Change.changeWithPrevName`).
+  Change withPrevName(ChildKey? prevName) => Change._(
+    eventType,
+    node,
+    oldNode: oldNode,
+    childKey: childKey,
+    prevName: prevName,
+  );
 
+  /// As Android `Change.toString`.
   @override
-  String toString() => throw UnimplementedError();
+  String toString() => 'Change: ${eventType.name} $childKey';
 }
