@@ -195,7 +195,9 @@ final class SyncTree implements SyncTreeApi {
     }
     final UserWriteRecord? write = _pendingWriteTree.getWrite(writeId);
     if (write == null) {
-      throw StateError('ackUserWrite called with nonexistent writeId');
+      // purgeOutstandingWrites removed it: an answer the connection received before the purge is
+      // delivered after it. Android drops the answer in the connection; JS asserts here.
+      return const <Event>[];
     }
     final bool needToReevaluate = _pendingWriteTree.removeWrite(writeId);
     if (write.visible && !revert) {

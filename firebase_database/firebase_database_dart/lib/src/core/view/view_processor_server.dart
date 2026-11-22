@@ -19,7 +19,7 @@ extension _ServerOperations on ViewProcessor {
     }
     final Node newEventCache;
     final ChildKey? childKey = changePath.front;
-    if (childKey == null) {
+    if (childKey == null || _staleEventLeafAbove(viewCache, changePath)) {
       assert(
         viewCache.serverCache.fullyInitialized,
         'If change path is empty, we must have complete server data',
@@ -101,6 +101,29 @@ extension _ServerOperations on ViewProcessor {
       complete: oldEventSnap.fullyInitialized || changePath.isEmpty,
       filtered: filter.filtersNodes,
     );
+  }
+
+  /// Whether the event cache of [viewCache] holds a leaf above [changePath] while the server
+  /// cache is complete: a change below a leaf cannot be applied child by child, because the
+  /// writes that made the leaf may no longer shadow the server data (a write at `b/c` replaced
+  /// by a later one there, over a server leaf). The event cache is then built again from the
+  /// server cache. No JS or Android counterpart.
+  bool _staleEventLeafAbove(ViewCache viewCache, Path changePath) {
+    if (!viewCache.serverCache.fullyInitialized ||
+        viewCache.serverCache.filtered) {
+      return false;
+    }
+    Node node = viewCache.eventCache.node;
+    for (final ChildKey key in changePath.segments) {
+      if (key.isPriorityKey) {
+        return false;
+      }
+      if (node.isLeafNode) {
+        return true;
+      }
+      node = node.getImmediateChild(key);
+    }
+    return false;
   }
 
   /// JS `viewProcessorApplyServerOverwrite`.
@@ -267,6 +290,20 @@ extension _ServerOperations on ViewProcessor {
     // Only filter the server node if it is currently filtered.
     final bool filterServerNode = viewCache.serverCache.filtered;
     final CacheNode serverCache = viewCache.serverCache;
+    final Path? leafPath = _serverLeafAbove(serverCache, ackPath);
+    if (leafPath != null) {
+      // The server turned an ancestor of the write into a leaf: apply that leaf. Applying the
+      // empty child below it, as JS and Android do, would remove the leaf from the event cache.
+      return _applyServerOverwrite(
+        viewCache,
+        leafPath,
+        serverCache.node.getChild(leafPath),
+        writesCache,
+        completeCache,
+        filterServerNode,
+        accumulator,
+      );
+    }
     if (affectedTree.value != null) {
       // An overwrite.
       if ((ackPath.isEmpty && serverCache.fullyInitialized) ||
@@ -320,6 +357,29 @@ extension _ServerOperations on ViewProcessor {
       filterServerNode,
       accumulator,
     );
+  }
+
+  /// The shortest path from the root of [serverCache] to [ackPath] (inclusive) at which the
+  /// complete server data is a leaf, or null. No JS or Android counterpart.
+  Path? _serverLeafAbove(CacheNode serverCache, Path ackPath) {
+    Node node = serverCache.node;
+    final List<ChildKey> prefix = <ChildKey>[];
+    for (int i = 0; i <= ackPath.length; i++) {
+      final Path at = Path.fromKeys(List<ChildKey>.of(prefix));
+      if (node.isLeafNode) {
+        return serverCache.isCompleteForPath(at) ? at : null;
+      }
+      if (i == ackPath.length) {
+        return null;
+      }
+      final ChildKey key = ackPath.segments[i];
+      if (key.isPriorityKey) {
+        return null;
+      }
+      prefix.add(key);
+      node = node.getImmediateChild(key);
+    }
+    return null;
   }
 
   /// JS `viewProcessorListenComplete`: the server cache is complete at [path].

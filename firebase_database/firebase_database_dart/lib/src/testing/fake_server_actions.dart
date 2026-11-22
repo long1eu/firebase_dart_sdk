@@ -320,6 +320,9 @@ final class FakeServerActions implements ServerActions {
 
   /// Answers [call] with [status] and [data]; a failed listen leaves the listen table, a get
   /// completes its future (with a [ServerActionsException] unless [status] is `ok`).
+  ///
+  /// Throws a [StateError] for a second answer to one call, except the one revoke of a listen
+  /// answered `ok`.
   void respond(ServerCall call, {String status = statusOk, Object? data}) {
     final bool revoke =
         call._answered &&
@@ -350,6 +353,20 @@ final class FakeServerActions implements ServerActions {
       activeListens.remove(call.spec);
     }
     call.onComplete?.call(status, data);
+  }
+
+  /// Answers the put or merge [call] as a connection that has received the answer but not yet
+  /// delivered it: the call counts as answered now (a later [purgeOutstandingWrites] or
+  /// [disconnect] skips it), and the delegate hears [status] in a microtask.
+  void queueResponse(ServerCall call, {String status = statusOk}) {
+    if (call.action != 'put' && call.action != 'merge') {
+      throw ArgumentError.value(call, 'call', 'Not a put or merge.');
+    }
+    if (call._answered) {
+      throw StateError('$call was already answered.');
+    }
+    call._answered = true;
+    scheduleMicrotask(() => call.onComplete?.call(status, null));
   }
 
   /// Answers the listen of [spec] (see [respond]).
@@ -411,15 +428,20 @@ final class FakeServerActions implements ServerActions {
   Object? dataAt(String path) =>
       _store.getChild(Path(path)).toJson(exportFormat: true);
 
-  /// Acknowledges the most recent unanswered put or merge as the measured server does.
+  /// Acknowledges the most recent unanswered put or merge (see [ackWrite]).
+  void ackLastWrite() => ackWrite(_lastPending(const <String>{'put', 'merge'}));
+
+  /// Acknowledges the put or merge [call] as the measured server does.
   ///
   /// A put with a hash that does not match the stored data at its path answers `datastale` with
   /// the stored value as data and changes nothing. Otherwise server values are resolved (the
   /// timestamp from [serverTimeMillis], an increment against the stored value), the data is
   /// stored and pushed once to each overlapping listen (a tagged listen gets the path data with
   /// its tag, unfiltered), and then the write is answered `ok`: the push comes before the ack.
-  void ackLastWrite() {
-    final ServerCall call = _lastPending(const <String>{'put', 'merge'});
+  void ackWrite(ServerCall call) {
+    if (call.action != 'put' && call.action != 'merge') {
+      throw ArgumentError.value(call, 'call', 'Not a put or merge.');
+    }
     final String writePath = normalizePath(call.path!);
     final String? hash = call.hash;
     if (hash != null && _store.getChild(Path(writePath)).hash() != hash) {
@@ -494,14 +516,22 @@ final class FakeServerActions implements ServerActions {
     }
   }
 
+  /// Whether a tagged listen gets the whole data at its path for every write that overlaps it,
+  /// instead of the write itself. Whether the server pushes a write below a query's path when the
+  /// written child is not in the client's window yet is not measured; this is the form that holds
+  /// either way.
+  bool taggedListensGetWholeData = false;
+
   /// Pushes a write at [writePath] once to each overlapping listen.
   void _pushWrite(String writePath, Object? data, {required bool isMerge}) {
     for (final ServerCall listen in activeListens.values.toList()) {
       final String listenPath = listen.spec!.path;
       final int? tag = listen.tag;
-      if (_covers(listenPath, writePath)) {
+      final bool whole = tag != null && taggedListensGetWholeData;
+      if (_covers(listenPath, writePath) && !whole) {
         _delegate.onDataUpdate(writePath, data, isMerge: isMerge, tag: tag);
-      } else if (_covers(writePath, listenPath)) {
+      } else if (_covers(writePath, listenPath) ||
+          _covers(listenPath, writePath)) {
         // The listen lies below the write: it gets its own path's data.
         _delegate.onDataUpdate(
           listenPath,
@@ -510,6 +540,16 @@ final class FakeServerActions implements ServerActions {
           isMerge: false,
         );
       }
+    }
+  }
+
+  /// Another client writes [data] at [path] (either form; a map of children when [isMerge]):
+  /// the data is stored, and pushed once to each overlapping listen while [isConnected].
+  void writeByOtherClient(String path, Object? data, {bool isMerge = false}) {
+    final String writePath = normalizePath(path);
+    _storeUpdate(writePath, data, isMerge: isMerge);
+    if (isConnected) {
+      _pushWrite(writePath, data, isMerge: isMerge);
     }
   }
 
@@ -524,10 +564,14 @@ final class FakeServerActions implements ServerActions {
   }
 
   /// Drops the connection: sent transaction puts are answered with [statusDisconnect], then the
-  /// delegate hears [ServerActionsDelegate.onDisconnect].
+  /// delegate hears [ServerActionsDelegate.onDisconnect]. A call answered while this runs (a
+  /// handler that purges) is not answered again.
   void disconnect() {
     isConnected = false;
     for (final ServerCall call in pendingWrites) {
+      if (call.answered) {
+        continue;
+      }
       if (call.action == 'put' && call.hash != null ||
           call.action.startsWith('onDisconnect') && call.sent) {
         respond(call, status: statusDisconnect);
