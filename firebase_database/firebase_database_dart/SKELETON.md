@@ -112,6 +112,7 @@ Paths are under `lib/src/`. Android paths are relative to `com/google/firebase/d
 | `core/persistence/noop_persistence_manager.dart` | SYNC | - | core/persistence/NoopPersistenceManager | compound_write, path, persistence_manager, child_key, node, user_write_record, cache_node, query_spec, write_id |
 | `core/persistence/persistence_storage_engine.dart` | PERSIST | - | core/persistence/PersistenceStorageEngine | compound_write, path, prune_forest, tracked_query, child_key, node, user_write_record, write_id |
 | `core/persistence/persistence_storage_engine_opener.dart` | PERSIST | - | core/Platform.createPersistenceManager | persistence_storage_engine, logger |
+| `core/persistence/database_persistence.dart` | PERSIST | - | core/DatabaseConfig (persistence, cache size) | persistence_storage_engine_opener |
 | `core/persistence/tracked_query.dart` | PERSIST | - | core/persistence/TrackedQuery | query_spec |
 | `core/persistence/prune_forest.dart` | PERSIST | - | core/persistence/PruneForest | path, child_key, immutable_tree |
 | `core/persistence/cache_policy.dart` | PERSIST | - | core/persistence/CachePolicy | - |
@@ -129,7 +130,7 @@ Paths are under `lib/src/`. Android paths are relative to `com/google/firebase/d
 | `core/callback_event_registration.dart` | REPO | api/Reference_impl.ts Value/ChildEventRegistration | core/ValueEventRegistration, ChildEventRegistration | database_error, event_registration, change, event, query_spec |
 | `testing/fake_server_actions.dart` | FROZEN (real) | - | - | listen_hash_provider, listen_spec, server_actions, wire_range_merge |
 | `testing/recording_server_actions_delegate.dart` | FROZEN (real) | - | - | server_actions, wire_range_merge |
-| `testing/in_memory_persistence_storage_engine.dart` | FROZEN (real) | - | testUtil MockPersistenceStorageEngine | compound_write, path, persistence_storage_engine, prune_forest, tracked_query, child_key, children_node, priority_index, node, user_write_record, node_size_estimator, write_id |
+| `testing/in_memory_persistence_storage_engine.dart` | FROZEN (real) | - | testUtil MockPersistenceStorageEngine | compound_write, path, persistence_storage_engine, prune_forest, tracked_query, child_key, children_node, priority_index, node, user_write_record, logger, node_size_estimator, write_id |
 
 `lib/firebase_database_dart.dart` is a placeholder library (no exports); the public API is a later contract.
 

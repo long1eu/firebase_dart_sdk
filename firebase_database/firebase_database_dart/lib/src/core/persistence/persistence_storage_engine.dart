@@ -26,6 +26,12 @@ import 'package:firebase_database_dart/src/core/write_id.dart';
 /// throw: the engine rolls back, becomes degraded ([isDurable] turns false for good), and from
 /// then on stores nothing and reads as empty, while the sync tree's memory state stays
 /// authoritative for the session.
+///
+/// A condition that only stored data can cause (an unknown write id or tracked query id, keys
+/// removed that are not stored, data that a prune neither prunes nor keeps) is never an error an
+/// engine must report: a degraded engine reads as empty, and a store may hold data an earlier
+/// version wrote. The reference engine checks some of these while [isDurable] is true; each such
+/// check is marked "a reference-engine check, not a requirement on engines".
 abstract interface class PersistenceStorageEngine {
   /// Stores an overwrite.
   void saveUserOverwrite(Path path, Node node, WriteId writeId);
@@ -33,7 +39,10 @@ abstract interface class PersistenceStorageEngine {
   /// Stores a merge.
   void saveUserMerge(Path path, CompoundWrite children, WriteId writeId);
 
-  /// Removes write [writeId]; it must exist.
+  /// Removes write [writeId]; an unknown id is a no-op (Android deletes no row).
+  ///
+  /// The reference engine throws a [StateError] for an unknown id while [isDurable] is true: a
+  /// reference-engine check, not a requirement on engines.
   void removeUserWrite(WriteId writeId);
 
   /// The stored writes ordered by write id.
@@ -58,6 +67,11 @@ abstract interface class PersistenceStorageEngine {
   int serverCacheEstimatedSizeInBytes();
 
   /// Stores [trackedQuery] (insert or replace by id).
+  ///
+  /// One id per query is kept by `TrackedQueryManager`, which holds the tracked queries in
+  /// memory. The reference engine throws a [StateError] when an id moves to another query or a
+  /// query gets a second id while [isDurable] is true: a reference-engine check, not a requirement
+  /// on engines.
   void saveTrackedQuery(TrackedQuery trackedQuery);
 
   /// Deletes tracked query [trackedQueryId] and its keys.
@@ -67,22 +81,40 @@ abstract interface class PersistenceStorageEngine {
   List<TrackedQuery> loadTrackedQueries();
 
   /// Marks every active tracked query inactive with [lastUse] (at start-up).
+  ///
+  /// Runs as its own transaction when called outside one, and as part of the current one
+  /// otherwise. Android requires a transaction here (`SqlPersistenceStorageEngine.java:521`) and
+  /// opens one in `TrackedQueryManager.resetPreviouslyActiveTrackedQueries` (:114-124).
   void resetPreviouslyActiveTrackedQueries(int lastUse);
 
-  /// Replaces the keys of [trackedQueryId]; the query must exist.
+  /// Replaces the keys of [trackedQueryId].
+  ///
+  /// The reference engine throws a [StateError] for an untracked id while [isDurable] is true: a
+  /// reference-engine check, not a requirement on engines.
   void saveTrackedQueryKeys(int trackedQueryId, Set<ChildKey> keys);
 
-  /// Adds and removes keys of [trackedQueryId]; the query must exist.
+  /// Adds and removes keys of [trackedQueryId]; removing a key that is not stored is a no-op.
+  ///
+  /// The reference engine throws a [StateError] for an untracked id or for removing keys that do
+  /// not exist while [isDurable] is true: a reference-engine check, not a requirement on engines.
   void updateTrackedQueryKeys(
     int trackedQueryId,
     Set<ChildKey> added,
     Set<ChildKey> removed,
   );
 
-  /// The union of the keys of [trackedQueryIds] (one id: a set of one); each must exist.
+  /// The union of the keys of [trackedQueryIds] (one id: a set of one); an unknown id adds no
+  /// keys.
+  ///
+  /// The reference engine throws a [StateError] for an untracked id while [isDurable] is true: a
+  /// reference-engine check, not a requirement on engines.
   Set<ChildKey> loadTrackedQueryKeys(Set<int> trackedQueryIds);
 
   /// Deletes the cached data below [root] that [pruneForest] prunes and does not keep.
+  ///
+  /// Data stored above [root], and data below it that [pruneForest] neither prunes nor keeps, is
+  /// left alone with a warning through the engine's `DatabaseLogger`; it is never an error.
+  /// Android: `SqlPersistenceStorageEngine.java:657-681`.
   void pruneCache(Path root, PruneForest pruneForest);
 
   /// Starts a transaction; nesting is an error.
