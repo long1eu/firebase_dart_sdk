@@ -32,7 +32,7 @@
 #      - a linux/ folder (`flutter create --platforms=linux`), which the example does not have;
 #   4. runs `flutter pub get` in the copy;
 #   5. starts the Database emulator on GATE_DATABASE_PORT with tool/start_database_emulator.sh
-#      (from the branch rtdb/emulator), and loads FlutterFire's rules into the namespace of the
+#      (it is in this repository), and loads FlutterFire's rules into the namespace of the
 #      databaseURL through the emulator's REST API;
 #   6. runs `flutter test test/gate_test.dart` (a file under integration_test/ would make flutter
 #      pick a connected device; with --device it runs integration_test/gate_test.dart), prints

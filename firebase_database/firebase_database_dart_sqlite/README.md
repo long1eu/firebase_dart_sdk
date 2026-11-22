@@ -11,8 +11,9 @@ app is offline. It is not affiliated with or endorsed by Google or Firebase.
 > - On Windows 11 x64, 221 of 222 passed before a test-only fix, after which the file passed.
 > - On Linux x64, 168 tests passed at an earlier commit.
 > - Nothing ran on Android or iOS, in a release build of a desktop app, or against a production project.
-> - The benchmarks that would settle the open numbers (JSON against a binary codec, `synchronous = FULL` against
->   `NORMAL`, the worst synchronous call on the UI isolate for a 10 MiB subtree) have not run.
+> - Cost of the cache, measured on one Mac mini (macOS, AOT, medians of 5, rows of about 100 bytes; see Limits). Not
+>   measured: JSON against a binary codec, `synchronous = FULL` against `NORMAL`, and any write cost on Linux or
+>   Windows.
 >
 > One person maintains it.
 
@@ -59,8 +60,8 @@ unless you pass it.
 - **`cacheSizeBytes`**: the size above which the client prunes cached server data, 1 MiB to 100 MiB, 10 MiB by default;
   anything else throws an `ArgumentError`. The least recently used queries go first, 20 % of the inactive ones at a
   time; queries with a listener and pending writes are never pruned.
-- **`cacheServerData: false`**: only the pending writes are stored. They survive a restart and are sent again; no
-  server data is kept on disk, so after a restart a listener waits for the server.
+- **`cacheServerData: false`** (the default is `true`): only the pending writes are stored. They survive a restart and
+  are sent again; no server data is kept on disk, so after a restart a listener waits for the server.
 
 ```dart
 import 'package:firebase_database_dart/firebase_database_dart.dart';
@@ -74,9 +75,12 @@ await clearSqlitePersistence(
 );
 ```
 
-`clearSqlitePersistence` deletes a cache while no instance holds it. There is one SQLite file per app and database URL
-in the directory you give; its name is a hash, never the URL or the user. On POSIX the directory is created with mode
-0700 and the file with 0600. Tokens, the server host and session ids are never written.
+`clearSqlitePersistence` deletes a cache while no instance holds it: it waits about 7.5 s to see whether an owner is
+alive, throws a `StateError` while one is, and throws a `ClearPersistenceException` that lists the files it could not
+delete. `SqlitePersistence.pathOf(key)` gives the path of the file of an app and database URL. There is one SQLite file
+per app and database URL in the directory you give; its name is a hash, never the URL or the user. On macOS and Linux
+the directory is created with mode 0700 and the file gets mode 0600; elsewhere the platform's default permissions
+apply. Tokens, the server host and session ids are never written.
 
 ## How it works
 
@@ -105,8 +109,13 @@ and the tracked queries, restores the writes, and then connects. The layout is A
 - **The cache belongs to the app and the database URL, not to a user.** A second user on a shared machine can read the
   first user's cached data until you call `clearSqlitePersistence`; call it at sign-out.
 - **SQLite is synchronous and runs on the caller's isolate**, which in Flutter is the UI isolate. A cold read of a
-  large subtree or a prune can take long enough to drop a frame. How long has not been measured.
-- **On macOS `fsync` does not flush the drive cache** and `fullfsync` is not set.
+  large subtree or a prune can take long enough to drop a frame. Measured on one Mac mini (macOS, AOT, medians of 5,
+  rows of about 100 bytes): a point read takes 0.1 to 0.2 ms and one pending write 0.1 ms, whatever the size of the
+  cache. Loading a whole subtree takes 56.2 ms for 1 MB, 615.2 ms for 10 MB and 2,968.3 ms for 50 MB; writing it takes
+  51.9, 483.8 and 2,123.7 ms; reopening the file takes 3.4, 12.7 and 55.5 ms. A listener loads the subtree below its
+  path, so listen below the root of a large cache.
+- **On macOS `fsync` does not flush the drive cache** and `fullfsync` is not set, so those write costs are not the
+  cost on Linux or Windows; nothing was measured there.
 - **No web persistence.**
 
 ## Platforms

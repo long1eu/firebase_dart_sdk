@@ -1,10 +1,12 @@
 # firebase_database_dart
 
 Unofficial client for the [Firebase Realtime Database](https://firebase.google.com/docs/database), written in Dart,
-for the Dart VM and the web. It is for Linux, Windows and macOS desktop apps, servers and command line tools, where
-the official Flutter plugin has no implementation. It speaks the WebSocket protocol of the Firebase JS SDK, with Dart
-names (`DatabaseReference`, `onValue`, `runTransaction`) and Dart streams. It is not affiliated with or supported by
-Google or Firebase.
+for the Dart VM and the web. The official Flutter plugin `firebase_database` declares Android, iOS, macOS, Windows and
+web, and no Linux. So on Linux this client (through the adapter) is the only implementation; on Windows and macOS the
+official plugin exists (on Windows through the Firebase C++ SDK) and this client is an alternative written in Dart, with
+no native SDK in the build; for servers and command line tools in Dart there is no official client at all. It speaks
+the WebSocket protocol of the Firebase JS SDK, with Dart names (`DatabaseReference`, `onValue`, `runTransaction`) and
+Dart streams. It is not affiliated with or supported by Google or Firebase.
 
 > **Status: 0.0.1, work in progress, not published.** What has run (the maintainer's runs; the record is in
 > [docs/database_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_decisions.md),
@@ -24,8 +26,9 @@ Google or Firebase.
 
 ## Use it when
 
-- You write a Flutter desktop app for Linux, Windows or macOS and want the Realtime Database where
-  `firebase_database` has no implementation (see [Flutter apps](#flutter-apps-that-keep-package-firebase_database)).
+- You write a Flutter desktop app for Linux, where `firebase_database` has no implementation, or for Windows or macOS
+  and want a client written in Dart with no native SDK in the build (see
+  [Flutter apps](#flutter-apps-that-keep-package-firebase_database)).
 - You write a server or a command line tool in Dart that reads and writes the database with a user's rules, or
   listens for changes.
 - You write a Dart web app and want a client without the JS SDK or JS interop.
@@ -120,10 +123,13 @@ await db.close();
 ```
 
 A `FirebaseDatabase` is immutable: every setting is a constructor argument, there is no global instance and no
-instance cache, and two instances on one URL are two connections. A `databaseUrl` must be `https://`; an `http://` URL
-is refused with a pointer to `emulatorHost`. `close()` is idempotent; afterwards every asynchronous call fails with the
-code `database-closed`, and `ref()` still works because it makes no request. Nothing was run against a production
-project yet (see Status).
+instance cache, and two instances on one URL are two connections. A `databaseUrl` must be `https://`: plain text is
+refused outside the emulator, and the message says to use an https URL or the `emulatorHost` argument. The constructor
+also refuses, with an `ArgumentError` before any connection, a URL with a path, a custom domain without `?ns=`, a port
+other than 443 on a host that is not loopback, and an invalid project id; a start that fails fails every pending and
+later call instead of hanging. `close()` is idempotent; afterwards every asynchronous call fails with the code
+`database-closed`, and `ref()` still works because it makes no request. Nothing was run against a production project yet
+(see Status).
 
 ## Read and write
 
@@ -158,6 +164,11 @@ is not an error, and the local events fire at once. A rejected write rolls back 
 integral number within 2^53 reads as an `int` even if you wrote `5.0`. A map whose keys are `0..n` with more than half
 present reads as a `List`, so iterate `snapshot.children` when the shape can vary. Bad keys, paths, depths and numbers
 throw an `ArgumentError` or `StateError` at the call, before anything is sent.
+
+`set` and `OnDisconnect.set` take an optional `priority:`, and `setPriority` changes only the priority.
+`DatabaseReference.key`, `parent`, `root` and `child` build paths without a request; `FirebaseDatabase.refFromUrl` takes
+a full URL of this database (it throws for another one), `FirebaseDatabase.app` is the app and `databaseUrl` the URL in
+use. A `DataSnapshot` also has `priority`, `child`, `hasChild`, `hasChildren`, `childrenCount`, `ref` and `toJson`.
 
 More: [read_write.dart](example/read_write.dart), [push_and_keys.dart](example/push_and_keys.dart),
 [multi_path_update.dart](example/multi_path_update.dart),
@@ -229,15 +240,22 @@ print(sorted.children.length);
 
 A query is immutable: each modifier returns a new one. Modifiers are checked when you build the query (one `orderBy`,
 one start, one end, one limit; `equalTo` is a start and an end), and a violation throws at the call. `startAt` and
-`endAt` include the bound, `startAfter` and `endBefore` leave it out. The query decides the order of
+`endAt` include the bound, `startAfter` and `endBefore` leave it out; each of them, and `equalTo`, takes an optional
+`key:` that breaks ties between children with equal values. `orderByValue`, `orderByPriority` and `limitToFirst` work as
+in the JS SDK; `Query.ref`, `path` and `url` say where a query points, and `once()` takes the event type to wait for
+(`DatabaseEventType.value` by default; the others are `childAdded`, `childChanged`, `childMoved` and
+`childRemoved`). Two queries are equal when they belong to the same database and have the same path and modifiers. The
+query decides the order of
 `snapshot.children`, not of `snapshot.value` as a `Map`.
 
 `get()` answers from an active listener that covers the query, else from the server. A query that only orders (no
 range, no limit) is sent as the default query and ordered in the client, so it needs no `.indexOn` rule. A **filtered
-or limited** `get()` is sent with its index and fails with `index-not-defined` where the rules have no `.indexOn` for
-it. A listener or `once()` has no such limit: without the index the client downloads the location, filters it itself
-and logs a `no_index` warning. When the client is not connected, `get()` waits 3 s for a connection and then answers
-from the cache or fails with `unavailable`; a refusal by the rules is `permission-denied`, never a cached answer.
+or limited** `get()` on `orderByChild` or `orderByValue` is sent with its index and fails with `index-not-defined`
+where the rules have no `.indexOn` for it. A listener or `once()` has no such limit: without the index the client
+downloads the location, filters it itself and logs a warning ("Using an unspecified index", the server's `no_index`
+warning). When the client is not connected, `get()` waits 3 s for a connection and then answers from the cache, only
+when the cache holds the complete value for that query (its limit applied; a cached empty location answers null), or
+fails with `unavailable`; a refusal by the rules is `permission-denied`, never a cached answer.
 
 More: [queries.dart](example/queries.dart).
 
@@ -257,11 +275,14 @@ print('committed: ${result.committed}, value: ${result.snapshot.value}');
 ```
 
 The handler is synchronous and may run several times, so it must have no side effects. It receives a fresh mutable copy
-of the current local value. It is sent as a put with the hash of the data it was computed from; when the server
-answers that the data changed, the handler runs again, up to 25 times, then the Future fails with `max-retries`. An
-abort completes with `committed: false` and the snapshot the handler saw. An exception in the handler aborts the
-transaction and fails the Future with that same exception. Transactions are never persisted: one pending when the app
-quits is lost.
+of the current local value. It is sent as a put with the hash of the data it was computed from; when the server answers
+that the data changed, the handler runs again, up to 25 times, then the Future fails with `max-retries`. A transaction
+that was sent and loses its connection before the answer is not run again and not re-sent: its local write is rolled
+back and the Future fails with `disconnected`. An abort completes with `committed: false` and the snapshot the handler
+saw. An exception in the handler aborts the transaction and fails the Future with that same exception. Transactions are
+never persisted: one pending when the app quits is lost. `Transaction.success(value, priority:)` can also set the
+priority, and `runTransaction(applyLocally: false)` raises no local event for the intermediate runs; the handler's type
+is `TransactionHandler`.
 
 More: [transactions.dart](example/transactions.dart), [cookbook/counter.dart](example/cookbook/counter.dart).
 
@@ -284,7 +305,8 @@ final presence = database.onConnected.listen((bool connected) async {
 await presence.cancel();
 ```
 
-`onDisconnect` has `set`, `update`, `remove` and `cancel`. The server runs the operation when it sees the connection
+`onDisconnect` has `set`, `update`, `remove` and `cancel`. A path under `.info` is refused by `set`, `update` and
+`remove` and `cancel`. The server runs the operation when it sees the connection
 end, also after a crash; the Future completes when the server has registered it, not when it ran. Register the offline
 write first and write "online" second, so a crash between them cannot leave a user stuck online. A request that was sent
 and whose connection drops before the answer completes with `disconnected` and is not replayed; the app registers again
@@ -329,16 +351,18 @@ await queued;
 
 `onConnected` is `.info/connected`; its first event is the current state, `false` until the first connection is up.
 `isConnected`, `serverTimeOffset` and `estimatedServerTime` are plain getters. `purgeOutstandingWrites()` rolls back
-every pending write, fails their Futures with `write-canceled`, and aborts transactions. It also cancels
-`onDisconnect` operations that are still queued locally; those the server has already registered are not undone. A transaction already sent is not undone by `purgeOutstandingWrites()` when the server has accepted it:
-it completes as committed with the server's value.
+every pending write, fails their Futures with `write-canceled`, aborts transactions and completes queued
+`onDisconnect` operations with `write-canceled`, as the Android SDK does. An `onDisconnect` operation already sent to
+the server is not undone by it, and neither is a transaction already sent if the server accepts it. A transaction the server
+accepted completes as committed with the server's value.
 
 A new instance does not connect: the first read, listener (also on `.info`), write, transaction, `get`, onDisconnect
 call, `keepSynced(true)` or `goOnline()` does. `goOffline()` before that is kept, so the first operation stays offline.
 
 The client reconnects with a delay that starts at 1 s, grows by 1.3 per failure up to 30 s, with jitter, and resets
 after a connection that stayed healthy for 30 s. When the link has had no inbound frame for 30 s it sends a protocol
-ping; if nothing arrives in the next 15 s it closes the connection and reconnects. It resets the delay and reconnects
+ping, and after 45 s with nothing sent or received it sends the JS SDK's `0` keep-alive frame; if nothing arrives in
+the next 15 s after the ping it closes the connection and reconnects. It resets the delay and reconnects
 at once on a hint from the app's network source (`app.onNetworkConnected`). It never closes an idle connection by
 itself.
 
@@ -362,7 +386,7 @@ final FirebaseDatabase signedIn = FirebaseDatabase(app);
 await signedIn.close();
 ```
 
-Tokens go only over TLS, to the exact `host:port` you gave as `emulatorHost`, or to a loopback host. The App Check token
+Tokens go only over TLS or to the exact `host:port` you gave as `emulatorHost`. The App Check token
 is sent in an upgrade header on the VM and in the WebSocket URL on the web, where a socket has no headers; the ID token
 never goes in a URL. The
 [authentication guide](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/guides/authentication.md) describes
@@ -428,8 +452,12 @@ await clearSqlitePersistence(
 ```
 
 Pending writes survive a restart and are sent again; cached server data answers listeners and `get()` while offline.
-The cache is kept per app and database URL, not per signed-in user: on a shared machine call `clearSqlitePersistence`
-at sign-out. One process or isolate owns a cache file at a time; see [Limits](#limits).
+`cacheServerData: false` (the default is `true`) keeps the pending writes across a restart and caches no server data.
+`package:firebase_database_dart/storage_engine.dart` is the library for writing a persistence engine of your own
+(`databasePersistence`, the engine interface and `InMemoryPersistenceStorageEngine`).
+The cache is kept per app and normalised database URL (two `?ns=` values on one host are two caches), not per signed-in
+user: on a shared machine call `clearSqlitePersistence` at sign-out. One process or isolate owns a cache file at a time;
+see [Limits](#limits).
 
 ## Errors
 
@@ -453,13 +481,14 @@ try {
 }
 ```
 
-The codes are `permission-denied`, `disconnected`, `max-retries`, `overridden-by-set`, `unavailable`, `network-error`,
-`write-canceled`, `index-not-defined`, `operation-failed`, `too-big`, `read-only`, `database-closed` and `unknown`.
-`serverStatus` is the raw status and reason from the server. A message never contains a token or a URL query. A
-rejected or expired token is not a code of its own: the server answers `permission-denied` and the connection retries
-the token itself. A bad path, key, value or query is an `ArgumentError` or `StateError` at the call, not an exception
-through a Future; fix the code instead of catching it. Offline is not an error: writes stay pending and listeners keep
-their data.
+`FirebaseDatabaseException.cause` holds the underlying error when it came from outside the package; it is never part of
+the message. The codes are `permission-denied`, `disconnected`, `max-retries`, `overridden-by-set`, `unavailable`,
+`network-error`, `write-canceled`, `index-not-defined`, `operation-failed`, `too-big`, `read-only`, `database-closed`
+and `unknown`. `serverStatus` is the raw status and reason from the server. A message never contains a token or a URL
+query. A rejected or expired token is not a code of its own: the server answers `permission-denied` and the connection
+retries the token itself. A bad path, key, value or query is an `ArgumentError` or `StateError` at the call, not an
+exception through a Future; fix the code instead of catching it. Offline is not an error: writes stay pending and
+listeners keep their data.
 
 More: [error_handling.dart](example/error_handling.dart).
 
@@ -481,14 +510,15 @@ final FirebaseDatabase logged = FirebaseDatabase(
 await logged.close();
 ```
 
-The levels are `debug`, `info`, `warning` and `error`. Warnings include `no_index` (a query that is filtered on the
-client because the rules have no `.indexOn`), a cache that runs memory-only and failed persisted writes. Requests that
-carry credentials are logged as `<action> (contents hidden)`, URLs without their query, and snapshot data appears at
-the debug level only; it is your users' data.
+`DatabaseLogger` is the type of the callback, `void Function(DatabaseLogLevel level, String message)`. The levels are
+`debug`, `info`, `warning` and `error`. Warnings include the missing-index one ("Using an unspecified
+index": a query that is filtered on the client because the rules have no `.indexOn`), a cache that runs memory-only and
+failed persisted writes. Requests that carry credentials are logged as `<action> (contents hidden)`, URLs without their
+query, and snapshot data appears at the debug level only; it is your users' data.
 
 ## How it differs from the JS SDK
 
-The ones you notice. The full table of 22 rows, with the test that pins each, is section 25 of
+The 17 you notice are below. The full table, 22 rows with the test that pins each, is section 25 of
 [docs/database_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_decisions.md).
 
 | Topic | JS SDK | This client |
@@ -501,14 +531,14 @@ The ones you notice. The full table of 22 rows, with the test that pins each, is
 | Child events | four callbacks | four getters, plus `onChildEvents` and `once()` |
 | Transaction result | return `undefined` to abort | `Transaction.success(value)` or `Transaction.abort()` |
 | Error codes | upper-case status string | kebab-case codes, none for tokens |
-| Plain text | `http://host:443` is accepted | `ArgumentError`, and no token goes over plain text |
+| Plain text | `http://host:443` is accepted | refused outside the emulator, and no token goes over plain text |
 | Reconnect delay | cap 5 min, reset on browser events | cap 30 s, reset when healthy |
 | Dead link | `0` frame every 45 s, no answer expected | ping after 30 s of silence, close after 15 s more |
 | Request timeout | none | a silence timer re-armed by every frame |
 | Logging | request bodies logged, tokens too | off; callback; credentials hidden |
 | Disk persistence | none | optional SQLite cache with a lease owner |
 | Browser storage | writes `firebase:*` keys | writes nothing |
-| Writes under `.info` | `update` and `cancel` accepted | refused |
+| Writes under `.info` | `update` and `cancel` accepted | `set`, `update`, `remove`, `cancel` refused |
 | Long polling | present | absent |
 
 ## Limits
@@ -524,26 +554,37 @@ The ones you notice. The full table of 22 rows, with the test that pins each, is
   client reconnects. Usually that is about 46 s (30 s, 15 s and 1 s of backoff after a healthy connection) plus the
   connect. At worst it is about 75 s plus the connect, when the connection had not been healthy for 30 s and the
   backoff may be up to 30 s. Both figures are computed from the timing constants, not measured. When the app signals
-  connectivity (`app.onNetworkConnected`), the client reconnects at once.
+  connectivity (`app.onNetworkConnected`), the client reconnects at once; it reads no wake or app-lifecycle event
+  from the operating system itself.
 - **An increment that leaves the double range is a local infinity.** If the sum of a `ServerValue.increment` goes
   beyond the range of a double, the local value is infinity until the server's value replaces it.
 - **One owner per cache file.** A second process or isolate on the same file watches its lease for about 7.5 s, then
   runs memory-only with one logged warning (`persistenceEnabled` is false); its writes are not durable. After a
   storage error an instance is memory-only for the rest of the session, and the file keeps what was committed before
   it. The cache is clear text, and a cache that cannot be used (damaged, or of a newer major version) is moved aside.
-- **Large snapshots.** A snapshot of about 100,000 children is the subject of a benchmark whose report is to be at
-  [docs/database_benchmarks.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_benchmarks.md)
-  (not in the repository yet). The SQLite engine is synchronous and runs on the caller's isolate, which in Flutter is
-  the UI isolate.
+- **The SQLite cache runs on the caller's isolate**, which in Flutter is the UI isolate. Measured on one Mac mini
+  (macOS, AOT, medians of 5, rows of about 100 bytes): a point read takes 0.1 to 0.2 ms and one pending write 0.1 ms,
+  whatever the size of the cache. Loading a whole subtree takes 56.2 ms for 1 MB, 615.2 ms for 10 MB and 2,968.3 ms
+  for 50 MB; writing it takes 51.9, 483.8 and 2,123.7 ms; reopening the file takes 3.4, 12.7 and 55.5 ms. macOS
+  `fsync` does not force the drive cache, so the write cost on Linux and Windows is not measured.
+- **Proxies.** On the Dart VM a secure connection honours `HTTPS_PROXY` and `NO_PROXY` (and the lower-case forms), as
+  Dart's `HttpClient` does. Loopback addresses and the emulator are always reached directly. There is no option in the
+  API. A proxy that refuses the tunnel fails the connection attempt with an error that names the proxy and the status.
 - **Transactions and `onDisconnect` registrations are not persisted.** After a restart, register them again.
-- **No long polling.** Networks that block the WebSocket upgrade cannot use the client.
 - **The server's behaviour was measured on the emulator only.** Token refresh, revocation, ping answers and the
   size limits of a production server are not measured; the three connection timeouts (30 s, 15 s, 60 s) are chosen,
   not measured.
-- **Not in this version:** long polling, typed converters (patterns on the typed value are the typed read), a writing
-  REST client, web disk persistence, a configurable `get()` wait, the compat (namespaced) API, admin-only
-  authentication paths and the idle disconnect. There is no parity page for the Database yet; the decisions document
-  is the record of what differs.
+- **Not in this version:**
+  - long polling: networks that block the WebSocket upgrade cannot use the client;
+  - web disk persistence: the web build is memory only;
+  - a REST client, read-only or writing: the WebSocket is the only transport;
+  - an instance cache per app and URL: every `FirebaseDatabase(...)` is a new connection;
+  - `.info/authenticated` as a typed member (it can be read as the path `.info/authenticated`), and a hook that goes
+    offline when an app is sent to the background;
+  - typed converters (patterns on the typed value are the typed read), a configurable `get()` wait, the compat
+    (namespaced) API, admin-only authentication paths and the idle disconnect.
+
+  There is no parity page for the Database yet; the decisions document is the record of what differs.
 
 ## Platforms
 
@@ -578,7 +619,9 @@ On Linux it registers itself; on Windows when it is a direct dependency; elsewhe
 
 `package:firebase_database_dart/testing.dart` has a scripted in-memory server (`FakeDatabaseServer`), a database
 connected to it (`databaseWithFakeServer`) and in-memory persistence (`fakePersistence`). It has no stability promise
-beyond the package's contract tests.
+beyond the package's contract tests. A test steers the server with `acceptConnections` (set it to false and call
+`dropConnection` to keep the client offline), `serverTime`, `ackLastWrite`, `failLastWrite`, `ackLastOnDisconnect`,
+`answerGet`, `failGet`, `revokeAuth` and `kill`, and reads `connectionAttempts` and `receivedAuthTokens`.
 
 ## More
 
