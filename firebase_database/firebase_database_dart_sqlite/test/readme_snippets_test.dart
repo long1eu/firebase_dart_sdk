@@ -27,6 +27,7 @@ import 'package:test/test.dart';
 const Map<String, String> _readmes = <String, String>{
   '../firebase_database_dart/README.md': 'clientReadme',
   'README.md': 'sqliteReadme',
+  '../../docs/guides/database.md': 'databaseGuide',
 };
 
 const String _generated = 'test/readme/readme_snippets.dart';

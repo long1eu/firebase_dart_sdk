@@ -6,6 +6,7 @@
 // ignore_for_file: type=lint, unused_local_variable, unused_import
 // ignore_for_file: unused_element
 
+import 'dart:io';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 import 'package:firebase_database_dart/firebase_database_dart.dart';
@@ -247,4 +248,53 @@ Future<void> sqliteReadmeLine65() async {
     appName: app.name,
     databaseUrl: database.databaseUrl,
   );
+}
+
+// ../../docs/guides/database.md:67
+Future<void> databaseGuideLine67() async {
+  ref.child('private').onValue.listen(
+    (DatabaseEvent event) => print(event.snapshot.value),
+    onError: (Object error) {
+      if (error is FirebaseDatabaseException && error.code == 'permission-denied') {
+        print('the rules refused or revoked this listen; the stream has ended');
+      }
+    },
+  );
+  try {
+    await ref.child('private/note').set('hello');
+  } on FirebaseDatabaseException catch (e) {
+    print('write refused: ${e.code} (${e.serverStatus})');
+  }
+}
+
+// ../../docs/guides/database.md:158
+Future<void> databaseGuideLine158() async {
+  final FirebaseDatabase cached = FirebaseDatabase(
+    app,
+    persistence: sqlitePersistence('/var/lib/my-app/rtdb', cacheSizeBytes: 50 * 1024 * 1024),
+  );
+  final DatabaseReference notes = cached.ref('users/ada/notes');
+  notes.onValue.listen((DatabaseEvent event) => print(event.snapshot.children.length));
+  print('durable: ${cached.persistenceEnabled}');
+  await cached.close();
+}
+
+// ../../docs/guides/database.md:206
+Future<void> databaseGuideLine206() async {
+  database.onConnected.listen((bool connected) => print('connected: $connected'));
+  ProcessSignal.sigterm.watch().first.then((ProcessSignal _) async {
+    await database.close();
+    exit(0);
+  });
+}
+
+// ../../docs/guides/database.md:237
+Future<void> databaseGuideLine237() async {
+  final FirebaseDatabase asAda = FirebaseDatabase(
+    app,
+    emulatorHost: '127.0.0.1:9100',
+    mockUserToken: mockUserTokenFor('ada', projectId: 'demo-test', claims: <String, Object?>{'role': 'editor'}),
+  );
+  await asAda.ref('private/ada').set('hello');
+  await asAda.close();
 }
