@@ -92,6 +92,7 @@ extension _RepoGet on Repo {
       return;
     }
     _finishGet(request);
+    _releaseGetQuery(request.query);
     final Node? persisted = _serverSyncTree.persistenceServerCache(
       request.query,
     );
@@ -113,6 +114,18 @@ extension _RepoGet on Repo {
     _pendingGets.remove(request);
   }
 
+  /// Marks [query], made active by a get that ends without a server overwrite, inactive again
+  /// unless another get of it is open or a listener holds it. Otherwise the tracked query stays
+  /// active for the session: it is never pruned, and an acknowledged write below it is not
+  /// written to the cache (`applyUserWriteToServerCache` takes it for a listened location), so
+  /// a later offline get could answer the older value.
+  void _releaseGetQuery(QuerySpec query) {
+    if (_pendingGets.any((_PendingGet other) => other.query == query)) {
+      return;
+    }
+    _serverSyncTree.releaseQuery(query);
+  }
+
   /// Applies the server's answer as a listen would (the REST path sends no data update), raising
   /// events on listeners it completes, then answers (JS `repoGetValue`; Android `getValue`). A
   /// filtered query's answer goes to its tagged view only, so it never makes the default query
@@ -131,6 +144,7 @@ extension _RepoGet on Repo {
         DatabaseLogLevel.error,
         'Failed to parse server response for get(): $e',
       );
+      _releaseGetQuery(query);
       request.completer.completeError(
         DatabaseError.fromStatus(DatabaseErrorCode.unknown.wireStatus, '$e'),
       );
@@ -162,6 +176,9 @@ extension _RepoGet on Repo {
       return;
     }
     _finishGet(request);
+    if (!_closed) {
+      _releaseGetQuery(request.query);
+    }
     _log(
       DatabaseLogLevel.debug,
       'get for query ${request.query} failed: $error',

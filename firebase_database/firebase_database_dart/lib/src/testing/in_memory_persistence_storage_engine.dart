@@ -325,6 +325,12 @@ final class InMemoryPersistenceStorageEngine
   @override
   void close() => _closed = true;
 
+  /// Whether [close] was called and [reopen] was not called since.
+  bool get isClosed => _closed;
+
+  /// Opens a closed engine again with the data it held, as reopening a file does.
+  void reopen() => _closed = false;
+
   @override
   bool get isDurable => !_closed && !_degraded;
 

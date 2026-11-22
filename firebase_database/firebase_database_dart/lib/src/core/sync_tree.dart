@@ -49,6 +49,7 @@ import 'package:firebase_database_dart/src/core/view/change.dart';
 import 'package:firebase_database_dart/src/core/view/event.dart';
 import 'package:firebase_database_dart/src/core/view/query_spec.dart';
 import 'package:firebase_database_dart/src/core/view/view.dart';
+import 'package:firebase_database_dart/src/core/view/view_cache.dart';
 import 'package:firebase_database_dart/src/core/write_id.dart';
 import 'package:firebase_database_dart/src/core/write_tree.dart';
 import 'package:firebase_database_dart/src/core/write_tree_ref.dart';
@@ -153,7 +154,9 @@ final class SyncTree implements SyncTreeApi {
     });
   }
 
-  /// Android `SyncTree.applyUserMerge`.
+  /// Android `SyncTree.applyUserMerge`. A merge that writes [path] itself (`update({'': v})`) is
+  /// kept and applied as an overwrite of [path], which it is: the write tree's shadowing and the
+  /// view processor take a merge to write below its path only. It is persisted as given.
   @override
   List<Event> applyUserMerge(
     Path path,
@@ -164,6 +167,13 @@ final class SyncTree implements SyncTreeApi {
   }) => _run(() {
     if (persist) {
       _persistenceManager.saveUserMerge(path, unresolvedChildren, writeId);
+    }
+    if (children.rootWrite() != null) {
+      final Node newData = children.apply(ChildrenNode.empty);
+      _pendingWriteTree.addOverwrite(path, newData, writeId, visible: true);
+      return _applyOperationToSyncPoints(
+        Overwrite(OperationSource.user, path, newData),
+      );
     }
     _pendingWriteTree.addMerge(path, children, writeId);
     return _applyOperationToSyncPoints(
@@ -244,24 +254,75 @@ final class SyncTree implements SyncTreeApi {
     );
   });
 
+  /// The paths under which server data at [path] is persisted: [path] when a sync point is at or
+  /// above it, else the top-most sync points below it (none when nothing listens there).
+  /// Android persists every push (`SyncTree.java:300-323`); docs/database_decisions.md section 6.
+  List<Path> _persistedPathsAt(Path path) {
+    if (_syncPointTree.rootMostValue(path) != null) {
+      return <Path>[path];
+    }
+    final List<Path> paths = <Path>[];
+    void visit(Path at, ImmutableTree<SyncPoint> tree) {
+      if (tree.value != null) {
+        paths.add(at);
+        return;
+      }
+      for (final MapEntry<ChildKey, ImmutableTree<SyncPoint>> child
+          in tree.children.entries) {
+        visit(at.child(child.key), child.value);
+      }
+    }
+
+    visit(path, _syncPointTree.subtree(path));
+    return paths;
+  }
+
+  /// Counts a server update that stored nothing towards the persistence manager's prune check,
+  /// as Android counts every server update: an empty merge stores nothing.
+  void _countUnpersistedServerUpdate(Path path) =>
+      _persistenceManager.updateServerCacheWithMerge(path, CompoundWrite.empty);
+
   /// Android `SyncTree.applyServerOverwrite`. Applying the same data twice raises no events the
-  /// second time (overlapping listens push the same data twice).
+  /// second time (overlapping listens push the same data twice). Only the parts of [newData]
+  /// under a sync point are persisted.
   @override
   List<Event> applyServerOverwrite(Path path, Node newData) => _run(() {
-    _persistenceManager.updateServerCache(QuerySpec.defaultAt(path), newData);
+    final List<Path> persistedPaths = _persistedPathsAt(path);
+    for (final Path persisted in persistedPaths) {
+      _persistenceManager.updateServerCache(
+        QuerySpec.defaultAt(persisted),
+        newData.getChild(Path.relative(path, persisted)),
+      );
+    }
+    if (persistedPaths.isEmpty) {
+      _countUnpersistedServerUpdate(path);
+    }
     return _applyOperationToSyncPoints(
       Overwrite(OperationSource.server, path, newData),
     );
   });
 
-  /// Android `SyncTree.applyServerMerge`.
+  /// Android `SyncTree.applyServerMerge`. Only the parts of the merge under a sync point are
+  /// persisted.
   @override
   List<Event> applyServerMerge(Path path, Map<Path, Node> changedChildren) =>
       _run(() {
         final CompoundWrite merge = CompoundWrite.fromPathMerge(
           changedChildren,
         );
-        _persistenceManager.updateServerCacheWithMerge(path, merge);
+        bool persistedAny = false;
+        for (final Path persisted in _persistedPathsAt(path)) {
+          final CompoundWrite part = merge.childCompoundWrite(
+            Path.relative(path, persisted),
+          );
+          if (!part.isEmpty) {
+            _persistenceManager.updateServerCacheWithMerge(persisted, part);
+            persistedAny = true;
+          }
+        }
+        if (!persistedAny) {
+          _countUnpersistedServerUpdate(path);
+        }
         return _applyOperationToSyncPoints(
           Merge(OperationSource.server, path, merge),
         );
@@ -393,12 +454,28 @@ final class SyncTree implements SyncTreeApi {
         () => _persistenceManager.setQueryInactive(query),
       );
 
-  /// Android `SyncTree.persistenceServerCache`: the persisted server data of [query], or null
-  /// when there is none (Android's caller checks `exists()`).
+  /// Marks [query] inactive unless a view at its path serves it. Android: none (its `getValue`
+  /// leaves the query active after a failed or offline get).
+  @override
+  void releaseQuery(QuerySpec query) {
+    if (_syncPointTree.get(query.path)?.viewExistsForQuery(query) ?? false) {
+      return;
+    }
+    setQueryInactive(query);
+  }
+
+  /// Android `SyncTree.persistenceServerCache`: the persisted server data of [query] through the
+  /// query's filter, or null. Differences from Android, which answers whatever is stored when it
+  /// is not empty: only a cache persistence knows complete answers, so a partly known location
+  /// (children cached by other queries) gives null and a location known empty gives an empty
+  /// node; the limit and range of [query] apply.
   @override
   Node? persistenceServerCache(QuerySpec query) {
-    final Node node = _persistenceManager.serverCache(query).node;
-    return node.isEmpty ? null : node.withIndex(query.index);
+    final CacheNode cache = _persistenceManager.serverCache(query);
+    if (!cache.fullyInitialized) {
+      return null;
+    }
+    return View(query, ViewCache(cache, cache)).completeNode;
   }
 
   /// Android `SyncTree.getServerValue`: the complete data of [query] from the tree, pending

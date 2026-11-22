@@ -529,6 +529,12 @@ void runPersistenceOracle(OpenEngine openEngine) {
           newTestPersistence();
 
       final SyncTree tree = newTestSyncTree(manager);
+      // Difference from Android (docs/database_decisions.md section 25 row 23, section 6):
+      // server data is cached only under a listen or keepSynced, so this test listens at foo
+      // first.
+      tree.addEventRegistration(
+        _testEventRegistration(defaultFooQuery, <EventType>[EventType.value]),
+      );
 
       tree.applyServerOverwrite(
         p('foo'),

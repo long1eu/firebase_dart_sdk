@@ -125,7 +125,9 @@ abstract interface class SyncTreeApi {
   /// else null.
   Node? getServerValue(QuerySpec query);
 
-  /// The cached server data of [query] from persistence, or null (for `get` while offline).
+  /// The cached server data of [query] from persistence, filtered by the query, when persistence
+  /// knows it complete (an empty node for a location known empty), else null (for `get` while
+  /// offline).
   Node? persistenceServerCache(QuerySpec query);
 
   /// Marks [query] active in persistence (around `get`).
@@ -133,6 +135,10 @@ abstract interface class SyncTreeApi {
 
   /// Marks [query] inactive in persistence.
   void setQueryInactive(QuerySpec query);
+
+  /// Marks [query] inactive in persistence unless a view of the tree serves it (the end of a
+  /// `get` answered without a server overwrite).
+  void releaseQuery(QuerySpec query);
 
   /// The complete event cache at [path] (server data with pending writes, including hidden
   /// ones) excluding [writeIdsToExclude], or null; used by transactions and server values.

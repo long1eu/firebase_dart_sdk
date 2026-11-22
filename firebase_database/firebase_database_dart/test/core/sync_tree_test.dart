@@ -364,9 +364,11 @@ void main() {
       tree.applyServerOverwrite(p('a'), n(1));
       tree.applyServerMerge(p('b'), <Path, Node>{p('c'): n(2)});
       tree.applyListenComplete(p('a'));
+      // Nothing listens at /a or /b, so nothing is stored (decisions section 25 row 23): the empty
+      // merge only counts the update for the prune check.
       expect(log, <String>[
         'begin',
-        'updateServerCache $defaultA',
+        'updateServerCacheWithMerge /a',
         'end',
         'begin',
         'updateServerCacheWithMerge /b',
