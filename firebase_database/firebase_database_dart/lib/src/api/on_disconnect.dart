@@ -3,6 +3,13 @@
 library;
 
 import 'package:firebase_database_dart/src/api/database_reference.dart';
+import 'package:firebase_database_dart/src/api/firebase_database.dart';
+import 'package:firebase_database_dart/src/api/user_value.dart';
+import 'package:firebase_database_dart/src/core/path.dart';
+import 'package:firebase_database_dart/src/core/repo.dart';
+import 'package:firebase_database_dart/src/core/snap/node.dart';
+import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
+import 'package:firebase_database_dart/src/core/util/validation.dart';
 import 'package:meta/meta.dart';
 
 /// Writes the server applies to one location when this client's connection ends, from
@@ -32,23 +39,52 @@ final class OnDisconnect {
 
   /// On disconnect, replaces the location's data with [value], and its priority with [priority] when
   /// given. Values are validated at the call as in `DatabaseReference.set`.
-  Future<void> set(Object? value, {Object? priority}) {
-    // TODO(repo): normalise numbers with normalizeUserNumber (core/util/numbers.dart) before the write
-    // leaves the API, so a -0.0 written by the user is sent as 0.
-    throw UnimplementedError();
+  Future<void> set(Object? value, {Object? priority}) =>
+      _set('OnDisconnect.set', value, priority);
+
+  Future<void> _set(String fnName, Object? value, Object? priority) {
+    final Path path = reference.spec.path;
+    validateWritablePath(fnName, path);
+    validateUserValue(fnName, value, path);
+    if (priority != null) {
+      validateNotReadOnlyKey(fnName, path);
+      validateUserPriority(fnName, priority);
+    }
+    final Node node = userValueNode(value, priority);
+    return reference.database.write(
+      (Repo repo, WriteCompletion done) =>
+          repo.onDisconnectSetValue(path, node, onComplete: done),
+    );
   }
 
   /// On disconnect, writes each entry of [values] below the location, leaving other children alone. Keys
   /// may be multi-segment paths (`'a/b'`).
   Future<void> update(Map<String, Object?> values) {
-    // TODO(repo): normalise numbers with normalizeUserNumber (core/util/numbers.dart) before the write
-    // leaves the API, so a -0.0 written by the user is sent as 0.
-    throw UnimplementedError();
+    const String fnName = 'OnDisconnect.update';
+    final Path path = reference.spec.path;
+    validateWritablePath(fnName, path);
+    validateUserMerge(fnName, values, path);
+    final Map<String, Object?> normalized =
+        normalizeUserValue(values)! as Map<String, Object?>;
+    final Map<Path, Node> children = <Path, Node>{
+      for (final MapEntry<String, Object?> entry in normalized.entries)
+        Path(entry.key): nodeFromJson(entry.value),
+    };
+    return reference.database.write(
+      (Repo repo, WriteCompletion done) =>
+          repo.onDisconnectUpdate(path, children, normalized, onComplete: done),
+    );
   }
 
   /// On disconnect, removes the location's data: the same as `set(null)`.
-  Future<void> remove() => throw UnimplementedError();
+  Future<void> remove() => _set('OnDisconnect.remove', null, null);
 
   /// Cancels every onDisconnect write registered at this location and below it.
-  Future<void> cancel() => throw UnimplementedError();
+  Future<void> cancel() {
+    final Path path = reference.spec.path;
+    return reference.database.write(
+      (Repo repo, WriteCompletion done) =>
+          repo.onDisconnectCancel(path, onComplete: done),
+    );
+  }
 }
