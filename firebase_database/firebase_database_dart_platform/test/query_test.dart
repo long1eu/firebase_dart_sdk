@@ -215,6 +215,20 @@ void main() {
       }
     });
 
+    test('an event stream not listened to creates no client', () async {
+      final FirebaseApp app = await newApp();
+      final FirebaseDatabase db = FirebaseDatabase.instanceFor(app: app);
+
+      final Stream<DatabaseEvent> stream = db.ref('a').onValue;
+      db.useDatabaseEmulator('localhost', 9000);
+      final StreamSubscription<DatabaseEvent> subscription = stream.listen(
+        (_) {},
+      );
+      addTearDown(subscription.cancel);
+
+      expect(createdClients.single.emulatorHost, 'localhost:9000');
+    });
+
     test('server cancel is permission-denied then done', () async {
       final FirebaseDatabase db = FirebaseDatabase.instanceFor(
         app: await newApp(),

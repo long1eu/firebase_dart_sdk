@@ -57,7 +57,8 @@ class DartReference extends DartQuery implements DatabaseReferencePlatform {
   String? get key => segments.isEmpty ? null : segments.last;
 
   /// `DatabaseReferencePlatform.push`: client `push()`, which makes the key
-  /// locally from the server time offset (creates the client; no write).
+  /// locally from the server time offset. No write, but it creates the client
+  /// and so fixes its settings: call `useDatabaseEmulator` before it.
   @override
   DartReference push() => DartReference.ofClient(database, clientRef.push());
 

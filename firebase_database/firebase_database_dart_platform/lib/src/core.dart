@@ -2,22 +2,20 @@ import 'package:firebase_app_dart/firebase_app_dart.dart' as dart_app;
 import 'package:firebase_core_platform_interface/firebase_core_platform_interface.dart';
 import 'package:flutter/foundation.dart';
 
-/// Installs [LinuxFirebaseCore] when [force] is true, or, when it is null, on
-/// Linux while `firebase_core` still has its default (method channel)
-/// implementation, which has nothing behind it there.
+/// Installs [LinuxFirebaseCore] in place of `firebase_core`'s default (method
+/// channel) implementation, which has nothing behind it on Linux: when
+/// [force] is true on any platform, when it is null on Linux only, never when
+/// it is false.
 ///
-/// Another package may install a core of its own (the Firestore, Storage and
-/// Auth platform packages of this repository do); whichever registers first is kept,
-/// so they can be in one app in any order. Nothing here depends on the type of the
-/// core that is in place. A [LinuxFirebaseCore] already installed is kept, also
-/// when [force] is true, so that calling `use` again does not lose the apps.
+/// Any other core is kept, also when [force] is true: another package may
+/// install a pure-Dart core of its own (the Firestore, Storage and Auth
+/// platform packages of this repository do), and whichever registers first is
+/// kept with its apps, so they can be in one app in any order. Nothing here
+/// depends on the type of the core that is in place.
 void installCoreIfNeeded({bool? force}) {
   final bool install =
-      force ??
-      (!kIsWeb &&
-          defaultTargetPlatform == TargetPlatform.linux &&
-          FirebasePlatform.instance is MethodChannelFirebase);
-  if (install && FirebasePlatform.instance is! LinuxFirebaseCore) {
+      force ?? (!kIsWeb && defaultTargetPlatform == TargetPlatform.linux);
+  if (install && FirebasePlatform.instance is MethodChannelFirebase) {
     FirebasePlatform.instance = LinuxFirebaseCore();
   }
 }
