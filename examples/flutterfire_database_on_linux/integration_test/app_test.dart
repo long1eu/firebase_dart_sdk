@@ -28,6 +28,17 @@ Future<void> pumpUntil(
   fail('Timed out waiting for $finder');
 }
 
+/// Taps the field with [key], then types [text] into it. On Linux the tap on
+/// Push unfocuses the note field and closes its text input connection; under
+/// this binding enterText reopens it only when it targets another field than
+/// the last enterText, so without the tap a second note into the same field
+/// is dropped (see test/note_field_test.dart).
+Future<void> typeInto(WidgetTester tester, String key, String text) async {
+  await tester.tap(byKey(key));
+  await tester.pump();
+  await tester.enterText(byKey(key), text);
+}
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -43,7 +54,7 @@ void main() {
     await pumpUntil(tester, find.text('Connected'));
     await pumpUntil(tester, find.text('No notes yet'));
 
-    await tester.enterText(byKey('noteField'), 'hello from the test');
+    await typeInto(tester, 'noteField', 'hello from the test');
     await tester.tap(byKey('pushButton'));
     await pumpUntil(tester, find.text('hello from the test'));
 
@@ -63,7 +74,7 @@ void main() {
     // onChildAdded keeps the order and onChildRemoved drops the oldest: 11
     // notes through the field leave the 10 newest.
     for (int i = 0; i < 10; i++) {
-      await tester.enterText(byKey('noteField'), 'note $i');
+      await typeInto(tester, 'noteField', 'note $i');
       await tester.tap(byKey('pushButton'));
       await pumpUntil(tester, find.text('note $i'));
     }
@@ -74,6 +85,15 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
     }
     expect(find.text('edited by the test'), findsNothing);
+    // The list builds only the rows near the viewport; the oldest is last.
+    await tester.scrollUntilVisible(
+      find.text('note 0'),
+      100,
+      scrollable: find.descendant(
+        of: find.byType(ListView),
+        matching: find.byType(Scrollable),
+      ),
+    );
     expect(find.text('note 0'), findsOneWidget);
 
     await tester.tap(byKey('counterButton'));
@@ -96,7 +116,7 @@ void main() {
       tester,
       find.descendant(of: byKey('connection'), matching: find.text('Offline')),
     );
-    await tester.enterText(byKey('noteField'), 'written offline');
+    await typeInto(tester, 'noteField', 'written offline');
     await tester.tap(byKey('pushButton'));
     await pumpUntil(tester, find.text('written offline'));
     await tester.tap(byKey('offlineSwitch'));
