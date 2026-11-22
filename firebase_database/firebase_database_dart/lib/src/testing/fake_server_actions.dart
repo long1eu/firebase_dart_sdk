@@ -10,6 +10,11 @@ import 'package:firebase_database_dart/src/core/connection/listen_hash_provider.
 import 'package:firebase_database_dart/src/core/connection/listen_spec.dart';
 import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
 import 'package:firebase_database_dart/src/core/connection/wire_range_merge.dart';
+import 'package:firebase_database_dart/src/core/path.dart';
+import 'package:firebase_database_dart/src/core/snap/children_node.dart';
+import 'package:firebase_database_dart/src/core/snap/node.dart';
+import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
+import 'package:firebase_database_dart/src/core/util/server_values.dart';
 
 /// One call made on a [FakeServerActions], in the order made.
 final class ServerCall {
@@ -58,6 +63,14 @@ final class ServerCall {
   /// Whether [FakeServerActions.respond] was called.
   bool get answered => _answered;
   bool _answered = false;
+
+  /// Whether the call was made while the fake was connected (a sent request, as opposed to one
+  /// the connection queues while offline).
+  bool get sent => _sent;
+  bool _sent = false;
+
+  /// Whether a listen was answered `ok`: the server may still revoke it once, with an error.
+  bool _listenOk = false;
 
   @override
   String toString() =>
@@ -127,6 +140,7 @@ final class FakeServerActions implements ServerActions {
   };
 
   ServerCall _record(ServerCall call) {
+    call._sent = isConnected;
     calls.add(call);
     if (readOnly && _writeActions.contains(call.action)) {
       scheduleMicrotask(() {
@@ -162,6 +176,14 @@ final class FakeServerActions implements ServerActions {
     _record(ServerCall('shutdown'));
     isShutdown = true;
     activeListens.clear();
+    for (final ServerCall call in callsOf('get')) {
+      if (!call._answered) {
+        call._answered = true;
+        call.getCompleter!.completeError(
+          const ServerActionsException('database_closed'),
+        );
+      }
+    }
   }
 
   @override
@@ -299,10 +321,20 @@ final class FakeServerActions implements ServerActions {
   /// Answers [call] with [status] and [data]; a failed listen leaves the listen table, a get
   /// completes its future (with a [ServerActionsException] unless [status] is `ok`).
   void respond(ServerCall call, {String status = statusOk, Object? data}) {
-    if (call._answered) {
+    final bool revoke =
+        call._answered &&
+        call._listenOk &&
+        status != statusOk &&
+        call.action == 'listen';
+    if (call._answered && !revoke) {
       throw StateError('$call was already answered.');
     }
     call._answered = true;
+    if (revoke) {
+      call._listenOk = false;
+    } else if (call.action == 'listen' && status == statusOk) {
+      call._listenOk = true;
+    }
     final Completer<Object?>? completer = call.getCompleter;
     if (completer != null) {
       if (status == statusOk) {
@@ -347,12 +379,17 @@ final class FakeServerActions implements ServerActions {
     Object? data, {
     bool isMerge = false,
     int? tag,
-  }) => _delegate.onDataUpdate(
-    normalizePath(path),
-    data,
-    isMerge: isMerge,
-    tag: tag,
-  );
+  }) {
+    if (tag == null) {
+      _storeUpdate(normalizePath(path), data, isMerge: isMerge);
+    }
+    _delegate.onDataUpdate(
+      normalizePath(path),
+      data,
+      isMerge: isMerge,
+      tag: tag,
+    );
+  }
 
   /// Pushes `rm` at [path] (either form).
   void deliverRangeMerge(
@@ -360,6 +397,125 @@ final class FakeServerActions implements ServerActions {
     List<WireRangeMerge> merges, {
     int? tag,
   }) => _delegate.onRangeMergeUpdate(normalizePath(path), merges, tag: tag);
+
+  /// The server's clock for `{'.sv': 'timestamp'}` in acknowledged writes (milliseconds since
+  /// the epoch); settable.
+  int Function() serverTimeMillis = () => DateTime.now().millisecondsSinceEpoch;
+
+  /// The data the fake server holds: untagged pushes ([deliverDataUpdate]) and acknowledged
+  /// writes, in export form.
+  Object? get data => _store.toJson(exportFormat: true);
+  Node _store = ChildrenNode.empty;
+
+  /// The stored data at [path] (either form), in export form.
+  Object? dataAt(String path) =>
+      _store.getChild(Path(path)).toJson(exportFormat: true);
+
+  /// Acknowledges the most recent unanswered put or merge as the measured server does.
+  ///
+  /// A put with a hash that does not match the stored data at its path answers `datastale` with
+  /// the stored value as data and changes nothing. Otherwise server values are resolved (the
+  /// timestamp from [serverTimeMillis], an increment against the stored value), the data is
+  /// stored and pushed once to each overlapping listen (a tagged listen gets the path data with
+  /// its tag, unfiltered), and then the write is answered `ok`: the push comes before the ack.
+  void ackLastWrite() {
+    final ServerCall call = _lastPending(const <String>{'put', 'merge'});
+    final String writePath = normalizePath(call.path!);
+    final String? hash = call.hash;
+    if (hash != null && _store.getChild(Path(writePath)).hash() != hash) {
+      respond(call, status: 'datastale', data: dataAt(writePath));
+      return;
+    }
+    final Map<String, Object?> serverValues = generateServerValues(
+      timestamp: serverTimeMillis(),
+    );
+    final Object? resolved;
+    if (call.action == 'put') {
+      resolved = resolveDeferredValueSnapshot(
+        nodeFromJson(call.data),
+        _store.getChild(Path(writePath)),
+        serverValues,
+      ).toJson(exportFormat: true);
+    } else {
+      resolved = <String, Object?>{
+        for (final MapEntry<String, Object?> entry
+            in (call.data! as Map<String, Object?>).entries)
+          entry.key: resolveDeferredValueSnapshot(
+            nodeFromJson(entry.value),
+            _store.getChild(Path(writePath).childPath(Path(entry.key))),
+            serverValues,
+          ).toJson(exportFormat: true),
+      };
+    }
+    _storeUpdate(writePath, resolved, isMerge: call.action == 'merge');
+    _pushWrite(writePath, resolved, isMerge: call.action == 'merge');
+    respond(call);
+  }
+
+  /// Refuses the most recent unanswered put or merge with [status] (`permission_denied`,
+  /// `datastale`, ...) and the optional [reason]; pushes and stores nothing.
+  void failLastWrite(String status, [String? reason]) => respond(
+    _lastPending(const <String>{'put', 'merge'}),
+    status: status,
+    data: reason,
+  );
+
+  /// Acknowledges the most recent unanswered onDisconnect request.
+  void ackLastOnDisconnect() => respond(
+    _lastPending(const <String>{
+      'onDisconnectPut',
+      'onDisconnectMerge',
+      'onDisconnectCancel',
+    }),
+  );
+
+  ServerCall _lastPending(Set<String> actions) {
+    final List<ServerCall> pending = pendingWrites
+        .where((ServerCall call) => actions.contains(call.action))
+        .toList();
+    if (pending.isEmpty) {
+      throw StateError('No unanswered request of $actions.');
+    }
+    return pending.last;
+  }
+
+  void _storeUpdate(String path, Object? data, {required bool isMerge}) {
+    final Path at = Path(path);
+    if (!isMerge) {
+      _store = _store.updateChild(at, nodeFromJson(data));
+      return;
+    }
+    for (final MapEntry<Object?, Object?> entry
+        in (data! as Map<Object?, Object?>).entries) {
+      _store = _store.updateChild(
+        at.childPath(Path('${entry.key}')),
+        nodeFromJson(entry.value),
+      );
+    }
+  }
+
+  /// Pushes a write at [writePath] once to each overlapping listen.
+  void _pushWrite(String writePath, Object? data, {required bool isMerge}) {
+    for (final ServerCall listen in activeListens.values.toList()) {
+      final String listenPath = listen.spec!.path;
+      final int? tag = listen.tag;
+      if (_covers(listenPath, writePath)) {
+        _delegate.onDataUpdate(writePath, data, isMerge: isMerge, tag: tag);
+      } else if (_covers(writePath, listenPath)) {
+        // The listen lies below the write: it gets its own path's data.
+        _delegate.onDataUpdate(
+          listenPath,
+          dataAt(listenPath),
+          tag: tag,
+          isMerge: false,
+        );
+      }
+    }
+  }
+
+  /// Whether [outer] is [inner] or one of its ancestors (both `/a/b` form).
+  static bool _covers(String outer, String inner) =>
+      outer == '/' || inner == outer || inner.startsWith('$outer/');
 
   /// Reports the connection up (after the replay).
   void connect() {
@@ -372,7 +528,8 @@ final class FakeServerActions implements ServerActions {
   void disconnect() {
     isConnected = false;
     for (final ServerCall call in pendingWrites) {
-      if (call.action == 'put' && call.hash != null) {
+      if (call.action == 'put' && call.hash != null ||
+          call.action.startsWith('onDisconnect') && call.sent) {
         respond(call, status: statusDisconnect);
       }
     }

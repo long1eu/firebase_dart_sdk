@@ -21,14 +21,22 @@ final class PersistenceKey {
   /// The database URL (with `ns` for the emulator).
   final Uri databaseUrl;
 
+  /// Equal when app name and database URL are (Android keys its cache by both,
+  /// `AndroidPlatform.createPersistenceManager`).
   @override
-  bool operator ==(Object other) => throw UnimplementedError();
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PersistenceKey &&
+          other.appName == appName &&
+          other.databaseUrl == databaseUrl;
 
+  /// Hash of app name and database URL.
   @override
-  int get hashCode => throw UnimplementedError();
+  int get hashCode => Object.hash(appName, databaseUrl);
 
+  /// The app name and database URL.
   @override
-  String toString() => throw UnimplementedError();
+  String toString() => 'PersistenceKey($appName, $databaseUrl)';
 }
 
 /// Opens the engine for [key]; called by the client once at Repo start, before the Repo's first

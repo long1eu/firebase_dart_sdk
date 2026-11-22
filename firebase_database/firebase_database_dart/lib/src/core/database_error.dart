@@ -67,8 +67,27 @@ enum DatabaseErrorCode {
   /// The code for a wire [status]; JS-only local statuses map as follows: `disconnect` to
   /// [disconnected], `maxretry` to [maxRetries], `set` to [overriddenBySet], anything else to
   /// [unknown].
-  static DatabaseErrorCode fromWireStatus(String status) =>
-      throw UnimplementedError();
+  ///
+  /// Matching ignores case, as Android `DatabaseError.fromStatus` lower-cases the status, so
+  /// Android's local `overriddenBySet` also maps to [overriddenBySet]. JS: `errorForServerCode`;
+  /// Android: `DatabaseError.fromStatus`.
+  static DatabaseErrorCode fromWireStatus(String status) {
+    final String lower = status.toLowerCase();
+    switch (lower) {
+      case 'disconnect':
+        return disconnected;
+      case 'maxretry':
+        return maxRetries;
+      case 'set':
+        return overriddenBySet;
+    }
+    for (final DatabaseErrorCode code in values) {
+      if (code.wireStatus == lower) {
+        return code;
+      }
+    }
+    return unknown;
+  }
 }
 
 /// An error raised by the database core: a [code], a human-readable [message] and optional
@@ -79,8 +98,19 @@ final class DatabaseError {
 
   /// Creates the error for a wire [status] with the server's optional [reason], as Repo does for
   /// a failed request.
-  factory DatabaseError.fromStatus(String status, [String? reason]) =>
-      throw UnimplementedError();
+  ///
+  /// The code comes from [DatabaseErrorCode.fromWireStatus], the message from the code. [details]
+  /// is [reason]; for a status the client does not know (mapped to [DatabaseErrorCode.unknown])
+  /// it is the raw status followed by the reason (`invalid_parameters: ...`), so the public
+  /// `serverStatus` keeps it. JS: `errorForServerCode`; Android: `DatabaseError.fromStatus`.
+  factory DatabaseError.fromStatus(String status, [String? reason]) {
+    final DatabaseErrorCode code = DatabaseErrorCode.fromWireStatus(status);
+    final String? details =
+        code == DatabaseErrorCode.unknown && status.toLowerCase() != 'unknown'
+        ? (reason == null ? status : '$status: $reason')
+        : reason;
+    return DatabaseError(code, _messageFor(code), details: details);
+  }
 
   /// The error code.
   final DatabaseErrorCode code;
@@ -91,6 +121,39 @@ final class DatabaseError {
   /// Extra details, never containing tokens.
   final String? details;
 
+  /// The code, message and details; never a token (Android `DatabaseError.toString`).
   @override
-  String toString() => throw UnimplementedError();
+  String toString() =>
+      'DatabaseError(${code.code}): $message'
+      '${details == null ? '' : ' ($details)'}';
 }
+
+/// The human-readable message of this code (Android `DatabaseError.errorReasons`, JS
+/// `errorForServerCode`).
+String _messageFor(DatabaseErrorCode code) => switch (code) {
+  DatabaseErrorCode.dataStale =>
+    'The transaction needs to be run again with current data.',
+  DatabaseErrorCode.operationFailed =>
+    'The server indicated that this operation failed.',
+  DatabaseErrorCode.permissionDenied =>
+    'This client does not have permission to perform this operation.',
+  DatabaseErrorCode.disconnected =>
+    'The operation had to be aborted due to a network disconnect.',
+  DatabaseErrorCode.maxRetries => 'The transaction had too many retries.',
+  DatabaseErrorCode.overriddenBySet =>
+    'The transaction was overridden by a subsequent set.',
+  DatabaseErrorCode.unavailable => 'The service is unavailable.',
+  DatabaseErrorCode.tooBig =>
+    'The data requested exceeds the maximum size that can be accessed with '
+        'a single request.',
+  DatabaseErrorCode.userCodeException =>
+    'User code called from the database threw an exception.',
+  DatabaseErrorCode.networkError =>
+    'The operation could not be performed due to a network error.',
+  DatabaseErrorCode.writeCanceled => 'The write was canceled by the user.',
+  DatabaseErrorCode.readOnly => 'The database is read-only here.',
+  DatabaseErrorCode.indexNotDefined =>
+    'Index not defined: add ".indexOn" to the security rules for this query.',
+  DatabaseErrorCode.databaseClosed => 'The database was closed.',
+  DatabaseErrorCode.unknown => 'An unknown error occurred.',
+};
