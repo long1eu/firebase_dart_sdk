@@ -999,7 +999,7 @@ the number; the section each reason cites has the upstream lines.
 | 19 | Browser storage | writes `firebase:*` keys | writes nothing | `ws_channel_web_test` |
 | 20 | Writes under `.info` | `update`, `cancel` accepted | refused | `validation_test` |
 | 21 | Long polling | present | absent | no test found |
-| 22 | Acknowledging pipelined `update`s | visible writes rebuilt on each ack | no rebuild, same state | `write_tree_test` |
+| 22 | Ack of pipelined `update`s | writes rebuilt on each ack | no rebuild, same state | `write_tree_test` |
 
 Test file names are given without their directory: `scenarios_test`, `snapshot_test`, `public_surface_test` and
 `validation_test` are in `test/api/`; `repo_get_test` and `database_error_test` in `test/core/`; `replay_test`,
