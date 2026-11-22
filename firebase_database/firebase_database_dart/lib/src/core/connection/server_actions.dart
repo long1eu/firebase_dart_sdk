@@ -1,0 +1,161 @@
+/// The seam between Repo and the connection. JS: `core/ServerActions.ts` (implemented by
+/// `core/PersistentConnection.ts`) and the callbacks Repo passes to it (`core/Repo.ts` `repoStart`,
+/// ~line 230-330); Android: `connection/PersistentConnection.java` and its `Delegate`.
+///
+/// Cross-team seam: JSON only. Paths cross as wire strings (`/a/b`, `/` for the root); data
+/// crosses as decoded JSON (`Map<String, Object?>`, `List<Object?>`, `String`, `num`, `bool`,
+/// null), in the export form for writes (`.priority`, `.value`, server values `{'.sv': ...}` left
+/// unresolved). No `Path`, `Node` or `QuerySpec` crosses it. The protocol is specified in
+/// `rtdb/from_boss/rtdb_protocol.md`.
+library;
+
+import 'package:firebase_database_dart/src/core/connection/listen_hash_provider.dart';
+import 'package:firebase_database_dart/src/core/connection/listen_spec.dart';
+import 'package:firebase_database_dart/src/core/connection/wire_range_merge.dart';
+
+/// The `s` status of a successful response.
+const String statusOk = 'ok';
+
+/// The status a sent transaction put (a put with a hash) is cancelled with when the connection
+/// drops; produced locally by the connection, never by the server.
+const String statusDisconnect = 'disconnect';
+
+/// Completion of a request: [status] is `ok`, a server error status (`permission_denied`,
+/// `datastale`, `too_big`, `unavailable`, ...) or the local [statusDisconnect]; [data] is the
+/// response `d`: on error the human-readable reason (`String?`), on a successful listen the
+/// payload (which may hold warnings `{'w': ['no_index']}`), otherwise usually null.
+///
+/// Called at most once per request, on the caller's event loop, never synchronously from inside
+/// the call that sent the request.
+typedef RequestResultCallback = void Function(String status, Object? data);
+
+/// What Repo asks of the connection. One instance per Repo; the connection owns the socket,
+/// handshake, framing, tokens, backoff and replay.
+///
+/// Reconnect contract: after a reconnect the connection replays by itself, in this order: `auth`,
+/// `appcheck`, every listen still registered (with a freshly computed hash), every put and merge
+/// not yet acknowledged, onDisconnect requests not yet sent, and every outstanding [get]. Only then
+/// does it call [ServerActionsDelegate.onConnect]. Exception: a put sent with a `hash` (a
+/// transaction put) that was already sent is NOT replayed; its [RequestResultCallback] is called
+/// with [statusDisconnect] and Repo reruns the transaction. Acknowledged onDisconnect requests are
+/// not replayed (the server forgot them with the old connection).
+abstract interface class ServerActions {
+  /// Starts connecting (the first connection starts when Repo is created, not on first use).
+  void initialize();
+
+  /// Closes the connection for good and drops every pending callback; later calls are ignored.
+  void shutdown();
+
+  /// Sends `q`: listen at [spec]. The listen always carries `h` = [ListenHashProvider.simpleHash]
+  /// (and `ch` when [ListenHashProvider.shouldIncludeCompoundHash]). [tag] is non-null only for
+  /// queries that do not load all data (tags start at 1); only then are `q` (the query object)
+  /// and `t` sent. A query that loads all data is passed as its default form, untagged.
+  ///
+  /// The data arrives through [ServerActionsDelegate.onDataUpdate] (tagged with [tag]) before
+  /// [onComplete] reports `ok`. A failed listen, or a listen the server revokes later with a `c`
+  /// push (rules changed), completes with its status (`permission_denied`) and is removed from
+  /// the listen table. Listening twice to the same [spec] is an error.
+  void listen(
+    ListenSpec spec, {
+    required ListenHashProvider hashProvider,
+    int? tag,
+    required RequestResultCallback onComplete,
+  });
+
+  /// Sends `n` (with `q` and `t` when [tag] is non-null) if the listen is registered and the
+  /// connection is up; always removes it from the listen table. No callback.
+  void unlisten(ListenSpec spec, {int? tag});
+
+  /// Sends `g` with `p` and `q` (always, `{}` for the default query) and completes with the
+  /// decoded `d`, or fails with the error status and reason. Not cancelled by a disconnect: it is
+  /// re-sent after the reconnect. No timeout.
+  Future<Object?> get(ListenSpec spec);
+
+  /// Sends `p`: overwrite [path] with [data] (export form, null removes). With [hash] it is a
+  /// transaction put (`h` = hash of the data the transaction read): the server answers
+  /// `datastale` when the data changed, and a dropped connection completes it with
+  /// [statusDisconnect]. Without [hash] it is replayed after a reconnect until acknowledged.
+  void put(String path, Object? data, {String? hash, RequestResultCallback? onComplete});
+
+  /// Sends `m`: merge [data] (keys are child keys or relative paths) into [path]. Replayed after
+  /// a reconnect until acknowledged.
+  void merge(
+    String path,
+    Map<String, Object?> data, {
+    String? hash,
+    RequestResultCallback? onComplete,
+  });
+
+  /// Sends `o`: on disconnect, overwrite [path] with [data]. Queued while offline.
+  void onDisconnectPut(String path, Object? data, {RequestResultCallback? onComplete});
+
+  /// Sends `om`: on disconnect, merge [data] into [path]. Queued while offline.
+  void onDisconnectMerge(
+    String path,
+    Map<String, Object?> data, {
+    RequestResultCallback? onComplete,
+  });
+
+  /// Sends `oc`: cancel the onDisconnect operations at and below [path]. Queued while offline.
+  void onDisconnectCancel(String path, {RequestResultCallback? onComplete});
+
+  /// The auth token changed: [token] null signs out (`unauth` when connected); otherwise sends
+  /// `auth` (JWT) or `gauth` on the current connection, without reconnecting.
+  void refreshAuthToken(String? token);
+
+  /// The App Check token changed: null removes it, otherwise sends `appcheck`.
+  void refreshAppCheckToken(String? token);
+
+  /// Drops every put and merge not yet acknowledged, completing each with `write_canceled`
+  /// (Repo's `purgeOutstandingWrites`).
+  void purgeOutstandingWrites();
+
+  /// Adds [reason] (`repo_interrupt` for goOffline) and closes the connection; no reconnect while
+  /// any reason is set.
+  void interrupt(String reason);
+
+  /// Removes [reason]; when none is left, resets the backoff and reconnects at once.
+  void resume(String reason);
+
+  /// Whether [reason] is set.
+  bool isInterrupted(String reason);
+}
+
+/// What the connection tells Repo. Every call arrives on the event loop, never synchronously from
+/// inside a [ServerActions] call.
+abstract interface class ServerActionsDelegate {
+  /// A `d` (overwrite, [isMerge] false) or `m` (merge, [isMerge] true) push at [path]. For a
+  /// merge, [data] is a map of child keys or relative paths to values, null meaning delete.
+  /// [tag] is the listen tag for data of a filtered query, else null.
+  void onDataUpdate(String path, Object? data, {required bool isMerge, int? tag});
+
+  /// An `rm` push at [path] (only after a listen sent a compound hash); [merges] is never empty.
+  void onRangeMergeUpdate(String path, List<WireRangeMerge> merges, {int? tag});
+
+  /// The connection is up and the replay (see [ServerActions]) has been sent:
+  /// `.info/connected` becomes true.
+  void onConnect();
+
+  /// The connection was lost: `.info/connected` becomes false and Repo applies the local
+  /// onDisconnect tree. Sent transaction puts have already been completed with
+  /// [statusDisconnect].
+  void onDisconnect();
+
+  /// The result of an `auth`/`gauth` request or an `ac` push: [status] `ok` when authenticated,
+  /// else the revoke status (`invalid_token`, `permission_denied`, `expired_token`) and the
+  /// server's [explanation]. On a revoke the connection has closed itself and will reconnect with
+  /// a freshly forced token.
+  void onAuthStatus(String status, {String? explanation});
+
+  /// The result of an `appcheck` request or an `apc` push; on a revoke the connection stays open
+  /// and the next token fetch is forced.
+  void onAppCheckStatus(String status, {String? explanation});
+
+  /// The server shut this client down (control message `s`) with [reason]; the connection does not
+  /// reconnect. Repo fails nothing by itself but logs and reports the reason.
+  void onServerShutdown(String reason);
+
+  /// Server info changed; today only `serverTimeOffset` (server time minus local time in ms),
+  /// written to `.info/serverTimeOffset`.
+  void onServerInfoUpdate(Map<String, Object?> updates);
+}
