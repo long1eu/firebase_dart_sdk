@@ -22,7 +22,18 @@ import 'package:firebase_database_dart/src/core/util/sorted_map.dart';
 /// Numbers are kept as given (server data: `1.0`, `-0.0` and large integers stay as they are).
 /// A `List` is read as a map of its indices (null entries skipped), like JS's array branch, but
 /// built in linear time like the object branch.
-Node nodeFromJson(Object? json, [Object? priority]) {
+///
+/// A name that occurs many times in [json] (the field names of a list of records) gets one
+/// [ChildKey] and one string for the whole call. The table lives for this call only: it cannot
+/// grow without bound and nothing is shared between two messages or two databases.
+Node nodeFromJson(Object? json, [Object? priority]) =>
+    _nodeFromJson(json, priority, null);
+
+Node _nodeFromJson(
+  Object? json,
+  Object? priority,
+  Map<String, ChildKey>? keys,
+) {
   if (json == null) {
     return ChildrenNode.empty;
   }
@@ -50,9 +61,10 @@ Node nodeFromJson(Object? json, [Object? priority]) {
 
   // Valid leaf nodes include non-objects or server-value wrapper objects.
   if (data is! Map && data is! List || data is Map && data.containsKey('.sv')) {
-    return LeafNode(data!, _priorityNode(priorityValue));
+    return LeafNode(data!, _priorityNode(priorityValue, keys));
   }
 
+  final Map<String, ChildKey> keyTable = keys ?? <String, ChildKey>{};
   final List<NamedNode> children = <NamedNode>[];
   bool childrenHavePriority = false;
   void addChild(String key, Object? childData) {
@@ -60,11 +72,11 @@ Node nodeFromJson(Object? json, [Object? priority]) {
     if (key.startsWith('.')) {
       return;
     }
-    final Node childNode = nodeFromJson(childData);
+    final Node childNode = _nodeFromJson(childData, null, keyTable);
     if (!childNode.isEmpty) {
       childrenHavePriority =
           childrenHavePriority || !childNode.priority.isEmpty;
-      children.add(NamedNode(ChildKey(key), childNode));
+      children.add(NamedNode(keyTable[key] ??= ChildKey(key), childNode));
     }
   }
 
@@ -90,7 +102,7 @@ Node nodeFromJson(Object? json, [Object? priority]) {
     valueOf: (NamedNode n) => n.node,
     keyCompare: nameComparator,
   );
-  final Node priorityNode = _priorityNode(priorityValue);
+  final Node priorityNode = _priorityNode(priorityValue, keyTable);
   if (childrenHavePriority) {
     final SortedMap<NamedNode, Node> sortedChildSet =
         buildChildSet<NamedNode, Node>(
@@ -111,5 +123,5 @@ Node nodeFromJson(Object? json, [Object? priority]) {
   return ChildrenNode(childSet, priorityNode, IndexMap.defaultMap);
 }
 
-Node _priorityNode(Object? priority) =>
-    priority == null ? ChildrenNode.empty : nodeFromJson(priority);
+Node _priorityNode(Object? priority, Map<String, ChildKey>? keys) =>
+    priority == null ? ChildrenNode.empty : _nodeFromJson(priority, null, keys);
