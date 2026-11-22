@@ -16,6 +16,8 @@ registers before `main()` on Linux. The app code does not import it; the only si
 | A text field that pushes a note with `push()`, `set` and `ServerValue.timestamp` | `_push` |
 | Delete of a note with `remove()` | `_remove` |
 | A counter changed by `runTransaction` | `_increment` |
+| A second counter changed by `set(ServerValue.increment(1))`, shown from `onValue` of its reference | `_hit` |
+| An offline switch: `goOffline()` and `goOnline()`; the chip follows `.info/connected`; a note pushed offline shows at once and is sent on going online | `_setOffline`, `_onConnected` |
 | Presence: an `onDisconnect().set(...)` registered on every (re)connection, then `set` of the online entry; the list of entries under `presence` | `_onConnected`, `initState` |
 | Integration test: connect, push through the field, count, see the presence entry | `integration_test/app_test.dart` |
 
@@ -43,7 +45,7 @@ no signed-in user. The adapter's README says how to pass a token provider, persi
 | `EMULATOR_PORT` | `9100` | Port of the Database emulator |
 | `ROOT` | `ffdb` | The node of the database the app reads and writes under |
 
-The project id is `demo-test` and the database `demo-test-default-rtdb` (open rules), the ones of
+The emulator creates a namespace on first use, so no setup is needed for `demo-test`. The project id is `demo-test` and the database `demo-test-default-rtdb` (open rules), the ones of
 `tool/start_database_emulator.sh`. The app always calls `useDatabaseEmulator`, so it never talks to a real
 project; to use one, replace `demoOptions` in `lib/bootstrap.dart` with your own options and remove that call.
 
@@ -71,13 +73,14 @@ close one.
 flutter test integration_test/app_test.dart -d linux --dart-define=EMULATOR_PORT=9100 --dart-define=ROOT=ffdb-test
 ```
 
-It empties the node, waits for **Connected**, types a note and taps **Push**, edits it, pushes 10 more (the first, edited note leaves the window of 10), taps **Count with a transaction**,
+It empties the node, waits for **Connected**, types a note and taps **Push**, edits it, pushes 10 more (the first, edited note leaves the window of 10), taps **Count with a transaction**, taps **Count with increment(1)** twice, switches offline, pushes a note
+(shown at once), switches online and reads the note from the server,
 checks the counter with `get()`, and checks that the presence entry of the run is `online`.
 
 ## Status
 
 - `flutter analyze` reports no issues (Flutter 3.44.9, macOS). The list code was written for the child events
-  of a `limitToLast` query as the JS SDK delivers them; how the adapter orders them was not run.
+  of a `limitToLast` query as the JS SDK delivers them; how the adapter orders them, and the offline switch, were not run.
 - **Not built or run on Linux.** The build was not tried (it needs a Linux machine), the integration test was not
   run, and the app has not been seen on screen. Treat the code as written against the API, not as observed
   behaviour.

@@ -25,6 +25,7 @@ class _NotesPageState extends State<NotesPage> {
   late final DatabaseReference _counter = _database.ref(
     '${AppConfig.root}/counter',
   );
+  late final DatabaseReference _hits = _database.ref('${AppConfig.root}/hits');
   late final DatabaseReference _presence = _database.ref(
     '${AppConfig.root}/presence',
   );
@@ -44,6 +45,8 @@ class _NotesPageState extends State<NotesPage> {
   /// The notes in the window, oldest first, as the query orders them.
   final List<DataSnapshot> _noteList = <DataSnapshot>[];
   int _count = 0;
+  int _hitCount = 0;
+  bool _offline = false;
   Map<String, Object?> _others = <String, Object?>{};
 
   @override
@@ -57,6 +60,9 @@ class _NotesPageState extends State<NotesPage> {
       _notesQuery.onChildRemoved.listen(_drop, onError: _onError),
       _counter.onValue.listen((DatabaseEvent event) {
         setState(() => _count = (event.snapshot.value as int?) ?? 0);
+      }, onError: _onError),
+      _hits.onValue.listen((DatabaseEvent event) {
+        setState(() => _hitCount = (event.snapshot.value as int?) ?? 0);
       }, onError: _onError),
       _presence.onValue.listen((DatabaseEvent event) {
         final Object? value = event.snapshot.value;
@@ -161,6 +167,26 @@ class _NotesPageState extends State<NotesPage> {
       );
     } on FirebaseException catch (error) {
       _setStatus('Transaction failed: ${error.code}');
+    }
+  }
+
+  /// Adds one on the server, without a read: the value is resolved there.
+  Future<void> _hit() async {
+    try {
+      await _hits.set(ServerValue.increment(1));
+    } on FirebaseException catch (error) {
+      _setStatus('Increment failed: ${error.code}');
+    }
+  }
+
+  /// Takes the client offline or online. Writes made offline show locally at
+  /// once and are sent on going online.
+  Future<void> _setOffline(bool offline) async {
+    setState(() => _offline = offline);
+    if (offline) {
+      await _database.goOffline();
+    } else {
+      await _database.goOnline();
     }
   }
 
@@ -272,19 +298,32 @@ class _NotesPageState extends State<NotesPage> {
               ],
             ),
             const SizedBox(height: 12),
-            Row(
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: <Widget>[
                 OutlinedButton(
                   key: const ValueKey<String>('counterButton'),
                   onPressed: _increment,
                   child: const Text('Count with a transaction'),
                 ),
-                const SizedBox(width: 12),
                 Text(
                   'Counter: $_count',
                   key: const ValueKey<String>('counter'),
                 ),
-                const Spacer(),
+                OutlinedButton(
+                  key: const ValueKey<String>('hitButton'),
+                  onPressed: _hit,
+                  child: const Text('Count with increment(1)'),
+                ),
+                Text('Hits: $_hitCount', key: const ValueKey<String>('hits')),
+                Switch(
+                  key: const ValueKey<String>('offlineSwitch'),
+                  value: _offline,
+                  onChanged: _setOffline,
+                ),
+                const Text('Offline'),
                 Text(
                   'Online: $online of ${_others.length}',
                   key: const ValueKey<String>('presence'),

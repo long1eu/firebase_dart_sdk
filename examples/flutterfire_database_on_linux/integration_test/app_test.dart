@@ -83,6 +83,32 @@ void main() {
         .get();
     expect(counter.value, 1);
 
+    // ServerValue.increment(1), twice.
+    await tester.tap(byKey('hitButton'));
+    await pumpUntil(tester, find.text('Hits: 1'));
+    await tester.tap(byKey('hitButton'));
+    await pumpUntil(tester, find.text('Hits: 2'));
+
+    // Offline: the note shows at once, the chip follows .info/connected, and
+    // the note reaches the server on going online.
+    await tester.tap(byKey('offlineSwitch'));
+    await pumpUntil(
+      tester,
+      find.descendant(of: byKey('connection'), matching: find.text('Offline')),
+    );
+    await tester.enterText(byKey('noteField'), 'written offline');
+    await tester.tap(byKey('pushButton'));
+    await pumpUntil(tester, find.text('written offline'));
+    await tester.tap(byKey('offlineSwitch'));
+    await pumpUntil(tester, find.text('Connected'));
+    final DataSnapshot notes = await FirebaseDatabase.instance
+        .ref('${AppConfig.root}/notes')
+        .get();
+    expect(
+      notes.children.map((DataSnapshot n) => n.child('text').value),
+      contains('written offline'),
+    );
+
     await pumpUntil(tester, find.text('Online: 1 of 1'));
     final DataSnapshot me = await FirebaseDatabase.instance
         .ref('${AppConfig.root}/presence/${AppConfig.clientId}')
