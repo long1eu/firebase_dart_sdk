@@ -56,8 +56,14 @@ Object? _rawLeafValue(LeafNode leaf) {
 
 /// Whether [a] and [b] are the same number of the same type (an `int` and a `double` differ on
 /// the VM, so `5.0` is replaced by `5`).
-bool _sameNumber(num a, num b) =>
-    identical(a, b) || (a is int && b is int && a == b);
+///
+/// A negative zero is never the same as `0`: on the web `identical(-0.0, 0)` is true.
+bool _sameNumber(num a, num b) {
+  if (a == 0 && b == 0) {
+    return a.isNegative == b.isNegative;
+  }
+  return identical(a, b) || (a is int && b is int && a == b);
+}
 
 /// A copy of the JSON [json] with every number in `normalizeUserNumber` form (keys kept as
 /// given, so multi-segment update keys survive).
