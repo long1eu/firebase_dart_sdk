@@ -88,10 +88,15 @@ void runServerActionsReconnectContract(
     expect(received(2), isEmpty);
     final int connectsBefore = delegate.callsOf('connect').length;
     await harness.reconnect();
-    expect(
-      harness.actionsOn(2).where((String a) => a != 'gauth').toList(),
-      <String>['auth', 'appcheck', 'q', 'p', 'm', 'o', 'g'],
-    );
+    expect(harness.actionsOn(2), <String>[
+      'auth',
+      'appcheck',
+      'q',
+      'p',
+      'm',
+      'o',
+      'g',
+    ]);
     expect(delegate.callsOf('connect').length, connectsBefore + 1);
     unawaitedIgnore(pending);
   });
@@ -185,8 +190,9 @@ void runServerActionsReconnectContract(
       await harness.drop();
       await harness.reconnect();
       expect(received(2).where((String a) => a == 'g'), hasLength(1));
-      await harness.answer('g', status: 'permission_denied', data: 'no');
-      await expectLater(
+      // The expectation listens before the answer, or the error would be unhandled (a connection
+      // may complete the get inside the answer; same fix as the core's contract).
+      final Future<void> failed = expectLater(
         first,
         throwsA(
           isA<ServerActionsException>()
@@ -198,6 +204,8 @@ void runServerActionsReconnectContract(
               .having((ServerActionsException e) => e.reason, 'reason', 'no'),
         ),
       );
+      await harness.answer('g', status: 'permission_denied', data: 'no');
+      await failed;
     },
   );
 

@@ -11,9 +11,12 @@ import 'package:firebase_database_dart/src/core/connection/listen_spec.dart';
 import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
 
 /// A request that is replayed after a reconnect and counts its timeouts across connections.
-abstract class TimedRequest {
-  /// How many times the request timed out on a live connection (`RequestTable`).
+sealed class TimedRequest {
+  /// How many timeouts the request has been counted for on live connections.
   int timeouts = 0;
+
+  /// Whether it was written to the current connection and its answer has not arrived.
+  bool awaitingAnswer = false;
 }
 
 /// One registered listen.
@@ -179,13 +182,34 @@ final class ReplayQueues {
     return taken;
   }
 
-  /// Marks every write and get as not sent: the connection that carried them is gone.
+  /// The replayable requests waiting for their answer on the current connection.
+  Iterable<TimedRequest> get awaitingAnswer => <TimedRequest>[
+    ..._listens.values,
+    ...writes,
+    ...gets,
+  ].where((TimedRequest request) => request.awaitingAnswer);
+
+  /// Whether [request] is still registered (not answered, purged, unlistened or failed).
+  bool isQueued(TimedRequest request) => switch (request) {
+    ListenRecord() => hasListen(request),
+    OutstandingWrite() => writes.contains(request),
+    OutstandingGet() => gets.contains(request),
+  };
+
+  /// Marks every request as not sent: the connection that carried them is gone.
   void markAllUnsent() {
+    for (final ListenRecord listen in _listens.values) {
+      listen.awaitingAnswer = false;
+    }
     for (final OutstandingWrite write in writes) {
-      write.sent = false;
+      write
+        ..sent = false
+        ..awaitingAnswer = false;
     }
     for (final OutstandingGet get in gets) {
-      get.sent = false;
+      get
+        ..sent = false
+        ..awaitingAnswer = false;
     }
   }
 

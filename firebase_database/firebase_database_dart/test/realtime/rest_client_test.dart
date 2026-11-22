@@ -576,10 +576,10 @@ void main() {
 
   group('shutdown', () {
     test('drops the callbacks of reads in flight', () async {
-      final Completer<http.StreamedResponse> answer =
-          Completer<http.StreamedResponse>();
+      // Each request gets its own response (and body stream), as from a real server.
+      final Completer<void> answer = Completer<void>();
       final ScriptedServer server = ScriptedServer(
-        (http.BaseRequest _) => answer.future,
+        (http.BaseRequest _) => answer.future.then((_) => respond(200, '1')),
       );
       final RestClient client = restClientFor(server, delegate: delegate);
       final ListenResult result = ListenResult();
@@ -595,7 +595,7 @@ void main() {
       await pumpUntil(() => server.received.length == 2);
 
       await client.shutdown();
-      answer.complete(respond(200, '1'));
+      answer.complete();
       await pumpEventQueue();
 
       expect(result.completion, isNull);

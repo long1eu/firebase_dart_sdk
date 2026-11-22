@@ -27,7 +27,9 @@ import 'fake_rtdb_server.dart';
 final class ScriptedTokens implements RealtimeTokenSource {
   /// Creates the source handing out [auth] and [appCheck].
   ScriptedTokens({
-    this.auth = 'header.eyJpYXQiOjB9.sig',
+    // A user-shaped JWT (header {"alg":"none"}, claims {"iat":0}): K sends it as `auth`. A token
+    // that is not a decodable JWT with `iat` goes out as `gauth` (auth_session.dart authActionFor).
+    this.auth = 'eyJhbGciOiJub25lIn0.eyJpYXQiOjB9.sig',
     this.appCheck = 'app-check-token',
   });
 

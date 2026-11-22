@@ -56,7 +56,8 @@ void main() {
           'd': <String, Object?>{'r': r, 'b': 'not an object'},
         });
         await rig.settle();
-        expect(statuses, <String>['failed']);
+        // The core's operationFailed wire status (K's decoder; the stub's 'failed' was wrong).
+        expect(statuses, <String>['failure']);
       },
     );
 
@@ -529,6 +530,19 @@ void main() {
     );
 
     test(
+      'an admin credential (the emulator owner) goes out as gauth',
+      () async {
+        rig = PRig()..tokens.auth = 'owner';
+        await rig.start();
+        expect(rig.actionsOn(1).first, 'gauth');
+        expect(rig.sent('gauth').single.body, <String, Object?>{
+          'cred': 'owner',
+        });
+        expect(rig.sent('auth'), isEmpty);
+      },
+    );
+
+    test(
       'B-8.3a every connection sends auth, then appcheck, before its listens',
       () async {
         rig = PRig();
@@ -725,18 +739,8 @@ void main() {
         await rig.answerCredentials();
         final List<String> statuses = <String>[];
         final Future<Object?> get = rig.connection.get(defaultListen('/g'));
-        rig.connection.put(
-          '/a',
-          1,
-          onComplete: (String s, _) => statuses.add(s),
-        );
-        await until(() => rig.connects == 2);
-        await rig.answerCredentials();
-        expect(rig.sent('p', onConnection: 2), hasLength(1));
-        expect(statuses, isEmpty);
-        await until(() => statuses.isNotEmpty);
-        expect(statuses, <String>['network_error']);
-        await expectLater(
+        // The expectation listens before the failure, or the error would be unhandled.
+        final Future<void> getFailed = expectLater(
           get,
           throwsA(
             isA<ServerActionsException>().having(
@@ -746,6 +750,22 @@ void main() {
             ),
           ),
         );
+        rig.connection.put(
+          '/a',
+          1,
+          onComplete: (String s, _) => statuses.add(s),
+        );
+        // First timeout: both the get and the put were waiting, both count one; reconnect.
+        await until(() => rig.connects == 2);
+        await rig.answerCredentials();
+        expect(rig.sent('p', onConnection: 2), hasLength(1));
+        expect(rig.sent('g', onConnection: 2), hasLength(1));
+        expect(statuses, isEmpty);
+        // Second timeout: both fail; nothing is left waiting, so the connection stays.
+        await until(() => statuses.isNotEmpty);
+        expect(statuses, <String>['network_error']);
+        await getFailed;
+        expect(rig.connects, 2);
         await rig.drop();
         await until(() => rig.connects == 3);
         expect(rig.sent('p', onConnection: 3), isEmpty);

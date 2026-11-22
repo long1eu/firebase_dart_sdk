@@ -47,6 +47,9 @@ void _connectAndDrop(
   if (answer) {
     rig.answerCredentialsNow();
     async.flushMicrotasks();
+    // The reset needs the connection to be older than resetAfter (zero here): strictly older, as
+    // JS's `>` (rtdb_protocol.md 8.2); with no time passing it would not reset.
+    async.elapse(const Duration(milliseconds: 1));
   }
   final int disconnects = rig.delegate.callsOf('disconnect').length;
   rig.server.connector.last.serverClose(1006);

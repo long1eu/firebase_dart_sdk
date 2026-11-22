@@ -20,11 +20,6 @@ import 'package:firebase_database_dart/src/realtime/replay.dart';
 import 'package:firebase_database_dart/src/realtime/request_table.dart';
 import 'package:firebase_database_dart/src/realtime/server_message.dart';
 
-// MERGE: core: statusNetworkError. Addendum 2 adds `const String statusNetworkError =
-// 'network_error'` to core/connection/server_actions.dart (produced locally when a request timed
-// out twice on live connections); use it and delete this one when the core has it.
-const String _statusNetworkError = 'network_error';
-
 /// Creates the [RealtimeConnection] of the next attempt for [delegate] (test plan section 5).
 /// Production passes a closure over `RealtimeConnection` and the platform connector; tests return a
 /// connection over the fake connector.
@@ -148,9 +143,8 @@ final class PersistentConnection implements ServerActions {
       return;
     }
     _initialized = true;
-    // MERGE: K: P subscribes to the token source's change streams and forwards each change to
-    // AuthSession.authChanged/appCheckChanged; AuthSession must not subscribe to them itself, or
-    // every change is sent twice (rtdb_seam_changes.md A.1).
+    // Exactly one subscriber to the token changes: P, which forwards each change to
+    // AuthSession.authChanged/appCheckChanged (AuthSession never subscribes; A.1).
     _subscriptions
       ..add(_tokens.authChanges.listen(_onAuthTokenChanged))
       ..add(_tokens.appCheckChanges.listen(_onAppCheckTokenChanged))
@@ -238,16 +232,14 @@ final class PersistentConnection implements ServerActions {
   }
 
   void _sendListen(ListenRecord record) {
+    record.awaitingAnswer = true;
     final Map<String, Object?> body = record.wireBody();
     _send(
       RealtimeProtocol.listen,
       body,
       onResponse: (Map<String, Object?> response) =>
           _onListenResponse(record, response),
-      onTimeout: () => _onTimeout(record, () {
-        _queues.removeListen(record.spec.path, record.spec.queryIdentifier);
-        _emit(() => record.onComplete(_statusNetworkError, null));
-      }),
+      onTimeout: () => _onTimeout(record),
     );
   }
 
@@ -257,6 +249,7 @@ final class PersistentConnection implements ServerActions {
     if (!_queues.hasListen(record)) {
       return;
     }
+    record.awaitingAnswer = false;
     final String status = _statusOf(response);
     final Object? data = response['d'];
     if (status == statusOk) {
@@ -307,6 +300,7 @@ final class PersistentConnection implements ServerActions {
 
   void _sendGet(OutstandingGet get) {
     get.sent = true;
+    get.awaitingAnswer = true;
     _send(
       RealtimeProtocol.get,
       get.body,
@@ -327,12 +321,7 @@ final class PersistentConnection implements ServerActions {
           );
         }
       },
-      onTimeout: () => _onTimeout(get, () {
-        _queues.gets.remove(get);
-        get.completer.completeError(
-          ServerActionsException(_statusNetworkError),
-        );
-      }),
+      onTimeout: () => _onTimeout(get),
     );
   }
 
@@ -383,6 +372,7 @@ final class PersistentConnection implements ServerActions {
 
   void _sendWrite(OutstandingWrite write) {
     write.sent = true;
+    write.awaitingAnswer = true;
     _send(
       write.action,
       write.body,
@@ -397,13 +387,7 @@ final class PersistentConnection implements ServerActions {
           _emit(() => onComplete(status, reason));
         }
       },
-      onTimeout: () => _onTimeout(write, () {
-        _queues.writes.remove(write);
-        final RequestResultCallback? onComplete = write.onComplete;
-        if (onComplete != null) {
-          _emit(() => onComplete(_statusNetworkError, null));
-        }
-      }),
+      onTimeout: () => _onTimeout(write),
     );
   }
 
@@ -487,7 +471,7 @@ final class PersistentConnection implements ServerActions {
           _emit(() => onComplete(status, reason));
         }
       },
-      onTimeout: () => _closeConnection(DisconnectReason.other),
+      onTimeout: () => _onTimeout(null),
     );
   }
 
@@ -585,7 +569,7 @@ final class PersistentConnection implements ServerActions {
       body,
       onResponse: onResponse,
       // Credentials are sent again on every connection: a timeout only closes this one.
-      onTimeout: () => _closeConnection(DisconnectReason.other),
+      onTimeout: () => _onTimeout(null),
     );
   }
 
@@ -646,8 +630,8 @@ final class PersistentConnection implements ServerActions {
     if (!_shouldConnect) {
       return;
     }
-    // MERGE: K: P stores the fetched tokens through authChanged/appCheckChanged while offline;
-    // AuthSession must clear forceRefreshNext once a forced fetch has been stored this way.
+    // Stored while offline; AuthSession sends them at onConnected, which also clears its
+    // forceRefreshNext (so a forced fetch is requested until a connection is up).
     _session
       ..authChanged(authToken)
       ..appCheckChanged(appCheckToken);
@@ -898,26 +882,66 @@ final class PersistentConnection implements ServerActions {
       action == RealtimeProtocol.gauth ||
       action == RealtimeProtocol.appCheck;
 
-  /// A request timed out on a live connection: the first time the connection is closed and the
-  /// request replayed; at `ConnectionTimings.maxRequestTimeouts` [fail] completes it with
-  /// `network_error` and it leaves the replay (lead's decision).
-  void _onTimeout(TimedRequest request, void Function() fail) {
-    request.timeouts++;
-    if (request.timeouts >= _timings.maxRequestTimeouts) {
-      _log(
-        DatabaseLogLevel.warning,
-        'A request got no answer twice; it fails with network_error',
-      );
-      fail();
+  /// A request timed out on a live connection (lead's decision, addendum 2).
+  ///
+  /// Every replayable request still waiting for its answer on this connection counts one timeout,
+  /// not only the one whose timer fired: closing the connection cancels the other timers, so with
+  /// a per-timer count a silent server would let the first request (often `auth`) close every
+  /// connection and the others would never reach their limit (found by the first test run). A
+  /// request at `ConnectionTimings.maxRequestTimeouts` completes with [statusNetworkError] and
+  /// leaves the replay. The connection is closed (and the rest replayed) unless every waiting
+  /// request has just failed. [request] is the replayable request whose timer fired, null for a
+  /// credential or onDisconnect request; a request that already failed is ignored.
+  void _onTimeout(TimedRequest? request) {
+    if (request != null &&
+        (!request.awaitingAnswer || !_queues.isQueued(request))) {
       return;
     }
-    _log(DatabaseLogLevel.info, 'A request got no answer; reconnecting');
-    _closeConnection(DisconnectReason.other);
+    final List<TimedRequest> waiting = _queues.awaitingAnswer.toList();
+    bool anyLeft = waiting.isEmpty;
+    for (final TimedRequest pending in waiting) {
+      pending.timeouts++;
+      if (pending.timeouts >= _timings.maxRequestTimeouts) {
+        _failWithNetworkError(pending);
+      } else {
+        anyLeft = true;
+      }
+    }
+    if (anyLeft) {
+      _log(DatabaseLogLevel.info, 'A request got no answer; reconnecting');
+      _closeConnection(DisconnectReason.other);
+    }
+  }
+
+  void _failWithNetworkError(TimedRequest request) {
+    _log(
+      DatabaseLogLevel.warning,
+      'A request got no answer twice; it fails with $statusNetworkError',
+    );
+    request.awaitingAnswer = false;
+    switch (request) {
+      case ListenRecord():
+        _queues.removeListen(request.spec.path, request.spec.queryIdentifier);
+        _emit(() => request.onComplete(statusNetworkError, null));
+      case OutstandingWrite():
+        _queues.writes.remove(request);
+        final RequestResultCallback? onComplete = request.onComplete;
+        if (onComplete != null) {
+          _emit(() => onComplete(statusNetworkError, null));
+        }
+      case OutstandingGet():
+        _queues.gets.remove(request);
+        request.completer.completeError(
+          const ServerActionsException(statusNetworkError),
+        );
+    }
   }
 
   static String _statusOf(Map<String, Object?> response) {
     final Object? status = response['s'];
-    return status is String ? status : 'failed';
+    return status is String
+        ? status
+        : DatabaseErrorCode.operationFailed.wireStatus;
   }
 
   /// Runs [action] on the event loop, never inside the current call (seam rule).

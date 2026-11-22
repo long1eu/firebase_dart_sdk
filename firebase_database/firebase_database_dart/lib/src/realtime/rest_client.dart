@@ -18,10 +18,6 @@ import 'package:http/http.dart' as http;
 /// The most of an error response body that is read (threat model T23).
 const int _maxErrorBodyBytes = 16 * 1024;
 
-/// The status of a read that failed without an HTTP answer (`DatabaseErrorCode.networkError`).
-// MERGE: core: statusNetworkError (addendum 2) replaces this constant after the rebase.
-const String _statusNetworkError = 'network_error';
-
 /// The status of a success body over `maxResponseBytes` (`DatabaseErrorCode.tooBig`).
 const String _statusTooBig = 'too_big';
 
@@ -358,7 +354,7 @@ final class RestClient implements ServerActions {
         'Auth token fetch failed; REST read of ${spec.path} not sent',
       );
       return const _ReadFailure(
-        _statusNetworkError,
+        statusNetworkError,
         'The auth token could not be fetched.',
       );
     }
@@ -467,7 +463,7 @@ final class RestClient implements ServerActions {
 
   _ReadResult _networkFailure(ListenSpec spec, String detail) {
     _log(DatabaseLogLevel.warning, 'REST read of ${spec.path} failed: $detail');
-    return _ReadFailure(_statusNetworkError, 'REST read failed: $detail');
+    return _ReadFailure(statusNetworkError, 'REST read failed: $detail');
   }
 
   /// Sends [request]; fails with [TimeoutException] when the headers take longer than the
