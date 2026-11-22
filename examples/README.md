@@ -21,7 +21,7 @@ app and a browser app. Each directory is a package of its own with a `pubspec.ya
 | [`rtdb_presence_worker/`](rtdb_presence_worker/) | A worker that keeps a presence record with a heartbeat and an `onDisconnect` write, and a watcher that lists who is online. Run against the Database emulator, including a killed worker. |
 | [`rtdb_web_app/`](rtdb_web_app/) | A browser app in plain Dart (`package:web`) on the Realtime Database: a live list of items (child events), a form that pushes an item, a connection indicator, a go offline / go online button, and a panel to connect an emulator or a project (`?emulator=127.0.0.1:9100`). Needs an emulator or a project; loaded through `bootstrap.js` with dart2wasm and a dart2js fallback. I could not verify that it was used against an emulator. |
 | [`rtdb_playground/`](rtdb_playground/) | A browser playground for the Realtime Database with no backend: the client runs against a fake server in the page. Static files only. Loads in Chrome with dart2js and dart2wasm. |
-| [`flutterfire_database_on_linux/`](flutterfire_database_on_linux/) | A Flutter Linux desktop app written only against the official `firebase_database` and `firebase_core` API; `firebase_database_dart_platform` registers itself, with no code: the connection state, a query bound to a live list, push, delete, a transaction on a counter, presence with `onDisconnect`, and integration tests. Against the Database emulator. Built on Linux x64 (Debian 13); the integration tests in their current form have **not yet passed in full there**. |
+| [`flutterfire_database_on_linux/`](flutterfire_database_on_linux/) | A Flutter Linux desktop app written only against the official `firebase_database` and `firebase_core` API; `firebase_database_dart_platform` registers itself, with no code: the connection state, a query bound to a live list, push, delete, a transaction on a counter, presence with `onDisconnect`, and integration tests. Built and run on Linux x64 (Debian 13, a virtual display) against the emulator. |
 | [`flutterfire_database_on_windows/`](flutterfire_database_on_windows/) | The Windows sibling of the Linux app, on the same official `firebase_database` API with `firebase_database_dart_platform` replacing the native plugin: the same list by child events, push, edit, delete, a counter, presence, an offline write, an optional disk cache, and integration tests. Run on Windows 11 against the emulator. |
 | [`playground/`](playground/) | A browser playground with no backend: the client runs with its network disabled on a memory cache, and the page shows each snapshot event, the writes waiting for a server and a timeline. Static files only, ready for any static host. Supported in Chrome, untested elsewhere. |
 
@@ -107,8 +107,8 @@ no-backend exit code is `78` in all three.
 - Run against the Firestore emulator (v1.22.0) on macOS with Dart 3.12.2, by their tests and
   by hand.
 - The `rtdb_*` examples were run against the Database emulator, by hand (see each README); `rtdb_web_app` and `flutterfire_database_on_linux` are
-  described in their READMEs (the Linux one builds on Linux x64; its integration tests have not yet passed in full there).
-  `flutterfire_database_on_windows` passed its four integration tests on Windows 11.
+  described in their READMEs; `flutterfire_database_on_linux` (Linux x64, a virtual display) and
+  `flutterfire_database_on_windows` (Windows 11) each passed the same four integration tests.
 - **Not run against a real Firebase project.** The Docker image of `cloud_run_job/` has not
   been built.
 - `server_shelf`, `cli` and `cloud_run_job` take the three packages from this repository, with

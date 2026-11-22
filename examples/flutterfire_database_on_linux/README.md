@@ -91,9 +91,12 @@ side of an offline push into a full window is covered without a device by
 
 ## Status
 
-- `flutter analyze` reports no issues (Flutter 3.44.9, macOS). The list code was written for the child events
-  of a `limitToLast` query as the JS SDK delivers them; how the adapter orders them, and the offline switch, were not run.
-- **Not built or run on Linux.** The build was not tried (it needs a Linux machine), the integration test was not
-  run, and the app has not been seen on screen. Treat the code as written against the API, not as observed
-  behaviour.
+- `flutter analyze` reports no issues (Flutter 3.44.9, macOS).
+- **Built and tested on Linux x64** (a Debian 13 container, Flutter 3.47.8, `xvfb`, against the Database emulator):
+  `flutter build linux --debug` succeeds, the plugin registrant has `FirebaseDatabaseDart`, and
+  `generated_plugins.cmake` lists no Firebase plugin, so the adapter is the only Database implementation in the
+  build. `integration_test/app_test.dart` passes 4 of 4: it connects and shows the empty list; push, edit and delete
+  through the UI; the order is kept and the oldest note leaves the window of 10; counters, presence, and a note pushed
+  offline.
+- Not run: a release build, and a real display (the run used a virtual one).
 - Not run against a real project.
