@@ -9,130 +9,132 @@ import 'package:flutterfire_database_on_linux/bootstrap.dart';
 import 'package:flutterfire_database_on_linux/main.dart';
 import 'package:integration_test/integration_test.dart';
 
-Finder byKey(String key) => find.byKey(ValueKey<String>(key));
+import 'helpers.dart';
 
-/// Pumps frames until [finder] finds something, or fails after [timeout].
-/// `pumpAndSettle` does not fit: the network answers outside the frames.
-Future<void> pumpUntil(
-  WidgetTester tester,
-  Finder finder, {
-  Duration timeout = const Duration(seconds: 30),
-}) async {
-  final DateTime end = DateTime.now().add(timeout);
-  while (DateTime.now().isBefore(end)) {
-    await tester.pump(const Duration(milliseconds: 100));
-    if (finder.evaluate().isNotEmpty) {
-      return;
-    }
-  }
-  fail('Timed out waiting for $finder');
+/// Pushes a note through the field and the Push button.
+Future<void> pushNote(WidgetTester tester, String text) async {
+  await typeInto(tester, 'noteField', text);
+  await tester.tap(byKey('pushButton'));
+  await pumpUntil(tester, find.text(text));
 }
 
-/// Taps the field with [key], then types [text] into it. On Linux the tap on
-/// Push unfocuses the note field and closes its text input connection; under
-/// this binding enterText reopens it only when it targets another field than
-/// the last enterText, so without the tap a second note into the same field
-/// is dropped (see test/note_field_test.dart).
-Future<void> typeInto(WidgetTester tester, String key, String text) async {
-  await tester.tap(byKey(key));
-  await tester.pump();
-  await tester.enterText(byKey(key), text);
-}
+/// The scrollable of the list of notes (the text field has one too).
+Finder get noteList => find.descendant(
+  of: find.byType(ListView),
+  matching: find.byType(Scrollable),
+);
+
+/// Whether the row with [upper] is shown above the row with [lower].
+bool isAbove(WidgetTester tester, String upper, String lower) =>
+    tester.getTopLeft(find.text(upper)).dy <
+    tester.getTopLeft(find.text(lower)).dy;
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(bootstrap);
 
-  // Each test starts from an empty node.
+  // Each test starts from an empty node, so that the list, the counters and
+  // the presence have known values.
   setUp(() => FirebaseDatabase.instance.ref(AppConfig.root).remove());
 
-  testWidgets('push a note, count with a transaction, see presence', (
+  testWidgets('connects and shows the empty list', (WidgetTester tester) async {
+    await tester.pumpWidget(const FlutterfireDatabaseOnLinuxApp());
+    await pumpUntil(tester, connection('Connected'));
+    await pumpUntil(tester, find.text('No notes yet'));
+  });
+
+  testWidgets('push, edit and delete through the UI', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(const FlutterfireDatabaseOnLinuxApp());
-    await pumpUntil(tester, find.text('Connected'));
-    await pumpUntil(tester, find.text('No notes yet'));
+    await pumpUntil(tester, connection('Connected'));
 
-    await typeInto(tester, 'noteField', 'hello from the test');
-    await tester.tap(byKey('pushButton'));
-    await pumpUntil(tester, find.text('hello from the test'));
+    await pushNote(tester, 'hello linux');
+    final List<DataSnapshot> pushed = await serverNotes('hello linux');
+    expect(pushed, hasLength(1));
+    expect(pushed.single.child('createdAt').value, isA<int>());
+    final String key = pushed.single.key!;
 
-    // onChildChanged: edit the note through the dialog.
-    final Finder edit = find.byWidgetPredicate(
-      (Widget w) =>
-          w.key is ValueKey<String> &&
-          (w.key! as ValueKey<String>).value.startsWith('edit-'),
-    );
-    await tester.tap(edit);
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.enterText(byKey('editField'), 'edited by the test');
+    // onChildChanged: the same row shows the new text.
+    await tester.tap(byKey('edit-$key'));
+    await pumpUntil(tester, byKey('editField'));
+    await typeInto(tester, 'editField', 'edited on linux');
     await tester.tap(byKey('editSave'));
-    await pumpUntil(tester, find.text('edited by the test'));
-    expect(find.text('hello from the test'), findsNothing);
-
-    // onChildAdded keeps the order and onChildRemoved drops the oldest: 11
-    // notes through the field leave the 10 newest.
-    for (int i = 0; i < 10; i++) {
-      await typeInto(tester, 'noteField', 'note $i');
-      await tester.tap(byKey('pushButton'));
-      await pumpUntil(tester, find.text('note $i'));
-    }
-    for (int i = 0; i < 100; i++) {
-      if (find.text('edited by the test').evaluate().isEmpty) {
-        break;
-      }
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-    expect(find.text('edited by the test'), findsNothing);
-    // The list builds only the rows near the viewport; the oldest is last.
-    await tester.scrollUntilVisible(
-      find.text('note 0'),
-      100,
-      scrollable: find.descendant(
-        of: find.byType(ListView),
-        matching: find.byType(Scrollable),
+    await pumpUntil(
+      tester,
+      find.descendant(
+        of: byKey('note-$key'),
+        matching: find.text('edited on linux'),
       ),
     );
-    expect(find.text('note 0'), findsOneWidget);
+    expect(find.text('hello linux'), findsNothing);
+    expect(await serverNotes('edited on linux'), hasLength(1));
+
+    // onChildRemoved: the row leaves the list.
+    await tester.tap(byKey('delete-$key'));
+    await pumpUntil(tester, find.text('No notes yet'));
+    expect(byKey('note-$key'), findsNothing);
+    expect((await node('notes').get()).exists, isFalse);
+  });
+
+  testWidgets('the order is kept and the oldest leaves the window of 10', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const FlutterfireDatabaseOnLinuxApp());
+    await pumpUntil(tester, connection('Connected'));
+
+    for (int i = 0; i < 11; i++) {
+      await pushNote(tester, 'note $i');
+    }
+    await pumpUntil(tester, find.text('Last 10 notes (newest first)'));
+    expect(isAbove(tester, 'note 10', 'note 9'), isTrue);
+    // The list is lazy: the oldest rows are built only once scrolled to.
+    await tester.scrollUntilVisible(
+      find.text('note 1'),
+      100,
+      scrollable: noteList,
+    );
+    expect(isAbove(tester, 'note 2', 'note 1'), isTrue);
+    await tester.drag(noteList, const Offset(0, -2000));
+    await tester.pump();
+    expect(find.text('note 0'), findsNothing);
+  });
+
+  // The offline note is pushed into an empty list: in a list scrolled down to
+  // its oldest row, a new note goes in at the top, out of view, and find.text
+  // does not see it (test/scrolled_list_test.dart).
+  testWidgets('counters, presence, and a note pushed offline', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const FlutterfireDatabaseOnLinuxApp());
+    await pumpUntil(tester, connection('Connected'));
 
     await tester.tap(byKey('counterButton'));
     await pumpUntil(tester, find.text('Counter: 1'));
-    final DataSnapshot counter = await FirebaseDatabase.instance
-        .ref('${AppConfig.root}/counter')
-        .get();
-    expect(counter.value, 1);
+    await tester.tap(byKey('counterButton'));
+    await pumpUntil(tester, find.text('Counter: 2'));
+    expect((await node('counter').get()).value, 2);
 
     // ServerValue.increment(1), twice.
     await tester.tap(byKey('hitButton'));
     await pumpUntil(tester, find.text('Hits: 1'));
     await tester.tap(byKey('hitButton'));
     await pumpUntil(tester, find.text('Hits: 2'));
+    expect((await node('hits').get()).value, 2);
 
     // Offline: the note shows at once, the chip follows .info/connected, and
     // the note reaches the server on going online.
     await tester.tap(byKey('offlineSwitch'));
-    await pumpUntil(
-      tester,
-      find.descendant(of: byKey('connection'), matching: find.text('Offline')),
-    );
-    await typeInto(tester, 'noteField', 'written offline');
-    await tester.tap(byKey('pushButton'));
-    await pumpUntil(tester, find.text('written offline'));
+    await pumpUntil(tester, connection('Offline'));
+    await pushNote(tester, 'written offline');
     await tester.tap(byKey('offlineSwitch'));
-    await pumpUntil(tester, find.text('Connected'));
-    final DataSnapshot notes = await FirebaseDatabase.instance
-        .ref('${AppConfig.root}/notes')
-        .get();
-    expect(
-      notes.children.map((DataSnapshot n) => n.child('text').value),
-      contains('written offline'),
-    );
+    await pumpUntil(tester, connection('Connected'));
+    expect(await serverNotes('written offline'), hasLength(1));
 
+    // The presence entry is written again on the new connection.
     await pumpUntil(tester, find.text('Online: 1 of 1'));
-    final DataSnapshot me = await FirebaseDatabase.instance
-        .ref('${AppConfig.root}/presence/${AppConfig.clientId}')
-        .get();
+    final DataSnapshot me = await node('presence/${AppConfig.clientId}').get();
     expect(me.child('online').value, true);
   });
 }

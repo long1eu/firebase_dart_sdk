@@ -73,9 +73,21 @@ close one.
 flutter test integration_test/app_test.dart -d linux --dart-define=EMULATOR_PORT=9100 --dart-define=ROOT=ffdb-test
 ```
 
-It empties the node, waits for **Connected**, types a note and taps **Push**, edits it, pushes 10 more (the first, edited note leaves the window of 10), taps **Count with a transaction**, taps **Count with increment(1)** twice, switches offline, pushes a note
-(shown at once), switches online and reads the note from the server,
-checks the counter with `get()`, and checks that the presence entry of the run is `online`.
+Four tests, the same as in the Windows example; each empties the node first and waits for **Connected**:
+
+1. `connects and shows the empty list`.
+2. `push, edit and delete through the UI`: types a note and taps **Push**, reads it from the server, edits it
+   through the dialog, then deletes it.
+3. `the order is kept and the oldest leaves the window of 10`: pushes 11 notes, checks the newest is on top,
+   scrolls down to the oldest rows and checks the first note left the list.
+4. `counters, presence, and a note pushed offline`: taps **Count with a transaction** and **Count with
+   increment(1)** twice each and reads both with `get()`, switches offline, pushes a note (shown at once),
+   switches online, reads the note from the server, and checks that the presence entry of the run is `online`.
+
+The offline note goes into an empty list on purpose: in a list scrolled down to its oldest row, a new note is
+inserted at the top, out of view, and `find.text` does not find it (`test/scrolled_list_test.dart`). The client
+side of an offline push into a full window is covered without a device by
+`firebase_database/firebase_database_dart/test/api/notes_window_test.dart`.
 
 ## Status
 
