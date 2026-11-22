@@ -751,6 +751,11 @@ void main() {
   });
 
   test('a worker script that cannot be loaded fails the open', () async {
+    // Without the module the opener fails earlier, on the missing sqlite3.wasm.
+    if (!await exists(sqlite3Wasm)) {
+      markTestSkipped('test/browser/sqlite3.wasm is missing');
+      return;
+    }
     final String name = 'missing-${newAppName()}';
     OpenDatabase broken() => sqliteWebOpener(
       sqlite3Wasm: sqlite3Wasm,
