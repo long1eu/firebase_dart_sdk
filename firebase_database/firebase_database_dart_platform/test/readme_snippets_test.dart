@@ -34,10 +34,7 @@ const Map<String, String> _readmes = <String, String>{
 const String _generatedDir = 'test/readme';
 
 /// Blocks (`path:line`) that use a package that is not a dependency of this package.
-const Set<String> _needsOtherPackages = <String>{
-  // firebase_app_check: no pubspec of the repository gives a constraint to copy.
-  'README.md:98',
-};
+const Set<String> _needsOtherPackages = <String>{};
 
 /// Blocks of route B (the client's own Dart API) without an import line: they use the client, and
 /// the `database` of the block before them.
@@ -66,6 +63,10 @@ const List<String> _clientImports = <String>[
 const Map<String, List<String>> _extraImports = <String, List<String>>{
   'README.md:65': <String>[
     "import 'package:firebase_auth_dart_platform/firebase_auth_dart_platform.dart';",
+  ],
+  'README.md:98': <String>[
+    "import 'package:firebase_app_check/firebase_app_check.dart';",
+    "import 'package:cloud_firestore_dart_flutterfire/cloud_firestore_dart_flutterfire.dart';",
   ],
   'README.md:73': <String>[
     "import 'package:firebase_auth/firebase_auth.dart';",
@@ -233,7 +234,7 @@ void main() {
     );
     expect(
       RegExp(r'^readme_', multiLine: true).allMatches(names),
-      hasLength(greaterThanOrEqualTo(3)),
+      hasLength(greaterThanOrEqualTo(4)),
     );
   }, skip: skip);
 }

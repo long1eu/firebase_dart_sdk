@@ -54,6 +54,7 @@ dev_dependencies:
   # (test/readme_snippets_test.dart).
   cloud_firestore_dart_flutterfire:
     path: ../../cloud_firestore/cloud_firestore_dart_flutterfire
+  firebase_app_check: ^0.5.2
   firebase_auth: ^7.0.1
   firebase_auth_dart_platform:
     path: ../../firebase_auth/firebase_auth_dart_platform
