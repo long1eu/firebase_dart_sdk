@@ -19,10 +19,11 @@ SortedMap<K, V> buildChildSet<K, V>(
   Comparator<K>? keyCompare,
 }) {
   childList.sort(compare);
-  final List<MapEntry<K, V>> entries = <MapEntry<K, V>>[
-    for (final NamedNode node in childList)
-      MapEntry<K, V>(keyOf(node), valueOf(node)),
-  ];
   final Comparator<K> mapCompare = keyCompare ?? compare as Comparator<K>;
-  return SortedMap<K, V>.fromSortedEntries(entries, mapCompare);
+  return SortedMap<K, V>.fromSorted(
+    childList.length,
+    (int i) => keyOf(childList[i]),
+    (int i) => valueOf(childList[i]),
+    mapCompare,
+  );
 }
