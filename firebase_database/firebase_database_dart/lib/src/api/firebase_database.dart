@@ -23,6 +23,7 @@ import 'package:firebase_database_dart/src/core/persistence/default_persistence_
 import 'package:firebase_database_dart/src/core/persistence/lru_cache_policy.dart';
 import 'package:firebase_database_dart/src/core/persistence/persistence_manager.dart';
 import 'package:firebase_database_dart/src/core/persistence/persistence_storage_engine.dart';
+import 'package:firebase_database_dart/src/core/persistence/writes_only_persistence_manager.dart';
 import 'package:firebase_database_dart/src/core/persistence/persistence_storage_engine_opener.dart';
 import 'package:firebase_database_dart/src/core/repo.dart';
 import 'package:firebase_database_dart/src/core/repo_info.dart';
@@ -198,11 +199,13 @@ final class FirebaseDatabase {
         logger: _logger,
       );
       _engine = engine;
-      manager = DefaultPersistenceManager(
-        engine,
-        LruCachePolicy(persistence.cacheSizeBytes),
-        _clock ?? DateTime.now,
-      );
+      manager = persistence.cacheServerData
+          ? DefaultPersistenceManager(
+              engine,
+              LruCachePolicy(persistence.cacheSizeBytes),
+              _clock ?? DateTime.now,
+            )
+          : WritesOnlyPersistenceManager(engine);
     } on Object catch (e) {
       _openFailed = true;
       _logger?.call(

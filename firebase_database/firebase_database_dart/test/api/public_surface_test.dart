@@ -333,6 +333,7 @@ void _storageEngineLibrary(
     DatabasePersistence Function({
       required PersistenceStorageEngineOpener opener,
       int? cacheSizeBytes,
+      bool cacheServerData,
     })
   >
   _ = databasePersistence.exact;

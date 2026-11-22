@@ -15,6 +15,9 @@ final FirebaseDatabase database = FirebaseDatabase(
 100 MiB, 10 MiB by default) is the size above which the client prunes cached server data; pending
 writes are never pruned. `clearSqlitePersistence` deletes a cache while no instance holds it.
 
+With `cacheServerData: false` only the pending writes are stored: they survive a restart and are
+sent again, and no server data is kept on disk, so a listener waits for the server after a restart.
+
 One SQLite file per app and database URL in that directory. One process or isolate owns a file at a
 time; another one keeps its data in memory. SQLite is loaded by `package:sqlite3` as in
 `cloud_firestore_dart_sqlite` (see "Which `sqlite3`" in its README); this package does not override

@@ -23,12 +23,20 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 /// 100 MiB, 10 MiB when null ([ArgumentError] outside, from [databasePersistence]). Pending writes
 /// are never pruned.
 ///
+/// With [cacheServerData] false only the pending writes are stored: they survive a restart and are
+/// sent again, and no server data is kept on disk.
+///
 /// An [ArgumentError] when [directory] is empty. Delete a cache with [clearSqlitePersistence]; find
 /// its file with [SqlitePersistence.pathOf].
-DatabasePersistence sqlitePersistence(String directory, {int? cacheSizeBytes}) {
+DatabasePersistence sqlitePersistence(
+  String directory, {
+  int? cacheSizeBytes,
+  bool cacheServerData = true,
+}) {
   return databasePersistence(
     opener: SqlitePersistence(directory).open,
     cacheSizeBytes: cacheSizeBytes,
+    cacheServerData: cacheServerData,
   );
 }
 

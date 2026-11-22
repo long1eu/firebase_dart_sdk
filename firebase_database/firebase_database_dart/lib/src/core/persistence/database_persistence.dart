@@ -24,20 +24,30 @@ const int maxPersistenceCacheSizeBytes = 100 * 1024 * 1024;
 /// package's factory on top of it) and passed to the client, which calls the opener once at
 /// start with the (app name, database URL) of the instance.
 final class DatabasePersistence {
-  DatabasePersistence._(this._opener, this._cacheSizeBytes);
+  DatabasePersistence._(
+    this._opener,
+    this._cacheSizeBytes,
+    this._cacheServerData,
+  );
 
   final PersistenceStorageEngineOpener _opener;
   final int _cacheSizeBytes;
+  final bool _cacheServerData;
 }
 
 /// Makes the persistence option of an engine package: the client opens the engine with [opener]
 /// and prunes the server cache above [cacheSizeBytes] (null: 10 MiB).
+///
+/// With [cacheServerData] false only the pending writes are stored: they survive a restart and
+/// are sent again, but no server data is kept, so after a restart a listener waits for the
+/// server as it does without persistence. [cacheSizeBytes] then has nothing to prune.
 ///
 /// Throws an [ArgumentError] when [cacheSizeBytes] is below 1 MiB or above 100 MiB (C38).
 /// Android: `core/DatabaseConfig.java:162-171` (`DatabaseException` there).
 DatabasePersistence databasePersistence({
   required PersistenceStorageEngineOpener opener,
   int? cacheSizeBytes,
+  bool cacheServerData = true,
 }) {
   final int size = cacheSizeBytes ?? defaultPersistenceCacheSizeBytes;
   if (size < minPersistenceCacheSizeBytes) {
@@ -54,7 +64,7 @@ DatabasePersistence databasePersistence({
       'The maximum cache size must be at most 100 MiB.',
     );
   }
-  return DatabasePersistence._(opener, size);
+  return DatabasePersistence._(opener, size, cacheServerData);
 }
 
 /// What the client reads from a [DatabasePersistence]; package-internal (not exported by any
@@ -66,4 +76,7 @@ extension DatabasePersistenceInternal on DatabasePersistence {
 
   /// The cache size in bytes, already validated.
   int get cacheSizeBytes => _cacheSizeBytes;
+
+  /// Whether server data is cached; false stores the pending writes only.
+  bool get cacheServerData => _cacheServerData;
 }
