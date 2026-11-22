@@ -51,6 +51,6 @@ curl -X DELETE localhost:8000/notes/<id>
 curl localhost:8000/healthz
 ```
 
-Not run yet: the real connection of `firebase_database_dart` was not merged when this was written.
+Run against the Database emulator: every route above, the event stream and the shutdown on `SIGTERM`.
 
 [sse]: https://html.spec.whatwg.org/multipage/server-sent-events.html

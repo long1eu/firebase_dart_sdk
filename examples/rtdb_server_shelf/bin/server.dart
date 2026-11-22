@@ -46,7 +46,9 @@ Future<void> main() async {
   for (final StreamSubscription<ProcessSignal> signal in signals) {
     await signal.cancel();
   }
-  final Future<void> closing = server.close(force: false);
+  // then<void>: the Future of close is not a Future<void> at run time, and timeout checks its
+  // onTimeout against that type.
+  final Future<void> closing = server.close(force: false).then<void>((_) {});
   await api.close();
   await closing.timeout(const Duration(seconds: 5), onTimeout: () {});
   await server.close(force: true);
