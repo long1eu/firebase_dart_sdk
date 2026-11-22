@@ -194,6 +194,22 @@ void main() {
       h.settle();
       expect(h.log.last, 'S1:V(21)');
     });
+
+    // A stated behaviour, as the JS SDK: the sum of two finite doubles that leaves the double
+    // range is a local infinity; the write is sent as the increment it is, and the value the
+    // server resolves replaces the local one.
+    scenario(
+      'an increment that overflows is a local infinity and is still sent',
+      (Harness h) {
+        h.listenAnswered('S1', h.ref('n').onValue, 'n', 1e308);
+        h.log.clear();
+        final int before = h.server.requests.length;
+        h.ref('n').set(ServerValue.increment(1e308));
+        h.settle();
+        expect(h.log, <String>['S1:V(Infinity)']);
+        expect(h.server.requests.sublist(before), <String>['p /n']);
+      },
+    );
   });
 
   group('receivedAuthTokens', () {
