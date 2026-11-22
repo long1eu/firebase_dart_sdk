@@ -8,6 +8,7 @@ import 'package:firebase_app_dart/firebase_app_dart.dart' as dart_app;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database_dart/firebase_database_dart.dart' as fs;
 import 'package:firebase_database_dart_platform/src/app.dart';
+import 'package:firebase_database_dart_platform/src/errors.dart';
 import 'package:firebase_database_dart_platform/src/reference.dart';
 import 'package:firebase_database_platform_interface/firebase_database_platform_interface.dart';
 import 'package:flutter/foundation.dart';
@@ -88,7 +89,13 @@ typedef DatabaseClientFactory =
 fs.FirebaseDatabase createClient(
   dart_app.FirebaseApp app,
   DatabaseClientSettings settings,
-) => throw UnimplementedError();
+) => fs.FirebaseDatabase(
+  app,
+  databaseUrl: settings.databaseUrl,
+  emulatorHost: settings.emulatorHost,
+  persistence: settings.persistence,
+  logger: settings.logger,
+);
 
 /// The implementation of [DatabasePlatform] on top of
 /// `firebase_database_dart`: one instance per FlutterFire app and database
@@ -115,6 +122,17 @@ class DartFirebaseDatabase extends DatabasePlatform {
   /// The instance without an app, for [DatabasePlatform.instance].
   DartFirebaseDatabase() : super();
 
+  DartFirebaseDatabase._(FirebaseApp app, String? databaseURL)
+    : super(app: app, databaseURL: databaseURL);
+
+  static const int _mebibyte = 1024 * 1024;
+  static const int _defaultCacheSizeBytes = 10 * _mebibyte;
+  static const int _minCacheSizeBytes = _mebibyte;
+  static const int _maxCacheSizeBytes = 100 * _mebibyte;
+
+  static final Map<String, DartFirebaseDatabase> _instances =
+      <String, DartFirebaseDatabase>{};
+
   /// The configuration of the clients created from now on.
   static DartDatabaseConfig config = const DartDatabaseConfig();
 
@@ -124,40 +142,138 @@ class DartFirebaseDatabase extends DatabasePlatform {
   static DatabaseClientFactory clientFactory = createClient;
 
   /// Whether an instance has created its client, after which `use` throws.
-  static bool get anyStarted => throw UnimplementedError();
+  static bool get anyStarted =>
+      _instances.values.any((DartFirebaseDatabase it) => it.started);
 
   /// The instance of [app] and [databaseURL], created on first use and kept
   /// under the key `'${app.name}|$databaseURL'`, the key of
   /// `FirebaseDatabase.instanceFor`. A kept instance whose app is not [app]
   /// (the app was deleted and created again under the same name; the client
   /// of the old one closed itself) is replaced.
-  static DartFirebaseDatabase forApp(FirebaseApp app, String? databaseURL) =>
-      throw UnimplementedError();
+  static DartFirebaseDatabase forApp(FirebaseApp app, String? databaseURL) {
+    final String key = '${app.name}|$databaseURL';
+    final DartFirebaseDatabase? kept = _instances[key];
+    if (kept != null && kept.app == app && !kept._appDeleted) {
+      return kept;
+    }
+    return _instances[key] = DartFirebaseDatabase._(app, databaseURL);
+  }
+
+  /// `host:port` of [useDatabaseEmulator], null until it is called.
+  String? _emulator;
+
+  /// The argument of [setPersistenceEnabled], null until it is called.
+  bool? _persistenceEnabled;
+
+  /// The argument of [setPersistenceCacheSizeBytes], null until it is called.
+  int? _cacheSizeBytes;
+
+  bool _logging = false;
+
+  /// What the client was created with; null before.
+  DatabaseClientSettings? _settings;
+
+  fs.FirebaseDatabase? _client;
 
   /// Whether this instance has created its client.
-  bool get started => throw UnimplementedError();
+  bool get started => _client != null;
+
+  /// Whether the client's `firebase_app_dart` app was deleted (with the
+  /// FlutterFire app of the same name), which closed the client.
+  bool get _appDeleted {
+    final fs.FirebaseDatabase? client = _client;
+    return client != null &&
+        !dart_app.Firebase.apps.any(
+          (dart_app.FirebaseApp candidate) => identical(candidate, client.app),
+        );
+  }
 
   /// The client of this instance's app and URL, created on first use with the
   /// settings in force then ([clientFactory], [DatabaseClientSettings]).
   /// Throws a [StateError] on the registered instance, which has no app.
-  fs.FirebaseDatabase get client => throw UnimplementedError();
+  fs.FirebaseDatabase get client {
+    final fs.FirebaseDatabase? existing = _client;
+    if (existing != null) {
+      return existing;
+    }
+    final FirebaseApp? app = this.app;
+    if (app == null) {
+      throw StateError(
+        'This is the registered instance of firebase_database_dart_platform, '
+        'which has no app: use FirebaseDatabase.instanceFor(app: ...).',
+      );
+    }
+    final dart_app.FirebaseApp dartApp = dartAppFor(
+      app,
+      tokenProviderFor: config.tokenProviderFor,
+      appCheckProviderFor: config.appCheckProviderFor,
+    );
+    final DatabaseClientSettings settings = _clientSettings();
+    final fs.FirebaseDatabase created = clientFactory(dartApp, settings);
+    _settings = settings;
+    return _client = created;
+  }
+
+  DatabaseClientSettings _clientSettings() {
+    final DatabasePersistenceFactory? persistenceFor = config.persistenceFor;
+    final bool persist = persistenceFor != null && _persistenceEnabled != false;
+    return DatabaseClientSettings(
+      databaseUrl: databaseURL,
+      emulatorHost:
+          _emulator ?? fs.FirebaseDatabase.emulatorHostFromEnvironment,
+      persistence: persist
+          ? persistenceFor(_cacheSizeBytes ?? _defaultCacheSizeBytes)
+          : null,
+      logger: _log,
+    );
+  }
+
+  void _log(fs.DatabaseLogLevel level, String message) {
+    if (_logging) {
+      debugPrint('[firebase_database] ${level.name}: $message');
+    }
+  }
+
+  void _ignored(String setting) {
+    debugPrint(
+      'firebase_database_dart_platform: $setting was called after the first '
+      'use of this FirebaseDatabase and has no effect.',
+    );
+  }
 
   /// `DatabasePlatform.delegateFor`: [forApp].
   @override
   DatabasePlatform delegateFor({
     required FirebaseApp app,
     String? databaseURL,
-  }) => throw UnimplementedError();
+  }) => forApp(app, databaseURL);
 
   /// `DatabasePlatform.ref`: a [DartReference] of [path] (null, `''`, `'a/b'`
   /// or `'/a/b'`, the last from `refFromURL`). No I/O and no client.
   @override
-  DatabaseReferencePlatform ref([String? path]) => throw UnimplementedError();
+  DatabaseReferencePlatform ref([String? path]) => DartReference(this, path);
 
   /// `DatabasePlatform.useDatabaseEmulator`: the client's `emulatorHost`,
   /// `host:port`, an IPv6 [host] in brackets. See the table of the class.
   @override
-  void useDatabaseEmulator(String host, int port) => throw UnimplementedError();
+  void useDatabaseEmulator(String host, int port) {
+    final String emulator = host.contains(':') && !host.startsWith('[')
+        ? '[$host]:$port'
+        : '$host:$port';
+    final DatabaseClientSettings? settings = _settings;
+    if (settings == null) {
+      _emulator = emulator;
+      return;
+    }
+    if (settings.emulatorHost != emulator) {
+      throw StateError(
+        'useDatabaseEmulator($emulator) was called after the first use of '
+        'this FirebaseDatabase, which talks to '
+        '${settings.emulatorHost ?? 'the production database'}. Call it '
+        'before any other use.',
+      );
+    }
+  }
 
   /// `DatabasePlatform.setPersistenceEnabled`: whether the client gets the
   /// persistence of [DartDatabaseConfig.persistenceFor]. Persistence is on when
@@ -165,30 +281,62 @@ class DartFirebaseDatabase extends DatabasePlatform {
   /// a factory prints one warning and stays in memory, never throws. See the
   /// table of the class.
   @override
-  void setPersistenceEnabled(bool enabled) => throw UnimplementedError();
+  void setPersistenceEnabled(bool enabled) {
+    final DatabaseClientSettings? settings = _settings;
+    if (settings != null) {
+      if (enabled != (settings.persistence != null)) {
+        _ignored('setPersistenceEnabled($enabled)');
+      }
+      return;
+    }
+    if (enabled && config.persistenceFor == null) {
+      debugPrint(
+        'firebase_database_dart_platform: setPersistenceEnabled(true) without '
+        'a persistence factory keeps the data in memory; pass '
+        'FirebaseDatabaseDart.use(persistenceFor: ...).',
+      );
+    }
+    _persistenceEnabled = enabled;
+  }
 
   /// `DatabasePlatform.setPersistenceCacheSizeBytes`: the argument of
   /// [DatabasePersistenceFactory]. See the table of the class.
   @override
-  void setPersistenceCacheSizeBytes(int cacheSize) =>
-      throw UnimplementedError();
+  void setPersistenceCacheSizeBytes(int cacheSize) {
+    if (cacheSize < _minCacheSizeBytes || cacheSize > _maxCacheSizeBytes) {
+      throw ArgumentError.value(
+        cacheSize,
+        'cacheSize',
+        'must be between 1 MiB ($_minCacheSizeBytes) and 100 MiB '
+            '($_maxCacheSizeBytes) bytes',
+      );
+    }
+    if (_settings == null) {
+      _cacheSizeBytes = cacheSize;
+      return;
+    }
+    if (cacheSize != (_cacheSizeBytes ?? _defaultCacheSizeBytes)) {
+      _ignored('setPersistenceCacheSizeBytes($cacheSize)');
+    }
+  }
 
   /// `DatabasePlatform.setLoggingEnabled`: read by
   /// [DatabaseClientSettings.logger] on every call, at any time.
   @override
-  void setLoggingEnabled(bool enabled) => throw UnimplementedError();
+  void setLoggingEnabled(bool enabled) => _logging = enabled;
 
   /// `DatabasePlatform.goOnline`: client `goOnline()` (creates the client).
   @override
-  Future<void> goOnline() => throw UnimplementedError();
+  Future<void> goOnline() async => client.goOnline();
 
   /// `DatabasePlatform.goOffline`: client `goOffline()` (creates the client).
   @override
-  Future<void> goOffline() => throw UnimplementedError();
+  Future<void> goOffline() async => client.goOffline();
 
   /// `DatabasePlatform.purgeOutstandingWrites`: client
   /// `purgeOutstandingWrites()` through `guard`; the pending writes fail with
   /// `write-cancelled`.
   @override
-  Future<void> purgeOutstandingWrites() => throw UnimplementedError();
+  Future<void> purgeOutstandingWrites() =>
+      guard(() => client.purgeOutstandingWrites());
 }

@@ -15,8 +15,6 @@
 ///   `main`, before the first use of Firebase, to replace the official
 ///   implementation.
 ///
-/// Work in progress: the API is declared; its bodies are not written yet.
-///
 /// ```dart
 /// Future<void> main() async {
 ///   WidgetsFlutterBinding.ensureInitialized();
@@ -29,11 +27,15 @@
 /// ```
 library;
 
+import 'dart:io' show Platform;
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database_dart/firebase_database_dart.dart' as fs;
 import 'package:firebase_database_dart_platform/src/app.dart';
+import 'package:firebase_database_dart_platform/src/core.dart';
 import 'package:firebase_database_dart_platform/src/firebase_database.dart';
 import 'package:firebase_database_platform_interface/firebase_database_platform_interface.dart';
+import 'package:flutter/foundation.dart';
 
 export 'package:firebase_database_dart_platform/src/app.dart'
     show AppCheckProviderFactory, TokenProviderFactory;
@@ -43,11 +45,17 @@ export 'package:firebase_database_dart_platform/src/firebase_database.dart'
 /// Selects `firebase_database_dart` as the implementation of the official
 /// `firebase_database` package.
 abstract final class FirebaseDatabaseDart {
+  static DartFirebaseDatabase? _registered;
+
   /// Whether [use] (or [registerWith]) made this package the Realtime
   /// Database implementation, and nothing replaced it since. Never reads
   /// [DatabasePlatform.instance] before this package set it (its getter
   /// would install the method-channel implementation).
-  static bool get isRegistered => throw UnimplementedError();
+  static bool get isRegistered {
+    final DartFirebaseDatabase? registered = _registered;
+    return registered != null &&
+        identical(DatabasePlatform.instance, registered);
+  }
 
   /// Called by Flutter's plugin registrant on the platforms this package
   /// declares in its pubspec (Linux and Windows), before `main` runs. Same as
@@ -55,7 +63,9 @@ abstract final class FirebaseDatabaseDart {
   /// set), where it leaves `firebase_core` alone so that
   /// `setupFirebaseCoreMocks` keeps working; a test that wants the Dart core
   /// calls [use].
-  static void registerWith() => throw UnimplementedError();
+  static void registerWith() {
+    use(useDartCore: _runningUnderFlutterTest() ? false : null);
+  }
 
   /// Makes `firebase_database_dart` the implementation of `firebase_database`
   /// on any platform. Call it at the start of `main`, before `Firebase` or
@@ -89,7 +99,25 @@ abstract final class FirebaseDatabaseDart {
     AppCheckProviderFactory? appCheckProviderFor,
     DatabasePersistenceFactory? persistenceFor,
     bool? useDartCore,
-  }) => throw UnimplementedError();
+  }) {
+    if (DartFirebaseDatabase.anyStarted) {
+      throw StateError(
+        'FirebaseDatabaseDart.use must be called before the first use of '
+        'FirebaseDatabase.',
+      );
+    }
+    DartFirebaseDatabase.config = DartDatabaseConfig(
+      tokenProviderFor: tokenProviderFor,
+      appCheckProviderFor: appCheckProviderFor,
+      persistenceFor: persistenceFor,
+    );
+    installCoreIfNeeded(force: useDartCore);
+    if (!isRegistered) {
+      final DartFirebaseDatabase platform = DartFirebaseDatabase();
+      DatabasePlatform.instance = platform;
+      _registered = platform;
+    }
+  }
 
   /// The `firebase_database_dart` client behind
   /// `FirebaseDatabase.instanceFor(app: app, databaseURL: databaseURL)`, for
@@ -101,5 +129,9 @@ abstract final class FirebaseDatabaseDart {
   static fs.FirebaseDatabase clientFor(
     FirebaseApp app, {
     String? databaseURL,
-  }) => throw UnimplementedError();
+  }) => DartFirebaseDatabase.forApp(app, databaseURL).client;
 }
+
+/// Whether the program runs under `flutter test`, which sets `FLUTTER_TEST`.
+bool _runningUnderFlutterTest() =>
+    !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');

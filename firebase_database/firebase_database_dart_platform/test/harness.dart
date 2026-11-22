@@ -1,6 +1,5 @@
 // What the test files share: the fake server, the registration, new apps,
-// the error matchers. Owner: builder A (see lib/src/OWNERS.md). Signatures
-// only; builder A writes the bodies first, then B and C use them.
+// the error matchers. Owner: builder A (see lib/src/OWNERS.md).
 //
 // The rig is the client's own test double,
 // package:firebase_database_dart/testing.dart: every client the shim creates
@@ -10,9 +9,11 @@
 
 import 'package:firebase_app_dart/firebase_app_dart.dart' as dart_app;
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_database_dart/firebase_database_dart.dart' as fs;
 import 'package:firebase_database_dart/testing.dart';
 import 'package:firebase_database_dart_platform/firebase_database_dart_platform.dart';
 import 'package:firebase_database_dart_platform/src/firebase_database.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// The database URL of [options].
@@ -43,9 +44,11 @@ final List<DatabaseClientSettings> createdClients = <DatabaseClientSettings>[];
 /// The tokens handed out per app name; an app without one has no user.
 final Map<String, String> tokens = <String, String>{};
 
+int _apps = 0;
+
 /// A new app, so that every test starts with fresh instances and settings.
 Future<FirebaseApp> newApp({FirebaseOptions appOptions = options}) =>
-    throw UnimplementedError();
+    Firebase.initializeApp(name: 'app${_apps++}', options: appOptions);
 
 /// Registers the package as an app on Linux would
 /// ([FirebaseDatabaseDart.use] in `setUpAll`), with the Dart core, the
@@ -55,20 +58,61 @@ Future<FirebaseApp> newApp({FirebaseOptions appOptions = options}) =>
 /// persistence: settings.persistence, logger: settings.logger,
 /// reconnectDelay: reconnectDelay)`. Adds the `setUp` that makes a new
 /// [server] and clears [createdClients].
-void registerForTests({DatabasePersistenceFactory? persistenceFor}) =>
-    throw UnimplementedError();
+void registerForTests({DatabasePersistenceFactory? persistenceFor}) {
+  setUpAll(() {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    FirebaseDatabaseDart.use(
+      useDartCore: true,
+      persistenceFor: persistenceFor,
+      tokenProviderFor: (FirebaseApp app) {
+        final String? token = tokens[app.name];
+        return token == null ? null : FixedToken(token);
+      },
+    );
+    DartFirebaseDatabase.clientFactory = _fakeClient;
+  });
+  tearDownAll(() {
+    debugDefaultTargetPlatformOverride = null;
+    DartFirebaseDatabase.clientFactory = createClient;
+  });
+  setUp(() {
+    server = FakeDatabaseServer();
+    createdClients.clear();
+  });
+}
+
+fs.FirebaseDatabase _fakeClient(
+  dart_app.FirebaseApp app,
+  DatabaseClientSettings settings,
+) {
+  createdClients.add(settings);
+  return databaseWithFakeServer(
+    app,
+    server,
+    persistence: settings.persistence,
+    logger: settings.logger,
+    reconnectDelay: reconnectDelay,
+  );
+}
 
 /// Lets the client deliver what is queued: its dispatch queue drains in
 /// microtasks and yields with `Timer.run` between changes.
-Future<void> settle() => throw UnimplementedError();
+Future<void> settle() => pumpEventQueue();
 
 /// Throws a [FirebaseException] of `firebase_core` (not the client's) with
 /// the plugin `firebase_database` and [code].
-Matcher throwsDatabaseCode(String code) => throw UnimplementedError();
+Matcher throwsDatabaseCode(String code) => throwsA(isDatabaseCode(code));
 
 /// A [FirebaseException] of `firebase_core` (not the client's) with the
 /// plugin `firebase_database` and [code].
-Matcher isDatabaseCode(String code) => throw UnimplementedError();
+Matcher isDatabaseCode(String code) => isA<FirebaseException>()
+    .having((FirebaseException e) => e.plugin, 'plugin', 'firebase_database')
+    .having((FirebaseException e) => e.code, 'code', code)
+    .having(
+      (FirebaseException e) => e,
+      'not the client exception',
+      isNot(isA<dart_app.FirebaseException>()),
+    );
 
 /// A token provider with one token.
 class FixedToken extends dart_app.AuthTokenProvider {
@@ -81,12 +125,12 @@ class FixedToken extends dart_app.AuthTokenProvider {
   @override
   Future<dart_app.GetTokenResult> getAccessToken({
     required bool forceRefresh,
-  }) => throw UnimplementedError();
+  }) async => dart_app.GetTokenResult(token);
 
   @override
-  String? get uid => throw UnimplementedError();
+  String? get uid => 'user';
 
   @override
   Stream<dart_app.AuthTokenChange> get onTokenChanged =>
-      throw UnimplementedError();
+      const Stream<dart_app.AuthTokenChange>.empty();
 }
