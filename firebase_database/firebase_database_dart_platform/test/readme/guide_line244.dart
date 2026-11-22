@@ -6,8 +6,7 @@
 // ignore_for_file: type=lint, unused_local_variable, unused_import
 // ignore_for_file: unused_element
 
-import 'package:firebase_app_dart/firebase_app_dart.dart' show FirebaseApp;
-import 'package:firebase_core/firebase_core.dart' hide FirebaseApp;
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_database_dart_platform/firebase_database_dart_platform.dart';
 

@@ -50,8 +50,17 @@ dev_dependencies:
   # Parses lib in test/public_api_lister.dart (dart:mirrors is not available
   # under flutter test).
   analyzer: ^13.0.0
+  # The packages that the snippets of the README and of the Flutter guide name
+  # (test/readme_snippets_test.dart).
+  cloud_firestore_dart_flutterfire:
+    path: ../../cloud_firestore/cloud_firestore_dart_flutterfire
+  firebase_auth: ^7.0.1
+  firebase_auth_dart_platform:
+    path: ../../firebase_auth/firebase_auth_dart_platform
   # The app-facing package the tests drive, as an app would.
   firebase_database: ^13.1.0
+  firebase_database_dart_sqlite:
+    path: ../firebase_database_dart_sqlite
   flutter_test:
     sdk: flutter
   lints: ^6.1.0

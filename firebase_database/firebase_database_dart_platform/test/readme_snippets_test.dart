@@ -35,13 +35,7 @@ const String _generatedDir = 'test/readme';
 
 /// Blocks (`path:line`) that use a package that is not a dependency of this package.
 const Set<String> _needsOtherPackages = <String>{
-  // firebase_database_dart_sqlite.
-  '../../docs/guides/database_flutter.md:86',
-  // firebase_auth_dart_platform.
-  'README.md:65',
-  // firebase_auth and cloud_firestore_dart_flutterfire.
-  'README.md:73',
-  // firebase_app_check and cloud_firestore_dart_flutterfire.
+  // firebase_app_check: no pubspec of the repository gives a constraint to copy.
   'README.md:98',
 };
 
@@ -68,9 +62,19 @@ const List<String> _clientImports = <String>[
   "import 'package:firebase_database_dart/firebase_database_dart.dart';",
 ];
 
+/// Imports added to the defaults of a block that names other packages.
+const Map<String, List<String>> _extraImports = <String, List<String>>{
+  'README.md:65': <String>[
+    "import 'package:firebase_auth_dart_platform/firebase_auth_dart_platform.dart';",
+  ],
+  'README.md:73': <String>[
+    "import 'package:firebase_auth/firebase_auth.dart';",
+    "import 'package:cloud_firestore_dart_flutterfire/cloud_firestore_dart_flutterfire.dart';",
+  ],
+};
+
 const List<String> _defaultImports = <String>[
-  "import 'package:firebase_core/firebase_core.dart' hide FirebaseApp;",
-  "import 'package:firebase_app_dart/firebase_app_dart.dart' show FirebaseApp;",
+  "import 'package:firebase_core/firebase_core.dart';",
   "import 'package:firebase_database/firebase_database.dart';",
   "import 'package:firebase_database_dart_platform/firebase_database_dart_platform.dart';",
 ];
@@ -124,7 +128,10 @@ Map<String, String> generate() {
       final List<String> sortedImports =
           (imports.isNotEmpty
                 ? imports.toList()
-                : (client ? _clientImports : _defaultImports).toList())
+                : <String>[
+                    ...(client ? _clientImports : _defaultImports),
+                    ...?_extraImports['$path:$start'],
+                  ])
             ..sort();
       files['${prefix}_line$start.dart'] = <String>[
         '// GENERATED from the docs by test/readme_snippets_test.dart. Do not edit: change the',
@@ -222,11 +229,11 @@ void main() {
     final String names = generate().keys.join('\n');
     expect(
       RegExp(r'^guide_', multiLine: true).allMatches(names),
-      hasLength(greaterThanOrEqualTo(4)),
+      hasLength(greaterThanOrEqualTo(5)),
     );
     expect(
       RegExp(r'^readme_', multiLine: true).allMatches(names),
-      hasLength(greaterThanOrEqualTo(1)),
+      hasLength(greaterThanOrEqualTo(3)),
     );
   }, skip: skip);
 }
