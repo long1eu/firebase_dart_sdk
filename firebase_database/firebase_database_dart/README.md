@@ -623,6 +623,11 @@ beyond the package's contract tests. A test steers the server with `acceptConnec
 `dropConnection` to keep the client offline), `serverTime`, `ackLastWrite`, `failLastWrite`, `ackLastOnDisconnect`,
 `answerGet`, `failGet`, `revokeAuth` and `kill`, and reads `connectionAttempts` and `receivedAuthTokens`.
 
+Events are delivered in batches of 1000, with a turn of the event loop between batches so a long burst does not block
+the page. In a browser that turn is a message task, not a timer (a hidden tab delays timers), so a fake clock such as
+`package:fake_async` does not drive it: a browser test that queues more than 1000 events at once needs a real `await`
+to see the rest. On the VM the turn is `Timer.run`, which a fake clock does drive.
+
 ## More
 
 - Decisions, what was measured and what was not:
