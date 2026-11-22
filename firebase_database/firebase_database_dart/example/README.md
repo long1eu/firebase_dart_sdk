@@ -8,6 +8,7 @@ from this package:
 ../../tool/start_database_emulator.sh
 dart pub get
 FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 dart run example/main.dart
+../../tool/stop_database_emulator.sh         # when you are done
 ```
 
 Each program writes under the key `example-<name>-<timestamp>` and removes it at the end, then closes the
@@ -26,7 +27,7 @@ database. Without `FIREBASE_DATABASE_EMULATOR_HOST` they stop with a message. Th
 | `on_disconnect.dart` | `OnDisconnect.set` / `update` / `remove` / `cancel` with a second client watching. |
 | `connection_state.dart` | `onConnected`, `isConnected`, `goOffline` / `goOnline`, a write queued while offline. |
 | `server_values.dart` | `ServerValue.timestamp` and `increment`, the local estimate, `estimatedServerTime`. |
-| `auth_and_rules.dart` | `mockUserToken` and a rule that refuses (`permission-denied`); needs the rules in its header. |
+| `auth_and_rules.dart` | `mockUserToken` and a rule that refuses (`permission-denied`); needs the rules in its header, loaded as shown below. |
 | `error_handling.dart` | `FirebaseDatabaseException` (`code`, `serverStatus`) against `ArgumentError` and `StateError`. |
 | `lifecycle.dart` | Independent instances, `close()`, the `database-closed` error on streams and calls. |
 | `cookbook/presence.dart` | Online and offline with `onConnected` and `onDisconnect`. |
@@ -37,6 +38,15 @@ database. Without `FIREBASE_DATABASE_EMULATOR_HOST` they stop with a message. Th
 `FIREBASE_DATABASE_EMULATOR_HOST`, adds port 9100 when the value has none), `freshKey()` and `runExample()`
 (a database plus a fresh key, removed and closed afterwards).
 
+To load the rules of `auth_and_rules.dart` for the `demo-example` project while the emulator runs (the start
+script's `DATABASE_RULES` applies to the `demo-test` namespace only), put the JSON from the program's header in
+`rules.json` and send it with the namespace of this project:
+
+```sh
+curl -X PUT -H 'Authorization: Bearer owner' --data @rules.json \
+  'http://127.0.0.1:9100/.settings/rules.json?ns=demo-example-default-rtdb'
+```
+
 Every program was run against the Database emulator; none against a real database. Limits to know:
 
 - A `get()` with a range or a limit on `orderByChild` or `orderByValue` needs an `.indexOn` rule
@@ -46,4 +56,8 @@ Every program was run against the Database emulator; none against a real databas
   has no way to do it): the client gives up on it after its timeout and tries again, and the
   socket stays until the peer or the system ends it.
 
-Not yet here: offline persistence and a server that shares one instance.
+Complete apps are in [`examples/`](../../../examples/README.md): `rtdb_cli`, `rtdb_server_shelf` (one shared
+instance behind an HTTP API), `rtdb_presence_worker`, `rtdb_web_app`, `rtdb_playground` and
+`flutterfire_database_on_linux`. The FlutterFire adapter has its own program in
+[`firebase_database_dart_platform/example/`](../../firebase_database_dart_platform/example/main.dart).
+Not yet here: a program for offline persistence (`firebase_database_dart_sqlite`).

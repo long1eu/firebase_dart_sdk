@@ -20,16 +20,18 @@ CommandRunner<void> buildRunner({
   final Map<String, String> env = environment ?? Platform.environment;
   final CommandRunner<void> runner = CommandRunner<void>(
     'rtdb_cli',
-    'Reads and writes the Firebase Realtime Database. Needs --emulator or an '
+    'Reads and writes the Firebase Realtime Database. Needs --emulator-host or an '
         'explicit --database-url.',
   );
   runner.argParser
     ..addOption(
-      'emulator',
+      'emulator-host',
       help:
           'host:port of the Database emulator '
           '(FIREBASE_DATABASE_EMULATOR_HOST).',
     )
+    // The older spelling still works.
+    ..addOption('emulator', hide: true)
     ..addOption('project', help: 'Project id; demo-example with an emulator.')
     ..addOption(
       'database-url',
@@ -124,7 +126,7 @@ abstract class _DbCommand extends Command<void> {
   ) async {
     final ArgResults global = globalResults!;
     final DatabaseTarget target = resolveTarget(
-      emulator: global['emulator'] as String?,
+      emulator: (global['emulator-host'] ?? global['emulator']) as String?,
       databaseUrl: global['database-url'] as String?,
       project: global['project'] as String?,
       environment: env,

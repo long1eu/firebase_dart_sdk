@@ -3,9 +3,9 @@
 - **Product:** Realtime Database (`firebase_database_dart`)
 - **Platform:** web (`package:web`, no Flutter)
 - **Backend:** emulator (start it from the repository root with `tool/start_database_emulator.sh` (port 9100)), or your own project (none by default)
-- **Run:** `dart compile js -O2 -o build/web/main.dart.js web/main.dart`, copy `web/*` next to it, serve the folder, open `index.html?emulator=127.0.0.1:9100`
-- **CI:** compile (`dart compile js`) and `dart analyze`
-- **Web gallery:** -
+- **Run:** `./build.sh`, serve `build/web`, open `index.html?emulator=127.0.0.1:9100`
+- **CI:** `tool/test_all.sh` runs `dart pub get` and `dart analyze` here; nothing in CI compiles it
+- **Web gallery:** yes, `tool/build_gallery.sh` compiles it with dart2wasm and dart2js and copies `web/*`
 
 A browser app in plain Dart on the pure-Dart Realtime Database client:
 
@@ -33,14 +33,17 @@ database: the page has no server of its own, and its Content-Security-Policy (a 
 
 ## Status
 
-The client's real connection is not merged yet: `FirebaseDatabase(app)` throws at run time until it is.
-The page compiles; it has not been served or run against an emulator.
+The page uses the real connection (`FirebaseDatabase(app, emulatorHost: ..., databaseUrl: ...)` in
+`web/main.dart`). I could not verify that this page was served and used against an emulator; the
+package's own browser tests run the client in a browser (see `firebase_database_dart/README.md`).
 
 ## Build
 
 ```sh
-dart pub get
-dart compile js -O2 -o build/web/main.dart.js web/main.dart
+./build.sh
 ```
 
-Dependencies come from this repository (`dependency_overrides` in `pubspec.yaml`).
+`build.sh` writes `build/web`: the page, `bootstrap.js`, the dart2wasm build (`main.mjs`, `main.wasm`, used when
+the browser can run it) and the dart2js build (`main.dart.js`, the fallback). `?compiler=js` or `?compiler=wasm`
+picks one. The Content-Security-Policy has `'wasm-unsafe-eval'` for the WebAssembly build; without it the page
+falls back to dart2js. Dependencies come from this repository (`dependency_overrides` in `pubspec.yaml`).

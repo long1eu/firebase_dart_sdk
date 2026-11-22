@@ -6,7 +6,7 @@
 | Platform | Dart server (VM), `package:shelf` |
 | Backend | Realtime Database emulator, project `demo-example`; start it from the repository root with `tool/start_database_emulator.sh` (port 9100) |
 | Run | `FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 PORT=8000 dart run bin/server.dart` |
-| CI | not in CI yet; run by hand against the emulator |
+| CI | `tool/test_all.sh` runs `dart pub get` and `dart analyze` here; its tests are not run in CI and need the emulator |
 | Web gallery | - |
 
 A small notes API that shares **one** `FirebaseDatabase` between all requests, plus a
@@ -35,9 +35,11 @@ FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 PORT=8000 dart run bin/server.dar
 
 | Variable | Meaning |
 | --- | --- |
-| `FIREBASE_DATABASE_EMULATOR_HOST` | `host:port` of a Database emulator. Required unless `DATABASE_URL` is set. |
-| `DATABASE_URL` | An explicit database URL. The only way to reach a real database; no credentials are set up. |
+| `FIREBASE_DATABASE_EMULATOR_HOST` | `host:port` of a Database emulator. Required unless `FIREBASE_DATABASE_URL` is set. |
+| `FIREBASE_DATABASE_URL` | An explicit database URL (the older name `DATABASE_URL` still works). The only way to reach a real database; no credentials are set up. |
 | `PORT` | HTTP port (default `8000`). |
+
+Exit codes: `0` after a clean stop, `78` no backend configured (neither variable set, or a bad `host:port`).
 
 ## curl
 

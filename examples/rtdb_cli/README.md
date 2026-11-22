@@ -5,8 +5,8 @@
 | Product | Firebase Realtime Database |
 | Platform | Command line (Dart VM: macOS, Linux, Windows) |
 | Backend | The Database emulator (start it from the repository root with `tool/start_database_emulator.sh` (port 9100)); a real database only with an explicit `--database-url` |
-| Run | `cd examples/rtdb_cli && dart pub get && dart run rtdb_cli --emulator 127.0.0.1:9100 get /` |
-| CI | `dart analyze` and `dart test` in this folder |
+| Run | `cd examples/rtdb_cli && dart pub get && dart run rtdb_cli --emulator-host 127.0.0.1:9100 get /` |
+| CI | `tool/test_all.sh` runs `dart pub get` and `dart analyze` here; `dart test` is not run in CI (it needs the emulator) |
 | Web gallery | - |
 
 `rtdb_cli`, a command-line tool on [`package:args`](https://pub.dev/packages/args) and
@@ -31,7 +31,7 @@ Global options:
 
 | Option | Variable | Meaning |
 | --- | --- | --- |
-| `--emulator host:port` | `FIREBASE_DATABASE_EMULATOR_HOST` | the Database emulator |
+| `--emulator-host host:port` (older: `--emulator`) | `FIREBASE_DATABASE_EMULATOR_HOST` | the Database emulator |
 | `--project` | | project id; `demo-example` with an emulator |
 | `--database-url` | | URL of a real database |
 | `--api-key` | `FIREBASE_API_KEY` | Web API key for a real database |
@@ -43,9 +43,9 @@ Exit codes: `64` usage, `66` missing local file, `78` no backend configured, `1`
 `FirebaseDatabaseException` (printed as `code: message`).
 
 ```sh
-dart run rtdb_cli --emulator 127.0.0.1:9100 set /users/ann '{"age": 31}'
-dart run rtdb_cli --emulator 127.0.0.1:9100 get /users --order-by-child age --start-at 18
-dart run rtdb_cli --emulator 127.0.0.1:9100 export /users users.json
+dart run rtdb_cli --emulator-host 127.0.0.1:9100 set /users/ann '{"age": 31}'
+dart run rtdb_cli --emulator-host 127.0.0.1:9100 get /users --order-by-child age --start-at 18
+dart run rtdb_cli --emulator-host 127.0.0.1:9100 export /users users.json
 ```
 
 The second command needs `".indexOn": "age"` at `/users` in the rules: the server refuses a filtered

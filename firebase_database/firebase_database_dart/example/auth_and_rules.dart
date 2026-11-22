@@ -10,6 +10,9 @@
 //     { "rules": { "example-private": {
 //         "$uid": { ".read": "auth.uid === $uid", ".write": "auth.uid === $uid" } } } }
 //
+// Load them with: curl -X PUT -H 'Authorization: Bearer owner' --data @rules.json
+// 'http://127.0.0.1:9100/.settings/rules.json?ns=demo-example-default-rtdb'
+//
 // Without those rules the emulator's own rules apply and the program prints
 // what it saw.
 

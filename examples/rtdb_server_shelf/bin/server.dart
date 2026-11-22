@@ -16,7 +16,7 @@ Future<void> main() async {
     db = databaseFromEnvironment();
   } on ConfigurationError catch (e) {
     stderr.writeln(e);
-    exitCode = 64;
+    exitCode = 78; // no backend configured
     return;
   }
   final NotesApi api = NotesApi(db);

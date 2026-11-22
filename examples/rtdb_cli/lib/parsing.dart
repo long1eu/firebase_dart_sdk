@@ -249,7 +249,7 @@ DatabaseTarget resolveTarget({
   }
   if (url == null) {
     throw ConfigurationError(
-      'Refusing to run without a backend: pass --emulator host:port (or set '
+      'Refusing to run without a backend: pass --emulator-host host:port (or set '
       'FIREBASE_DATABASE_EMULATOR_HOST), or an explicit --database-url to use '
       'a real database.',
     );

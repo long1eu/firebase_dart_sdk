@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*">
   <title>Realtime list: firebase_database_dart</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -21,6 +21,7 @@
     <dt>Backend</dt><dd id="backend">none</dd>
     <dt>Connection</dt><dd><span id="connected" class="offline">Not connected</span>
       <button id="toggle" type="button" disabled>Go offline</button></dd>
+    <dt>Compiler</dt><dd><span id="compiler"></span> (other build: <a id="other-compiler" href="?compiler=js">dart2js</a>)</dd>
     <dt>Pending</dt><dd id="pending">0 writes made while offline, not yet sent</dd>
   </dl>
 
@@ -51,6 +52,6 @@
       <code>?apiKey=</code> and <code>?project=</code>.</p>
   </details>
 
-  <script defer src="main.dart.js"></script>
+  <script src="bootstrap.js" data-app="main"></script>
 </body>
 </html>

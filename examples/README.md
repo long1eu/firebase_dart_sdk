@@ -1,6 +1,6 @@
 # Examples
 
-Small, complete programs that use `cloud_firestore_dart` and `firebase_storage_dart`: servers and tools, a worker, a Flutter
+Small, complete programs that use `cloud_firestore_dart`, `firebase_storage_dart` and `firebase_database_dart`: servers and tools, a worker, a Flutter
 app and a browser app. Each directory is a package of its own with a `pubspec.yaml` and a README.
 
 | Directory | What it is |
@@ -19,7 +19,7 @@ app and a browser app. Each directory is a package of its own with a `pubspec.ya
 | [`rtdb_cli/`](rtdb_cli/) | A command-line tool for the Realtime Database on `firebase_database_dart`: `get` (with order, range and limit), `set`, `update`, `push`, `remove`, `import`, `export`, `watch`. Run against the Database emulator. |
 | [`rtdb_server_shelf/`](rtdb_server_shelf/) | An HTTP API on `package:shelf` over the Realtime Database: notes with create, read, patch and delete, a list, and one listener sent to every client as server-sent events. Run against the Database emulator. |
 | [`rtdb_presence_worker/`](rtdb_presence_worker/) | A worker that keeps a presence record with a heartbeat and an `onDisconnect` write, and a watcher that lists who is online. Run against the Database emulator, including a killed worker. |
-| [`rtdb_web_app/`](rtdb_web_app/) | A browser app in plain Dart (`package:web`) on the Realtime Database. |
+| [`rtdb_web_app/`](rtdb_web_app/) | A browser app in plain Dart (`package:web`) on the Realtime Database: a live list of items (child events), a form that pushes an item, a connection indicator, a go offline / go online button, and a panel to connect an emulator or a project (`?emulator=127.0.0.1:9100`). Needs an emulator or a project; loaded through `bootstrap.js` with dart2wasm and a dart2js fallback. I could not verify that it was used against an emulator. |
 | [`rtdb_playground/`](rtdb_playground/) | A browser playground for the Realtime Database with no backend: the client runs against a fake server in the page. Static files only. Loads in Chrome with dart2js and dart2wasm. |
 | [`flutterfire_database_on_linux/`](flutterfire_database_on_linux/) | A Flutter Linux desktop app written only against the official `firebase_database` and `firebase_core` API; `firebase_database_dart_platform` registers itself, with no code: the connection state, a query bound to a live list, push, delete, a transaction on a counter, presence with `onDisconnect`, and an integration test. Against the Database emulator; **not yet built or run on Linux**. |
 | [`playground/`](playground/) | A browser playground with no backend: the client runs with its network disabled on a memory cache, and the page shows each snapshot event, the writes waiting for a server and a timeline. Static files only, ready for any static host. Supported in Chrome, untested elsewhere. |
@@ -39,6 +39,14 @@ flowchart TD
   start -- "a Flutter web page" --> flutterWeb["flutter_web_two_users"]
   start -- "a browser, without Flutter" --> webApp["web_app"]
   start -- "I want one Firestore API topic" --> apiExamples["cloud_firestore_dart/example/"]
+  start -- "I want a live tree, not documents" --> rtdbKind{"Where does your code run?"}
+  rtdbKind -- "a server, one shared client" --> rtdbShelf["rtdb_server_shelf"]
+  rtdbKind -- "a long-running worker" --> rtdbWorker["rtdb_presence_worker"]
+  rtdbKind -- "a terminal" --> rtdbCli["rtdb_cli"]
+  rtdbKind -- "a browser, without Flutter" --> rtdbWeb["rtdb_web_app"]
+  rtdbKind -- "a browser, no backend" --> rtdbPlayground["rtdb_playground"]
+  rtdbKind -- "a Flutter app on Linux" --> flutterDatabase["flutterfire_database_on_linux"]
+  rtdbKind -- "I want one Database API topic" --> rtdbExamples["firebase_database_dart/example/"]
   start -- "I want files, not documents" --> storageKind{"Where does your code run?"}
   storageKind -- "a server, streaming bodies" --> serverShelf
   storageKind -- "a browser, without Flutter" --> webApp
@@ -51,6 +59,9 @@ For the API one topic at a time, see
 the programs in [`cloud_firestore/cloud_firestore_dart/example/`](../cloud_firestore/cloud_firestore_dart/example/README.md)
 and, for Cloud Storage, those in
 [`firebase_storage/firebase_storage_dart/example/`](../firebase_storage/firebase_storage_dart/example/README.md).
+For the Realtime Database, the programs per topic (reads and writes, listeners, queries, transactions, `onDisconnect`,
+server values, rules, and a cookbook) are in
+[`firebase_database/firebase_database_dart/example/`](../firebase_database/firebase_database_dart/example/README.md).
 
 ## Running them
 
@@ -64,18 +75,37 @@ READMEs):
   Default Credentials (`GOOGLE_APPLICATION_CREDENTIALS`, `gcloud auth application-default
   login`, or the metadata server on Google Cloud). These credentials bypass security rules.
 
-No project id, key or token is in any file. The first three have tests; start an emulator, then,
-in the example's directory:
+No project id, key or token is in any file. `server_shelf`, `cli`, `cloud_run_job`, `storage_cli`,
+`rtdb_cli`, `rtdb_server_shelf` and `playground` have a `test/` folder (`playground`'s needs no emulator); start an
+emulator, then, in the example's directory:
 
 ```sh
 dart pub get
 FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart test
 ```
 
+The Realtime Database examples (`rtdb_*`, and `flutterfire_database_on_linux`) read the Database emulator from
+`FIREBASE_DATABASE_EMULATOR_HOST=host:port`; the project is `demo-example`. Start one from the repository root on
+port 9100 (it refuses the Firebase CLI's own 9000) and stop it when you are done:
+
+```sh
+tool/start_database_emulator.sh              # 127.0.0.1:9100
+cd examples/rtdb_cli && dart pub get
+FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 dart test
+cd ../.. && tool/stop_database_emulator.sh
+```
+
+`rtdb_cli` and `rtdb_presence_worker` take `--emulator-host host:port` as well (`rtdb_cli` still accepts the older `--emulator`); `rtdb_server_shelf` and
+`rtdb_presence_worker` take `FIREBASE_DATABASE_URL` for a real database (`rtdb_server_shelf` also accepts the older
+`DATABASE_URL`), and `rtdb_cli` takes `--database-url`. None of them reaches a real database without it. The
+no-backend exit code is `78` in all three.
+
 ## Status
 
 - Run against the Firestore emulator (v1.22.0) on macOS with Dart 3.12.2, by their tests and
   by hand.
+- The `rtdb_*` examples were run against the Database emulator, by hand (see each README); `rtdb_web_app` and `flutterfire_database_on_linux` are
+  described in their READMEs (the Linux one is not yet built or run on Linux).
 - **Not run against a real Firebase project.** The Docker image of `cloud_run_job/` has not
   been built.
 - `server_shelf`, `cli` and `cloud_run_job` take the three packages from this repository, with
@@ -85,5 +115,12 @@ FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 dart test
   pub.dev (`^0.2.0`, and `cloud_firestore_dart_sqlite` `^0.1.0` for the SQLite cache of
   `flutter_notes` and `web_app`) and can be copied out as they are; they have no tests, except
   `playground`, which has a smoke test that needs no emulator.
+- The `rtdb_*` packages take `firebase_app_dart` and `firebase_database_dart` from this repository (path
+  dependencies or `dependency_overrides`); `rtdb_web_app` and `rtdb_presence_worker` declare `^0.2.0` and `^0.0.1`
+  with overrides, so they also run against the code next to them.
+- CI: `tool/test_all.sh` runs `dart pub get` and `dart analyze` for every `examples/*/pubspec.yaml`, and does not
+  run their tests. `tool/build_gallery.sh` builds the web gallery (`playground`, `web_app`, `rtdb_web_app`,
+  `rtdb_playground`) with dart2wasm and dart2js; no file in `.github/workflows/` calls it, and
+  `.github/workflows/playground-pages.yml` publishes `playground` only.
 - `firestore_from_env.dart` is copied, not shared, so that each directory can be copied out on
   its own.

@@ -6,7 +6,7 @@
 | Platform | Dart VM on a server or a desktop (Linux, macOS, Windows); no Flutter |
 | Backend | Realtime Database emulator (project `demo-example`; start it from the repository root with `tool/start_database_emulator.sh` (port 9100)), or a real database by URL |
 | Run | `FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9100 dart run bin/presence_worker.dart --id worker-a` |
-| CI | none; run by hand against the emulator |
+| CI | `tool/test_all.sh` runs `dart pub get` and `dart analyze` here; no tests |
 | Web gallery | - |
 
 A long-running process that keeps `status/<id>` in the Realtime Database true: `online` while
