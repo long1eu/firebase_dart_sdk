@@ -3,6 +3,13 @@
 // Every engine (SQLite, IndexedDB-backed image, ...) must pass runStorageEngineContract;
 // persistence_storage_engine_contract_test.dart runs it against InMemoryPersistenceStorageEngine.
 // Needs the data layer filled. No main here: other packages import this file.
+//
+// The contract requires a StateError only for programming errors (nested transactions). It never
+// requires one for a condition that only stored data can cause: unknown write or tracked query
+// ids, removing keys that are not stored, one id per query (TrackedQueryManager owns that), and
+// data that pruneCache finds above its root or neither pruned nor kept (an engine logs a warning
+// and skips it, as Android's SqlPersistenceStorageEngine.java:657-681 does). The reference
+// engine's own checks for these live in persistence_storage_engine_contract_test.dart.
 import 'package:firebase_database_dart/src/core/compound_write.dart';
 import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:firebase_database_dart/src/core/persistence/persistence_storage_engine.dart';
@@ -122,5 +129,23 @@ void runStorageEngineContract(PersistenceStorageEngine Function() open) {
     expect(engine.loadTrackedQueries().single.lastUse, 200);
     inTransaction(() => engine.deleteTrackedQuery(1));
     expect(engine.loadTrackedQueries(), isEmpty);
+  });
+
+  test('resetPreviouslyActiveTrackedQueries joins the current transaction', () {
+    final TrackedQuery query = TrackedQuery(
+      id: 1,
+      querySpec: QuerySpec.defaultAt(Path('/a')),
+      lastUse: 100,
+      complete: false,
+      active: true,
+    );
+    inTransaction(() => engine.saveTrackedQuery(query));
+    engine.beginTransaction();
+    engine.resetPreviouslyActiveTrackedQueries(200);
+    engine.endTransaction();
+    expect(engine.loadTrackedQueries(), <TrackedQuery>[query]);
+    engine.resetPreviouslyActiveTrackedQueries(300);
+    expect(engine.loadTrackedQueries().single.active, isFalse);
+    expect(engine.loadTrackedQueries().single.lastUse, 300);
   });
 }
