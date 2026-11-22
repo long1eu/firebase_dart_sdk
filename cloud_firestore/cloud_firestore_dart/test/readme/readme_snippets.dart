@@ -130,8 +130,8 @@ class City {
   Map<String, Object?> toMap() => {'name': name, 'population': population};
 }
 
-// ../../README.md:57
-Future<void> rootReadmeLine57() async {
+// ../../README.md:66
+Future<void> rootReadmeLine66() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(apiKey: 'demo-key', appId: '1:1234567890:dart:demo', projectId: 'demo-my-app'),
   );
