@@ -30,10 +30,16 @@ String restListenStatus(int httpStatus) {
   return '$restErrorPrefix$httpStatus';
 }
 
+/// The status the server answers an `auth` request with when the token is not valid.
+const String invalidTokenStatus = 'invalid_token';
+
 /// Whether [status] counts toward the invalid-token threshold of 8.3: `invalid_token` or
 /// `permission_denied` (PersistentConnection.ts:985-1004).
+///
+/// `invalid_token` is a wire status only: it reaches the auth callback of the delegate and never a
+/// Future or a stream, so the core's error vocabulary has no code for it.
 bool countsAsInvalidToken(String status) =>
-    status == DatabaseErrorCode.invalidToken.wireStatus ||
+    status == invalidTokenStatus ||
     status == DatabaseErrorCode.permissionDenied.wireStatus;
 
 /// [text] from the server made safe for a log line or an error message (threat model T7): cut at
