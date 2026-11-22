@@ -349,6 +349,109 @@ void main() {
     });
   });
 
+  group('probeNow', () {
+    const ConnectionTimings healthy = ConnectionTimings(
+      responsesRequiredToBeHealthy: 0,
+    );
+    const String ping = '{"t":"c","d":{"t":"p","d":{}}}';
+
+    int pings(FakeWsChannel channel) =>
+        channel.sentFrames.where((SentFrame f) => f.text == ping).length;
+
+    test('pings at once and closes as deadLink after the probe timeout', () {
+      fakeAsync((FakeAsync async) {
+        final _Probe probe = _Probe(async, timings: healthy);
+        probe.liveness
+          ..start()
+          ..onHello();
+        async.elapse(_s * 3);
+        probe.liveness.probeNow();
+        expect(probe.pings, <Duration>[_s * 3]);
+        async.elapse(_s * 15);
+
+        expect(probe.closes, <(DisconnectReason, Duration)>[
+          (DisconnectReason.deadLink, _s * 18),
+        ]);
+        expect(async.pendingTimers, isEmpty);
+      });
+    });
+
+    test('is a no-op before the hello', () {
+      fakeAsync((FakeAsync async) {
+        final ConnectionRig rig = ConnectionRig(async, timings: healthy);
+        final RealtimeConnection connection = rig.open();
+        connection.probeNow();
+        async.elapse(_s * 20);
+
+        expect(pings(rig.fake.last), 0);
+        expect(rig.delegate.disconnects, isEmpty);
+
+        final _Probe probe = _Probe(async, timings: healthy)..liveness.start();
+        probe.liveness.probeNow();
+        expect(probe.pings, isEmpty);
+        probe.liveness.stop();
+      });
+    });
+
+    test('is a no-op while a probe is outstanding and keeps its deadline', () {
+      fakeAsync((FakeAsync async) {
+        final ConnectionRig rig = ConnectionRig(async, timings: healthy);
+        final RealtimeConnection connection = rig.openReady();
+        connection.probeNow();
+        async.elapse(_s * 10);
+        connection.probeNow();
+        expect(pings(rig.fake.last), 1);
+        async.elapse(_s * 5);
+
+        expect(
+          rig.delegate.disconnects.single.reason,
+          DisconnectReason.deadLink,
+        );
+      });
+    });
+
+    test(
+      'after the close it starts nothing: one disconnect, no ping, no timer',
+      () {
+        fakeAsync((FakeAsync async) {
+          final ConnectionRig rig = ConnectionRig(async, timings: healthy);
+          final RealtimeConnection connection = rig.openReady()..probeNow();
+          async.elapse(_s * 15);
+          expect(
+            rig.delegate.disconnects.single.reason,
+            DisconnectReason.deadLink,
+          );
+
+          connection.probeNow();
+          async.elapse(const Duration(minutes: 2));
+
+          expect(pings(rig.fake.last), 1);
+          expect(rig.delegate.disconnects, hasLength(1));
+          expect(rig.fake.attempts, hasLength(1));
+          expect(async.pendingTimers, isEmpty);
+        });
+      },
+    );
+
+    test('a pong after probeNow keeps the connection', () {
+      fakeAsync((FakeAsync async) {
+        final ConnectionRig rig = ConnectionRig(async, timings: healthy);
+        final RealtimeConnection connection = rig.openReady()..probeNow();
+        async.elapse(_s * 2);
+        rig.fake.last.serverControl('o');
+        rig.flush();
+        async.elapse(_s * 20);
+
+        expect(connection.isConnected, isTrue);
+        expect(rig.delegate.disconnects, isEmpty);
+        // The next routine probe comes idleProbeAfter after the pong.
+        expect(pings(rig.fake.last), 1);
+        async.elapse(_s * 10);
+        expect(pings(rig.fake.last), 2);
+      });
+    });
+  });
+
   group('through RealtimeConnection', () {
     test(
       'keep-alive 0 is re-armed by every send and receive and stops at close',

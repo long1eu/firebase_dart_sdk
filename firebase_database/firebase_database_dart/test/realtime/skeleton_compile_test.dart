@@ -20,6 +20,7 @@ import 'package:firebase_database_dart/src/realtime/reconnect_backoff.dart';
 import 'package:firebase_database_dart/src/realtime/replay.dart';
 import 'package:firebase_database_dart/src/realtime/request_table.dart';
 import 'package:firebase_database_dart/src/realtime/rest_client.dart';
+import 'package:firebase_database_dart/src/realtime/server_actions_factories.dart';
 import 'package:firebase_database_dart/src/realtime/server_message.dart';
 import 'package:firebase_database_dart/src/realtime/transport/ws_channel.dart';
 import 'package:firebase_database_dart/src/realtime/transport/ws_connector.dart';
@@ -37,6 +38,7 @@ final List<Object?> _topLevel = <Object?>[
   isAdminCredential,
   // connection.dart
   DisconnectReason.values,
+  credentialActions,
   RealtimeDelegate,
   RealtimeConnection.new,
   // realtime_target.dart
@@ -120,6 +122,7 @@ final List<Object?> _topLevel = <Object?>[
   // persistent_connection.dart
   RealtimeConnectionFactory,
   PersistentConnection.new,
+  tapInboundFrames,
   // realtime_error.dart
   noIndexWarning,
   restErrorPrefix,
@@ -129,7 +132,6 @@ final List<Object?> _topLevel = <Object?>[
   // reconnect_backoff.dart
   ReconnectBackoff.new,
   // replay.dart
-  TimedRequest,
   ListenRecord.new,
   OutstandingWrite.new,
   OutstandingGet.new,
@@ -139,6 +141,9 @@ final List<Object?> _topLevel = <Object?>[
   RequestTable.new,
   // rest_client.dart
   RestClient.new,
+  // server_actions_factories.dart
+  persistentConnectionFactory,
+  restClientFactory,
   // server_message.dart
   ServerMessage,
   Response.new,
@@ -210,6 +215,7 @@ List<Object?> _members({
   final ServerActions actions = persistent;
   final ServerActions readOnly = rest;
   return <Object?>[
+    persistent.inboundFrame,
     source.authToken,
     source.appCheckToken,
     source.authChanges,
@@ -229,6 +235,8 @@ List<Object?> _members({
     connection.isConnected,
     connection.send,
     connection.close,
+    connection.probeNow,
+    connection.onInboundFrame,
     delegate.onReady,
     delegate.onDataMessage,
     delegate.onDisconnect,
@@ -276,6 +284,7 @@ List<Object?> _members({
     liveness.onResponse,
     liveness.isHealthy,
     liveness.stop,
+    liveness.probeNow,
     actions,
     readOnly,
     backoff.min,
@@ -295,7 +304,6 @@ List<Object?> _members({
     listenRecord.hashProvider,
     listenRecord.onComplete,
     listenRecord.wireBody,
-    listenRecord.timeouts,
     write.action,
     write.body,
     write.onComplete,
@@ -304,11 +312,14 @@ List<Object?> _members({
     outstandingGet.body,
     outstandingGet.completer,
     outstandingGet.sent,
+    outstandingGet.silentConnections,
     queued.action,
     queued.body,
     queued.onComplete,
     queues.writes,
     queues.onDisconnects,
+    queues.sentOnDisconnects,
+    queues.takeSentOnDisconnects,
     queues.gets,
     queues.listens,
     queues.addListen,

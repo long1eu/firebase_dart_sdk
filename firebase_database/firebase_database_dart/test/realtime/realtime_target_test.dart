@@ -336,24 +336,19 @@ void main() {
   });
 
   group('construction and toString', () {
-    test('a plain-text RepoInfo that is not the emulator is built, and no '
-        'URL of it may receive tokens (addendum 4, T3)', () {
-      final RealtimeTarget target = RealtimeTarget(
-        const RepoInfo(host: 'x.firebaseio.com', namespace: 'x', secure: false),
-        useHeaders: true,
+    test('a plain-text RepoInfo that is not the emulator is refused '
+        '(T3; review M1 (a))', () {
+      expect(
+        () => RealtimeTarget(
+          const RepoInfo(
+            host: 'x.firebaseio.com',
+            namespace: 'x',
+            secure: false,
+          ),
+          useHeaders: true,
+        ),
+        throwsArgumentError,
       );
-      final Uri rest = target.restUri('/a', <String, String>{'auth': 't'});
-      expect(rest.toString(), 'http://x.firebaseio.com/a.json?ns=x&auth=t');
-      expect(target.mayReceiveTokens(rest), isFalse);
-      expect(target.mayReceiveTokens(target.connectionUri()), isFalse);
-      for (final String url in <String>[
-        'http://x.firebaseio.com/a.json',
-        'http://x.firebaseio.com:443/a.json',
-        'https://x.firebaseio.com/a.json',
-        'wss://x.firebaseio.com/.ws',
-      ]) {
-        expect(target.mayReceiveTokens(Uri.parse(url)), isFalse, reason: url);
-      }
     });
 
     test('toString shows the configured URL only (T8)', () {

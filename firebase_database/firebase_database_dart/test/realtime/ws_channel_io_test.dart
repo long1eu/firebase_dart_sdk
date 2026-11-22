@@ -398,4 +398,142 @@ void main() {
     expect(channel, isA<IoWsChannel>());
     expect(((await _drain(channel)).last as WsClosed).code, 4005);
   });
+
+  group(
+    'a server that accepts and stays silent leaves nothing open (review M2)',
+    () {
+      late ServerSocket listener;
+      late int accepted;
+      late Set<Socket> open;
+
+      setUp(() async {
+        accepted = 0;
+        open = <Socket>{};
+        listener = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+        listener.listen((Socket socket) {
+          accepted++;
+          open.add(socket);
+          socket.listen(
+            (_) {},
+            onError: (Object _) {},
+            onDone: () {
+              open.remove(socket);
+              socket.destroy();
+            },
+          );
+        });
+      });
+
+      tearDown(() async {
+        for (final Socket socket in open) {
+          socket.destroy();
+        }
+        await listener.close();
+      });
+
+      Future<void> allClosed() async {
+        for (int i = 0; i < 100 && open.isNotEmpty; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+      }
+
+      Matcher failsAs(String message) => throwsA(
+        isA<WsConnectException>()
+            .having(
+              (WsConnectException e) => e.kind,
+              'kind',
+              WsConnectFailure.other,
+            )
+            .having((WsConnectException e) => e.message, 'message', message),
+      );
+
+      for (final String scheme in <String>['ws', 'wss']) {
+        test('20 $scheme attempts time out and close their sockets', () async {
+          final WsConnector bounded = ioWsConnector(
+            maxMessageBytes: 1000,
+            upgradeTimeout: const Duration(milliseconds: 100),
+          );
+          final Uri url = Uri.parse('$scheme://127.0.0.1:${listener.port}/.ws');
+          await Future.wait(<Future<void>>[
+            for (int i = 0; i < 20; i++)
+              expectLater(
+                bounded(url),
+                failsAs('the WebSocket upgrade timed out'),
+              ),
+          ]);
+          await allClosed();
+          expect(accepted, 20);
+          expect(open, isEmpty);
+        });
+      }
+
+      test(
+        '20 aborted attempts fail at once and close their sockets',
+        () async {
+          final WsConnector slow = ioWsConnector(maxMessageBytes: 1000);
+          final Uri url = Uri.parse('ws://127.0.0.1:${listener.port}/.ws');
+          final Stopwatch watch = Stopwatch()..start();
+          await Future.wait(<Future<void>>[
+            for (int i = 0; i < 20; i++)
+              expectLater(
+                slow(
+                  url,
+                  abort: Future<void>.delayed(
+                    const Duration(milliseconds: 100),
+                  ),
+                ),
+                failsAs('the connect attempt was aborted'),
+              ),
+          ]);
+          expect(watch.elapsed, lessThan(const Duration(seconds: 5)));
+          await allClosed();
+          expect(accepted, 20);
+          expect(open, isEmpty);
+        },
+      );
+
+      test(
+        'an abort with a shared client drops the request, not the client',
+        () async {
+          final HttpClient shared = HttpClient();
+          addTearDown(() => shared.close(force: true));
+          final WsConnector viaShared = ioWsConnector(
+            httpClient: shared,
+            maxMessageBytes: 1000,
+          );
+          final Uri url = Uri.parse('ws://127.0.0.1:${listener.port}/.ws');
+          final Completer<void> abort = Completer<void>();
+          final Future<WsChannel> attempt = viaShared(url, abort: abort.future);
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+          abort.complete();
+          await expectLater(
+            attempt,
+            failsAs('the connect attempt was aborted'),
+          );
+          await allClosed();
+          expect(accepted, 1);
+          expect(open, isEmpty);
+        },
+      );
+    },
+  );
+
+  test('an abort after the channel opened does not touch it', () async {
+    final _WsServer server = await _WsServer.start((WebSocket socket) {
+      socket.listen((Object? message) => socket.add('echo:$message'));
+    });
+    addTearDown(server.close);
+    final Completer<void> abort = Completer<void>();
+    final WsChannel channel = await connect(server.url, abort: abort.future);
+    abort.complete();
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    final StreamIterator<WsEvent> events = StreamIterator<WsEvent>(
+      channel.events,
+    );
+    channel.sendText('still');
+    expect(await events.moveNext(), isTrue);
+    expect((events.current as WsText).data, 'echo:still');
+    await channel.close();
+    await events.cancel();
+  });
 }

@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:firebase_database_dart/src/core/connection/listen_spec.dart';
 import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
+import 'package:firebase_database_dart/src/core/database_error.dart';
 import 'package:firebase_database_dart/src/realtime/rest_client.dart';
 import 'package:firebase_database_dart/src/testing/recording_server_actions_delegate.dart';
 import 'package:http/http.dart' as http;
@@ -25,6 +26,15 @@ const ListenSpec ageQuery = ListenSpec(
     'startAt': '25',
     'limitToFirst': '2',
   },
+);
+
+/// A [ServerActionsException] with the core's closed status.
+final Matcher throwsDatabaseClosed = throwsA(
+  isA<ServerActionsException>().having(
+    (ServerActionsException e) => e.status,
+    'status',
+    DatabaseErrorCode.databaseClosed.wireStatus,
+  ),
 );
 
 void main() {
@@ -325,6 +335,51 @@ void main() {
     });
   });
 
+  group('keys of the answer (review M6)', () {
+    test('a key the database refuses fails a get with failure', () async {
+      final RestClient client = restClientFor(
+        ScriptedServer.always(200, '{"a.b": 1}'),
+        delegate: delegate,
+      );
+      await expectLater(
+        client.get(defaultSpecAt('/a')),
+        throwsA(
+          isA<ServerActionsException>().having(
+            (ServerActionsException e) => e.status,
+            'status',
+            'failure',
+          ),
+        ),
+      );
+      expect(delegate.calls, isEmpty);
+    });
+
+    test('a key the database refuses completes a listen with failure and no '
+        'data', () async {
+      final RestClient client = restClientFor(
+        ScriptedServer.always(200, '{"x":{"a.b": 1}}'),
+        delegate: delegate,
+      );
+      final ListenResult result = await listenOnce(client, defaultSpecAt('/a'));
+      expect(result.completion?.status, 'failure');
+      expect(delegate.calls, isEmpty);
+    });
+
+    test('the export form (.value, .priority) is accepted', () async {
+      final RestClient client = restClientFor(
+        ScriptedServer.always(
+          200,
+          '{".priority":7.0,"x":{".value":3,".priority":"p"}}',
+        ),
+        delegate: delegate,
+      );
+      expect(await client.get(defaultSpecAt('/a')), <String, Object?>{
+        '.priority': 7.0,
+        'x': <String, Object?>{'.value': 3, '.priority': 'p'},
+      });
+    });
+  });
+
   group('get', () {
     test('is one GET that completes with the data and does not call the '
         'delegate', () async {
@@ -575,7 +630,8 @@ void main() {
   });
 
   group('shutdown', () {
-    test('drops the callbacks of reads in flight', () async {
+    test('drops listen callbacks in flight and fails an outstanding get '
+        'with database_closed (review M7)', () async {
       // Each request gets its own response (and body stream), as from a real server.
       final Completer<void> answer = Completer<void>();
       final ScriptedServer server = ScriptedServer(
@@ -588,22 +644,23 @@ void main() {
         hashProvider: FixedHash(''),
         onComplete: result.call,
       );
-      bool getCompleted = false;
-      unawaited(
-        client.get(defaultSpecAt('/b')).whenComplete(() => getCompleted = true),
-      );
+      final Future<Object?> read = client.get(defaultSpecAt('/b'));
+      // Listened to before the shutdown, or the failure would be unhandled.
+      final Future<void> closed = expectLater(read, throwsDatabaseClosed);
       await pumpUntil(() => server.received.length == 2);
 
       await client.shutdown();
+      // The server never answers before the get must have failed.
+      await closed.timeout(const Duration(seconds: 1));
       answer.complete();
       await pumpEventQueue();
 
       expect(result.completion, isNull);
-      expect(getCompleted, isFalse);
       expect(delegate.calls, isEmpty);
     });
 
-    test('later reads and writes complete nothing and send nothing', () async {
+    test('later listens and writes complete nothing, a later get fails with '
+        'database_closed, and nothing is sent', () async {
       final ScriptedServer server = ScriptedServer.always(200, '1');
       final RestClient client = restClientFor(server, delegate: delegate);
       await client.shutdown();
@@ -615,14 +672,13 @@ void main() {
           onComplete: result.call,
         )
         ..put('/a', 1, onComplete: result.call);
-      bool getCompleted = false;
-      unawaited(
-        client.get(defaultSpecAt('/a')).whenComplete(() => getCompleted = true),
+      await expectLater(
+        client.get(defaultSpecAt('/a')).timeout(const Duration(seconds: 1)),
+        throwsDatabaseClosed,
       );
       await pumpEventQueue();
       expect(server.received, isEmpty);
       expect(result.completion, isNull);
-      expect(getCompleted, isFalse);
     });
 
     test('a write completion pending at shutdown is dropped', () async {

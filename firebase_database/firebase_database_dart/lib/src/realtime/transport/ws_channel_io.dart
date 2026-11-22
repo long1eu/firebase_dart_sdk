@@ -29,14 +29,29 @@ WsConnector createWsConnector({required int maxMessageBytes}) =>
 /// A connector over `dart:io`.
 ///
 /// [httpClient] is used for the upgrade when given (for a proxy through `HttpClient.findProxy`;
-/// none is read from the environment, threat model T4); otherwise a new one is created per attempt.
-/// No `badCertificateCallback` is ever set.
+/// none is read from the environment, threat model T4); otherwise a new one is created per attempt,
+/// with [upgradeTimeout] as its `connectionTimeout`, and closed after it. No
+/// `badCertificateCallback` is ever set.
+///
+/// An attempt that has no open channel after [upgradeTimeout] (TCP, TLS and the upgrade answer
+/// together), or whose `abort` future completes first, aborts its pending request, closes a client
+/// of its own with force and fails with [WsConnectFailure.other]: a server that accepts and stays
+/// silent leaves no socket behind (review M2).
 WsConnector ioWsConnector({
   HttpClient? httpClient,
   required int maxMessageBytes,
+  Duration upgradeTimeout = const Duration(seconds: 30),
 }) {
-  return (Uri url, {Map<String, String> headers = const <String, String>{}}) =>
-      _connect(url, headers, httpClient, maxMessageBytes);
+  final _IoConnector connector = _IoConnector(
+    httpClient,
+    maxMessageBytes,
+    upgradeTimeout,
+  );
+  return (
+    Uri url, {
+    Map<String, String> headers = const <String, String>{},
+    Future<void>? abort,
+  }) => connector.connect(url, headers, abort);
 }
 
 /// The GUID of RFC 6455 section 1.3, appended to the key for `Sec-WebSocket-Accept`.
@@ -46,103 +61,184 @@ const String _acceptGuid = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 String _expectedAccept(String key) =>
     base64Encode(sha1.convert(ascii.encode('$key$_acceptGuid')).bytes);
 
-Future<WsChannel> _connect(
-  Uri url,
-  Map<String, String> headers,
-  HttpClient? httpClient,
-  int maxMessageBytes,
-) async {
-  final String httpScheme = switch (url.scheme) {
-    'ws' => 'http',
-    'wss' => 'https',
-    _ => throw const WsConnectException(
-      WsConnectFailure.badScheme,
-      'only ws and wss URLs are accepted',
-    ),
-  };
-  if (url.userInfo.isNotEmpty) {
-    // dart:io would turn it into an `Authorization: Basic` header (threat model T4).
-    throw const WsConnectException(
-      WsConnectFailure.other,
-      'a URL with user info is refused',
+final class _IoConnector {
+  _IoConnector(this._httpClient, this._maxMessageBytes, this._upgradeTimeout);
+
+  final HttpClient? _httpClient;
+  final int _maxMessageBytes;
+  final Duration _upgradeTimeout;
+
+  Future<WsChannel> connect(
+    Uri url,
+    Map<String, String> headers,
+    Future<void>? abort,
+  ) async {
+    final String httpScheme = switch (url.scheme) {
+      'ws' => 'http',
+      'wss' => 'https',
+      _ => throw const WsConnectException(
+        WsConnectFailure.badScheme,
+        'only ws and wss URLs are accepted',
+      ),
+    };
+    if (url.userInfo.isNotEmpty) {
+      // dart:io would turn it into an `Authorization: Basic` header (threat model T4).
+      throw const WsConnectException(
+        WsConnectFailure.other,
+        'a URL with user info is refused',
+      );
+    }
+    final HttpClient? shared = _httpClient;
+    final _UpgradeAttempt attempt = _UpgradeAttempt(
+      shared ?? (HttpClient()..connectionTimeout = _upgradeTimeout),
+      ownsClient: shared == null,
     );
-  }
-  final HttpClient client = httpClient ?? HttpClient();
-  try {
-    final Socket socket = await _upgrade(
-      client,
-      url.replace(scheme: httpScheme),
-      headers,
+    final Timer timer = Timer(
+      _upgradeTimeout,
+      () => attempt.stop('the WebSocket upgrade timed out'),
     );
-    final _MeteredSocket metered = _MeteredSocket(socket, maxMessageBytes);
-    final WebSocket webSocket = WebSocket.fromUpgradedSocket(
-      metered,
-      serverSide: false,
-      compression: CompressionOptions.compressionOff,
-    );
-    return IoWsChannel._(webSocket, maxMessageBytes, metered);
-  } on WsConnectException {
-    rethrow;
-  } on SocketException catch (e) {
-    throw _socketFailure(e);
-  } on TlsException catch (e) {
-    throw WsConnectException(
-      WsConnectFailure.tls,
-      'the TLS handshake failed',
-      cause: e,
-    );
-  } on IOException catch (e) {
-    throw WsConnectException(
-      WsConnectFailure.other,
-      'the WebSocket upgrade failed',
-      cause: e,
-    );
-  } finally {
-    if (httpClient == null) {
-      client.close();
+    if (abort != null) {
+      void stop() => attempt.stop('the connect attempt was aborted');
+      unawaited(abort.then((_) => stop(), onError: (Object _) => stop()));
+    }
+    try {
+      // A shared client may keep connecting until its own connectionTimeout: the attempt fails at
+      // once when stopped, and a request that opens later is dropped by `upgrade`.
+      final Socket socket = await Future.any(<Future<Socket>>[
+        attempt.upgrade(url.replace(scheme: httpScheme), headers),
+        attempt.whenStopped,
+      ]);
+      final _MeteredSocket metered = _MeteredSocket(socket, _maxMessageBytes);
+      final WebSocket webSocket = WebSocket.fromUpgradedSocket(
+        metered,
+        serverSide: false,
+        compression: CompressionOptions.compressionOff,
+      );
+      return IoWsChannel._(webSocket, _maxMessageBytes, metered);
+    } on Object catch (e) {
+      final WsConnectException? failure = attempt.stopped ?? _connectFailure(e);
+      if (failure == null) {
+        rethrow;
+      }
+      throw failure;
+    } finally {
+      timer.cancel();
+      attempt.finish();
     }
   }
 }
 
-/// Sends the upgrade request and checks the answer; returns the detached socket.
-Future<Socket> _upgrade(
-  HttpClient client,
-  Uri httpUrl,
-  Map<String, String> headers,
-) async {
-  final Random random = Random.secure();
-  final String key = base64Encode(
-    List<int>.generate(16, (_) => random.nextInt(256)),
-  );
-  final HttpClientRequest request = await client.openUrl('GET', httpUrl);
-  request.followRedirects = false;
-  headers.forEach(request.headers.set);
-  request.headers
-    ..set(HttpHeaders.connectionHeader, 'Upgrade')
-    ..set(HttpHeaders.upgradeHeader, 'websocket')
-    ..set('Sec-WebSocket-Key', key)
-    ..set('Sec-WebSocket-Version', '13')
-    ..removeAll('Sec-WebSocket-Extensions');
-  final HttpClientResponse response = await request.close();
-  final int status = response.statusCode;
-  if (status != HttpStatus.switchingProtocols) {
-    (await response.detachSocket()).destroy();
-    throw WsConnectException(
-      WsConnectFailure.upgradeRejected,
-      'the server refused the WebSocket upgrade',
-      httpStatus: status,
+/// The connect failure of an error raised by the upgrade, without URL or header in the message;
+/// null for an error that is not a connect failure (rethrown as it is).
+WsConnectException? _connectFailure(Object e) => switch (e) {
+  WsConnectException() => e,
+  SocketException() => _socketFailure(e),
+  TlsException() => WsConnectException(
+    WsConnectFailure.tls,
+    'the TLS handshake failed',
+    cause: e,
+  ),
+  IOException() => WsConnectException(
+    WsConnectFailure.other,
+    'the WebSocket upgrade failed',
+    cause: e,
+  ),
+  _ => null,
+};
+
+/// One upgrade in flight: its client and pending request, and whether it was stopped (review M2).
+final class _UpgradeAttempt {
+  _UpgradeAttempt(this._client, {required bool ownsClient})
+    : _ownsClient = ownsClient;
+
+  final HttpClient _client;
+  final bool _ownsClient;
+  HttpClientRequest? _request;
+  bool _finished = false;
+  final Completer<Socket> _stopSignal = Completer<Socket>();
+
+  /// Fails with [stopped] when the attempt is stopped; never completes otherwise.
+  Future<Socket> get whenStopped => _stopSignal.future;
+
+  /// The failure of a stopped attempt (timed out or aborted), or null while it runs.
+  WsConnectException? stopped;
+
+  /// Stops the attempt with [why] unless it already ended: aborts the pending request and closes
+  /// a client of its own with force, which also cancels a TCP or TLS connect in progress.
+  void stop(String why) {
+    if (_finished || stopped != null) {
+      return;
+    }
+    final WsConnectException failure = WsConnectException(
+      WsConnectFailure.other,
+      why,
     );
+    stopped = failure;
+    _stopSignal.completeError(failure);
+    _request?.abort(failure);
+    if (_ownsClient) {
+      _client.close(force: true);
+    }
   }
-  final String? problem = _upgradeProblem(response.headers, key);
-  if (problem != null) {
-    (await response.detachSocket()).destroy();
-    throw WsConnectException(
-      WsConnectFailure.upgradeRejected,
-      problem,
-      httpStatus: status,
+
+  /// Ends the attempt: a client of its own is closed (gently when it succeeded).
+  void finish() {
+    if (_finished) {
+      return;
+    }
+    _finished = true;
+    if (_ownsClient && stopped == null) {
+      _client.close();
+    }
+  }
+
+  /// Sends the upgrade request to [httpUrl] and checks the answer; returns the detached socket.
+  Future<Socket> upgrade(Uri httpUrl, Map<String, String> headers) async {
+    final Random random = Random.secure();
+    final String key = base64Encode(
+      List<int>.generate(16, (_) => random.nextInt(256)),
     );
+    final HttpClientRequest request = await _client.openUrl('GET', httpUrl);
+    final WsConnectException? stoppedEarly = stopped;
+    if (stoppedEarly != null) {
+      // A shared client is not closed: the request it opened meanwhile is dropped here.
+      request.abort(stoppedEarly);
+      throw stoppedEarly;
+    }
+    _request = request;
+    request.followRedirects = false;
+    headers.forEach(request.headers.set);
+    request.headers
+      ..set(HttpHeaders.connectionHeader, 'Upgrade')
+      ..set(HttpHeaders.upgradeHeader, 'websocket')
+      ..set('Sec-WebSocket-Key', key)
+      ..set('Sec-WebSocket-Version', '13')
+      ..removeAll('Sec-WebSocket-Extensions');
+    final HttpClientResponse response = await request.close();
+    final int status = response.statusCode;
+    final String? problem = status != HttpStatus.switchingProtocols
+        ? 'the server refused the WebSocket upgrade'
+        : _upgradeProblem(response.headers, key);
+    if (problem != null || stopped != null) {
+      (await response.detachSocket()).destroy();
+      throw stopped ??
+          WsConnectException(
+            WsConnectFailure.upgradeRejected,
+            problem!,
+            httpStatus: status,
+          );
+    }
+    final Socket socket = await response.detachSocket();
+    if (stopped != null) {
+      socket.destroy();
+      throw stopped!;
+    }
+    _finished = true;
+    if (_ownsClient) {
+      _client.close();
+    }
+    return socket;
   }
-  return response.detachSocket();
 }
 
 /// What is wrong with the headers of a 101 answer to [key], or null.

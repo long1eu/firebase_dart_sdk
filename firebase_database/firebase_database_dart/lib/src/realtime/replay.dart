@@ -1,7 +1,11 @@
 /// What the persistent connection keeps across disconnects (owner P): the listen table, the
-/// unacknowledged writes, the onDisconnect requests queued offline and the outstanding gets, in
-/// the order of the replay of `rtdb_protocol.md` 8.4 (PersistentConnection.ts:95-104,
-/// 1035-1069).
+/// unacknowledged writes, the onDisconnect requests (queued offline, or sent and not answered)
+/// and the outstanding gets, in the order of the replay of `rtdb_protocol.md` 8.4
+/// (PersistentConnection.ts:95-104, 1035-1069).
+///
+/// Timeouts (review H1, the lead's replaced rule): no write, listen or onDisconnect request ever
+/// counts a timeout; only a get counts the connections that ended in link silence while it waited
+/// ([OutstandingGet.silentConnections]).
 library;
 
 import 'dart:async';
@@ -10,17 +14,8 @@ import 'package:firebase_database_dart/src/core/connection/listen_hash_provider.
 import 'package:firebase_database_dart/src/core/connection/listen_spec.dart';
 import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
 
-/// A request that is replayed after a reconnect and counts its timeouts across connections.
-sealed class TimedRequest {
-  /// How many timeouts the request has been counted for on live connections.
-  int timeouts = 0;
-
-  /// Whether it was written to the current connection and its answer has not arrived.
-  bool awaitingAnswer = false;
-}
-
 /// One registered listen.
-final class ListenRecord extends TimedRequest {
+final class ListenRecord {
   /// Creates the record of [spec] with [tag], hashed by [hashProvider], completed by
   /// [onComplete].
   ListenRecord(this.spec, this.tag, this.hashProvider, this.onComplete);
@@ -60,8 +55,9 @@ final class ListenRecord extends TimedRequest {
   }
 }
 
-/// One put or merge not yet acknowledged.
-final class OutstandingWrite extends TimedRequest {
+/// One put or merge not yet acknowledged. Never failed by a timeout: it stays in the replay
+/// until an answer, a purge or a shutdown (at-least-once, 8.4).
+final class OutstandingWrite {
   /// Creates the write of [action] (`p` or `m`) with [body]; [isTransaction] for a put with a
   /// hash.
   OutstandingWrite(
@@ -84,12 +80,12 @@ final class OutstandingWrite extends TimedRequest {
   /// of a replay (8.5).
   final bool isTransaction;
 
-  /// Whether it was written to the current connection.
+  /// Whether it was written to the current connection (set only when the send succeeded).
   bool sent = false;
 }
 
 /// One `g` not yet answered.
-final class OutstandingGet extends TimedRequest {
+final class OutstandingGet {
   /// Creates the get with [body] `{p, q}`.
   OutstandingGet(this.body);
 
@@ -99,13 +95,18 @@ final class OutstandingGet extends TimedRequest {
   /// Completes with the data, or fails with a `ServerActionsException`.
   final Completer<Object?> completer = Completer<Object?>();
 
-  /// Whether it was written to the current connection.
+  /// Whether it was written to the current connection (set only when the send succeeded).
   bool sent = false;
+
+  /// How many connections ended in link silence while this get waited for its answer on them
+  /// (the lead's rule: two give `network_error`). It belongs to this get alone; an answered get
+  /// leaves the queue.
+  int silentConnections = 0;
 }
 
-/// One onDisconnect request made while offline.
+/// One onDisconnect request (`o`, `om`, `oc`).
 final class QueuedOnDisconnect {
-  /// Creates the request of [action] (`o`, `om`, `oc`) with [body].
+  /// Creates the request of [action] with [body].
   QueuedOnDisconnect(this.action, this.body, this.onComplete);
 
   /// `o`, `om` or `oc`.
@@ -114,7 +115,7 @@ final class QueuedOnDisconnect {
   /// `{p, d}`.
   final Map<String, Object?> body;
 
-  /// Gets the status of the response.
+  /// Gets the status of the response, or `disconnect` when its connection dropped first.
   final RequestResultCallback? onComplete;
 }
 
@@ -128,8 +129,12 @@ final class ReplayQueues {
   /// Unacknowledged puts and merges, in the order they were made.
   final List<OutstandingWrite> writes = <OutstandingWrite>[];
 
-  /// onDisconnect requests made while offline, first in first out.
+  /// onDisconnect requests made while offline, first in first out; sent at the next connection.
   final List<QueuedOnDisconnect> onDisconnects = <QueuedOnDisconnect>[];
+
+  /// onDisconnect requests sent on the current connection and not answered yet. Never replayed:
+  /// a drop completes each with `disconnect` (review H3).
+  final List<QueuedOnDisconnect> sentOnDisconnects = <QueuedOnDisconnect>[];
 
   /// Gets not yet answered.
   final List<OutstandingGet> gets = <OutstandingGet>[];
@@ -182,34 +187,20 @@ final class ReplayQueues {
     return taken;
   }
 
-  /// The replayable requests waiting for their answer on the current connection.
-  Iterable<TimedRequest> get awaitingAnswer => <TimedRequest>[
-    ..._listens.values,
-    ...writes,
-    ...gets,
-  ].where((TimedRequest request) => request.awaitingAnswer);
+  /// Removes and returns the onDisconnect requests sent on the connection that just ended.
+  List<QueuedOnDisconnect> takeSentOnDisconnects() {
+    final List<QueuedOnDisconnect> taken = sentOnDisconnects.toList();
+    sentOnDisconnects.clear();
+    return taken;
+  }
 
-  /// Whether [request] is still registered (not answered, purged, unlistened or failed).
-  bool isQueued(TimedRequest request) => switch (request) {
-    ListenRecord() => hasListen(request),
-    OutstandingWrite() => writes.contains(request),
-    OutstandingGet() => gets.contains(request),
-  };
-
-  /// Marks every request as not sent: the connection that carried them is gone.
+  /// Marks every write and get as not sent: the connection that carried them is gone.
   void markAllUnsent() {
-    for (final ListenRecord listen in _listens.values) {
-      listen.awaitingAnswer = false;
-    }
     for (final OutstandingWrite write in writes) {
-      write
-        ..sent = false
-        ..awaitingAnswer = false;
+      write.sent = false;
     }
     for (final OutstandingGet get in gets) {
-      get
-        ..sent = false
-        ..awaitingAnswer = false;
+      get.sent = false;
     }
   }
 
@@ -218,6 +209,7 @@ final class ReplayQueues {
     _listens.clear();
     writes.clear();
     onDisconnects.clear();
+    sentOnDisconnects.clear();
     gets.clear();
   }
 }

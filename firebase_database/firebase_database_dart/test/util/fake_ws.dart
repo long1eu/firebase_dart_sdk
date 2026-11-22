@@ -50,6 +50,10 @@ final class FakeWsChannel implements WsChannel {
   /// `FakeRtdbServer` sets it.
   void Function(String frame)? onClientFrame;
 
+  /// Called once when the channel closes, from either side (`FakeRtdbServer` cancels its idle
+  /// timer with it).
+  void Function()? onClosed;
+
   /// The raw frames sent by the code under test, in order (also those lost to a silent link).
   List<SentFrame> get sentFrames => List<SentFrame>.unmodifiable(_sent);
 
@@ -258,6 +262,7 @@ final class FakeWsChannel implements WsChannel {
     }
     _streamEnded = true;
     _heldInbound.clear();
+    onClosed?.call();
     _events.add(event);
     unawaited(_events.close());
   }
@@ -312,7 +317,8 @@ enum AttemptKind {
   /// Fails with [WsConnectFailure.dns].
   dnsFailure,
 
-  /// Never completes (the connect-timeout test).
+  /// Never completes (the connect-timeout test), unless the caller aborts it: it then fails with
+  /// [WsConnectFailure.other].
   hang,
 
   /// Completes with a channel that is silent from the start (the dead-link test).
@@ -335,7 +341,7 @@ final class AttemptBehavior {
     : kind = AttemptKind.dnsFailure,
       closeCode = null;
 
-  /// An attempt that never completes.
+  /// An attempt that never completes unless aborted.
   const AttemptBehavior.hang() : kind = AttemptKind.hang, closeCode = null;
 
   /// An attempt that succeeds and then never delivers a frame.
@@ -357,7 +363,13 @@ final class AttemptBehavior {
 /// One call of the connector, as recorded.
 final class ConnectAttempt {
   /// Creates the record of a call with [url] and [headers] at [at].
-  const ConnectAttempt(this.url, this.headers, this.at, this.channel);
+  const ConnectAttempt(
+    this.url,
+    this.headers,
+    this.at,
+    this.channel, {
+    this.abort,
+  });
 
   /// The URL passed (may hold `ac` on the web form).
   final Uri url;
@@ -370,6 +382,9 @@ final class ConnectAttempt {
 
   /// The channel of a successful attempt, else null.
   final FakeWsChannel? channel;
+
+  /// The abort signal the caller passed, if any.
+  final Future<void>? abort;
 
   /// Shows the host and the time only: the query and the headers may hold tokens.
   @override
@@ -440,13 +455,14 @@ final class FakeWsConnector {
   Future<WsChannel> _connect(
     Uri url, {
     Map<String, String> headers = const <String, String>{},
+    Future<void>? abort,
   }) {
     final Duration at = _elapsed();
     final Map<String, String> headersCopy = Map<String, String>.unmodifiable(
       headers,
     );
     if (url.scheme != 'ws' && url.scheme != 'wss') {
-      _attempts.add(ConnectAttempt(url, headersCopy, at, null));
+      _attempts.add(ConnectAttempt(url, headersCopy, at, null, abort: abort));
       return Future<WsChannel>.error(
         const WsConnectException(
           WsConnectFailure.badScheme,
@@ -459,7 +475,7 @@ final class FakeWsConnector {
         : _script.removeAt(0);
     switch (behavior.kind) {
       case AttemptKind.refuse:
-        _attempts.add(ConnectAttempt(url, headersCopy, at, null));
+        _attempts.add(ConnectAttempt(url, headersCopy, at, null, abort: abort));
         return Future<WsChannel>.error(
           const WsConnectException(
             WsConnectFailure.refused,
@@ -467,17 +483,32 @@ final class FakeWsConnector {
           ),
         );
       case AttemptKind.dnsFailure:
-        _attempts.add(ConnectAttempt(url, headersCopy, at, null));
+        _attempts.add(ConnectAttempt(url, headersCopy, at, null, abort: abort));
         return Future<WsChannel>.error(
           const WsConnectException(WsConnectFailure.dns, 'host lookup failed'),
         );
       case AttemptKind.hang:
-        _attempts.add(ConnectAttempt(url, headersCopy, at, null));
-        return Completer<WsChannel>().future;
+        _attempts.add(ConnectAttempt(url, headersCopy, at, null, abort: abort));
+        final Completer<WsChannel> pending = Completer<WsChannel>();
+        if (abort != null) {
+          void stop() {
+            if (!pending.isCompleted) {
+              pending.completeError(
+                const WsConnectException(
+                  WsConnectFailure.other,
+                  'the connect attempt was aborted',
+                ),
+              );
+            }
+          }
+
+          unawaited(abort.then((_) => stop(), onError: (Object _) => stop()));
+        }
+        return pending.future;
       case AttemptKind.accept ||
           AttemptKind.acceptThenSilent ||
           AttemptKind.acceptThenClose:
-        return _accept(url, headersCopy, at, behavior);
+        return _accept(url, headersCopy, at, behavior, abort);
     }
   }
 
@@ -486,10 +517,11 @@ final class FakeWsConnector {
     Map<String, String> headers,
     Duration at,
     AttemptBehavior behavior,
+    Future<void>? abort,
   ) {
     final FakeWsChannel channel = FakeWsChannel(elapsed: _elapsed);
     _accepted++;
-    _attempts.add(ConnectAttempt(url, headers, at, channel));
+    _attempts.add(ConnectAttempt(url, headers, at, channel, abort: abort));
     _last = channel;
     if (behavior.kind == AttemptKind.acceptThenClose) {
       channel.serverClose(behavior.closeCode);

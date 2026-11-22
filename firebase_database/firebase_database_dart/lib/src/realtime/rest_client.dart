@@ -9,10 +9,12 @@ import 'dart:typed_data';
 import 'package:firebase_database_dart/src/core/connection/listen_hash_provider.dart';
 import 'package:firebase_database_dart/src/core/connection/listen_spec.dart';
 import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
+import 'package:firebase_database_dart/src/core/database_error.dart';
 import 'package:firebase_database_dart/src/core/util/logger.dart';
 import 'package:firebase_database_dart/src/realtime/auth_session.dart';
 import 'package:firebase_database_dart/src/realtime/realtime_error.dart';
 import 'package:firebase_database_dart/src/realtime/realtime_target.dart';
+import 'package:firebase_database_dart/src/realtime/server_message.dart';
 import 'package:http/http.dart' as http;
 
 /// The most of an error response body that is read (threat model T23).
@@ -120,7 +122,8 @@ final class RestClient implements ServerActions {
   @override
   void initialize() {}
 
-  /// Closes the HTTP client when this client created it; later reads complete nothing.
+  /// Closes the HTTP client when this client created it. Listen callbacks in flight are
+  /// dropped; every outstanding [get], and any made later, fails with `database_closed`.
   @override
   Future<void> shutdown() async {
     if (_closed) {
@@ -195,7 +198,8 @@ final class RestClient implements ServerActions {
     _listens.remove((spec.path, spec.queryIdentifier))?.cancel();
   }
 
-  /// One read of [spec]. A read dropped by [shutdown] never completes.
+  /// One read of [spec]. A read outstanding at [shutdown], or made after it, fails with
+  /// `ServerActionsException('database_closed')` (review M7): no Future hangs across a shutdown.
   @override
   Future<Object?> get(ListenSpec spec) async {
     final _ReadResult result = _closed
@@ -207,7 +211,9 @@ final class RestClient implements ServerActions {
       case _ReadFailure(:final String status, :final String? reason):
         throw ServerActionsException(status, reason);
       case _ReadDropped():
-        return Completer<Object?>().future;
+        throw ServerActionsException(
+          DatabaseErrorCode.databaseClosed.wireStatus,
+        );
     }
   }
 
@@ -430,7 +436,7 @@ final class RestClient implements ServerActions {
     );
     try {
       final http.StreamedResponse response = await _sendOnce(request, attempt);
-      return await _answer(spec, response, attempt);
+      return await _answer(spec, request.url, response, attempt);
     } on TimeoutException {
       return _networkFailure(
         spec,
@@ -510,12 +516,22 @@ final class RestClient implements ServerActions {
     return result.future;
   }
 
-  /// The result of [response] (ReadonlyRestClient.ts:213-247).
+  /// The result of [response] to a request for [requested] (ReadonlyRestClient.ts:213-247).
   Future<_ReadResult> _answer(
     ListenSpec spec,
+    Uri requested,
     http.StreamedResponse response,
     _Attempt attempt,
   ) async {
+    // Review L5: `followRedirects = false` is honoured on the VM and by package:http's
+    // BrowserClient (fetch `redirect: 'error'`, http-1.6.0 lib/src/browser_client.dart:96), but an
+    // app's own client may follow one anyway; an answer from another origin is refused.
+    if (response case http.BaseResponseWithUrl(
+      :final Uri url,
+    ) when !_sameOrigin(url, requested)) {
+      _discard(response);
+      return _networkFailure(spec, 'the answer came from another host');
+    }
     final int status = response.statusCode;
     if (status >= 200 && status < 300) {
       final int? length = response.contentLength;
@@ -529,7 +545,7 @@ final class RestClient implements ServerActions {
         cap: _maxResponseBytes,
         cut: false,
       );
-      return _ReadData(_decode(spec.path, body));
+      return _decode(spec.path, body);
     }
     if (status == 404) {
       _discard(response);
@@ -546,9 +562,10 @@ final class RestClient implements ServerActions {
     return _ReadFailure(restListenStatus(status), reason);
   }
 
-  /// The decoded [body], or null with a warning when it is not JSON, nested deeper than the
-  /// limit or holding a number that is not finite.
-  Object? _decode(String path, Uint8List body) {
+  /// The decoded [body]: null with a warning when it is not JSON, nested deeper than the limit or
+  /// holding a number that is not finite; a `failure` when its keys break the database's rules
+  /// ([isValidServerData], review M6), as the WebSocket `g` answer.
+  _ReadResult _decode(String path, Uint8List body) {
     final Object? data;
     try {
       data = jsonDecode(utf8.decode(body));
@@ -557,7 +574,7 @@ final class RestClient implements ServerActions {
         DatabaseLogLevel.warning,
         'REST read of $path: the answer is not JSON; read as null',
       );
-      return null;
+      return const _ReadData(null);
     }
     final String? problem = _jsonProblem(data, _maxJsonDepth);
     if (problem != null) {
@@ -565,9 +582,20 @@ final class RestClient implements ServerActions {
         DatabaseLogLevel.warning,
         'REST read of $path: the answer has $problem; read as null',
       );
-      return null;
+      return const _ReadData(null);
     }
-    return data;
+    // After the depth walk: isValidServerData leaves depth to the caller.
+    if (!isValidServerData(data)) {
+      _log(
+        DatabaseLogLevel.warning,
+        'REST read of $path: the answer holds data the database does not allow',
+      );
+      return _ReadFailure(
+        DatabaseErrorCode.operationFailed.wireStatus,
+        'The answer holds a key or value the database does not allow.',
+      );
+    }
+    return _ReadData(data);
   }
 
   /// The server's reason in an error body: its `error` field when it is a JSON object with one,
@@ -668,6 +696,12 @@ final class RestClient implements ServerActions {
     _logger?.call(level, message);
   }
 }
+
+/// Whether [a] and [b] have the same scheme, host and port.
+bool _sameOrigin(Uri a, Uri b) =>
+    a.scheme.toLowerCase() == b.scheme.toLowerCase() &&
+    a.host.toLowerCase() == b.host.toLowerCase() &&
+    a.port == b.port;
 
 /// [message] with the URL, its query and the tokens of a request removed (T7, T8).
 String _hideSecrets(String message, Uri url, _Credentials credentials) {

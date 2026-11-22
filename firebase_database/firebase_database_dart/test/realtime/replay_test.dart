@@ -2,6 +2,7 @@
 // (request_table.dart): pure Dart, no connection.
 import 'dart:async';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:firebase_database_dart/src/core/connection/listen_hash_provider.dart';
 import 'package:firebase_database_dart/src/realtime/replay.dart';
 import 'package:firebase_database_dart/src/realtime/request_table.dart';
@@ -25,77 +26,99 @@ final class _CompoundHash implements ListenHashProvider {
 
 void main() {
   group('RequestTable', () {
+    RequestTable table({void Function()? onSilence}) => RequestTable(
+      timeout: const Duration(milliseconds: 100),
+      onSilence: onSilence ?? () {},
+    );
+
     test(
       'numbers start at 1 and grow, also for requests without a callback',
       () {
-        final RequestTable table = RequestTable(
-          timeout: const Duration(minutes: 1),
-        );
-        expect(table.add(null), 1);
-        expect(table.add((_) {}), 2);
-        expect(table.add(null), 3);
-        expect(table.pending, 1);
-        table.clear();
+        final RequestTable requests = table();
+        expect(requests.add(null), 1);
+        expect(requests.add((_) {}), 2);
+        expect(requests.add(null), 3);
+        expect(requests.pending, 1);
+        requests.clear();
       },
     );
 
     test('complete runs the callback once; an unknown number is ignored', () {
-      final RequestTable table = RequestTable(
-        timeout: const Duration(minutes: 1),
-      );
+      final RequestTable requests = table();
       final List<Object?> bodies = <Object?>[];
-      final int r = table.add(bodies.add);
+      final int r = requests.add(bodies.add);
       expect(
-        table.complete(r + 1, const <String, Object?>{'s': 'ok'}),
+        requests.complete(r + 1, const <String, Object?>{'s': 'ok'}),
         isFalse,
       );
-      expect(table.complete(r, const <String, Object?>{'s': 'ok'}), isTrue);
-      expect(table.complete(r, const <String, Object?>{'s': 'ok'}), isFalse);
+      expect(requests.complete(r, const <String, Object?>{'s': 'ok'}), isTrue);
+      expect(requests.complete(r, const <String, Object?>{'s': 'ok'}), isFalse);
       expect(bodies, <Object?>[
         <String, Object?>{'s': 'ok'},
       ]);
-      expect(table.pending, 0);
+      expect(requests.pending, 0);
+    });
+
+    test('silence with a request waiting reports once per silent period', () {
+      fakeAsync((FakeAsync async) {
+        int silences = 0;
+        final RequestTable requests = table(onSilence: () => silences++);
+        requests.add((_) {});
+        async.elapse(const Duration(milliseconds: 99));
+        expect(silences, 0);
+        async.elapse(const Duration(milliseconds: 2));
+        expect(silences, 1);
+        async.elapse(const Duration(seconds: 1));
+        expect(silences, 1);
+      });
     });
 
     test(
-      'a request without an answer times out once and leaves the table',
-      () async {
-        final RequestTable table = RequestTable(
-          timeout: const Duration(milliseconds: 10),
-        );
-        int timeouts = 0;
-        final List<Object?> bodies = <Object?>[];
-        final int r = table.add(bodies.add, onTimeout: () => timeouts++);
-        await Future<void>.delayed(const Duration(milliseconds: 40));
-        expect(timeouts, 1);
-        expect(table.complete(r, const <String, Object?>{'s': 'ok'}), isFalse);
-        expect(bodies, isEmpty);
+      'every inbound frame re-arms the timer: a long download never times out',
+      () {
+        fakeAsync((FakeAsync async) {
+          int silences = 0;
+          final RequestTable requests = table(onSilence: () => silences++);
+          requests.add((_) {});
+          for (int i = 0; i < 50; i++) {
+            async.elapse(const Duration(milliseconds: 60));
+            requests.linkActivity();
+          }
+          expect(silences, 0);
+          async.elapse(const Duration(milliseconds: 101));
+          expect(silences, 1);
+        });
       },
     );
 
-    test('an answered request never times out', () async {
-      final RequestTable table = RequestTable(
-        timeout: const Duration(milliseconds: 10),
-      );
-      int timeouts = 0;
-      final int r = table.add((_) {}, onTimeout: () => timeouts++);
-      table.complete(r, const <String, Object?>{'s': 'ok'});
-      await Future<void>.delayed(const Duration(milliseconds: 40));
-      expect(timeouts, 0);
+    test('nothing is timed while nothing waits; answers stop the timer', () {
+      fakeAsync((FakeAsync async) {
+        int silences = 0;
+        final RequestTable requests = table(onSilence: () => silences++);
+        requests
+          ..add(null)
+          ..linkActivity();
+        async.elapse(const Duration(seconds: 1));
+        expect(silences, 0);
+        final int r = requests.add((_) {});
+        requests.complete(r, const <String, Object?>{'s': 'ok'});
+        async.elapse(const Duration(seconds: 1));
+        expect(silences, 0);
+      });
     });
 
-    test('clear drops every entry and cancels every timer', () async {
-      final RequestTable table = RequestTable(
-        timeout: const Duration(milliseconds: 10),
-      );
-      int calls = 0;
-      table
-        ..add((_) => calls++, onTimeout: () => calls++)
-        ..add((_) => calls++, onTimeout: () => calls++)
-        ..clear();
-      await Future<void>.delayed(const Duration(milliseconds: 40));
-      expect(calls, 0);
-      expect(table.pending, 0);
+    test('clear drops every entry and stops the timer', () {
+      fakeAsync((FakeAsync async) {
+        int calls = 0;
+        final RequestTable requests = table(onSilence: () => calls++);
+        requests
+          ..add((_) => calls++)
+          ..add((_) => calls++)
+          ..clear();
+        async.elapse(const Duration(seconds: 1));
+        expect(calls, 0);
+        expect(requests.pending, 0);
+      });
     });
   });
 
@@ -211,6 +234,28 @@ void main() {
             'hs': <String>['x', ''],
           },
         });
+      },
+    );
+
+    test(
+      'sent onDisconnect requests are taken once at a drop, never replayed',
+      () {
+        final ReplayQueues queues = ReplayQueues();
+        final QueuedOnDisconnect sent = QueuedOnDisconnect(
+          'o',
+          <String, Object?>{},
+          null,
+        );
+        final QueuedOnDisconnect offline = QueuedOnDisconnect(
+          'om',
+          <String, Object?>{},
+          null,
+        );
+        queues.sentOnDisconnects.add(sent);
+        queues.onDisconnects.add(offline);
+        expect(queues.takeSentOnDisconnects(), <QueuedOnDisconnect>[sent]);
+        expect(queues.takeSentOnDisconnects(), isEmpty);
+        expect(queues.onDisconnects, <QueuedOnDisconnect>[offline]);
       },
     );
 

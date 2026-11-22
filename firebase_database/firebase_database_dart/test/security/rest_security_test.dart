@@ -3,6 +3,7 @@
 import 'dart:async';
 
 import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
+import 'package:firebase_database_dart/src/realtime/realtime_target.dart';
 import 'package:firebase_database_dart/src/realtime/rest_client.dart';
 import 'package:firebase_database_dart/src/testing/recording_server_actions_delegate.dart';
 import 'package:http/http.dart' as http;
@@ -92,21 +93,6 @@ void main() {
       expect(request.headers, isEmpty);
     });
 
-    test('web form: no ac where the target says tokens may not go', () async {
-      final ScriptedServer server = ScriptedServer.always(200, '1');
-      final RestClient client = restClientFor(
-        server,
-        delegate: delegate,
-        tokens: markers(),
-        target: plainHttpTarget(useHeaders: false),
-        useHeaders: false,
-      );
-      await client.get(defaultSpecAt('/a'));
-      final Uri url = server.received.single.url;
-      expect(url.queryParameters.containsKey('ac'), isFalse);
-      expect(url.queryParameters.containsKey('auth'), isFalse);
-    });
-
     test('the emulator target gets both tokens over http', () async {
       final ScriptedServer server = ScriptedServer.always(200, '1');
       final RestClient client = restClientFor(
@@ -137,26 +123,112 @@ void main() {
       );
     });
 
-    test('no token goes where the target says tokens may not go (plain '
-        'http to a production host)', () async {
-      final ScriptedServer server = ScriptedServer.always(200, '1');
-      final RestClient client = restClientFor(
-        server,
-        delegate: delegate,
-        tokens: markers(),
-        target: plainHttpTarget(),
-        logger: logger,
+    test('a target that is neither TLS nor the emulator is refused, so no '
+        'token can go over plain http to a production host (review M1)', () {
+      expect(() => plainHttpTarget(), throwsArgumentError);
+      expect(() => plainHttpTarget(useHeaders: false), throwsArgumentError);
+    });
+
+    // With M1 every target the client can be built with accepts its own REST URLs, so the
+    // client's `mayReceiveTokens` gate is defence in depth; these pin that the tokens only ever
+    // go to a URL the target accepts, and that the target refuses its neighbours.
+    for (final bool useHeaders in <bool>[true, false]) {
+      test('tokens go only to a URL the target accepts '
+          '(${useHeaders ? 'VM' : 'web'} form)', () async {
+        for (final RealtimeTarget target in <RealtimeTarget>[
+          emulatorTarget(useHeaders: useHeaders),
+          productionTarget(useHeaders: useHeaders),
+        ]) {
+          final ScriptedServer server = ScriptedServer.always(200, '1');
+          final RestClient client = restClientFor(
+            server,
+            delegate: delegate,
+            tokens: markers(),
+            target: target,
+            useHeaders: useHeaders,
+          );
+          await client.get(defaultSpecAt('/a'));
+          final Uri url = server.received.single.url;
+          expect(url.queryParameters['auth'], authMarker);
+          expect(target.mayReceiveTokens(url), isTrue);
+          await client.shutdown();
+        }
+      });
+    }
+
+    test('the targets refuse tokens for another port, host or scheme', () {
+      final RealtimeTarget emulator = emulatorTarget();
+      final RealtimeTarget production = productionTarget();
+      expect(
+        emulator.mayReceiveTokens(Uri.parse('http://127.0.0.1:9001/a.json')),
+        isFalse,
       );
-      expect(await client.get(defaultSpecAt('/a')), 1);
-      final http.BaseRequest request = server.received.single.request;
-      expect(request.url.scheme, 'http');
-      expect(request.url.toString(), isNot(contains(authMarker)));
-      expect(lowerCaseHeaders(request).values, isNot(contains(appCheckMarker)));
-      expect(logger.warnings.single, contains('without credentials'));
+      expect(
+        emulator.mayReceiveTokens(Uri.parse('http://10.0.0.5:9000/a.json')),
+        isFalse,
+      );
+      expect(
+        production.mayReceiveTokens(
+          Uri.parse('http://demo-db.firebaseio.com/a.json'),
+        ),
+        isFalse,
+      );
+      expect(
+        production.mayReceiveTokens(Uri.parse('https://evil.example/a.json')),
+        isFalse,
+      );
     });
   });
 
   group('redirects', () {
+    test(
+      'an answer from another origin (a client that followed a redirect) '
+      'is refused with network_error and its data is dropped (review L5)',
+      () async {
+        final RedirectedClient http = RedirectedClient(
+          Uri.parse('https://evil.example/a.json'),
+          '{"secret":1}',
+        );
+        final RestClient client = RestClient(
+          target: emulatorTarget(),
+          tokens: markers(),
+          delegate: delegate,
+          logger: logger.call,
+          httpClient: http,
+          maxResponseBytes: 1 << 20,
+          useHeaders: true,
+        );
+        await expectLater(
+          client.get(defaultSpecAt('/a')),
+          throwsA(
+            isA<ServerActionsException>().having(
+              (ServerActionsException e) => e.status,
+              'status',
+              'network_error',
+            ),
+          ),
+        );
+        expect(http.sent, hasLength(1));
+        expect(logger.lines, everyElement(isNot(contains('evil.example'))));
+      },
+    );
+
+    test('an answer that reports the requested origin is accepted', () async {
+      final RedirectedClient http = RedirectedClient(
+        Uri.parse('http://127.0.0.1:9000/a.json?ns=x'),
+        '1',
+      );
+      final RestClient client = RestClient(
+        target: emulatorTarget(),
+        tokens: FixedTokenSource(),
+        delegate: delegate,
+        httpClient: http,
+        maxResponseBytes: 1 << 20,
+        useHeaders: true,
+      );
+      expect(await client.get(defaultSpecAt('/a')), 1);
+    });
+
     test('a 302 is not followed: one request, rest_error:302', () async {
       final ScriptedServer server = ScriptedServer(
         (http.BaseRequest _) async => http.StreamedResponse(

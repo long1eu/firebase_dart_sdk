@@ -92,12 +92,21 @@ abstract interface class WsChannel {
 
 /// Opens a WebSocket to [url] with the upgrade [headers].
 ///
-/// Completes when the upgrade succeeded, fails with a [WsConnectException] otherwise. Has no
-/// timeout. Only `ws` and `wss` are accepted: another scheme fails with
-/// [WsConnectFailure.badScheme] before any socket is opened (C++ U-C20). [headers] are advisory:
-/// the browser cannot send them (`rtdb_protocol.md` 2.3).
+/// Completes when the upgrade succeeded, fails with a [WsConnectException] otherwise. The caller
+/// owns the connect timeout (`rtdb_protocol.md` 1.2); the io connector also bounds its own upgrade
+/// so that nothing it opened outlives a silent server (review M2). Only `ws` and `wss` are
+/// accepted: another scheme fails with [WsConnectFailure.badScheme] before any socket is opened
+/// (C++ U-C20). [headers] are advisory: the browser cannot send them (`rtdb_protocol.md` 2.3).
+///
+/// When [abort] completes (or fails) before the channel is open, the attempt stops: the pending
+/// request or socket is dropped and the future fails with [WsConnectFailure.other]. A channel that
+/// is already open is not affected (the caller abandons it).
 typedef WsConnector =
-    Future<WsChannel> Function(Uri url, {Map<String, String> headers});
+    Future<WsChannel> Function(
+      Uri url, {
+      Map<String, String> headers,
+      Future<void>? abort,
+    });
 
 /// Why a [WsConnector] could not open a channel.
 enum WsConnectFailure {

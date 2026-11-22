@@ -19,10 +19,12 @@ import 'package:firebase_database_dart/src/realtime/reconnect_backoff.dart';
 import 'package:firebase_database_dart/src/realtime/replay.dart';
 import 'package:firebase_database_dart/src/realtime/request_table.dart';
 import 'package:firebase_database_dart/src/realtime/server_message.dart';
+import 'package:firebase_database_dart/src/realtime/transport/ws_channel.dart';
 
 /// Creates the [RealtimeConnection] of the next attempt for [delegate] (test plan section 5).
-/// Production passes a closure over `RealtimeConnection` and the platform connector; tests return a
-/// connection over the fake connector.
+/// Production passes a closure over `RealtimeConnection` and the platform connector; tests pass
+/// the fake connector. The persistent connection sets `RealtimeConnection.onInboundFrame` on
+/// what it returns (the input of the link-silence timer, review H1).
 typedef RealtimeConnectionFactory =
     RealtimeConnection Function(
       RealtimeDelegate delegate, {
@@ -31,30 +33,70 @@ typedef RealtimeConnectionFactory =
       String? appCheckToken,
     });
 
+/// A connector whose channels call [onFrame] for every text or binary frame they receive, before
+/// the frame reaches the connection (the input of the link-silence timer, review H1).
+///
+/// Not needed any more: the persistent connection sets `RealtimeConnection.onInboundFrame`
+/// itself (addendum 7).
+// MERGE: U: test/integration/emulator_rig.dart still wraps its connector with this; drop that
+// wrapping, then delete tapInboundFrames, _TappedChannel and PersistentConnection.inboundFrame.
+WsConnector tapInboundFrames(WsConnector connector, void Function() onFrame) =>
+    (
+      Uri url, {
+      Map<String, String> headers = const <String, String>{},
+      Future<void>? abort,
+    }) async => _TappedChannel(
+      await connector(url, headers: headers, abort: abort),
+      onFrame,
+    );
+
+final class _TappedChannel implements WsChannel {
+  _TappedChannel(this._inner, this._onFrame);
+
+  final WsChannel _inner;
+  final void Function() _onFrame;
+
+  @override
+  Stream<WsEvent> get events => _inner.events.map((WsEvent event) {
+    if (event is WsText || event is WsBinary) {
+      _onFrame();
+    }
+    return event;
+  });
+
+  @override
+  void sendText(String frame) => _inner.sendText(frame);
+
+  @override
+  Future<void> close([int code = 1000, String? reason]) =>
+      _inner.close(code, reason);
+
+  @override
+  void abandon() => _inner.abandon();
+}
+
 /// The WebSocket implementation of [ServerActions] (test plan section 5, P gives the Repo half).
 ///
 /// Follows the reconnect contract of [ServerActions]: after each hello it replays auth, App Check,
 /// listens (hash recomputed through their [ListenHashProvider]), unacknowledged puts and merges,
-/// unsent onDisconnects and outstanding gets (8.4), then calls
-/// [ServerActionsDelegate.onConnect]. Sent transaction puts complete with [statusDisconnect] on a
-/// disconnect (8.5).
+/// onDisconnect requests queued offline and outstanding gets (8.4), then calls
+/// [ServerActionsDelegate.onConnect] if that connection is still the live one. On a drop, sent
+/// transaction puts complete with [statusDisconnect] (8.5) and so do sent onDisconnect requests
+/// that were not answered (review H3); neither is replayed.
 ///
-/// Paths cross the seam as `/a/b` both ways; the server pushes them without the leading slash
-/// (emulator probe, measured), and the decoded pushes already carry it (`wirePathFromServer` in
-/// `server_message.dart`, `rtdb_seam_changes.md` A.3). [get] fails with a
-/// [ServerActionsException] (A.2).
-/// Merge maps are handed over with their keys as the server sent them. A `c` push cancels every
-/// listen at its path with `permission_denied` (lead's decision). Every delegate call and every
-/// [RequestResultCallback] runs on the event loop, never synchronously inside a call of this
-/// class. Before each attempt the tokens are fetched through an [AuthSession] built over the
-/// given [RealtimeTokenSource] (8.1, A.1: it subscribes to token changes itself); its results
-/// reach [ServerActionsDelegate.onAuthStatus] and [ServerActionsDelegate.onAppCheckStatus]. The
-/// only external reconnect trigger is the `connectivityHints` stream (test plan B-8.7).
+/// Paths cross the seam as `/a/b` both ways (`wirePathFromServer`, `rtdb_seam_changes.md` A.3);
+/// merge maps keep the server's keys. A `c` push cancels every listen at its path with
+/// `permission_denied` (lead's decision). Every delegate call and every [RequestResultCallback]
+/// takes one microtask hop in socket arrival order (addendum 5). Before each attempt the tokens
+/// are fetched (bounded by `ConnectionTimings.connectTimeout`); a token change during the fetch
+/// wins over the fetched value (review H2). Tokens are handed over only where
+/// [RealtimeTarget.mayReceiveTokens] allows (review M1, threat model T3).
 ///
-/// Request timeouts (lead's decision): a request times out only while sent on a live connection
-/// (`RequestTable`); the first timeout closes the connection and the request is replayed; after
-/// `ConnectionTimings.maxRequestTimeouts` (2) it completes with `network_error` and is dropped
-/// from the replay (a `get` fails with a [ServerActionsException] of that status).
+/// Timeouts (review H1, the lead's replaced rule): the request table measures link silence. When
+/// the link has been silent for `ConnectionTimings.requestTimeout` with requests waiting, the
+/// connection is closed and the replay follows. Writes, listens and onDisconnect requests are
+/// never failed by a timeout; a get fails with [statusNetworkError] once
+/// `ConnectionTimings.maxRequestTimeouts` (2) connections ended in such a silence while it waited.
 final class PersistentConnection implements ServerActions {
   /// Creates the connection; nothing happens before [initialize].
   ///
@@ -73,7 +115,8 @@ final class PersistentConnection implements ServerActions {
     required DateTime Function() now,
     required double Function() random,
     Stream<void>? connectivityHints,
-  }) : _connectionFactory = connectionFactory,
+  }) : _target = target,
+       _connectionFactory = connectionFactory,
        _backoff = backoff,
        _tokens = tokens,
        _delegate = delegate,
@@ -81,8 +124,11 @@ final class PersistentConnection implements ServerActions {
        _appId = appId,
        _logger = logger,
        _now = now,
-       _connectivityHints = connectivityHints,
-       _requests = RequestTable(timeout: timings.requestTimeout) {
+       _connectivityHints = connectivityHints {
+    _requests = RequestTable(
+      timeout: timings.requestTimeout,
+      onSilence: _onLinkSilent,
+    );
     _session = AuthSession(
       _sendSessionRequest,
       tokens,
@@ -98,6 +144,7 @@ final class PersistentConnection implements ServerActions {
     );
   }
 
+  final RealtimeTarget _target;
   final RealtimeConnectionFactory _connectionFactory;
   final ReconnectBackoff _backoff;
   final RealtimeTokenSource _tokens;
@@ -107,7 +154,7 @@ final class PersistentConnection implements ServerActions {
   final DatabaseLogger? _logger;
   final DateTime Function() _now;
   final Stream<void>? _connectivityHints;
-  final RequestTable _requests;
+  late final RequestTable _requests;
   late final AuthSession _session;
 
   final ReplayQueues _queues = ReplayQueues();
@@ -118,21 +165,30 @@ final class PersistentConnection implements ServerActions {
   bool _initialized = false;
   bool _shutdown = false;
 
-  /// Bumped for every attempt and on interrupt/shutdown: a token fetch of an older attempt is
-  /// dropped when it completes (8.1 step 3, PersistentConnection.ts:844-875).
+  /// Bumped for every attempt and on interrupt/shutdown/hint: a token fetch of an older attempt
+  /// is dropped when it completes (8.1 step 3, PersistentConnection.ts:844-875).
   int _attempt = 0;
   Timer? _reconnectTimer;
   bool _fetchingTokens = false;
   DateTime? _attemptStartedAt;
 
+  /// Bumped on every token change event, per kind (review H2).
+  int _authVersion = 0;
+  int _appCheckVersion = 0;
+  String? _latestAppCheck;
+
   RealtimeConnection? _connection;
   _Link? _link;
   bool _connected = false;
   bool _reportedConnected = false;
+  bool _tokensAllowed = true;
   String? _lastSessionId;
   int _messagesOnConnection = 0;
   bool _okOnConnection = false;
   bool _established = false;
+  final Set<int> _pendingCredentials = <int>{};
+  bool _warnedSilentCredentials = false;
+  bool _warnedInsecure = false;
 
   // ---------------------------------------------------------------------------------------------
   // Lifecycle
@@ -157,6 +213,9 @@ final class PersistentConnection implements ServerActions {
     _scheduleConnect(Duration.zero);
   }
 
+  /// Closes the connection first, then releases the subscriptions without waiting for them one
+  /// after the other (review L4). Every outstanding get fails with `database_closed` (review M7);
+  /// every other pending callback is dropped.
   @override
   Future<void> shutdown() async {
     if (_shutdown) {
@@ -166,15 +225,31 @@ final class PersistentConnection implements ServerActions {
     _attempt++;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
-    for (final StreamSubscription<Object?> subscription in _subscriptions) {
-      await subscription.cancel();
-    }
-    _subscriptions.clear();
     final RealtimeConnection? connection = _connection;
     _detach();
     connection?.close();
     _requests.clear();
+    for (final OutstandingGet get in _queues.gets) {
+      get.completer.completeError(
+        ServerActionsException(DatabaseErrorCode.databaseClosed.wireStatus),
+      );
+    }
     _queues.clear();
+    final List<Future<void>> cancels = <Future<void>>[
+      for (final StreamSubscription<Object?> subscription in _subscriptions)
+        subscription.cancel(),
+    ];
+    _subscriptions.clear();
+    unawaited(Future.wait(cancels));
+  }
+
+  /// A frame arrived on the live connection. The connection reports its frames itself through
+  /// `RealtimeConnection.onInboundFrame` (addendum 7); this entry stays only for the emulator
+  /// rig's [tapInboundFrames] (see the MERGE note there).
+  void inboundFrame() {
+    if (_connection != null) {
+      _requests.linkActivity();
+    }
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -231,17 +306,12 @@ final class PersistentConnection implements ServerActions {
     _send(RealtimeProtocol.unlisten, body);
   }
 
-  void _sendListen(ListenRecord record) {
-    record.awaitingAnswer = true;
-    final Map<String, Object?> body = record.wireBody();
-    _send(
-      RealtimeProtocol.listen,
-      body,
-      onResponse: (Map<String, Object?> response) =>
-          _onListenResponse(record, response),
-      onTimeout: () => _onTimeout(record),
-    );
-  }
+  bool _sendListen(ListenRecord record) => _send(
+    RealtimeProtocol.listen,
+    record.wireBody(),
+    onResponse: (Map<String, Object?> response) =>
+        _onListenResponse(record, response),
+  );
 
   void _onListenResponse(ListenRecord record, Map<String, Object?> response) {
     // A response for a listen removed (or replaced) meanwhile is ignored
@@ -249,7 +319,6 @@ final class PersistentConnection implements ServerActions {
     if (!_queues.hasListen(record)) {
       return;
     }
-    record.awaitingAnswer = false;
     final String status = _statusOf(response);
     final Object? data = response['d'];
     if (status == statusOk) {
@@ -267,8 +336,9 @@ final class PersistentConnection implements ServerActions {
       if (warnings is List<Object?> && warnings.contains(noIndexWarning)) {
         _log(
           DatabaseLogLevel.warning,
-          'Using an unspecified index. Consider adding ".indexOn": "${spec.indexName}" at '
-          '${spec.path} to your security rules for better performance.',
+          'Using an unspecified index. Consider adding ".indexOn": '
+          '"${spec.indexName}" at ${spec.path} to your security rules for better '
+          'performance.',
         );
       }
     }
@@ -281,10 +351,7 @@ final class PersistentConnection implements ServerActions {
   Future<Object?> get(ListenSpec spec) {
     if (_shutdown) {
       return Future<Object?>.error(
-        ServerActionsException(
-          DatabaseErrorCode.disconnected.wireStatus,
-          'The connection is shut down.',
-        ),
+        ServerActionsException(DatabaseErrorCode.databaseClosed.wireStatus),
       );
     }
     final OutstandingGet get = OutstandingGet(<String, Object?>{
@@ -298,31 +365,46 @@ final class PersistentConnection implements ServerActions {
     return get.completer.future;
   }
 
-  void _sendGet(OutstandingGet get) {
-    get.sent = true;
-    get.awaitingAnswer = true;
-    _send(
+  bool _sendGet(OutstandingGet get) {
+    final bool sent = _send(
       RealtimeProtocol.get,
       get.body,
-      onResponse: (Map<String, Object?> response) {
-        if (!_queues.gets.remove(get)) {
-          return;
-        }
-        final String status = _statusOf(response);
-        final Object? data = response['d'];
-        // Completed here, not through _emit: the completer is asynchronous, so its listeners run in
-        // a microtask scheduled now, in arrival order with the delegate calls (addendum 5). Through
-        // _emit they would take a second hop and fall behind a push that arrived after.
-        if (status == statusOk) {
-          get.completer.complete(data);
-        } else {
-          get.completer.completeError(
-            ServerActionsException(status, data is String ? data : null),
-          );
-        }
-      },
-      onTimeout: () => _onTimeout(get),
+      onResponse: (Map<String, Object?> response) =>
+          _onGetResponse(get, response),
     );
+    get.sent = sent;
+    return sent;
+  }
+
+  void _onGetResponse(OutstandingGet get, Map<String, Object?> response) {
+    if (!_queues.gets.remove(get)) {
+      return;
+    }
+    final String status = _statusOf(response);
+    final Object? data = response['d'];
+    // Completed here, not through _emit: the completer is asynchronous, so its listeners run in a
+    // microtask scheduled now, in arrival order with the delegate calls (addendum 5).
+    if (status != statusOk) {
+      get.completer.completeError(
+        ServerActionsException(status, data is String ? data : null),
+      );
+      return;
+    }
+    // The decoder cannot tell a `g` answer from other answers, so it does not check keys; the
+    // data of a get reaches the core only if it is valid server data (review M6, threat model
+    // rule 4). Anything else is a protocol error.
+    if (!isValidServerData(data)) {
+      get.completer.completeError(
+        ServerActionsException(DatabaseErrorCode.operationFailed.wireStatus),
+      );
+      _log(
+        DatabaseLogLevel.warning,
+        'Invalid data in a get answer; reconnecting',
+      );
+      _closeConnection(DisconnectReason.other);
+      return;
+    }
+    get.completer.complete(data);
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -370,10 +452,8 @@ final class PersistentConnection implements ServerActions {
     }
   }
 
-  void _sendWrite(OutstandingWrite write) {
-    write.sent = true;
-    write.awaitingAnswer = true;
-    _send(
+  bool _sendWrite(OutstandingWrite write) {
+    final bool sent = _send(
       write.action,
       write.body,
       onResponse: (Map<String, Object?> response) {
@@ -387,8 +467,11 @@ final class PersistentConnection implements ServerActions {
           _emit(() => onComplete(status, reason));
         }
       },
-      onTimeout: () => _onTimeout(write),
     );
+    // Set only when it really left (review M5): a transaction marked sent is completed with
+    // `disconnect` at the next drop.
+    write.sent = sent;
+    return sent;
   }
 
   @override
@@ -449,21 +532,22 @@ final class PersistentConnection implements ServerActions {
       <String, Object?>{'p': path, 'd': data},
       onComplete,
     );
-    if (_connected) {
-      _sendOnDisconnect(request);
-    } else {
+    if (!_connected || !_sendOnDisconnect(request)) {
       // Queued while offline, sent at the next connection (PersistentConnection.ts:478-486).
       _queues.onDisconnects.add(request);
     }
   }
 
-  void _sendOnDisconnect(QueuedOnDisconnect request) {
-    // Once sent it is the server's: not replayed after a drop, its callback dropped with the
-    // connection (PersistentConnection.ts:527-545, 783).
-    _send(
+  /// Sends [request] and keeps it until its answer; a drop before the answer completes it with
+  /// `disconnect` and does not replay it (review H3: the server may or may not hold it).
+  bool _sendOnDisconnect(QueuedOnDisconnect request) {
+    final bool sent = _send(
       request.action,
       request.body,
       onResponse: (Map<String, Object?> response) {
+        if (!_queues.sentOnDisconnects.remove(request)) {
+          return;
+        }
         final RequestResultCallback? onComplete = request.onComplete;
         if (onComplete != null) {
           final String status = _statusOf(response);
@@ -471,8 +555,11 @@ final class PersistentConnection implements ServerActions {
           _emit(() => onComplete(status, reason));
         }
       },
-      onTimeout: () => _onTimeout(null),
     );
+    if (sent) {
+      _queues.sentOnDisconnects.add(request);
+    }
+    return sent;
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -514,12 +601,19 @@ final class PersistentConnection implements ServerActions {
     if (_shutdown) {
       return;
     }
-    // A network change: the delay goes back to its minimum and a waiting attempt starts now
-    // (lead's decision; JS onOnline_, PersistentConnection.ts:759-765).
+    // A network change: the delay goes back to its minimum (lead's decision; JS onOnline_,
+    // PersistentConnection.ts:759-765). A waiting attempt and a token fetch in flight start over
+    // now (review M3); a live connection is probed at once (C's probeNow).
     _backoff.reset();
-    if (_reconnectTimer != null) {
-      _reconnectTimer?.cancel();
-      _reconnectTimer = null;
+    final RealtimeConnection? connection = _connection;
+    if (connection != null) {
+      if (_connected) {
+        connection.probeNow();
+      }
+      return;
+    }
+    if (_reconnectTimer != null || _fetchingTokens) {
+      _cancelPendingAttempt();
       _scheduleConnect(Duration.zero);
     }
   }
@@ -539,12 +633,15 @@ final class PersistentConnection implements ServerActions {
 
   void _onAuthTokenChanged(String? token) {
     if (!_shutdown) {
+      _authVersion++;
       _session.authChanged(token);
     }
   }
 
   void _onAppCheckTokenChanged(String? token) {
     if (!_shutdown) {
+      _appCheckVersion++;
+      _latestAppCheck = token;
       _session.appCheckChanged(token);
     }
   }
@@ -564,12 +661,23 @@ final class PersistentConnection implements ServerActions {
     if (!_connected) {
       return;
     }
+    if (onResponse == null) {
+      _send(action, body);
+      return;
+    }
+    late final int r;
     _send(
       action,
       body,
-      onResponse: onResponse,
-      // Credentials are sent again on every connection: a timeout only closes this one.
-      onTimeout: () => _onTimeout(null),
+      onResponse: (Map<String, Object?> response) {
+        _pendingCredentials.remove(r);
+        _warnedSilentCredentials = false;
+        onResponse(response);
+      },
+      onNumber: (int number) {
+        r = number;
+        _pendingCredentials.add(number);
+      },
     );
   }
 
@@ -597,19 +705,19 @@ final class PersistentConnection implements ServerActions {
       return;
     }
     final int attempt = ++_attempt;
+    final int authVersion = _authVersion;
+    final int appCheckVersion = _appCheckVersion;
     _attemptStartedAt = _now();
     _fetchingTokens = true;
     final bool forceRefresh = _session.forceRefreshNext;
-    final String? authToken;
-    final String? appCheckToken;
+    final List<String?> fetched;
     try {
-      // 8.1 steps 1-2: both tokens before every connection, forced after a revoke.
-      final List<String?> fetched = await Future.wait(<Future<String?>>[
+      // 8.1 steps 1-2: both tokens before every connection, forced after a revoke; bounded so a
+      // provider that never answers cannot keep the client offline (review M3).
+      fetched = await Future.wait(<Future<String?>>[
         _tokens.authToken(forceRefresh: forceRefresh),
         _tokens.appCheckToken(forceRefresh: forceRefresh),
-      ]);
-      authToken = fetched[0];
-      appCheckToken = fetched[1];
+      ]).timeout(_timings.connectTimeout);
     } on Object catch (error) {
       if (attempt != _attempt) {
         return;
@@ -624,17 +732,23 @@ final class PersistentConnection implements ServerActions {
       return;
     }
     if (attempt != _attempt) {
-      return; // Interrupted or shut down while the tokens were fetched (8.1 step 3).
+      return; // Interrupted, shut down or restarted while the tokens were fetched (8.1 step 3).
     }
     _fetchingTokens = false;
     if (!_shouldConnect) {
       return;
     }
-    // Stored while offline; AuthSession sends them at onConnected, which also clears its
-    // forceRefreshNext (so a forced fetch is requested until a connection is up).
-    _session
-      ..authChanged(authToken)
-      ..appCheckChanged(appCheckToken);
+    // A token change during the fetch is newer than the fetched value: keep it (review H2; a
+    // sign-out during the fetch must not be undone).
+    if (authVersion == _authVersion) {
+      _session.authChanged(fetched[0]);
+    }
+    String? appCheckToken = _latestAppCheck;
+    if (appCheckVersion == _appCheckVersion) {
+      appCheckToken = fetched[1];
+      _latestAppCheck = appCheckToken;
+      _session.appCheckChanged(appCheckToken);
+    }
     _openConnection(appCheckToken);
   }
 
@@ -644,12 +758,28 @@ final class PersistentConnection implements ServerActions {
     _messagesOnConnection = 0;
     _okOnConnection = false;
     _established = false;
+    // No credential leaves unless the target allows tokens on this URL (review M1, T3).
+    _tokensAllowed = _target.mayReceiveTokens(_target.connectionUri());
+    if (!_tokensAllowed && !_warnedInsecure) {
+      _warnedInsecure = true;
+      _log(
+        DatabaseLogLevel.warning,
+        'The connection is not secure: no token is sent on it',
+      );
+    }
     final RealtimeConnection connection = _connectionFactory(
       link,
       lastSessionId: _lastSessionId,
       appId: _appId,
-      appCheckToken: appCheckToken,
+      appCheckToken: _tokensAllowed ? appCheckToken : null,
     );
+    // Every inbound text frame, pieces and count frames included, re-arms the link-silence
+    // timer before assembly (review H1; C's hook, addendum 7).
+    connection.onInboundFrame = () {
+      if (identical(link, _link)) {
+        _requests.linkActivity();
+      }
+    };
     _connection = connection;
     connection.open();
   }
@@ -677,29 +807,44 @@ final class PersistentConnection implements ServerActions {
         'serverTimeOffset': offset,
       }),
     );
-    _replay();
-    _reportedConnected = true;
-    _emit(_delegate.onConnect);
+    _replay(link);
+    // Reported only if the connection that carried the replay is still the live one (review M4).
+    if (identical(link, _link) && _connected) {
+      _reportedConnected = true;
+      _emit(_delegate.onConnect);
+    }
   }
 
   /// Sends the state after a hello, in the order of 8.4 (PersistentConnection.ts:1035-1069): auth
   /// and App Check (pipelined, not awaited), listens, unacked puts and merges, queued onDisconnect
-  /// requests, outstanding gets.
-  void _replay() {
-    _session.onConnected();
+  /// requests, outstanding gets. Stops at the first send that does not leave (the connection died
+  /// inside the replay, review M4/M5); what was not sent stays for the next replay.
+  void _replay(_Link link) {
+    if (_tokensAllowed) {
+      _session.onConnected();
+    }
+    bool live() => identical(link, _link) && _connected;
     for (final ListenRecord record in _queues.listens) {
-      _sendListen(record);
+      if (!live() || !_sendListen(record)) {
+        return;
+      }
     }
     for (final OutstandingWrite write in _queues.writes.toList()) {
-      _sendWrite(write);
+      if (!live() || !_sendWrite(write)) {
+        return;
+      }
     }
-    final List<QueuedOnDisconnect> queued = _queues.onDisconnects.toList();
-    _queues.onDisconnects.clear();
-    for (final QueuedOnDisconnect request in queued) {
-      _sendOnDisconnect(request);
+    while (_queues.onDisconnects.isNotEmpty) {
+      final QueuedOnDisconnect request = _queues.onDisconnects.first;
+      if (!live() || !_sendOnDisconnect(request)) {
+        return;
+      }
+      _queues.onDisconnects.removeAt(0);
     }
     for (final OutstandingGet get in _queues.gets.toList()) {
-      _sendGet(get);
+      if (!live() || !_sendGet(get)) {
+        return;
+      }
     }
   }
 
@@ -708,6 +853,7 @@ final class PersistentConnection implements ServerActions {
       return;
     }
     _messagesOnConnection++;
+    _requests.linkActivity();
     final ServerMessage decoded = decodeServerMessage(message);
     switch (decoded) {
       case Response(:final int r, :final String status, :final Object? data):
@@ -808,6 +954,38 @@ final class PersistentConnection implements ServerActions {
     _emit(() => _delegate.onServerShutdown(safeReason));
   }
 
+  /// The link was silent for `requestTimeout` with requests waiting (review H1): every get that
+  /// waited on this connection counts one silent connection and fails with
+  /// [statusNetworkError] at `ConnectionTimings.maxRequestTimeouts`; the connection is closed and
+  /// the rest is replayed. Writes, listens and onDisconnect requests count nothing.
+  void _onLinkSilent() {
+    if (_link == null) {
+      return;
+    }
+    for (final OutstandingGet get in _queues.gets.toList()) {
+      if (!get.sent) {
+        continue;
+      }
+      get.silentConnections++;
+      if (get.silentConnections >= _timings.maxRequestTimeouts) {
+        _queues.gets.remove(get);
+        get.completer.completeError(
+          const ServerActionsException(statusNetworkError),
+        );
+      }
+    }
+    if (_pendingCredentials.isNotEmpty && !_warnedSilentCredentials) {
+      // Review L3: an endless close/reconnect loop under the backoff, logged once.
+      _warnedSilentCredentials = true;
+      _log(
+        DatabaseLogLevel.warning,
+        'The server does not answer the credentials; reconnecting with backoff',
+      );
+    }
+    _log(DatabaseLogLevel.info, 'The link was silent; reconnecting');
+    _closeConnection(DisconnectReason.other);
+  }
+
   /// Closes the current connection and runs the disconnect path now; the connection's own
   /// callback, if it comes, is ignored.
   void _closeConnection(DisconnectReason reason) {
@@ -821,22 +999,23 @@ final class PersistentConnection implements ServerActions {
   }
 
   /// Forgets the current connection (8.2 `onRealtimeDisconnect_`): request callbacks dropped,
-  /// sent transaction puts completed with `disconnect`, every request marked unsent for the
-  /// replay, the delegate told once if it had been told connected.
+  /// sent transaction puts and sent onDisconnect requests completed with `disconnect`, every
+  /// request marked unsent for the replay, the delegate told once if it had been told connected.
   void _detach() {
     _link = null;
     _connection = null;
     _connected = false;
     _requests.clear();
+    _pendingCredentials.clear();
     if (_shutdown) {
       return;
     }
     _session.onDisconnected();
     for (final OutstandingWrite write in _queues.takeSentTransactions()) {
-      final RequestResultCallback? onComplete = write.onComplete;
-      if (onComplete != null) {
-        _emit(() => onComplete(statusDisconnect, null));
-      }
+      _completeDisconnect(write.onComplete);
+    }
+    for (final QueuedOnDisconnect request in _queues.takeSentOnDisconnects()) {
+      _completeDisconnect(request.onComplete);
     }
     _queues.markAllUnsent();
     if (_session.invalidTokenThresholdReached) {
@@ -848,93 +1027,47 @@ final class PersistentConnection implements ServerActions {
     }
   }
 
+  void _completeDisconnect(RequestResultCallback? onComplete) {
+    if (onComplete != null) {
+      _emit(() => onComplete(statusDisconnect, null));
+    }
+  }
+
   // ---------------------------------------------------------------------------------------------
   // Sending
 
-  void _send(
+  /// Sends a request on the live connection; returns whether it left (review M4/M5). False when
+  /// there is no live connection, or when the connection died while the frame was being sent.
+  bool _send(
     String action,
     Map<String, Object?> body, {
     void Function(Map<String, Object?> body)? onResponse,
-    void Function()? onTimeout,
+    void Function(int r)? onNumber,
   }) {
     final RealtimeConnection? connection = _connection;
     if (connection == null || !_connected) {
-      return;
+      return false;
     }
-    final int r = _requests.add(onResponse, onTimeout: onTimeout);
+    final int r = _requests.add(onResponse);
+    onNumber?.call(r);
     // Requests carrying a credential are never logged with their body (threat model T7); no
     // other body is logged either: it holds user data.
     _log(
       DatabaseLogLevel.debug,
-      _carriesCredential(action)
+      credentialActions.contains(action)
           ? '$action (contents hidden)'
           : 'send $action r=$r',
     );
-    connection.send(<String, Object?>{
-      RealtimeProtocol.requestNumberKey: r,
-      RealtimeProtocol.actionKey: action,
-      RealtimeProtocol.bodyKey: body,
-    });
-  }
-
-  static bool _carriesCredential(String action) =>
-      action == RealtimeProtocol.auth ||
-      action == RealtimeProtocol.gauth ||
-      action == RealtimeProtocol.appCheck;
-
-  /// A request timed out on a live connection (lead's decision, addendum 2).
-  ///
-  /// Every replayable request still waiting for its answer on this connection counts one timeout,
-  /// not only the one whose timer fired: closing the connection cancels the other timers, so with
-  /// a per-timer count a silent server would let the first request (often `auth`) close every
-  /// connection and the others would never reach their limit (found by the first test run). A
-  /// request at `ConnectionTimings.maxRequestTimeouts` completes with [statusNetworkError] and
-  /// leaves the replay. The connection is closed (and the rest replayed) unless every waiting
-  /// request has just failed. [request] is the replayable request whose timer fired, null for a
-  /// credential or onDisconnect request; a request that already failed is ignored.
-  void _onTimeout(TimedRequest? request) {
-    if (request != null &&
-        (!request.awaitingAnswer || !_queues.isQueued(request))) {
-      return;
+    try {
+      connection.send(<String, Object?>{
+        RealtimeProtocol.requestNumberKey: r,
+        RealtimeProtocol.actionKey: action,
+        RealtimeProtocol.bodyKey: body,
+      });
+    } on StateError {
+      return false;
     }
-    final List<TimedRequest> waiting = _queues.awaitingAnswer.toList();
-    bool anyLeft = waiting.isEmpty;
-    for (final TimedRequest pending in waiting) {
-      pending.timeouts++;
-      if (pending.timeouts >= _timings.maxRequestTimeouts) {
-        _failWithNetworkError(pending);
-      } else {
-        anyLeft = true;
-      }
-    }
-    if (anyLeft) {
-      _log(DatabaseLogLevel.info, 'A request got no answer; reconnecting');
-      _closeConnection(DisconnectReason.other);
-    }
-  }
-
-  void _failWithNetworkError(TimedRequest request) {
-    _log(
-      DatabaseLogLevel.warning,
-      'A request got no answer twice; it fails with $statusNetworkError',
-    );
-    request.awaitingAnswer = false;
-    switch (request) {
-      case ListenRecord():
-        _queues.removeListen(request.spec.path, request.spec.queryIdentifier);
-        _emit(() => request.onComplete(statusNetworkError, null));
-      case OutstandingWrite():
-        _queues.writes.remove(request);
-        final RequestResultCallback? onComplete = request.onComplete;
-        if (onComplete != null) {
-          _emit(() => onComplete(statusNetworkError, null));
-        }
-      case OutstandingGet():
-        _queues.gets.remove(request);
-        request.completer.completeError(
-          const ServerActionsException(statusNetworkError),
-        );
-    }
+    return identical(connection, _connection) && _connected;
   }
 
   static String _statusOf(Map<String, Object?> response) {

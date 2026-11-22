@@ -577,6 +577,7 @@ void main() {
                 (
                   Uri url, {
                   Map<String, String> headers = const <String, String>{},
+                  Future<void>? abort,
                 }) => late.future,
           );
           rig.open();
@@ -705,6 +706,7 @@ void main() {
               (
                 Uri url, {
                 Map<String, String> headers = const <String, String>{},
+                Future<void>? abort,
               }) => throw const WsConnectException(
                 WsConnectFailure.badScheme,
                 'bad scheme',
@@ -864,6 +866,144 @@ void main() {
       });
     });
   });
+
+  group('abort signal to the connector (review M2)', () {
+    /// A connector that never completes and records the abort signal it was given.
+    (WsConnector, List<bool>) hangingConnector() {
+      final List<bool> aborted = <bool>[];
+      Future<WsChannel> connect(
+        Uri url, {
+        Map<String, String> headers = const <String, String>{},
+        Future<void>? abort,
+      }) {
+        final int index = aborted.length;
+        aborted.add(false);
+        unawaited(abort?.then((_) => aborted[index] = true));
+        return Completer<WsChannel>().future;
+      }
+
+      return (connect, aborted);
+    }
+
+    test('fires when the connect timeout elapses', () {
+      fakeAsync((FakeAsync async) {
+        final (WsConnector connector, List<bool> aborted) = hangingConnector();
+        final ConnectionRig rig = ConnectionRig(async, connector: connector);
+        rig.open();
+        async.elapse(_connectTimeout - const Duration(milliseconds: 1));
+        expect(aborted, <bool>[false]);
+        async.elapse(const Duration(milliseconds: 1));
+
+        expect(aborted, <bool>[true]);
+        expect(
+          rig.delegate.disconnects.single.reason,
+          DisconnectReason.connectTimeout,
+        );
+      });
+    });
+
+    test('fires when the connection is closed during the upgrade', () {
+      fakeAsync((FakeAsync async) {
+        final (WsConnector connector, List<bool> aborted) = hangingConnector();
+        final ConnectionRig rig = ConnectionRig(async, connector: connector);
+        rig.open().close();
+        rig.flush();
+
+        expect(aborted, <bool>[true]);
+      });
+    });
+
+    test('does not fire once the connector returned a channel', () {
+      fakeAsync((FakeAsync async) {
+        final List<Future<void>> signals = <Future<void>>[];
+        bool fired = false;
+        late final ConnectionRig rig;
+        Future<WsChannel> connect(
+          Uri url, {
+          Map<String, String> headers = const <String, String>{},
+          Future<void>? abort,
+        }) {
+          signals.add(abort!);
+          unawaited(abort.then((_) => fired = true));
+          return rig.fake.connect(url, headers: headers);
+        }
+
+        rig = ConnectionRig(async, connector: connect);
+        rig.openReady().close();
+        async.elapse(const Duration(minutes: 1));
+
+        expect(signals, hasLength(1));
+        expect(fired, isFalse);
+        expect(rig.fake.last.isClosed, isTrue);
+      });
+    });
+  });
+
+  group('inbound frame signal (rulings H1)', () {
+    test('fires once per frame, pieces of a buffered message included', () {
+      fakeAsync((FakeAsync async) {
+        final ConnectionRig rig = ConnectionRig(async);
+        final RealtimeConnection connection = rig.openReady();
+        int signals = 0;
+        connection.onInboundFrame = () {
+          signals++;
+          expect(rig.delegate.data, isEmpty);
+        };
+        final Map<String, Object?> envelope = <String, Object?>{
+          't': 'd',
+          'd': <String, Object?>{
+            'r': 1,
+            'b': <String, Object?>{'s': 'ok', 'd': 'abcdefghij'},
+          },
+        };
+        rig.fake.last.serverMessage(envelope, frameSize: 5);
+        rig.flush();
+
+        final int pieces = (jsonEncode(envelope).length / 5).ceil();
+        expect(signals, 1 + pieces);
+        expect(rig.delegate.data, hasLength(1));
+      });
+    });
+
+    test('a close from the signal stops the frame', () {
+      fakeAsync((FakeAsync async) {
+        final ConnectionRig rig = ConnectionRig(async);
+        final RealtimeConnection connection = rig.openReady();
+        connection.onInboundFrame = connection.close;
+        rig.fake.last.serverResponse(1);
+        rig.flush();
+
+        expect(rig.delegate.data, isEmpty);
+        expect(rig.delegate.disconnects, hasLength(1));
+      });
+    });
+
+    test('binary frames do not signal', () {
+      fakeAsync((FakeAsync async) {
+        final ConnectionRig rig = ConnectionRig(async);
+        int signals = 0;
+        rig.openReady().onInboundFrame = () => signals++;
+        rig.fake.last.serverBinary(<int>[1]);
+        rig.flush();
+
+        expect(signals, 0);
+      });
+    });
+  });
+
+  test(
+    'credentialActions is the one list of credential actions (review L6)',
+    () {
+      expect(credentialActions, <String>{
+        'auth',
+        'gauth',
+        'unauth',
+        'appcheck',
+        'unappcheck',
+        'unappeck',
+      });
+    },
+  );
 
   test('toString shows no session, host query or token', () {
     fakeAsync((FakeAsync async) {

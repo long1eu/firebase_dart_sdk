@@ -6,6 +6,8 @@
 
 import 'dart:async';
 
+import 'package:fake_async/fake_async.dart';
+
 import 'package:firebase_database_dart/src/core/connection/listen_hash_provider.dart';
 import 'package:firebase_database_dart/src/core/connection/listen_spec.dart';
 import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
@@ -18,6 +20,7 @@ import 'package:firebase_database_dart/src/realtime/connection_timings.dart';
 import 'package:firebase_database_dart/src/realtime/persistent_connection.dart';
 import 'package:firebase_database_dart/src/realtime/realtime_target.dart';
 import 'package:firebase_database_dart/src/realtime/reconnect_backoff.dart';
+import 'package:firebase_database_dart/src/realtime/transport/ws_channel.dart';
 import 'package:firebase_database_dart/src/testing/recording_server_actions_delegate.dart';
 
 import 'fake_rtdb_server.dart';
@@ -65,12 +68,15 @@ final class ScriptedTokens implements RealtimeTokenSource {
   @override
   Future<String?> authToken({required bool forceRefresh}) async {
     authCalls.add(forceRefresh);
+    // The value of the moment the fetch starts, as a provider whose request is in flight: a
+    // sign-out after this point does not change what the fetch returns (review H2).
+    final String? value = auth;
     await gate?.future;
     final Exception? failure = error;
     if (failure != null) {
       throw failure;
     }
-    return auth;
+    return value;
   }
 
   @override
@@ -166,6 +172,7 @@ final class PRig {
     RecordingServerActionsDelegate? delegate,
     DateTime Function()? now,
     Duration Function()? elapsed,
+    WsConnector Function(WsConnector connector)? wrapConnector,
   }) : _now = now ?? DateTime.now,
        _elapsed = elapsed,
        timings = timings ?? shrunkTimings(),
@@ -198,14 +205,12 @@ final class PRig {
             lastSessionIds.add(lastSessionId);
             return RealtimeConnection(
               target,
-              server.connect,
+              wrapConnector?.call(server.connect) ?? server.connect,
               this.timings,
               delegate,
               lastSessionId: lastSessionId,
               appId: appId,
               appCheckToken: appCheckToken,
-              now: _now,
-              random: jitter,
             );
           },
       backoff: ReconnectBackoff(
@@ -419,4 +424,34 @@ final class _Forwarding implements ServerActionsDelegate {
     _inner.onServerInfoUpdate(updates);
     _report('serverInfoUpdate');
   }
+}
+
+/// Advances fake time in 1 ms steps until [condition] holds (at most [limit] of virtual time).
+void elapseUntil(
+  FakeAsync async,
+  bool Function() condition, {
+  Duration limit = const Duration(seconds: 30),
+}) {
+  final Duration end = async.elapsed + limit;
+  while (!condition()) {
+    if (async.elapsed > end) {
+      throw TimeoutException('condition not met in virtual time', limit);
+    }
+    async.elapse(const Duration(milliseconds: 1));
+  }
+}
+
+/// A rig on fake time: `now` and `elapsed` follow [async].
+PRig fakeTimeRig(
+  FakeAsync async, {
+  ConnectionTimings? timings,
+  WsConnector Function(WsConnector connector)? wrapConnector,
+}) {
+  final DateTime start = DateTime.utc(2026, 11, 22);
+  return PRig(
+    timings: timings,
+    now: () => start.add(async.elapsed),
+    elapsed: () => async.elapsed,
+    wrapConnector: wrapConnector,
+  );
 }

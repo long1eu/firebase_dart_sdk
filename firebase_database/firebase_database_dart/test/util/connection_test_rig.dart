@@ -137,8 +137,6 @@ final class ConnectionRig {
     appCheckToken: appCheckToken,
     logger: (DatabaseLogLevel level, String message) =>
         logs.add((level, message)),
-    now: () => DateTime.utc(2026, 11, 22).add(async.elapsed),
-    random: () => 0.5,
   );
 
   /// Opens a new connection and lets the connector accept.

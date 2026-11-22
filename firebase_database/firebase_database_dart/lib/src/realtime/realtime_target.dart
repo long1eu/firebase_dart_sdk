@@ -20,14 +20,22 @@ final class RealtimeTarget {
   /// For the emulator ([RepoInfo.isUsingEmulator]) the hello `h` and a reset `r` never change the
   /// host, and the scheme is `ws`/`http` unless [RepoInfo.secure] (`*.cloudworkstations.dev`, 2.4).
   ///
-  /// A [repoInfo] that is neither secure nor the emulator (a misconfiguration that
-  /// [parseDatabaseUrl] never produces) is accepted, and [mayReceiveTokens] is false for every
-  /// URL of it: no credential goes over plain text outside the emulator (T3). Throws
-  /// [ArgumentError] when the host of [repoInfo] is not `host[:port]`.
+  /// Throws [ArgumentError] when [repoInfo] is neither secure nor the emulator (a
+  /// misconfiguration that [parseDatabaseUrl] never produces: the WebSocket path would send the ID
+  /// and App Check tokens over `ws://`, threat model T3; review M1 (a)) or when its host is not
+  /// `host[:port]`.
   RealtimeTarget(this.repoInfo, {required bool useHeaders, String? userAgent})
     : _useHeaders = useHeaders,
       _userAgent = userAgent,
-      _address = _configuredAddress(repoInfo);
+      _address = _configuredAddress(repoInfo) {
+    if (!repoInfo.secure && !repoInfo.isUsingEmulator) {
+      throw ArgumentError.value(
+        repoInfo.host,
+        'repoInfo',
+        'a database that is not the emulator must use TLS',
+      );
+    }
+  }
 
   /// The identity this target was built from.
   final RepoInfo repoInfo;
@@ -193,13 +201,8 @@ final class RealtimeTarget {
   /// The scheme must be the configured one's family (`wss`/`https` when secure, `ws`/`http` for a
   /// plain-text emulator); a URL with user info never qualifies. The port compared is the
   /// explicit one or the scheme's default (443 for `wss`/`https`, 80 for `ws`/`http`).
-  ///
-  /// Always false for a plain-text target that is not the emulator.
   bool mayReceiveTokens(Uri uri) {
     final bool secure = repoInfo.secure;
-    if (!secure && !repoInfo.isUsingEmulator) {
-      return false;
-    }
     final String scheme = uri.scheme.toLowerCase();
     final bool schemeMatches = secure
         ? scheme == 'https' || scheme == 'wss'

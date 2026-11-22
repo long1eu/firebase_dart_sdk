@@ -220,7 +220,7 @@ void main() {
     });
 
     test(
-      'plain-text production URLs are refused; a plain-text RepoInfo gets no tokens',
+      'plain-text production URLs never become a target (review M1 (a))',
       () {
         for (final String url in <String>[
           'http://x.firebaseio.com:443',
@@ -233,21 +233,17 @@ void main() {
             reason: url,
           );
         }
-        final RealtimeTarget insecure = RealtimeTarget(
-          const RepoInfo(
-            host: 'x.firebaseio.com',
-            namespace: 'x',
-            secure: false,
-          ),
-          useHeaders: true,
-        );
         expect(
-          insecure.mayReceiveTokens(
-            Uri.parse('http://x.firebaseio.com/a.json'),
+          () => RealtimeTarget(
+            const RepoInfo(
+              host: 'x.firebaseio.com',
+              namespace: 'x',
+              secure: false,
+            ),
+            useHeaders: true,
           ),
-          isFalse,
+          throwsArgumentError,
         );
-        expect(insecure.mayReceiveTokens(insecure.connectionUri()), isFalse);
       },
     );
   });

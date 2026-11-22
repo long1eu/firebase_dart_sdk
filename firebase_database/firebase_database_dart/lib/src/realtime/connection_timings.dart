@@ -298,7 +298,7 @@ final class RealtimeProtocol {
   /// Push `sd`: security debug text (5).
   static const String pushSecurityDebug = 'sd';
 
-  /// Push `rm`: range merge, ignored (no compound hash is sent; 5, 7.4).
+  /// Push `rm`: range merge, decoded by `server_message.dart` into `RangeMergePush` (5, 7.4).
   static const String pushRangeMerge = 'rm';
 
   /// Interrupt reason of a server shutdown, never cleared: SERVER_KILL_INTERRUPT_REASON (1.3,

@@ -28,6 +28,7 @@ WsConnector webWsConnector() => _connect;
 Future<WsChannel> _connect(
   Uri url, {
   Map<String, String> headers = const <String, String>{},
+  Future<void>? abort,
 }) {
   if (url.scheme != 'ws' && url.scheme != 'wss') {
     return Future<WsChannel>.error(
@@ -52,21 +53,34 @@ Future<WsChannel> _connect(
   }
   socket.binaryType = 'arraybuffer';
   final Completer<WsChannel> completer = Completer<WsChannel>();
-  void fail() {
+  void fail([
+    String message = 'the WebSocket did not open (the browser gives no detail)',
+  ]) {
     socket
       ..onopen = null
       ..onerror = null
       ..onclose = null;
     if (!completer.isCompleted) {
       completer.completeError(
-        const WsConnectException(
-          WsConnectFailure.other,
-          'the WebSocket did not open (the browser gives no detail)',
-        ),
+        WsConnectException(WsConnectFailure.other, message),
       );
     }
   }
 
+  if (abort != null) {
+    void stop() {
+      if (!completer.isCompleted) {
+        try {
+          socket.close();
+        } on Object {
+          // Already closing: nothing more to drop.
+        }
+        fail('the connect attempt was aborted');
+      }
+    }
+
+    unawaited(abort.then((_) => stop(), onError: (Object _) => stop()));
+  }
   socket
     ..onopen = ((web.Event _) {
       socket

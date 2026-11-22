@@ -3,9 +3,9 @@
 library;
 
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:firebase_database_dart/src/core/util/logger.dart';
+import 'package:firebase_database_dart/src/core/view/query_params.dart';
 import 'package:firebase_database_dart/src/realtime/connection_timings.dart';
 import 'package:firebase_database_dart/src/realtime/framing.dart';
 import 'package:firebase_database_dart/src/realtime/liveness.dart';
@@ -49,9 +49,11 @@ abstract interface class RealtimeDelegate {
 
 enum _State { idle, connecting, connected, closed }
 
-/// The actions whose body carries a credential, or that belong to one: logged without contents
-/// (threat model T7; Android Connection.java:236-246). Both spellings of the App Check removal.
-const Set<String> _credentialActions = <String>{
+/// The actions whose body carries a credential, or that belong to one: logged as
+/// `<action> (contents hidden)`, never with their body (threat model T7; Android
+/// Connection.java:236-246). Both spellings of the App Check removal. The one list of the
+/// connection half: the persistent connection logs its requests by it too (review L6).
+const Set<String> credentialActions = <String>{
   RealtimeProtocol.auth,
   RealtimeProtocol.gauth,
   RealtimeProtocol.unauth,
@@ -75,9 +77,8 @@ final class RealtimeConnection {
   /// Creates a connection to [target] over [connector]; nothing happens before [open].
   ///
   /// [lastSessionId] becomes `ls` of the URL (2.3); [appId] and [appCheckToken] go into the
-  /// headers or the URL as [target] decides. [now] and [random] replace the clock and the random
-  /// source (test plan 2.4). [logger] gets the `e` control errors, unknown control types and the
-  /// version warning, cleaned by `safeServerText` (threat model T7); null drops them.
+  /// headers or the URL as [target] decides. [logger] gets the `e` control errors, unknown control
+  /// types and the version warning, cleaned by `safeServerText` (threat model T7); null drops them.
   RealtimeConnection(
     RealtimeTarget target,
     WsConnector connector,
@@ -87,8 +88,6 @@ final class RealtimeConnection {
     String? appId,
     String? appCheckToken,
     DatabaseLogger? logger,
-    required DateTime Function() now,
-    required double Function() random,
   }) : _target = target,
        _connector = connector,
        _timings = timings,
@@ -99,7 +98,7 @@ final class RealtimeConnection {
        _logger = logger,
        _splitter = FrameSplitter(maxFrameUnits: timings.maxFrameUnits);
 
-  static final String _pingFrame = jsonEncode(<String, Object?>{
+  static final String _pingFrame = jsStringify(<String, Object?>{
     RealtimeProtocol.typeKey: RealtimeProtocol.controlMessage,
     RealtimeProtocol.dataKey: <String, Object?>{
       RealtimeProtocol.typeKey: RealtimeProtocol.controlPing,
@@ -124,6 +123,20 @@ final class RealtimeConnection {
   int _generation = 0;
   int _resets = 0;
   WsChannel? _channel;
+
+  /// Completed when the connection gives up on a connector call that has not returned yet.
+  Completer<void>? _pendingAbort;
+
+  /// Called for every inbound text frame, before it is assembled: each piece of a multi-frame
+  /// message, the count frame, and a frame that turns out to be malformed (binary frames are
+  /// ignored). The persistent connection re-arms its request timers here: a request timer
+  /// measures silence of the link, not the age of a request (rulings, H1). Set it before [open];
+  /// it may close the connection.
+  ///
+  /// MERGE: P: set `connection.onInboundFrame` on the connection the factory returns. It is a
+  /// field, not a [RealtimeDelegate] member, so the delegates of P and of the emulator rig keep
+  /// compiling.
+  void Function()? onInboundFrame;
   StreamSubscription<WsEvent>? _subscription;
   FrameAssembler? _assembler;
   Liveness? _liveness;
@@ -157,8 +170,11 @@ final class RealtimeConnection {
     if (_state != _State.connected) {
       throw StateError('RealtimeConnection is not connected');
     }
-    // MERGE: lead: jsStringify from core/view/query_params.dart
-    final String json = jsonEncode(<String, Object?>{
+    // jsStringify (core/view/query_params.dart:394-484) is a full JSON encoder for decoded values:
+    // an integral double is written `1` as in a query identity, a lone surrogate is escaped
+    // instead of reaching the server as U+FFFD, and NaN/Infinity (refused by the core's
+    // validation) become `null` instead of throwing.
+    final String json = jsStringify(<String, Object?>{
       RealtimeProtocol.typeKey: RealtimeProtocol.dataMessage,
       RealtimeProtocol.dataKey: request,
     });
@@ -167,6 +183,18 @@ final class RealtimeConnection {
       if (!_sendFrame(frame)) {
         return;
       }
+    }
+  }
+
+  /// Probes a connected link at once (a resume or a network change may have killed it silently):
+  /// a ping now, and a close with [DisconnectReason.deadLink] if nothing arrives within
+  /// `ConnectionTimings.idleProbeTimeout`. A no-op while connecting, after a close, and while a
+  /// probe is outstanding, so it never starts a second reconnect.
+  ///
+  /// MERGE: P: call probeNow() on a connectivity hint when connected.
+  void probeNow() {
+    if (_state == _State.connected) {
+      _liveness?.probeNow();
     }
   }
 
@@ -201,12 +229,26 @@ final class RealtimeConnection {
     _connectTimer?.cancel();
     _connectTimer = Timer(_timings.connectTimeout, _onConnectTimeout);
     _log(DatabaseLogLevel.debug, 'connecting to ${url.host}');
+    final Completer<void> abort = Completer<void>();
+    _pendingAbort = abort;
+    void settled() {
+      if (identical(_pendingAbort, abort)) {
+        _pendingAbort = null;
+      }
+    }
+
     unawaited(
       Future<WsChannel>.sync(
-        () => _connector(url, headers: headers),
+        () => _connector(url, headers: headers, abort: abort.future),
       ).then<void>(
-        (WsChannel channel) => _onChannel(generation, channel),
-        onError: (Object error) => _onConnectError(generation, error),
+        (WsChannel channel) {
+          settled();
+          _onChannel(generation, channel);
+        },
+        onError: (Object error) {
+          settled();
+          _onConnectError(generation, error);
+        },
       ),
     );
   }
@@ -286,6 +328,10 @@ final class RealtimeConnection {
 
   void _onText(String frame) {
     _liveness?.onFrameReceived(frame.length);
+    onInboundFrame?.call();
+    if (_state == _State.closed) {
+      return;
+    }
     final FrameAssembler? assembler = _assembler;
     if (_state == _State.closed || assembler == null) {
       return;
@@ -471,6 +517,12 @@ final class RealtimeConnection {
 
   void _teardownSocket({required bool abandon}) {
     _generation++;
+    // A connector call still running is told to give up, so no socket stays open (review M2).
+    final Completer<void>? pendingAbort = _pendingAbort;
+    _pendingAbort = null;
+    if (pendingAbort != null && !pendingAbort.isCompleted) {
+      pendingAbort.complete();
+    }
     _connectTimer?.cancel();
     _connectTimer = null;
     _liveness?.stop();
@@ -504,7 +556,7 @@ final class RealtimeConnection {
     final Object? action = request[RealtimeProtocol.actionKey];
     if (action is! String) {
       _log(DatabaseLogLevel.debug, 'send request');
-    } else if (_credentialActions.contains(action)) {
+    } else if (credentialActions.contains(action)) {
       _log(DatabaseLogLevel.debug, '$action (contents hidden)');
     } else {
       _log(DatabaseLogLevel.debug, 'send $action');

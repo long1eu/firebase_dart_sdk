@@ -128,6 +128,19 @@ final class Liveness {
     }
   }
 
+  /// Probes the link now instead of waiting for [ConnectionTimings.idleProbeAfter]: sends a ping
+  /// and closes with [DisconnectReason.deadLink] unless a frame arrives within
+  /// [ConnectionTimings.idleProbeTimeout]. A no-op before the hello, after [stop], and while a probe
+  /// is already outstanding (its deadline is kept).
+  void probeNow() {
+    if (_stopped || !_helloSeen || _probing) {
+      return;
+    }
+    _idleTimer?.cancel();
+    _idleTimer = null;
+    _onIdle();
+  }
+
   /// Whether the connection has met the health rule of 3.4.
   bool get isHealthy => _healthy;
 

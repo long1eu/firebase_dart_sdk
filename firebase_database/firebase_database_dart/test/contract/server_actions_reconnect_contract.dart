@@ -35,7 +35,7 @@ abstract interface class ServerActionsReconnectHarness
   /// Pushes `ac` (auth revoked) with [status] and [explanation].
   Future<void> revokeAuth(String status, String explanation);
 
-  /// Lets every request on the current connection time out once (the server stays silent).
+  /// Keeps the server silent until the connection's link-silence timeout has closed it.
   Future<void> timeOutPending();
 }
 
@@ -48,11 +48,14 @@ abstract interface class ServerActionsReconnectHarness
 ///   [statusDisconnect] instead of being replayed, before `ServerActionsDelegate.onDisconnect`;
 /// * a failed listen, and a listen revoked by a `c` push, complete with their status, leave the
 ///   listen table and are not replayed;
-/// * onDisconnect requests made while offline are queued and sent at the next connection;
+/// * onDisconnect requests made while offline are queued and sent at the next connection; a sent
+///   one whose connection drops before its answer completes once with [statusDisconnect] and is
+///   not replayed (review H3);
 /// * a `get` outstanding at a drop is re-sent once and completes once; a failed `get` fails with
 ///   [ServerActionsException] carrying the status and reason;
-/// * a request that times out twice on live connections completes with `network_error` and is
-///   not replayed again;
+/// * a silent link closes the connection; a `get` waiting on two such connections fails with
+///   [statusNetworkError]; writes are never failed by a timeout and stay in the replay (review
+///   H1, the lead's replaced rule);
 /// * an auth revoke closes the connection and the next connection authenticates again.
 void runServerActionsReconnectContract(
   ServerActionsReconnectHarness Function() createHarness,
@@ -209,20 +212,54 @@ void runServerActionsReconnectContract(
     },
   );
 
-  test('a request that times out twice fails with network_error', () async {
-    final List<String> statuses = <String>[];
-    actions.put('/slow', 1, onComplete: (String s, _) => statuses.add(s));
-    await pumpEventQueue();
-    await harness.timeOutPending(); // First timeout: the connection closes.
-    await harness.reconnect(); // The put is replayed.
-    expect(received(2), contains('p'));
-    await harness.timeOutPending(); // Second timeout on a live connection.
-    await pumpEventQueue();
-    expect(statuses, <String>['network_error']);
-    await harness.drop();
-    await harness.reconnect();
-    expect(received(3), isNot(contains('p')));
-  });
+  test(
+    'a get waiting on two silent connections fails with network_error; a write never does',
+    () async {
+      final List<String> statuses = <String>[];
+      actions.put('/slow', 1, onComplete: (String s, _) => statuses.add(s));
+      final Future<void> failed = expectLater(
+        actions.get(defaultSpec),
+        throwsA(
+          isA<ServerActionsException>().having(
+            (ServerActionsException e) => e.status,
+            'status',
+            statusNetworkError,
+          ),
+        ),
+      );
+      await pumpEventQueue();
+      await harness
+          .timeOutPending(); // Connection 1 silent: closed, the get counts one.
+      await harness.reconnect();
+      expect(received(2), containsAll(<String>['p', 'g']));
+      await harness
+          .timeOutPending(); // Connection 2 silent: the get counts two.
+      await failed;
+      expect(statuses, isEmpty);
+      await harness.reconnect();
+      expect(received(3), contains('p'));
+      expect(received(3), isNot(contains('g')));
+    },
+  );
+
+  test(
+    'a sent onDisconnect whose connection drops completes once with disconnect, not replayed',
+    () async {
+      final List<String> statuses = <String>[];
+      actions.onDisconnectPut(
+        '/p',
+        'off',
+        onComplete: (String s, _) => statuses.add(s),
+      );
+      await pumpEventQueue();
+      expect(received(1), contains('o'));
+      await harness.drop();
+      await harness.reconnect();
+      await pumpEventQueue();
+      expect(statuses, <String>[statusDisconnect]);
+      expect(received(2), isNot(contains('o')));
+    },
+  );
 
   test(
     'an auth revoke closes the connection and the next one authenticates again',

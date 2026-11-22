@@ -114,7 +114,8 @@ RealtimeTarget productionTarget({bool useHeaders = true}) => RealtimeTarget(
   useHeaders: useHeaders,
 );
 
-/// A production host reached over plain HTTP: tokens may not go there (threat model T3).
+/// A production host over plain HTTP: `RealtimeTarget` refuses it with an [ArgumentError]
+/// (review M1; threat model T3).
 RealtimeTarget plainHttpTarget({bool useHeaders = true}) => RealtimeTarget(
   const RepoInfo(
     host: 'demo-db.firebaseio.com',
@@ -250,4 +251,35 @@ Future<void> pumpUntil(bool Function() condition, {int rounds = 50}) async {
   for (int i = 0; i < rounds && !condition(); i++) {
     await Future<void>.delayed(Duration.zero);
   }
+}
+
+/// A client that, like an app's own client might, followed a redirect: every answer is 200
+/// [body] and reports [finalUrl] as the URL it came from.
+final class RedirectedClient extends http.BaseClient {
+  /// Creates the client.
+  RedirectedClient(this.finalUrl, this.body);
+
+  /// The URL every answer reports.
+  final Uri finalUrl;
+
+  /// The body of every answer.
+  final String body;
+
+  /// The requests sent.
+  final List<http.BaseRequest> sent = <http.BaseRequest>[];
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    sent.add(request);
+    final List<int> bytes = utf8.encode(body);
+    return _ResponseWithUrl(finalUrl, Stream<List<int>>.value(bytes), 200);
+  }
+}
+
+final class _ResponseWithUrl extends http.StreamedResponse
+    implements http.BaseResponseWithUrl {
+  _ResponseWithUrl(this.url, super.stream, super.statusCode);
+
+  @override
+  final Uri url;
 }

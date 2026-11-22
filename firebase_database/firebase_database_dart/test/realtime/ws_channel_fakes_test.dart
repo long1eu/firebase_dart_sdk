@@ -401,6 +401,28 @@ void main() {
       expect(connector.attempts.single.at, const Duration(seconds: 2));
     });
 
+    test('an aborted hang fails with other (review M2)', () async {
+      final FakeWsConnector connector = FakeWsConnector();
+      connector.script(const <AttemptBehavior>[AttemptBehavior.hang()]);
+      final Completer<void> abort = Completer<void>();
+      final Future<WsChannel> attempt = connector.connect(
+        Uri.parse('wss://h/.ws'),
+        abort: abort.future,
+      );
+      expect(identical(connector.attempts.single.abort, abort.future), isTrue);
+      abort.complete();
+      await expectLater(
+        attempt,
+        throwsA(
+          isA<WsConnectException>().having(
+            (WsConnectException e) => e.kind,
+            'kind',
+            WsConnectFailure.other,
+          ),
+        ),
+      );
+    });
+
     test('last before any accepted attempt throws', () {
       expect(() => FakeWsConnector().last, throwsStateError);
     });
@@ -429,6 +451,265 @@ void main() {
     setUp(() async {
       server = FakeRtdbServer(host: 's-1.example', clock: () => 42);
       await open();
+    });
+
+    // Review M8: each test below failed against the fake before it modelled the measurement.
+    group('as measured on the emulator (review M8)', () {
+      Map<String, Object?> inner(Map<String, Object?> message) =>
+          message['d']! as Map<String, Object?>;
+
+      Map<String, Object?> answerOf(List<Map<String, Object?>> messages) =>
+          inner(messages.last)['b']! as Map<String, Object?>;
+
+      List<Map<String, Object?>> pushes(List<Map<String, Object?>> messages) =>
+          <Map<String, Object?>>[
+            for (final Map<String, Object?> m in messages)
+              if (m['t'] == 'd' && inner(m)['a'] != null) inner(m),
+          ];
+
+      test(
+        'a write is pushed once per overlapping listen, with its tag',
+        () async {
+          await send(_request(1, 'q', <String, Object?>{'p': '/', 'h': ''}));
+          await send(
+            _request(2, 'q', <String, Object?>{
+              'p': '/people',
+              'q': <String, Object?>{'l': 1, 'vf': 'l'},
+              't': 1,
+              'h': '',
+            }),
+          );
+          await send(
+            _request(3, 'q', <String, Object?>{
+              'p': '/people',
+              'q': <String, Object?>{'l': 2, 'vf': 'r'},
+              't': 2,
+              'h': '',
+            }),
+          );
+          final List<Map<String, Object?>> got = await send(
+            _request(4, 'p', <String, Object?>{'p': '/people/0', 'd': 1}),
+          );
+          expect(pushes(got).map((Map<String, Object?> p) => p['b']), <Object?>[
+            <String, Object?>{'p': 'people/0', 'd': 1},
+            <String, Object?>{'p': 'people/0', 'd': 1, 't': 1},
+            <String, Object?>{'p': 'people/0', 'd': 1, 't': 2},
+          ]);
+        },
+      );
+
+      test(
+        'a listen whose hash matches gets no push; a wrong hash gets the data',
+        () async {
+          server.data['v'] = 5;
+          // The hash the emulator accepted for the leaf 5 (probe addendum 4, measured).
+          const String hashOf5 = 'w28swksk9+tXf5jEdS9R5oSFAv8=';
+          final List<Map<String, Object?>> matched = await send(
+            _request(1, 'q', <String, Object?>{'p': '/v', 'h': hashOf5}),
+          );
+          expect(pushes(matched), isEmpty);
+          expect(answerOf(matched), <String, Object?>{
+            's': 'ok',
+            'd': <String, Object?>{},
+          });
+          final List<Map<String, Object?>> stale = await send(
+            _request(2, 'q', <String, Object?>{'p': '/v', 'h': 'AAAA'}),
+          );
+          expect(pushes(stale).single['b'], <String, Object?>{
+            'p': 'v',
+            'd': 5,
+          });
+        },
+      );
+
+      test(
+        'a hashed put: datastale on a mismatch, the new value on a match',
+        () async {
+          server.data['v'] = 5;
+          final List<Map<String, Object?>> stale = await send(
+            _request(1, 'p', <String, Object?>{'p': '/v', 'd': 7, 'h': 'AAAA'}),
+          );
+          expect(answerOf(stale), <String, Object?>{
+            's': 'datastale',
+            'd': 'Transaction ETag does not match',
+          });
+          expect(server.data['v'], 5);
+          final List<Map<String, Object?>> written = await send(
+            _request(2, 'p', <String, Object?>{
+              'p': '/v',
+              'd': 7,
+              'h': 'w28swksk9+tXf5jEdS9R5oSFAv8=',
+            }),
+          );
+          expect(answerOf(written), <String, Object?>{'s': 'ok', 'd': 7});
+          expect(server.data['v'], 7);
+        },
+      );
+
+      test('server values are resolved in what is stored and pushed', () async {
+        await send(_request(1, 'q', <String, Object?>{'p': '/', 'h': ''}));
+        final Map<String, Object?> increment = <String, Object?>{
+          '.sv': <String, Object?>{'increment': 3},
+        };
+        final List<Map<String, Object?>> first = await send(
+          _request(2, 'p', <String, Object?>{'p': '/n', 'd': increment}),
+        );
+        final List<Map<String, Object?>> second = await send(
+          _request(3, 'p', <String, Object?>{'p': '/n', 'd': increment}),
+        );
+        final List<Map<String, Object?>> stamped = await send(
+          _request(4, 'm', <String, Object?>{
+            'p': '/',
+            'd': <String, Object?>{
+              'ts': <String, Object?>{'.sv': 'timestamp'},
+            },
+          }),
+        );
+        expect(pushes(first).single['b'], <String, Object?>{'p': 'n', 'd': 3});
+        expect(pushes(second).single['b'], <String, Object?>{'p': 'n', 'd': 6});
+        expect(pushes(stamped).single['b'], <String, Object?>{
+          'p': '',
+          'd': <String, Object?>{'ts': 42},
+        });
+        expect(answerOf(second), <String, Object?>{'s': 'ok', 'd': ''});
+        expect(server.data, <String, Object?>{'n': 6, 'ts': 42});
+      });
+
+      test(
+        'malformed requests: a control error and no answer, as measured',
+        () async {
+          for (final Map<String, Object?> bad in <Map<String, Object?>>[
+            _request(1, 'zz', <String, Object?>{}),
+            _request(2, 'p', <String, Object?>{
+              'p': '/a',
+              'd': <String, Object?>{'a.b': 1},
+            }),
+            _request(3, 'p', <String, Object?>{
+              'p': '/a',
+              'd': <String, Object?>{'.sv': 'bogus'},
+            }),
+          ]) {
+            final List<Map<String, Object?>> got = await send(bad);
+            expect(got, hasLength(1));
+            expect(got.single['t'], 'c');
+            expect(inner(got.single)['t'], 'e');
+          }
+          expect(server.data, isEmpty);
+        },
+      );
+
+      test('a path with . or \$ is answered invalid_parameters', () async {
+        for (final String path in <String>['/a.b', r'/a/$b']) {
+          final List<Map<String, Object?>> got = await send(
+            _request(1, 'q', <String, Object?>{'p': path, 'h': ''}),
+          );
+          expect(answerOf(got), <String, Object?>{
+            's': 'invalid_parameters',
+            'd': 'Invalid token in path',
+          });
+        }
+        final List<Map<String, Object?>> priority = await send(
+          _request(2, 'p', <String, Object?>{'p': '/c/.priority', 'd': 5}),
+        );
+        expect(answerOf(priority)['s'], 'ok');
+      });
+
+      test(
+        'a q without p closes the socket with 1006 and no message',
+        () async {
+          _clientSend(channel, _request(1, 'q', <String, Object?>{'h': ''}));
+          await pumpEventQueue();
+          expect((events.last as WsClosed).code, 1006);
+          expect(server.log.single.action, 'q');
+        },
+      );
+
+      test(
+        'a query listen without a tag: internal_error, a reset, a close',
+        () async {
+          _clientSend(
+            channel,
+            _request(1, 'q', <String, Object?>{
+              'p': '/people',
+              'q': <String, Object?>{'l': 2, 'vf': 'l'},
+              'h': '',
+            }),
+          );
+          await pumpEventQueue();
+          final List<Map<String, Object?>> got = _messages(
+            events,
+          ).skip(1).toList();
+          expect(
+            answerOf(<Map<String, Object?>>[got.first])['s'],
+            'internal_error',
+          );
+          expect(inner(got.last), <String, Object?>{
+            't': 'r',
+            'd': 's-1.example',
+          });
+          expect((events.last as WsClosed).code, 1006);
+        },
+      );
+
+      test(
+        'a frame over 65536 bytes closes with 1002; 65536 bytes pass',
+        () async {
+          String frameOfBytes(int bytes) {
+            const String head =
+                '{"t":"d","d":{"r":1,"a":"p","b":{"p":"/a","d":"';
+            const String tail = '"}}}';
+            return '$head${'x' * (bytes - head.length - tail.length)}$tail';
+          }
+
+          channel.sendText(frameOfBytes(65536));
+          await pumpEventQueue();
+          expect(server.log, hasLength(1));
+          channel.sendText(frameOfBytes(65537));
+          await pumpEventQueue();
+          expect(server.log, hasLength(1));
+          expect((events.last as WsClosed).code, 1002);
+        },
+      );
+
+      test('the flags give the simple form back', () async {
+        server = FakeRtdbServer(
+          checkHashes: false,
+          resolveServerValues: false,
+          validateRequests: false,
+        );
+        await open();
+        final List<Map<String, Object?>> hashed = await send(
+          _request(1, 'p', <String, Object?>{'p': '/v', 'd': 7, 'h': 'AAAA'}),
+        );
+        expect(answerOf(hashed), <String, Object?>{'s': 'ok', 'd': ''});
+        final List<Map<String, Object?>> unknown = await send(
+          _request(2, 'zz', <String, Object?>{}),
+        );
+        expect(answerOf(unknown)['s'], 'ok');
+        final Map<String, Object?> sv = <String, Object?>{'.sv': 'timestamp'};
+        await send(_request(3, 'p', <String, Object?>{'p': '/t', 'd': sv}));
+        expect(server.data['t'], sv);
+      });
+
+      test('idleClose: 120 s without a client frame closes with 1006', () {
+        fakeAsync((FakeAsync async) {
+          final FakeRtdbServer idle = FakeRtdbServer(
+            idleClose: FakeRtdbServer.measuredIdleClose,
+            elapsed: () => async.elapsed,
+          );
+          late WsChannel ws;
+          idle.connect(Uri.parse('wss://h/.ws')).then((WsChannel c) => ws = c);
+          async.flushMicrotasks();
+          final List<WsEvent> seen = _record(ws);
+          async.elapse(const Duration(seconds: 100));
+          ws.sendText('0');
+          async.elapse(const Duration(seconds: 119));
+          expect(seen.whereType<WsClosed>(), isEmpty);
+          async.elapse(const Duration(seconds: 1));
+          expect((seen.last as WsClosed).code, 1006);
+          expect(async.pendingTimers, isEmpty);
+        });
+      });
     });
 
     test(
