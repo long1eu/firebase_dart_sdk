@@ -591,6 +591,63 @@ void main() {
     });
 
     test(
+      'an onDisconnect set failed by a drop is sent again when registered again',
+      () async {
+        final RepoHarness h = RepoHarness();
+        h.listen('S1', 'p');
+        h.answer('p', 'on');
+        h.repo.onDisconnectSetValue(
+          Path('p'),
+          nodeFromJson('off'),
+          onComplete: h.completion('F1'),
+        );
+        await settle();
+        h.server.disconnect();
+        await settle();
+        h.server.connect();
+        await settle();
+        h.repo.onDisconnectSetValue(
+          Path('p'),
+          nodeFromJson('off'),
+          onComplete: h.completion('F2'),
+        );
+        await settle();
+        expect(h.callsAt('onDisconnectPut', '/p'), hasLength(2));
+        h.server.ackLastOnDisconnect();
+        await settle();
+        expect(h.log.where((String e) => e.startsWith('F')), <String>[
+          'F1:E(disconnected)',
+          'F2:ok',
+        ]);
+        // Registered now: a drop applies it locally.
+        h.log.clear();
+        h.server.disconnect();
+        await settle();
+        expect(h.log, <String>['S1:V("off")']);
+      },
+    );
+
+    test('an onDisconnect cancel after a failed set is sent', () async {
+      final RepoHarness h = RepoHarness();
+      h.repo.onDisconnectSetValue(
+        Path('p'),
+        nodeFromJson('off'),
+        onComplete: h.completion('F'),
+      );
+      await settle();
+      h.server.disconnect();
+      await settle();
+      h.server.connect();
+      await settle();
+      h.repo.onDisconnectCancel(Path('p'), onComplete: h.completion('X'));
+      await settle();
+      expect(h.callsAt('onDisconnectCancel', '/p'), hasLength(1));
+      h.server.ackLastOnDisconnect();
+      await settle();
+      expect(h.log, <String>['F:E(disconnected)', 'X:ok']);
+    });
+
+    test(
       'a sent onDisconnect request fails with disconnected on a drop',
       () async {
         final RepoHarness h = RepoHarness();
