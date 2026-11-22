@@ -27,7 +27,7 @@ database. Without `FIREBASE_DATABASE_EMULATOR_HOST` they stop with a message. Th
 | `on_disconnect.dart` | `OnDisconnect.set` / `update` / `remove` / `cancel` with a second client watching. |
 | `connection_state.dart` | `onConnected`, `isConnected`, `goOffline` / `goOnline`, a write queued while offline. |
 | `server_values.dart` | `ServerValue.timestamp` and `increment`, the local estimate, `estimatedServerTime`. |
-| `auth_and_rules.dart` | `mockUserToken` and a rule that refuses (`permission-denied`); needs the rules in its header, loaded as shown below. |
+| `auth_and_rules.dart` | `mockUserToken` and a rule that refuses (`permission-denied`); loads the rules it needs and restores open ones. |
 | `error_handling.dart` | `FirebaseDatabaseException` (`code`, `serverStatus`) against `ArgumentError` and `StateError`. |
 | `lifecycle.dart` | Independent instances, `close()`, the `database-closed` error on streams and calls. |
 | `cookbook/presence.dart` | Online and offline with `onConnected` and `onDisconnect`. |
@@ -38,14 +38,9 @@ database. Without `FIREBASE_DATABASE_EMULATOR_HOST` they stop with a message. Th
 `FIREBASE_DATABASE_EMULATOR_HOST`, adds port 9100 when the value has none), `freshKey()` and `runExample()`
 (a database plus a fresh key, removed and closed afterwards).
 
-To load the rules of `auth_and_rules.dart` for the `demo-example` project while the emulator runs (the start
-script's `DATABASE_RULES` applies to the `demo-test` namespace only), put the JSON from the program's header in
-`rules.json` and send it with the namespace of this project:
-
-```sh
-curl -X PUT -H 'Authorization: Bearer owner' --data @rules.json \
-  'http://127.0.0.1:9100/.settings/rules.json?ns=demo-example-default-rtdb'
-```
+`auth_and_rules.dart` loads its own rules into the `demo-example` namespace when it starts (a `PUT` to the
+emulator's `/.settings/rules.json?ns=demo-example-default-rtdb`, see `setEmulatorRules` in `common.dart`) and puts open
+rules back when it ends, also after an error. It refuses to do this against anything but a local emulator.
 
 Every program was run against the Database emulator; none against a real database. Limits to know:
 

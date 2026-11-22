@@ -15,6 +15,7 @@
 // Every program needs the variable and stops with a message without it, so an
 // example can never reach a real project.
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_app_dart/firebase_app_dart.dart';
@@ -22,6 +23,13 @@ import 'package:firebase_database_dart/firebase_database_dart.dart';
 
 /// The project of the emulator; "demo-" projects never reach production.
 const String projectId = 'demo-example';
+
+/// The namespace of the emulator database of [projectId], what the client uses
+/// without a database URL.
+const String namespace = '$projectId-default-rtdb';
+
+/// Rules that allow every read and write: what the emulator starts with.
+const String openRules = '{"rules": {".read": true, ".write": true}}';
 
 /// The port of the Realtime Database emulator when the variable names none.
 const int defaultEmulatorPort = 9100;
@@ -54,6 +62,43 @@ String emulatorHost() {
       ? host.contains(']:')
       : host.contains(':');
   return hasPort ? host : '$host:$defaultEmulatorPort';
+}
+
+/// Replaces the rules of [namespace] on the emulator with [rules] (JSON), through
+/// its REST endpoint `PUT /.settings/rules.json?ns=<namespace>` with the
+/// `owner` credential, which the emulator accepts as an admin.
+///
+/// Stops with a message instead of sending anything when the address from
+/// `FIREBASE_DATABASE_EMULATOR_HOST` is a real Firebase host, or when
+/// [projectId] is not a `demo-` project, so that this never touches a real
+/// database. Throws a [StateError] when the emulator refuses the rules (for
+/// example, invalid JSON).
+Future<void> setEmulatorRules(String rules) async {
+  final String host = emulatorHost();
+  if (!projectId.startsWith('demo-') ||
+      host.contains('firebaseio.com') ||
+      host.contains('firebasedatabase.app')) {
+    stderr.writeln('Refusing to change rules: $host is not a local emulator.');
+    exit(64);
+  }
+  final HttpClient client = HttpClient();
+  try {
+    final HttpClientRequest request = await client.putUrl(
+      Uri.parse('http://$host/.settings/rules.json?ns=$namespace'),
+    );
+    request.headers.set('Authorization', 'Bearer owner');
+    request.write(rules);
+    final HttpClientResponse response = await request.close();
+    final String body = await response.transform(utf8.decoder).join();
+    if (response.statusCode != 200) {
+      throw StateError(
+        'The emulator at $host refused the rules '
+        '(${response.statusCode}): $body',
+      );
+    }
+  } finally {
+    client.close();
+  }
 }
 
 /// A [FirebaseDatabase] connected to the emulator. [mockUserToken] makes the
