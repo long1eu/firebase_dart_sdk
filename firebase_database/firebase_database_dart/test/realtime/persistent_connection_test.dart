@@ -424,6 +424,51 @@ void main() {
         expect(order, <String>['dataUpdate', 'complete ok']);
       },
     );
+
+    // Addendum 5: the server sends a write's data push before its ok (measured); the sync tree
+    // re-applies the server cache at the ack, so the push must reach Repo first, whether the two
+    // frames arrive in one burst or in separate events.
+    for (final bool burst in <bool>[true, false]) {
+      test('a write\'s push then its ack reach Repo in arrival order '
+          '(${burst ? 'one burst' : 'separate events'})', () async {
+        rig = PRig();
+        await rig.start();
+        final List<String> order = <String>[];
+        rig.onCall = order.add;
+        rig.connection.put(
+          '/a',
+          1,
+          onComplete: (String s, _) => order.add('complete $s'),
+        );
+        await rig.settle();
+        final int r = rig.sent('p').single.r!;
+        rig.server.pushData('/a', 1);
+        if (!burst) {
+          await Future<void>.delayed(Duration.zero);
+        }
+        rig.server.connector.last.serverResponse(r);
+        rig.server.pushData('/b', 2);
+        await rig.settle();
+        expect(order, <String>['dataUpdate', 'complete ok', 'dataUpdate']);
+      });
+    }
+
+    test('a get answer is seen before a push that arrived after it', () async {
+      rig = PRig();
+      await rig.start();
+      final List<String> order = <String>[];
+      rig.onCall = order.add;
+      final Future<Object?> result = rig.connection.get(defaultListen('/a'));
+      unawaited(result.then((Object? value) => order.add('get $value')));
+      await rig.settle();
+      rig.server.connector.last.serverResponse(
+        rig.sent('g').single.r!,
+        data: 1,
+      );
+      rig.server.pushData('/a', 2);
+      await rig.settle();
+      expect(order, <String>['get 1', 'dataUpdate']);
+    });
   });
 
   group('connection management (8)', () {

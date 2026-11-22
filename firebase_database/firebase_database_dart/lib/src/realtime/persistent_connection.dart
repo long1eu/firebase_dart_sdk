@@ -329,7 +329,9 @@ final class PersistentConnection implements ServerActions {
       },
       onTimeout: () => _onTimeout(get, () {
         _queues.gets.remove(get);
-        get.completer.completeError(ServerActionsException(_statusNetworkError));
+        get.completer.completeError(
+          ServerActionsException(_statusNetworkError),
+        );
       }),
     );
   }
