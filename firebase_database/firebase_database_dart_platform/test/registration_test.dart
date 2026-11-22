@@ -66,6 +66,17 @@ void main() {
     expect(DatabasePlatform.instance, same(registered));
   });
 
+  test('use(useDartCore: true) keeps a core another package installed', () {
+    final FirebasePlatform dartCore = FirebasePlatform.instance;
+    final FirebasePlatform foreign = _ForeignCore();
+    FirebasePlatform.instance = foreign;
+    addTearDown(() => FirebasePlatform.instance = dartCore);
+
+    FirebaseDatabaseDart.use(useDartCore: true);
+
+    expect(FirebasePlatform.instance, same(foreign));
+  });
+
   test('the official FirebaseDatabase runs on the client', () async {
     final FirebaseApp app = await Firebase.initializeApp(options: options);
 
@@ -85,3 +96,6 @@ void main() {
     expect(FirebaseDatabaseDart.registerWith, throwsStateError);
   });
 }
+
+/// A `firebase_core` implementation of another package.
+class _ForeignCore extends FirebasePlatform {}

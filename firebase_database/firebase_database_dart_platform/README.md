@@ -8,15 +8,16 @@ Firebase Realtime Database over its WebSocket protocol. An app keeps the officia
 client does the work underneath, without the native Firebase SDKs.
 
 It is for a Flutter app on Linux desktop, where `firebase_database` and `firebase_core` have no implementation of
-their own: adding the dependency registers it. On Windows, an app that lists it as a direct dependency gets it in
-place of the native plugin. On the other platforms it is an opt-in through `FirebaseDatabaseDart.use()`. It is not
-affiliated with or endorsed by Google or Firebase.
+their own: FlutterFire has no Linux plugin for `firebase_database`, so this package is the only implementation there,
+and adding the dependency registers it. On Windows FlutterFire has its own plugin (built on the Firebase C++ SDK); an
+app that lists this package as a direct dependency gets this package in its place. On the other platforms it is an
+opt-in through `FirebaseDatabaseDart.use()`. It is not affiliated with or endorsed by Google or Firebase.
 
 > **Status: 0.0.1, not published, work in progress.** What is and is not verified:
 >
 > - The client underneath, `firebase_database_dart`, is complete, and its tests pass against the Database emulator.
-> - The unit tests of this package pass (114, and 5 more against the emulator), against the client's fake server
->   (`package:firebase_database_dart/testing.dart`).
+> - The unit tests of this package run against the client's fake server (`package:firebase_database_dart/testing.dart`),
+>   and 5 more against the emulator. The tests added with the review fixes of 2026-11-22 have not run yet.
 > - FlutterFire's own `firebase_database` integration suite (77 tests) is the acceptance gate
 >   (`tool/test_flutterfire_database_gate.sh`, against the Database emulator): 76 pass and 1 skips itself, on
 >   macOS with the host test runner. It has **not run yet** on Linux or Windows, or in a built desktop app.
@@ -45,8 +46,9 @@ await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 await FirebaseDatabase.instance.ref('notes/today').set('Hello');
 ```
 
-**On Windows**, list the package as a direct dependency (as above): it then replaces the native `firebase_database`
-plugin, which leaves the build, and registers before `main()` as on Linux. `firebase_core` stays native.
+**On Windows**, list the package as a direct dependency (as above): it then replaces FlutterFire's native
+`firebase_database` plugin (the C++ SDK), which leaves the build, and registers before `main()` as on Linux: the
+generated plugin registrant calls `FirebaseDatabaseDart.registerWith()`. `firebase_core` stays native.
 
 **On any other platform**, call `FirebaseDatabaseDart.use()` at the start of `main()`, before the first use of
 `Firebase` or `FirebaseDatabase`. There `firebase_core` keeps its native implementation, and the native Realtime
@@ -72,9 +74,17 @@ FirebaseDatabaseDart.use(
 );
 ```
 
+A sign-in, a switch of users and a token refresh re-authenticate the open connection without dropping it. The
+change events of `FlutterFireAuthTokenProvider` do not hold the token, so the provider is installed behind a wrapper
+that answers each change with the token of `getAccessToken`.
+
 Without it the connection carries no user, which is enough for the emulator and for open rules. When another
 platform package of this repository already set up the app (a `firebase_app_dart` app with the name of the
-FlutterFire app), that app and its token provider are used, and `tokenProviderFor` is not called.
+FlutterFire app), that app keeps its token provider and `tokenProviderFor` is not called; when that app has no token
+provider, it gets the one of `tokenProviderFor`. The wrapper is installed only on a provider of `tokenProviderFor`: a
+`FlutterFireAuthTokenProvider` that another package installed on the shared app sends its change events as they are,
+and then each sign-in or refresh can drop the connection once until `firebase_database_dart` itself fetches the token
+on a change.
 
 ### App Check
 
@@ -103,7 +113,7 @@ Without it, or when it returns null, the connection sends no App Check token.
 | `tokenProviderFor` | none: no user | Returns the token provider of a FlutterFire app; called once per app. |
 | `appCheckProviderFor` | none: no App Check token | Returns the App Check token provider of a FlutterFire app; called once per app. |
 | `persistenceFor` | none: memory only | A `DatabasePersistenceFactory`: returns the client's `DatabasePersistence` for the cache size the app set (below). |
-| `useDartCore` | Linux only, when `firebase_core` has no other implementation | Installs a small pure-Dart `firebase_core`. Pass `true` to force it (tests), `false` to never do it. |
+| `useDartCore` | Linux only | Installs a small pure-Dart `firebase_core` in place of its method-channel implementation; a core another package installed is kept. Pass `true` for any platform (tests), `false` to never do it. |
 
 `use()` throws a `StateError` once an instance has created its client, because the configuration is read then.
 `FirebaseDatabaseDart.clientFor(app)` returns the client behind an instance, for what the official API does not
@@ -123,11 +133,22 @@ name and database URL, so one directory serves every app.
   `onDisconnect` registrations do not: they are memory only. Register `onDisconnect` writes again when the client
   reconnects (`clientFor(app).onConnected`).
 
+### Emulator, logging, deleting an app
+
+- The emulator is used only when the app calls `useDatabaseEmulator`. The `FIREBASE_DATABASE_EMULATOR_HOST`
+  environment variable is not read, as with the Firestore and Storage platform packages and FlutterFire's own
+  plugins.
+- The client's warnings and errors (for example that persistence could not be opened and the client runs in memory)
+  are printed with `debugPrint` always; its debug and info lines only after `setLoggingEnabled(true)`.
+- `FirebaseApp.delete()` closes the clients of that app on every platform (through `firebase_core`'s
+  `registerService`). The `FirebaseDatabase` objects of the app keep working once an app of the same name is created
+  again: the next call creates a new client with the settings the object had.
+
 ## What is implemented
 
 | Official API | Underneath | Notes |
 | --- | --- | --- |
-| `FirebaseDatabase.instanceFor(app:, databaseURL:)` | one `firebase_database_dart` client per app and URL, created at the first I/O | |
+| `FirebaseDatabase.instanceFor(app:, databaseURL:)` | one `firebase_database_dart` client per app and database, created at the first I/O | `instance` and `instanceFor` with the same database (the app's URL, a trailing slash, another case of the host) share it, as on Android |
 | `useDatabaseEmulator`, `setPersistenceEnabled`, `setPersistenceCacheSizeBytes`, `setLoggingEnabled` | the client's constructor arguments | captured before the client exists; see "How it differs" |
 | `goOnline`, `goOffline`, `purgeOutstandingWrites` | the same client calls | pending writes fail with `write-cancelled` |
 | `ref`, `refFromURL`, `child`, `parent`, `root`, `key`, `path` | the location's keys | no client, no I/O |
@@ -157,22 +178,31 @@ that same object. With `applyLocally: false`, listeners see no local event befor
 
 - **Web**: use the official plugin.
 - **Long polling**: the client speaks only the WebSocket protocol.
+- **`DatabasePlatform.getChannelArguments`** is not overridden and throws `UnimplementedError`, as in FlutterFire's
+  web implementation: only the method-channel implementation builds channel arguments, and the official
+  `firebase_database` never calls it.
 
 ## How it differs from the official plugin
 
 - **Streams are not broadcast streams.** Each listen of `onValue` (or another event stream) is its own registration
   with its own initial event, and cancelling it removes only that registration, as the client's streams do.
-- **Settings are captured when the client is created**, at the first I/O of an instance (a read, a write, `push`,
-  `goOnline`...). After that `useDatabaseEmulator` with the same host does nothing and with another one throws a
-  `StateError` (ignoring it would send the traffic to production); `setPersistenceEnabled` and
-  `setPersistenceCacheSizeBytes` are ignored with a debug message, as on Android; `setLoggingEnabled` takes effect at
-  once.
+- **Settings are captured when the client is created**, at the first I/O of an instance (a read, a write, the first
+  listen of an event stream, `push`, `goOnline`...). `push()` makes no request, but it needs the client for the
+  server time offset of the key, so call `useDatabaseEmulator` before it. After the client is created,
+  `useDatabaseEmulator` with the same host does nothing and with another one throws a `StateError` (ignoring it would
+  send the traffic to production); `setPersistenceEnabled` and `setPersistenceCacheSizeBytes` are ignored with a
+  debug message, as on Android; `setLoggingEnabled` takes effect at once.
 - **Persistence is injected** as a factory from the cache size (`persistenceFor`), not switched on by the native SDK.
 - **References are made without the client**: `ref`, `child`, `parent`, `root`, `key`, `path` and `onDisconnect()`
   only build a location. So an invalid key, `ref('a.b')`, is reported at the first read or write of it (an
   `ArgumentError`), not when the reference is made.
 - **Values are mutable copies**, typed `Map<Object?, Object?>` and `List<Object?>` as the native plugins type them,
-  made once per snapshot; two listeners never share one.
+  made once per snapshot; two listeners never share one. `snapshot.child(...)` and `snapshot.children` make their own
+  copies from the client's data, and `children` makes new ones on each iteration: a change to the parent's `value`
+  map, or to the value of a child taken from an earlier iteration, is not seen through them. The native plugins derive
+  children from the parent's `value` map, so there they see it.
+- **A stream ends after the server cancels its listen** (`permission-denied`, then done), as the client's streams do;
+  on Android the stream reports the error and stays open, so an `await for` loop ends here and waits there.
 - **A child snapshot keeps its priority** (`snapshot.child('a').priority`, `children`); the native plugins give null.
 - **The snapshot of a child event has the child's reference** (`event.snapshot.ref` of `onChildAdded` is the child,
   as in the JS and native SDKs); FlutterFire gives the query's reference. Code that used `event.snapshot.ref` as the
@@ -196,7 +226,7 @@ that same object. With `applyLocally: false`, listeners see no local event befor
 | Platform | Selected by | Notes |
 | --- | --- | --- |
 | Linux | automatic (`dartPluginClass`) | `firebase_core` is installed too, unless another package did it first |
-| Windows | automatic when a direct dependency (`dartPluginClass`) | replaces the native plugin; `firebase_core` stays native. Verified with stand-in plugins; a real Windows build is run before release |
+| Windows | automatic when a direct dependency (`dartPluginClass`) | replaces FlutterFire's native plugin (C++ SDK); `firebase_core` stays native. Run on Windows 11 x64, Flutter 3.47.8, debug: write, read and transaction against the emulator |
 | macOS, Android, iOS | `FirebaseDatabaseDart.use()` | `firebase_core` and the native SDK stay in the build |
 | Web | not supported | use the official plugin |
 

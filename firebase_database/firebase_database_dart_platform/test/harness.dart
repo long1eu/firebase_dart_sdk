@@ -41,8 +41,13 @@ late FakeDatabaseServer server;
 /// URL). Cleared before each test.
 final List<DatabaseClientSettings> createdClients = <DatabaseClientSettings>[];
 
-/// The tokens handed out per app name; an app without one has no user.
+/// The tokens handed out per app name, as a [FixedToken]; an app without
+/// one (and without an entry in [providers]) has no user.
 final Map<String, String> tokens = <String, String>{};
+
+/// The token providers handed out per app name; they win over [tokens].
+final Map<String, dart_app.AuthTokenProvider> providers =
+    <String, dart_app.AuthTokenProvider>{};
 
 int _apps = 0;
 
@@ -52,7 +57,7 @@ Future<FirebaseApp> newApp({FirebaseOptions appOptions = options}) =>
 
 /// Registers the package as an app on Linux would
 /// ([FirebaseDatabaseDart.use] in `setUpAll`), with the Dart core, the
-/// token providers of [tokens] and [persistenceFor]; replaces
+/// token providers of [providers] and [tokens], and [persistenceFor]; replaces
 /// [DartFirebaseDatabase.clientFactory] with one that records the settings in
 /// [createdClients] and returns `databaseWithFakeServer(app, server,
 /// persistence: settings.persistence, logger: settings.logger,
@@ -65,6 +70,10 @@ void registerForTests({DatabasePersistenceFactory? persistenceFor}) {
       useDartCore: true,
       persistenceFor: persistenceFor,
       tokenProviderFor: (FirebaseApp app) {
+        final dart_app.AuthTokenProvider? provider = providers[app.name];
+        if (provider != null) {
+          return provider;
+        }
         final String? token = tokens[app.name];
         return token == null ? null : FixedToken(token);
       },

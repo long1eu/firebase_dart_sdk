@@ -75,9 +75,11 @@ abstract final class FirebaseDatabaseDart {
   ///   FlutterFire app: `FirebaseAuthDart.userAuthFor(app)` of
   ///   `firebase_auth_dart_platform`, or a `FlutterFireAuthTokenProvider` of
   ///   `cloud_firestore_dart_flutterfire`. Called once per app; without it,
-  ///   or when it returns null, the connection carries no user. A
-  ///   `firebase_app_dart` app that already exists with the name of the
-  ///   FlutterFire app is used as it is, with its own providers.
+  ///   or when it returns null, the connection carries no user. The provider
+  ///   is installed as a `TokenOnChangeProvider`, whose change events carry
+  ///   the token. A `firebase_app_dart` app that already exists with the
+  ///   name of the FlutterFire app keeps its own providers, and gets these
+  ///   only where it has none.
   /// * [appCheckProviderFor] returns the App Check token provider of the
   ///   connection of a FlutterFire app (`FlutterFireAppCheckProvider` of
   ///   `cloud_firestore_dart_flutterfire` for the official
@@ -88,9 +90,10 @@ abstract final class FirebaseDatabaseDart {
   ///   off for an instance; `setPersistenceEnabled(true)` without it prints a
   ///   warning and stays in memory.
   /// * [useDartCore] replaces the implementation of `firebase_core` with a
-  ///   small pure-Dart one. By default (null) that happens only on Linux, and
-  ///   only while `firebase_core` has no other implementation; pass true to
-  ///   force it (for example in tests), false to never do it.
+  ///   small pure-Dart one, only while `firebase_core` has its default
+  ///   method-channel implementation (a core another package installed is
+  ///   kept). By default (null) that happens only on Linux; pass true to do
+  ///   it on any platform (for example in tests), false to never do it.
   ///
   /// Throws a [StateError] once an instance has created its client: the
   /// configuration is read then.

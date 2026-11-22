@@ -2,8 +2,7 @@ name: firebase_database_dart_platform
 description: >-
   Unofficial pure-Dart implementation of the FlutterFire Realtime Database
   platform interface: the official firebase_database API on Linux, or on any
-  platform you choose. Work in progress: this version is the signature-only
-  skeleton.
+  platform you choose.
 version: 0.0.1
 publish_to: none
 homepage: https://github.com/long1eu/firebase_dart_sdk
@@ -23,10 +22,9 @@ environment:
 # Flutter registers the plugin class before main() only on the platforms listed
 # here. On Linux neither firebase_database nor firebase_core has an
 # implementation of its own. On Windows, an app that lists this package as a
-# direct dependency gets it in place of the native firebase_database plugin,
-# which then leaves the build (verified with stand-in plugins; a real Windows
-# build is run before release). Elsewhere the app calls
-# FirebaseDatabaseDart.use() (see the README).
+# direct dependency gets it in place of the native (C++ SDK) firebase_database
+# plugin, which then leaves the build (run on Windows 11 x64, Flutter 3.47.8,
+# debug). Elsewhere the app calls FirebaseDatabaseDart.use() (see the README).
 flutter:
   plugin:
     implements: firebase_database

@@ -1,6 +1,8 @@
 /// [DartQuery], the [QueryPlatform] of this package.
 library;
 
+import 'dart:async';
+
 import 'package:firebase_database_dart/firebase_database_dart.dart' as fs;
 import 'package:firebase_database_dart_platform/src/data_snapshot.dart';
 import 'package:firebase_database_dart_platform/src/errors.dart';
@@ -83,19 +85,44 @@ class DartQuery extends QueryPlatform {
 
   /// `QueryPlatform.observe`: the client stream of [eventType]
   /// (`onValue`, `onChildAdded`, ...) of [clientQuery], mapped to
-  /// [DartDatabaseEvent]s and through [guardStream]. Not a broadcast stream:
-  /// as the client's `Stream.multi`, each listen is its own registration with
-  /// its own initial events, and its cancel removes it. An invalid query is a
-  /// stream with that error, then done (not a throw from this call).
+  /// [DartDatabaseEvent]s and through [guardStream]. Nothing happens until
+  /// the stream is listened to, as with FlutterFire's `async*` stream: the
+  /// client query (and the client, with its settings) is made by each listen.
+  /// Not a broadcast stream: as the client's `Stream.multi`, each listen is
+  /// its own registration with its own initial events, delivered
+  /// synchronously as the client delivers them, and its cancel removes it.
+  /// An invalid query is a stream with that error, then done (not a throw
+  /// from this call).
   @override
   Stream<DatabaseEventPlatform> observe(
     QueryModifiers modifiers,
     DatabaseEventType eventType,
+  ) => Stream<DatabaseEventPlatform>.multi((
+    MultiStreamController<DatabaseEventPlatform> controller,
   ) {
-    Stream<fs.DatabaseEvent> events;
+    final StreamSubscription<DatabaseEventPlatform> subscription =
+        guardStream(
+          _clientEvents(modifiers, eventType).map<DatabaseEventPlatform>(
+            (fs.DatabaseEvent event) => DartDatabaseEvent(database, event),
+          ),
+        ).listen(
+          controller.addSync,
+          onError: controller.addErrorSync,
+          onDone: controller.closeSync,
+        );
+    controller
+      ..onPause = subscription.pause
+      ..onResume = subscription.resume
+      ..onCancel = subscription.cancel;
+  });
+
+  Stream<fs.DatabaseEvent> _clientEvents(
+    QueryModifiers modifiers,
+    DatabaseEventType eventType,
+  ) {
     try {
       final fs.Query query = clientQuery(modifiers);
-      events = switch (eventType) {
+      return switch (eventType) {
         DatabaseEventType.value => query.onValue,
         DatabaseEventType.childAdded => query.onChildAdded,
         DatabaseEventType.childChanged => query.onChildChanged,
@@ -103,13 +130,8 @@ class DartQuery extends QueryPlatform {
         DatabaseEventType.childRemoved => query.onChildRemoved,
       };
     } on Object catch (error, stackTrace) {
-      events = Stream<fs.DatabaseEvent>.error(error, stackTrace);
+      return Stream<fs.DatabaseEvent>.error(error, stackTrace);
     }
-    return guardStream(
-      events.map<DatabaseEventPlatform>(
-        (fs.DatabaseEvent event) => DartDatabaseEvent(database, event),
-      ),
-    );
   }
 
   /// `QueryPlatform.get`: client `Query.get()` of [clientQuery] through
