@@ -26,14 +26,8 @@ enum LeafType {
   string,
 }
 
-/// The read form of a stored number: `int` when integral within 2^53, except negative zero,
-/// which stays `-0.0` (the server keeps it).
-num _readNumber(num value) {
-  if (value is double && value == 0 && value.isNegative) {
-    return value;
-  }
-  return normalizeNumber(value);
-}
+/// The read form of a stored number, see [normalizeNumber].
+num _readNumber(num value) => normalizeNumber(value);
 
 /// A leaf: a boolean, a number, a string or an unresolved server value map, with a priority.
 final class LeafNode implements Node {

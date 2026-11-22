@@ -25,6 +25,10 @@ const String statusOk = 'ok';
 /// drops; produced locally by the connection, never by the server.
 const String statusDisconnect = 'disconnect';
 
+/// The status a request fails with when it has timed out twice on live connections; produced
+/// locally by the connection, never by the server. Maps to `DatabaseErrorCode.networkError`.
+const String statusNetworkError = 'network_error';
+
 /// The status a read-only [ServerActions] (the REST client) completes every write and
 /// onDisconnect request with; maps to `DatabaseErrorCode.readOnly`.
 const String statusReadOnly = 'read_only';
@@ -49,7 +53,8 @@ final class ServerActionsException implements Exception {
 }
 
 /// Completion of a request: [status] is `ok`, a server error status (`permission_denied`,
-/// `datastale`, `too_big`, `unavailable`, ...) or the local [statusDisconnect]; [data] is the
+/// `datastale`, `too_big`, `unavailable`, ...) or the local [statusDisconnect] or
+/// [statusNetworkError]; [data] is the
 /// response `d`: on error the human-readable reason (`String?`), on a successful listen the
 /// payload (which may hold warnings `{'w': ['no_index']}`), otherwise usually null.
 ///
@@ -110,7 +115,9 @@ abstract interface class ServerActions {
 
   /// Sends `g` with `p` and `q` (always, `{}` for the default query) and completes with the
   /// decoded `d`, or fails with a [ServerActionsException] carrying the error status and
-  /// reason. Not cancelled by a disconnect: it is re-sent after the reconnect. No timeout.
+  /// reason. Not cancelled by a disconnect: it is re-sent after the reconnect. May
+  /// fail with `ServerActionsException(statusNetworkError)` when it timed out twice on live
+  /// connections; Repo sets no timer of its own while connected.
   Future<Object?> get(ListenSpec spec);
 
   /// Sends `p`: overwrite [path] with [data] (export form, null removes). With [hash] it is a
