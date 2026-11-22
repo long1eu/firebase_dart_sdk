@@ -830,8 +830,8 @@ project with a throwaway user.
 
 **Pinned by.** `test/integration/connection_emulator_test.dart` (listen pushes, hashes, server values, numbers, rules
 cancel, `onDisconnect`, auth), `idle_close_emulator_test.dart` (the idle close), `chaos_emulator_test.dart` and
-`public_api_emulator_test.dart` (tag `emulator`; these files hold 31 `test(` calls, counted and not run; the files ran
-at an earlier commit); no test found that replays the limit-query frames above; `tool/start_database_emulator.sh` and
+`public_api_emulator_test.dart` (tag `emulator`; 29 pass and 2 slow ones skip themselves); no test found that
+replays the limit-query frames above; `tool/start_database_emulator.sh` and
 `tool/stop_database_emulator.sh`.
 
 Status: built; measured on the emulator (v4.11.2); production not measured.
@@ -998,12 +998,12 @@ earlier commit.
 
 | Where | Result | Whose run |
 |---|---|---|
-| Dart VM | 2,437 tests of the client | lead |
-| Chrome, the whole test tree | dart2js 2,394 tests, dart2wasm 2,398 tests | lead |
+| Dart VM | 2,363 tests of the client (after the REST client and its tests were removed) | the other session |
+| Chrome, the whole test tree | dart2js 2,320 tests, dart2wasm 2,324 tests | the other session |
 | SQLite package | 247 tests on Dart 3.11.5 and on Dart 3.8.0 | lead |
-| Adapter | 133 tests, 5 skipped without the emulator | the other session |
+| Adapter | 133 tests, 5 skipped without the emulator; 138 with it | the other session |
 | FlutterFire's own `firebase_database` integration suite through the adapter | 76 pass, 1 skips itself (macOS host test runner, emulator) | lead |
-| Database emulator | the tests tagged `emulator` ran at an earlier commit; 31 `test(` calls are in `test/integration/` now (counted, not run) | lead |
+| Database emulator (v4.11.2, macOS) | the tests tagged `emulator`: 29 pass, 2 skip themselves | the other session |
 | Windows 11 x64 | the client's VM suite passed at an earlier commit (2,126); the Windows example app passes its 4 integration tests through the adapter (Flutter 3.47.8, debug); its disk cache test passed with an earlier version of the app | lead |
 | Linux x64 (Debian 13 container) | the client's VM suite and both browser legs passed at an earlier commit (2,058; 1,125; 1,128); the Linux example app builds and passes its 4 integration tests under a virtual display | lead |
 | Web gallery | a smoke script passes 66 steps on both compilers | the other session |
