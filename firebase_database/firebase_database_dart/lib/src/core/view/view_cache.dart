@@ -15,23 +15,34 @@ final class ViewCache {
   /// The server cache.
   final CacheNode serverCache;
 
-  /// With a new event cache.
+  /// With a new event cache (JS `viewCacheUpdateEventSnap`, Android `ViewCache.updateEventSnap`).
   ViewCache updateEventSnap(
     Node eventSnap, {
     required bool complete,
     required bool filtered,
-  }) => throw UnimplementedError();
+  }) => ViewCache(
+    CacheNode(eventSnap, fullyInitialized: complete, filtered: filtered),
+    serverCache,
+  );
 
-  /// With a new server cache.
+  /// With a new server cache (JS `viewCacheUpdateServerSnap`, Android
+  /// `ViewCache.updateServerSnap`).
   ViewCache updateServerSnap(
     Node serverSnap, {
     required bool complete,
     required bool filtered,
-  }) => throw UnimplementedError();
+  }) => ViewCache(
+    eventCache,
+    CacheNode(serverSnap, fullyInitialized: complete, filtered: filtered),
+  );
 
-  /// The event cache node if fully initialised, else null.
-  Node? get completeEventSnap => throw UnimplementedError();
+  /// The event cache node if fully initialised, else null (JS
+  /// `viewCacheGetCompleteEventSnap`).
+  Node? get completeEventSnap =>
+      eventCache.fullyInitialized ? eventCache.node : null;
 
-  /// The server cache node if fully initialised, else null.
-  Node? get completeServerSnap => throw UnimplementedError();
+  /// The server cache node if fully initialised, else null (JS
+  /// `viewCacheGetCompleteServerSnap`).
+  Node? get completeServerSnap =>
+      serverCache.fullyInitialized ? serverCache.node : null;
 }

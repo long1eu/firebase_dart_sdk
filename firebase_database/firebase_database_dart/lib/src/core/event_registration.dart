@@ -40,18 +40,41 @@ abstract class EventRegistration {
   /// Whether [other] is the same listener (the same callback); used to remove listeners.
   bool isSameListener(EventRegistration other);
 
-  /// Marks the registration removed; queued events for it are dropped.
-  void zombify() => throw UnimplementedError();
+  bool _zombied = false;
+  ZombieListener? _zombieListener;
+  bool _isUserInitiated = false;
 
-  /// Whether [zombify] was called.
-  bool get isZombied => throw UnimplementedError();
+  /// Marks the registration removed; queued events for it are dropped. Calls the [onZombied]
+  /// listener once (Android `EventRegistration.zombify`).
+  void zombify() {
+    if (_zombied) {
+      return;
+    }
+    _zombied = true;
+    final ZombieListener? listener = _zombieListener;
+    if (listener != null) {
+      _zombieListener = null;
+      listener(this);
+    }
+  }
 
-  /// Sets the listener called on [zombify].
-  set onZombied(ZombieListener? listener) => throw UnimplementedError();
+  /// Whether [zombify] was called (Android `EventRegistration.isZombied`).
+  bool get isZombied => _zombied;
 
-  /// Whether the user added it (false for internal ones such as keepSynced).
-  bool get isUserInitiated => throw UnimplementedError();
+  /// Sets the listener called on [zombify]; only once, before it (Android
+  /// `EventRegistration.setOnZombied`).
+  set onZombied(ZombieListener? listener) {
+    assert(!_zombied, 'The registration is already zombied');
+    assert(_zombieListener == null, 'A zombie listener is already set');
+    _zombieListener = listener;
+  }
 
-  /// Sets [isUserInitiated].
-  set isUserInitiated(bool value) => throw UnimplementedError();
+  /// Whether the user added it (false for internal ones such as keepSynced; Android
+  /// `EventRegistration.isUserInitiated`).
+  // The getter and setter pair is the skeleton's signature.
+  // ignore: unnecessary_getters_setters
+  bool get isUserInitiated => _isUserInitiated;
+
+  /// Sets [isUserInitiated] (Android `EventRegistration.setIsUserInitiated`).
+  set isUserInitiated(bool value) => _isUserInitiated = value;
 }

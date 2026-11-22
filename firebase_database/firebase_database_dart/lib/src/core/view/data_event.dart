@@ -30,11 +30,20 @@ final class DataEvent extends Event {
 
   /// The snapshot path for value events, its parent for child events.
   @override
-  Path get path => throw UnimplementedError();
+  Path get path =>
+      eventType == EventType.value ? snapshotPath : snapshotPath.parent!;
 
+  /// Hands the event to [eventRegistration] (Android `DataEvent.fire`).
   @override
-  void fire() => throw UnimplementedError();
+  void fire() => eventRegistration.fireEvent(this);
 
+  /// As Android `DataEvent.toString`.
   @override
-  String toString() => throw UnimplementedError();
+  String toString() {
+    if (eventType == EventType.value) {
+      return '$path: ${eventType.name}: ${snapshot.toJson(exportFormat: true)}';
+    }
+    return '$path: ${eventType.name}: '
+        '{ ${snapshotPath.back}: ${snapshot.toJson(exportFormat: true)} }';
+  }
 }

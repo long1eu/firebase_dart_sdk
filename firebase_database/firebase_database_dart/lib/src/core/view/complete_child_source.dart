@@ -3,10 +3,12 @@
 /// `core/view/ViewProcessor.java` (`NO_COMPLETE_SOURCE`, `WriteTreeCompleteChildSource`).
 library;
 
+import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:firebase_database_dart/src/core/snap/child_key.dart';
 import 'package:firebase_database_dart/src/core/snap/indexes/index.dart';
 import 'package:firebase_database_dart/src/core/snap/named_node.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
+import 'package:firebase_database_dart/src/core/view/cache_node.dart';
 import 'package:firebase_database_dart/src/core/view/view_cache.dart';
 import 'package:firebase_database_dart/src/core/write_tree_ref.dart';
 
@@ -23,20 +25,23 @@ abstract interface class CompleteChildSource {
   });
 }
 
-/// The source that knows nothing.
+/// The source that knows nothing (JS `NoCompleteChildSource_`, Android
+/// `ViewProcessor.NO_COMPLETE_SOURCE`).
 final class NoCompleteChildSource implements CompleteChildSource {
   /// Use [noCompleteChildSource].
   const NoCompleteChildSource();
 
+  /// Always null (JS `NoCompleteChildSource_.getCompleteChild`).
   @override
-  Node? getCompleteChild(ChildKey key) => throw UnimplementedError();
+  Node? getCompleteChild(ChildKey key) => null;
 
+  /// Always null (JS `NoCompleteChildSource_.getChildAfterChild`).
   @override
   NamedNode? getChildAfterChild(
     Index index,
     NamedNode child, {
     required bool reverse,
-  }) => throw UnimplementedError();
+  }) => null;
 }
 
 /// The single [NoCompleteChildSource].
@@ -60,13 +65,47 @@ final class WriteTreeCompleteChildSource implements CompleteChildSource {
   /// A complete server cache from elsewhere in the tree, or null.
   final Node? optCompleteServerCache;
 
+  /// The child from the event cache when complete there, else from the writes over the server
+  /// cache (JS `WriteTreeCompleteChildSource.getCompleteChild`).
   @override
-  Node? getCompleteChild(ChildKey key) => throw UnimplementedError();
+  Node? getCompleteChild(ChildKey key) {
+    final CacheNode node = viewCache.eventCache;
+    if (node.isCompleteForChild(key)) {
+      return node.node.getImmediateChild(key);
+    }
+    final Node? completeServer = optCompleteServerCache;
+    final CacheNode serverNode = completeServer != null
+        ? CacheNode(completeServer, fullyInitialized: true, filtered: false)
+        : viewCache.serverCache;
+    return writes.calcCompleteChild(key, serverNode);
+  }
 
+  /// The next child with the writes applied over the complete server data (JS
+  /// `WriteTreeCompleteChildSource.getChildAfterChild`, Android `calcNextNodeAfterPost`).
+  ///
+  /// Without complete server data only a write shadowing the whole view can answer, as Android's
+  /// `WriteTree.calcNextNodeAfterPost` with a null server node.
   @override
   NamedNode? getChildAfterChild(
     Index index,
     NamedNode child, {
     required bool reverse,
-  }) => throw UnimplementedError();
+  }) {
+    Node? completeServerData =
+        optCompleteServerCache ?? viewCache.completeServerSnap;
+    if (completeServerData == null) {
+      // The write tree ignores the server data when a write shadows the root, so the shadowing
+      // node stands in for it.
+      completeServerData = writes.shadowingWrite(Path.empty);
+      if (completeServerData == null) {
+        return null;
+      }
+    }
+    return writes.calcNextNodeAfterPost(
+      completeServerData,
+      child,
+      index,
+      reverse: reverse,
+    );
+  }
 }
