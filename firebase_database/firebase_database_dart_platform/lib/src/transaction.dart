@@ -17,8 +17,15 @@ import 'package:firebase_database_platform_interface/firebase_database_platform_
 /// `Transaction.success(value)` becomes `fs.Transaction.success` of the
 /// [transformValue] of the value. An exception [handler] throws propagates
 /// unchanged.
-fs.TransactionHandler clientHandler(TransactionHandler handler) =>
-    throw UnimplementedError();
+fs.TransactionHandler clientHandler(TransactionHandler handler) {
+  return (Object? currentValue) {
+    final Transaction result = handler(mutableCopy(currentValue));
+    if (result.aborted) {
+      return const fs.Transaction.abort();
+    }
+    return fs.Transaction.success(transformValue(result.value));
+  };
+}
 
 /// `DatabaseReferencePlatform.runTransaction` of [ref]: client
 /// `runTransaction(clientHandler(handler), applyLocally: applyLocally)`
@@ -32,7 +39,18 @@ Future<DartTransactionResult> runDartTransaction(
   DartReference ref,
   TransactionHandler handler, {
   required bool applyLocally,
-}) => throw UnimplementedError();
+}) async {
+  final fs.TransactionResult result = await guard(
+    () => ref.clientRef.runTransaction(
+      clientHandler(handler),
+      applyLocally: applyLocally,
+    ),
+  );
+  return DartTransactionResult(
+    result.committed,
+    DartDataSnapshot(ref.database, result.snapshot),
+  );
+}
 
 /// The implementation of [TransactionResultPlatform]: client
 /// `TransactionResult.committed` and `.snapshot`.
