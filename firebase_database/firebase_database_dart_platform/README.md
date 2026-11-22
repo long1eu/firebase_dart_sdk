@@ -15,17 +15,20 @@ opt-in through `FirebaseDatabaseDart.use()`. It is not affiliated with or endors
 
 > **Status: 0.0.1, not published, work in progress.** What is and is not verified:
 >
-> - The client underneath, `firebase_database_dart`, is complete, and its tests pass against the Database emulator.
-> - The unit tests of this package run against the client's fake server (`package:firebase_database_dart/testing.dart`),
->   and 5 more against the emulator. The tests added with the review fixes of 2026-11-22 have not run yet.
+> - The client underneath, `firebase_database_dart`, passes its own suites (2,437 tests on the Dart VM) and its tests
+>   against the Database emulator.
+> - This package has 133 tests, 5 of them skipped without the emulator (another session's run). The unit tests run
+>   against the client's fake server (`package:firebase_database_dart/testing.dart`).
 > - FlutterFire's own `firebase_database` integration suite (77 tests) is the acceptance gate
 >   (`tool/test_flutterfire_database_gate.sh`, against the Database emulator): 76 pass and 1 skips itself, on
->   macOS with the host test runner. It has **not run yet** on Linux or Windows, or in a built desktop app.
-> - A real Windows build has run (Windows 11 x64, Flutter 3.47.8, debug): the generated plugin registrant calls
->   `FirebaseDatabaseDart.registerWith()`, and an app written against `firebase_database` alone wrote a value,
->   read it back and committed a transaction against the Database emulator. A release build and a Linux desktop
->   build have **not run yet**.
-> - Nothing has run against a production project.
+>   macOS with the host test runner. It has **not run** on Linux or Windows.
+> - On Windows 11 x64 (Flutter 3.47.8, debug) the Windows example app, written against `firebase_database` alone,
+>   builds with this package (the generated plugin registrant calls `FirebaseDatabaseDart.registerWith()`) and passes
+>   its 4 integration tests against the Database emulator.
+> - On Linux x64 (a Debian 13 container) the Linux example app builds and passes its 4 integration tests under a
+>   virtual display.
+> - An independent review of the adapter found 2 high, 4 medium and 6 low findings; all were fixed with a test each.
+> - Not run: a release build of a desktop app, a real display, a production project.
 
 ## How to enable it
 
@@ -74,17 +77,17 @@ FirebaseDatabaseDart.use(
 );
 ```
 
-A sign-in, a switch of users and a token refresh re-authenticate the open connection without dropping it. The
-change events of `FlutterFireAuthTokenProvider` do not hold the token, so the provider is installed behind a wrapper
-that answers each change with the token of `getAccessToken`.
+A sign-in, a switch of users and a token refresh re-authenticate the open connection without dropping it. A change
+event of the provider is a signal: the client fetches the token from the provider, and an empty token means signed out.
+The change events of `FlutterFireAuthTokenProvider` do not hold the token, so the provider is installed behind a
+wrapper that answers each change with the token of `getAccessToken`; the adapter never forwards a placeholder as a
+token.
 
-Without it the connection carries no user, which is enough for the emulator and for open rules. When another
-platform package of this repository already set up the app (a `firebase_app_dart` app with the name of the
-FlutterFire app), that app keeps its token provider and `tokenProviderFor` is not called; when that app has no token
-provider, it gets the one of `tokenProviderFor`. The wrapper is installed only on a provider of `tokenProviderFor`: a
-`FlutterFireAuthTokenProvider` that another package installed on the shared app sends its change events as they are,
-and then each sign-in or refresh can drop the connection once until `firebase_database_dart` itself fetches the token
-on a change.
+Without it the connection carries no user, which is enough for the emulator and for open rules. When another platform
+package of this repository already set up the app (a `firebase_app_dart` app with the name of the FlutterFire app), that
+app keeps its token provider and `tokenProviderFor` is not called; when that app has no token provider, it gets the one
+of `tokenProviderFor`. The wrapper is installed only on a provider of `tokenProviderFor`; for a provider that another
+package installed on the shared app, the client fetches the token itself on each change event.
 
 ### App Check
 
@@ -225,8 +228,8 @@ that same object. With `applyLocally: false`, listeners see no local event befor
 
 | Platform | Selected by | Notes |
 | --- | --- | --- |
-| Linux | automatic (`dartPluginClass`) | `firebase_core` is installed too, unless another package did it first |
-| Windows | automatic when a direct dependency (`dartPluginClass`) | replaces FlutterFire's native plugin (C++ SDK); `firebase_core` stays native. Run on Windows 11 x64, Flutter 3.47.8, debug: write, read and transaction against the emulator |
+| Linux | automatic (`dartPluginClass`) | `firebase_core` is installed too, unless another package did it first. FlutterFire has no Linux plugin for `firebase_database`. Run on Linux x64 (Debian 13 container): the example app builds and passes its 4 integration tests under a virtual display |
+| Windows | automatic when a direct dependency (`dartPluginClass`) | replaces FlutterFire's native plugin (C++ SDK); `firebase_core` stays native. Run on Windows 11 x64, Flutter 3.47.8, debug: the example app passes its 4 integration tests against the emulator |
 | macOS, Android, iOS | `FirebaseDatabaseDart.use()` | `firebase_core` and the native SDK stay in the build |
 | Web | not supported | use the official plugin |
 
