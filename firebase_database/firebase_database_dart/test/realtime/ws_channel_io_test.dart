@@ -581,17 +581,24 @@ void main() {
       listener.listen((Socket socket) {
         Timer(const Duration(milliseconds: 400), () {
           sinceAnswer.start();
-          SecureSocket.secureServer(socket, context).then(
-            (SecureSocket secured) => secured.listen(
+          void sawEnd() {
+            if (!serverSawEnd.isCompleted) {
+              serverSawEnd.complete();
+            }
+          }
+
+          SecureSocket.secureServer(socket, context).then<void>((
+            SecureSocket secured,
+          ) {
+            secured.listen(
               (_) {},
               onError: (Object _) {},
               onDone: () {
                 secured.destroy();
-                serverSawEnd.complete();
+                sawEnd();
               },
-            ),
-            onError: (Object _) => serverSawEnd.complete(),
-          );
+            );
+          }, onError: (Object _) => sawEnd());
         });
       });
 
