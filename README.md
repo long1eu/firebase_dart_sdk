@@ -31,6 +31,11 @@ endorsed by Google or Firebase.
    own database, `importJsSdkCache` moves a JS cache into the other caches, and tabs can share it (a preview).
    Caveat: Chrome and the emulator only; the format is checked against the real JS SDK in a CI job, but no JS
    SDK tab was run beside a tab of this client, and multi-tab is a preview since 0.3.2.
+7. **You build a Flutter app for Linux desktop that needs the Realtime Database.** The official
+   `firebase_database` plugin has no Linux implementation. Add `firebase_database_dart_platform` and keep the
+   official API (on Windows it can replace the native plugin). Caveat: 0.0.1, not published; on Linux only the
+   Dart VM suites ran, no Linux app; on Windows one debug app did a write, a read and a transaction against the
+   emulator; never against production ([status](firebase_database/firebase_database_dart/README.md)).
 
 **Do not use it when**
 
@@ -43,9 +48,13 @@ endorsed by Google or Firebase.
 - You ship a Windows app and cannot test it yourself first: it was run on one Windows 11 VM against the
   emulator only (the Dart VM suites and two Flutter debug apps, no window drawn), not in CI, not in a
   release build and not against production.
-- You need a provider's sign-in page in a browser (popup or redirect), phone sign-in, SMS multi-factor, Storage,
-  Messaging or the other Firebase services, or admin jobs such as bulk writes and recursive deletes
-  (use `firebase_admin_sdk`).
+- You need a provider's sign-in page inside a browser page (`signInWithPopup` and `signInWithRedirect` throw
+  `unimplemented`; `signInWithProvider` opens the system browser on a loopback address instead), a phone or SMS
+  second factor proven by a real SMS (phone sign-in was run against a real project with a test phone number
+  only), Messaging or the other Firebase services this repository does not port, or admin jobs such as bulk
+  writes and recursive deletes (use `firebase_admin_sdk`).
+- You need the Realtime Database in production today: that client is not published and nothing was run against a
+  production project; the report of its large-snapshot benchmark is not written yet.
 - You need a vendor to call: one person maintains it, with no SLA.
 
 **Start** with the emulator (`firebase emulators:start --only firestore --project demo-my-app`):
@@ -89,8 +98,11 @@ from 0.1? The 0.2 API took FlutterFire's names: [what changed](docs/api_migratio
 | [`cloud_firestore_dart_flutterfire`](cloud_firestore/cloud_firestore_dart_flutterfire/) | 0.1.2 | Flutter apps that sign in with `firebase_auth` and want `cloud_firestore_dart` to use that user |
 | [`firebase_auth_dart_platform`](firebase_auth/firebase_auth_dart_platform/) | 0.2.0 | Flutter apps written against the official `firebase_auth` API, on Linux or by choice elsewhere; needs `firebase_auth_providers_dart` 0.3.2 |
 | [`firebase_auth_secure_storage_dart`](firebase_auth/firebase_auth_secure_storage_dart/) | 0.1.0 | Command line tools and servers that keep the signed-in session in the system's secret store (macOS Keychain; Linux and Windows untested) instead of a file |
-| [`firebase_storage_dart`](firebase_storage/firebase_storage_dart/) | 0.1.0 | Apps and servers that upload, download and list Cloud Storage for Firebase objects ([guide](docs/guides/storage.md), [parity](docs/storage_parity.md)) |
+| [`firebase_storage_dart`](firebase_storage/firebase_storage_dart/) | 0.2.0 | Apps and servers that upload, download and list Cloud Storage for Firebase objects ([guide](docs/guides/storage.md), [parity](docs/storage_parity.md)) |
 | [`firebase_admin_dart`](firebase_admin/firebase_admin_dart/) | 0.1.2 | Servers, tools and integration tests that mint custom tokens, manage users or verify ID tokens |
+| [`firebase_database_dart`](firebase_database/firebase_database_dart/) | 0.0.1, not published | Dart programs, servers and web apps that use the Realtime Database through this client ([guide](docs/guides/database.md)) |
+| [`firebase_database_dart_sqlite`](firebase_database/firebase_database_dart_sqlite/) | 0.0.1, not published | Anyone who wants the Realtime Database cache on disk on the VM or in Flutter |
+| [`firebase_database_dart_platform`](firebase_database/firebase_database_dart_platform/) | 0.0.1, not published | Flutter apps written against the official `firebase_database` API, on desktop |
 
 ## How it fits together
 
@@ -222,8 +234,8 @@ code; he reviews and tests it. Response times are in the [support policy](docs/s
   other browser was tried, and no browser was run against a production backend (the verification
   kit used the web transport against production from the VM).
 - Not implemented: coordination between clients that share one SQLite cache (isolates and processes;
-  deferred until after 0.1.0; the tabs of the web IndexedDB cache have a preview, `multiTab: true`), the parts of Firebase Auth that need a browser or app verification (popup and redirect sign-in,
-  phone sign-in and SMS multi-factor), and
+  deferred until after 0.1.0; the tabs of the web IndexedDB cache have a preview, `multiTab: true`), popup and
+  redirect sign-in of Firebase Auth (the loopback `signInWithProvider` replaces them on desktop), and
   Pipelines beyond the preview (no real-time pipelines and no offline evaluation; a local
   evaluator exists but is internal and not used yet; search, window functions and explain
   options are only checked for their encoding, since the emulator rejects them).
@@ -234,13 +246,21 @@ This repository ports Firestore and the Firebase Core pieces it needs, a Firebas
 `firebase_admin/firebase_admin_dart`. `firebase_auth/firebase_auth_dart_platform` runs the official
 `firebase_auth` API on top of the Auth client. The Auth client covers email, anonymous, custom token,
 email link and provider sign-in (with tokens the app holds, or through a loopback browser flow on
-desktop), account management, linking and TOTP multi-factor; it has no popup or redirect sign-in,
-no phone sign-in and no SMS multi-factor.
+desktop), phone sign-in, account management, linking, and TOTP and SMS multi-factor; it has no popup or redirect
+sign-in. Phone sign-in and SMS second factors were run against one real project with a test phone number, not
+with a real SMS.
 [docs/auth_parity.md](docs/auth_parity.md) compares it with the JS SDK, method by method.
 `firebase_storage/firebase_storage_dart` is a Cloud Storage for Firebase client
-([docs/storage_parity.md](docs/storage_parity.md)). There is no Realtime Database client here; for
-that see
-[appsup-dart/firebase_dart](https://github.com/appsup-dart/firebase_dart). The other directories
+([docs/storage_parity.md](docs/storage_parity.md)).
+`firebase_database/firebase_database_dart` is a Realtime Database client for the Dart VM and the web, ported from
+the protocol of the JS SDK; `firebase_database_dart_sqlite` keeps its cache on disk and
+`firebase_database_dart_platform` runs the official `firebase_database` API on top of it. Version 0.0.1, not
+published. What has run: its test suites on macOS, Windows 11 and Linux (Dart VM and Chrome), 33 tests against the
+Database emulator, FlutterFire's own `firebase_database` integration suite through the adapter, and one Flutter
+Windows debug app against the emulator. What has not: any production project, a release build of a desktop app,
+Safari and Firefox; the report of its large-snapshot benchmark is not written yet. See its
+[README](firebase_database/firebase_database_dart/README.md), the [guide](docs/guides/database.md) and the
+[decisions](docs/database_decisions.md). The other directories
 under `firebase_auth`, and `google_sign_in_dart`, are older code from
 the original project and are not part of the migrated, tested set.
 
