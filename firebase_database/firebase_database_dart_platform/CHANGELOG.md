@@ -3,10 +3,13 @@
 - Work in progress, not published: an implementation of `DatabasePlatform` (the platform interface of the
   official `firebase_database` plugin, 13.1.0) on top of `firebase_database_dart`, so that an app keeps the
   official API.
-- Registers itself on Linux and, as a direct dependency, on Windows in place of FlutterFire's C++ plugin (run on
-  Windows 11 x64, Flutter 3.47.8, debug); `FirebaseDatabaseDart.use()` selects it on any other platform.
+- Registers itself on Linux and, as a direct dependency, on Windows in place of FlutterFire's C++ plugin (Windows 11
+  x64, Flutter 3.47.8, debug: the example app passes its 4 integration tests; Linux x64: the example app builds and
+  passes its 4 integration tests under a virtual display); `FirebaseDatabaseDart.use()` selects it on any other
+  platform.
 - One instance and client per app and database: `instance` and `instanceFor` with the same database share them.
-- A token provider's change events reach the connection with the token itself, also from
+- A change event of the token provider is a signal for the client, which fetches the token from the provider (an
+  empty token means signed out); the adapter never forwards a placeholder as a token, also from
   `FlutterFireAuthTokenProvider`, whose events hold a marker.
 - `FirebaseApp.delete()` closes the app's clients on every platform; an app created again under the same name gets
   a new client.

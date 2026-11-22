@@ -10,5 +10,8 @@ Work in progress, not published. The SQLite offline cache of `firebase_database_
 - A storage error makes the instance memory-only for the session and deletes nothing; a file that cannot be used is
   moved aside once and the cache starts empty.
 - `clearSqlitePersistence(directory, appName:, databaseUrl:)` deletes a cache that no instance holds.
-- The file is named by a hash of the app name and the database URL; on POSIX the directory is 0700 and the file 0600.
+- The file is named by a hash of the app name and the normalised database URL (two `?ns=` values on one host are two
+  caches); on POSIX the directory is 0700 and the file 0600.
+- Only data under a listener or `keepSynced` is written to the cache, and an offline `get()` is answered from it only
+  when it holds the complete value for the query.
 - Not included: web persistence, a write-behind journal.

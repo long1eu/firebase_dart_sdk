@@ -5,11 +5,13 @@ of the Firebase Realtime Database. It is for the Dart VM and Flutter (Android, i
 `package:sqlite3`. It keeps your pending writes across a restart and serves listeners and `get()` from disk while the
 app is offline. It is not affiliated with or endorsed by Google or Firebase.
 
-> **Status: 0.0.1, work in progress, not published.** What has run (the counts are from the maintainer's runs):
+> **Status: 0.0.1, work in progress, not published.** What has run (the counts are from the maintainer's runs on the
+> merged trunk):
 >
-> - The package has 225 tests on macOS, including Android's own persistence suites run on the SQLite engine.
-> - On Windows 11 x64, 221 of 222 passed before a test-only fix, after which the file passed.
-> - On Linux x64, 168 tests passed at an earlier commit.
+> - The package has 247 tests, which pass on Dart 3.11.5 and on Dart 3.8.0, including Android's own persistence suites
+>   run on the SQLite engine.
+> - On Windows 11 x64 the disk cache test of the Windows example app passed with an earlier version of the app.
+> - The SQLite engine had an independent review (1 high, 5 medium and 10 low findings), all fixed with a test each.
 > - Nothing ran on Android or iOS, in a release build of a desktop app, or against a production project.
 > - Cost of the cache, measured on one Mac mini (macOS, AOT, medians of 5, rows of about 100 bytes; see Limits). Not
 >   measured: JSON against a binary codec, `synchronous = FULL` against `NORMAL`, and any write cost on Linux or
@@ -60,6 +62,8 @@ unless you pass it.
 - **`cacheSizeBytes`**: the size above which the client prunes cached server data, 1 MiB to 100 MiB, 10 MiB by default;
   anything else throws an `ArgumentError`. The least recently used queries go first, 20 % of the inactive ones at a
   time; queries with a listener and pending writes are never pruned.
+- **What is cached.** Only data under a listener or `keepSynced` is written to the cache. An offline `get()` is
+  answered from it only when it holds the complete value for that query, with its limit applied.
 - **`cacheServerData: false`** (the default is `true`): only the pending writes are stored. They survive a restart and
   are sent again; no server data is kept on disk, so after a restart a listener waits for the server.
 
@@ -78,7 +82,8 @@ await clearSqlitePersistence(
 `clearSqlitePersistence` deletes a cache while no instance holds it: it waits about 7.5 s to see whether an owner is
 alive, throws a `StateError` while one is, and throws a `ClearPersistenceException` that lists the files it could not
 delete. `SqlitePersistence.pathOf(key)` gives the path of the file of an app and database URL. There is one SQLite file
-per app and database URL in the directory you give; its name is a hash, never the URL or the user. On macOS and Linux
+per app and normalised database URL in the directory you give (every spelling of one URL shares a file, two `?ns=`
+values on one host get two); its name is a hash, never the URL or the user. On macOS and Linux
 the directory is created with mode 0700 and the file gets mode 0600; elsewhere the platform's default permissions
 apply. Tokens, the server host and session ids are never written.
 
@@ -122,9 +127,9 @@ and the tracked queries, restores the writes, and then connects. The layout is A
 
 | Platform | What ran |
 |---|---|
-| macOS | 225 tests, including Android's persistence suites on the SQLite engine |
-| Windows 11 x64 | 221 of 222 before a test-only fix whose file then passed |
-| Linux x64 | 168 tests, at an earlier commit |
+| Dart VM | 247 tests on Dart 3.11.5 and on Dart 3.8.0, including Android's persistence suites on the SQLite engine |
+| Windows 11 x64 | the disk cache test of the Windows example app, with an earlier version of the app |
+| Linux x64 | no run of this package is recorded; the client's own suites ran there (see its README) |
 | Android, iOS | declared in `pubspec.yaml`; no run is recorded |
 | Web | not supported |
 
