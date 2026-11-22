@@ -101,6 +101,10 @@ final List<Object?> _topLevel = <Object?>[
   defaultDatabase,
   emulatorDatabase,
   parseEmulatorHost,
+  splitHostPort,
+  joinHostPort,
+  isLoopbackHost,
+  isDnsHostName,
   // emulator_token.dart
   ownerToken,
   createMockUserToken,
