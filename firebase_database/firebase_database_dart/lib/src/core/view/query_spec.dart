@@ -13,13 +13,14 @@ final class QuerySpec {
   const QuerySpec(this.path, this.params);
 
   /// The default query at [path].
-  factory QuerySpec.defaultAt(Path path) => throw UnimplementedError();
+  factory QuerySpec.defaultAt(Path path) =>
+      QuerySpec(path, QueryParams.defaultParams);
 
   /// The query at [path] with the parameters of a wire object.
   factory QuerySpec.fromPathAndWireObject(
     Path path,
     Map<String, Object?> wire,
-  ) => throw UnimplementedError();
+  ) => QuerySpec(path, QueryParams.fromWireObject(wire));
 
   /// The path.
   final Path path;
@@ -28,23 +29,33 @@ final class QuerySpec {
   final QueryParams params;
 
   /// The index of [params].
-  Index get index => throw UnimplementedError();
+  Index get index => params.index;
 
   /// Whether this is the default query.
-  bool get isDefault => throw UnimplementedError();
+  bool get isDefault => params.isDefault;
 
   /// Whether the query loads all data at [path].
-  bool get loadsAllData => throw UnimplementedError();
+  bool get loadsAllData => params.loadsAllData;
 
   /// The form the connection takes ([ListenSpec]).
-  ListenSpec toListenSpec() => throw UnimplementedError();
+  ListenSpec toListenSpec() => ListenSpec(
+    path: path.toString(),
+    queryObject: params.toWireObject(),
+    queryIdentifier: params.toQueryIdentifier(),
+    isDefault: params.isDefault,
+    loadsAllData: params.loadsAllData,
+    indexName: params.index.queryDefinition,
+    // MERGE: restParams: Map.unmodifiable(params.toRestQueryStringParameters()),
+  );
 
   @override
-  bool operator ==(Object other) => throw UnimplementedError();
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is QuerySpec && other.path == path && other.params == params;
 
   @override
-  int get hashCode => throw UnimplementedError();
+  int get hashCode => Object.hash(path, params);
 
   @override
-  String toString() => throw UnimplementedError();
+  String toString() => '$path:$params';
 }
