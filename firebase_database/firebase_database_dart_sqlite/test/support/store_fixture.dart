@@ -14,7 +14,7 @@ final class FakeClock {
   /// Starts at a fixed time.
   FakeClock([this.nowMs = 1767225600000]);
 
-  /// The current time in milliseconds since the epoch.
+  /// The current time in milliseconds since the epoch. A test sets it to step the clock back.
   int nowMs;
 
   /// Every wait asked for through [delay].
@@ -53,9 +53,27 @@ final class FakeClock {
   }
 }
 
-/// A timer that never fires: tests call `SqliteConnection.refreshLease` themselves.
-final class InertTimer implements Timer {
+/// A periodic timer that fires only when a test calls [fire]; tests also call
+/// `SqliteConnection.refreshLease` themselves.
+final class FakePeriodicTimer implements Timer {
+  /// A timer that would fire every [period] and run the store's tick.
+  FakePeriodicTimer(this.period, this._tick);
+
+  /// The period the store asked for.
+  final Duration period;
+
+  final void Function(Timer timer) _tick;
   bool _active = true;
+  int _ticks = 0;
+
+  /// Runs the tick, as the real timer would after [period]; nothing once cancelled.
+  void fire() {
+    if (!_active) {
+      return;
+    }
+    _ticks++;
+    _tick(this);
+  }
 
   @override
   void cancel() => _active = false;
@@ -64,7 +82,7 @@ final class InertTimer implements Timer {
   bool get isActive => _active;
 
   @override
-  int get tick => 0;
+  int get tick => _ticks;
 }
 
 /// A temporary directory, a fake clock and the log of one test.
@@ -82,6 +100,9 @@ final class StoreFixture {
   /// Every message logged by the stores of this fixture.
   final List<String> log = <String>[];
 
+  /// Every refresh timer the stores of this fixture armed, oldest first.
+  final List<FakePeriodicTimer> timers = <FakePeriodicTimer>[];
+
   int _owners = 0;
 
   /// The store directory (not created: the opener creates it).
@@ -93,25 +114,43 @@ final class StoreFixture {
   /// The store file path used by [open].
   String get path => SqliteFiles.join(directory, fileName);
 
-  /// Options with this fixture's clock, log, an inert timer and owner ids `owner-1`, `owner-2`...
-  SqliteStoreOptions options({int? sqliteVersionNumber}) {
+  /// Options with this fixture's log, fake timers ([timers]) and owner ids `owner-1`, `owner-2`...
+  /// [clock] replaces the fixture's [clock] (an owner whose clock differs from the observer's);
+  /// [ownerId] replaces the generated owner id.
+  SqliteStoreOptions options({
+    int? sqliteVersionNumber,
+    FakeClock? clock,
+    String? ownerId,
+  }) {
+    final FakeClock time = clock ?? this.clock;
     return SqliteStoreOptions(
-      nowMs: clock.now,
-      delay: clock.delay,
-      periodicTimer: (Duration period, void Function(Timer timer) tick) =>
-          InertTimer(),
+      nowMs: time.now,
+      delay: time.delay,
+      periodicTimer: (Duration period, void Function(Timer timer) tick) {
+        final FakePeriodicTimer timer = FakePeriodicTimer(period, tick);
+        timers.add(timer);
+        return timer;
+      },
       log: (DatabaseLogLevel level, String message) => log.add(message),
-      newOwnerId: () => 'owner-${++_owners}',
+      newOwnerId: () => ownerId ?? 'owner-${++_owners}',
       sqliteVersionNumber: sqliteVersionNumber,
     );
   }
 
-  /// Opens the store at [path].
-  Future<SqliteConnection> open({int? sqliteVersionNumber}) {
+  /// Opens the store at [path] with [options].
+  Future<SqliteConnection> open({
+    int? sqliteVersionNumber,
+    FakeClock? clock,
+    String? ownerId,
+  }) {
     return openSqliteStore(
       directory: directory,
       fileName: fileName,
-      options: options(sqliteVersionNumber: sqliteVersionNumber),
+      options: options(
+        sqliteVersionNumber: sqliteVersionNumber,
+        clock: clock,
+        ownerId: ownerId,
+      ),
     );
   }
 

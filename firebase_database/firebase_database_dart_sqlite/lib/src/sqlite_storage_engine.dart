@@ -86,7 +86,10 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
     // A close inside the transaction already rolled it back; ending it is then a no-op.
     if (_connection.inTransaction) {
       if (_successful) {
-        _connection.commit();
+        // A transaction the file refused (busy) or that failed did not change the rows.
+        if (!_connection.commit()) {
+          _serverCache.size = _sizeAtBegin;
+        }
       } else {
         _connection.rollback();
         _serverCache.size = _sizeAtBegin;

@@ -214,16 +214,19 @@ final class SqliteConnection {
 
   /// Commits the transaction [begin] started. Requires an open transaction ([StateError]), except
   /// after [close], when it does nothing.
-  void commit() {
+  ///
+  /// Returns whether the transaction reached the file: false when it was refused (a busy file),
+  /// failed, was fenced, or the connection is not durable.
+  bool commit() {
     if (_state == StoreState.closed) {
-      return;
+      return false;
     }
     _requireTransaction('commit');
     final bool failed = _transactionFailed;
     _inTransaction = false;
     _transactionFailed = false;
     if (!isDurable || failed || !_sqliteTransactionOpen) {
-      return;
+      return false;
     }
     final bool committed = _guard(() {
       _db!.execute('COMMIT');
@@ -233,6 +236,7 @@ final class SqliteConnection {
     if (committed) {
       _consecutiveBusy = 0;
     }
+    return committed;
   }
 
   /// Rolls back the transaction [begin] started. Requires an open transaction ([StateError]),

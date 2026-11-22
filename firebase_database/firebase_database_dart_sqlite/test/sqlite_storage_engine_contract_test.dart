@@ -14,20 +14,28 @@ void main() {
   group('SqliteStorageEngine', () {
     late StoreFixture fixture;
     late SqliteStorageEngine opened;
+    late List<String> engineLog;
 
     // The contract opens synchronously; opening a store is async (the lease), so each test opens a
     // fresh store in a fresh directory here, and the contract's open hands it over.
     setUp(() async {
       fixture = StoreFixture();
       final SqliteConnection connection = await fixture.open();
+      engineLog = <String>[];
       opened = SqliteStorageEngine(
         connection,
-        logger: (DatabaseLogLevel level, String message) {},
+        logger: (DatabaseLogLevel level, String message) =>
+            engineLog.add(message),
       );
     });
     tearDown(() {
       opened.close();
       fixture.dispose();
+      // A stored row skipped as unreadable would make a contract check pass on less data.
+      expect(
+        engineLog.where((String m) => m.contains('could not be read')),
+        isEmpty,
+      );
     });
 
     runStorageEngineContract(() => opened);
