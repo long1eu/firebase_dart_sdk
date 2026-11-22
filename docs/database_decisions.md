@@ -2,18 +2,21 @@
 
 The decisions behind `firebase_database_dart` (`firebase_database/firebase_database_dart`), its SQLite cache
 (`firebase_database_dart_sqlite`) and its FlutterFire adapter (`firebase_database_dart_platform`): what was
-decided, why, what it costs, and where to check it. This is the first draft, written before the client exists.
-Every section says what the client does as a design, and ends with a status line:
+decided, why, what it costs, and where to check it. The code is built; each section says what it does. Where a
+review or a measurement changed an earlier plan, the section states the rule that holds now. Every section
+ends with a status line:
 
-- **designed**: decided on paper, from the upstream code and the emulator probe; nothing of it is built;
+- **built**: the code does this and tests pin it, on the VM, in the browser, or both (section 23 says what has
+  run where);
 - **measured on the emulator (v4.11.2)**: observed on the Firebase Database emulator
   (`firebase-database-emulator-v4.11.2.jar`, firebase-tools 15.18.0); production was not measured;
-- **to be measured**: a number or a behaviour that a planned test or benchmark will settle.
+- **not measured**: a number or a behaviour that no run has settled yet.
 
 Nothing here was run against a production project. [storage_decisions.md](storage_decisions.md) is the model
 of this document; [contributing_a_product.md](contributing_a_product.md) has the rules every product client
-follows. "Pinned by" names the tests that will pin each decision; none exists yet. Test paths are relative to
-`firebase_database/firebase_database_dart` unless they start with `docs/`, `tool/` or `.github/`.
+follows. "Pinned by" names the test files that pin each decision. Test paths are relative to
+`firebase_database/firebase_database_dart` unless they start with `docs/`, `tool/`, `.github/` or a package
+name.
 
 Path shorthand for upstream code, read at these commits on 2026-11-22:
 
@@ -31,7 +34,8 @@ Path shorthand for upstream code, read at these commits on 2026-11-22:
 
 **Decision.** The client is a Dart library, not a port of any one SDK's API. Configuration is immutable and
 goes to the constructor: `FirebaseDatabase(app, databaseUrl:, emulatorHost:, mockUserToken:, persistence:,
-logger:)`, plus injected clock, random source and delay for tests. There are no setters and no instance cache:
+logger:)`, plus a clock and a random source that are for tests only (`@visibleForTesting`); there is no
+`delay` parameter. There are no setters and no instance cache:
 two instances on one URL are two connections. `close()` is idempotent; afterwards anything asynchronous fails
 with the code `database-closed`, and `ref()` still works because it does no I/O. FlutterFire's shape
 (`FirebaseDatabase.instance`, `setPersistenceEnabled`, `setLoggingEnabled`) lives in
@@ -47,10 +51,11 @@ Futures of a closed database fail instead of hanging.
 **What we gave up.** A program written for `firebase_database` does not compile against the client; it needs
 the adapter. The adapter has to hold the settings that FlutterFire allows before first use (section 22).
 
-**Pinned by.** `test/api/construction_test.dart` (fields are `final`; `close()` is idempotent and fails
-pending writes with `database-closed`); `docs/contributing_a_product.md`, design rules 1 and 4.
+**Pinned by.** `test/api/public_surface_test.dart` (the constructor's parameters, `database-closed`);
+`test/api/scenarios_test.dart` (pending operations fail with `database-closed` after `close()`);
+`docs/contributing_a_product.md`, design rules 1 and 4.
 
-Status: designed.
+Status: built.
 
 ## 2. The JS SDK is the reference; Android and iOS fill the gaps
 
@@ -69,18 +74,19 @@ dependencies (Hive, rxdart, quiver and more), which this repository's packages a
 **What we gave up.** Upstream releases have to be followed by hand. The code is new and has no production
 history.
 
-**Pinned by.** `test/spec/sync_point_spec_test.dart` (the specification file, run through a runner built
-before the sync tree); `docs/database_parity.md` (what each SDK does, feature by feature).
+**Pinned by.** `test/spec/sync_point_spec_test.dart` (the specification file, run through
+`test/spec/sync_point_spec_runner.dart`); `test/conformance/` and `test/core/` (ports of the upstream unit
+tests of the data layer and the sync tree); `test/oracle/` (Android's persistence suites).
 
-Status: designed.
+Status: built.
 
 ## 3. Where the SDKs differ on the wire, what we chose
 
 **Decision.** Where JS and Android disagree, the client takes the behaviour that suits a desktop client:
 
 - **Reconnect.** Delay starts at 1 s, grows by 1.3 per failure to a cap of **30 s**, with JS's full jitter (a
-  random value in `[0, delay]`); it resets after a connection that stayed healthy for 30 s, on a wake from
-  sleep and on a network change. JS caps at 5 minutes and resets only on browser events
+  random value in `[0, delay]`); it resets after a connection that stayed healthy for 30 s and on a network
+  change hint. JS caps at 5 minutes and resets only on browser events
   (`J:core/PersistentConnection.ts:45-49,742-770,785-817`); Android caps at 30 s with a different jitter
   (`A:connection/util/RetryHelper.java:121-124`, `A:connection/PersistentConnectionImpl.java:344-350`).
 - **Auth before listens.** `auth`, `appcheck`, the listens and the puts go out back to back, as JS does
@@ -89,16 +95,20 @@ Status: designed.
 - **Idle disconnect.** None. Android closes after 60 s without work
   (`A:connection/PersistentConnectionImpl.java:277,1435-1476`); it changes what `.info/connected` means.
 - **Paths** in requests are `/a/b`, as JS; Android sends `a/b`.
-- **Hash on listen.** The simple hash `h` in 0.1. Android and iOS also send a compound hash `ch` above 1,024
-  bytes and handle `rm` range merges (`A:core/SyncTree.java:82,100-140`;
+- **Hash on listen.** The simple hash `h`, and, as Android and iOS do, a compound hash `ch` when the cached
+  data of the query is estimated above 1,024 bytes (`sizeThresholdForCompoundHash` in `lib/src/core/sync_tree.dart`),
+  and `rm` range merges are applied (`A:core/SyncTree.java:82,100-140`;
   `A:connection/PersistentConnectionImpl.java:947-967`); JS sends the simple hash only
-  (`J:core/PersistentConnection.ts:289`). Compound hash and `rm` come later, when the client's own hash is
-  accepted by the server (section 19).
-- **Clearing App Check** sends `unappcheck`, as Android. JS sends `unappeck`
-  (`J:core/PersistentConnection.ts:371`).
+  (`J:core/PersistentConnection.ts:289`). The emulator has not been shown to accept a two-range hash of ours
+  (section 19).
+- **Clearing App Check** sends `unappcheck` to the emulator, which knows only that spelling, and `unappeck`,
+  the JS spelling (`J:core/PersistentConnection.ts:371`), to a production host
+  (`lib/src/realtime/connection_timings.dart`, `unappCheck`). Production's answer to `unappeck` is not
+  measured.
 - **A server `c` (listen cancelled)** cancels every listen at that path, which is safe whichever query it
   names.
-- **A control message `e`** is logged and ignored; it has no request id, so a request can only time out.
+- **A control message `e`** is logged and ignored; it has no request id, so the request it refers to is
+  answered only by the link-silence rule (section 14).
 - **A server shutdown** ends reconnecting, as in JS and Android
   (`A:connection/PersistentConnectionImpl.java:539-555`).
 - **App id and App Check token** go in upgrade headers on the VM (Android,
@@ -113,16 +123,17 @@ next listen and denied the next read, in order); it accepts `unappcheck` and rej
 control message; it ignores the app id and App Check token in both forms; and a session that never sends `s`
 reads and writes normally.
 
-**What we gave up.** The compound hash is the way Android and iOS avoid re-downloading a large cache on every
-connect (section 15); without it a large cache is re-sent in full after each reconnect until it ships.
-Production was not measured for the `unappcheck` spelling or for pipelining.
+**What we gave up.** If a server does not accept our compound hash, a large cache is re-sent in full after each
+reconnect, as in JS. Production was not measured for the `unappeck` spelling, for the compound hash or for
+pipelining.
 
-**Pinned by.** `test/connection/backoff_test.dart` (delay sequence with injected random and clock);
-`test/connection/replay_order_test.dart`; `test/connection/requests_test.dart` (request names and paths in
-recorded exchanges); `test/integration/connection_emulator_test.dart` (pipelined auth, `unappcheck`).
+**Pinned by.** `test/realtime/reconnect_backoff_test.dart` (delay sequence with injected random and clock);
+`test/realtime/replay_test.dart` and `test/realtime/persistent_connection_test.dart` (replay order, request
+bodies including `ch`); `test/realtime/auth_session_test.dart` (the App Check removal action);
+`test/integration/connection_emulator_test.dart` (pipelined auth).
 
-Status: measured on the emulator (v4.11.2) for the accepted spellings, ordering and ignored headers; designed
-for the rest; production to be measured.
+Status: built; measured on the emulator (v4.11.2) for the accepted spellings, ordering and ignored headers;
+production not measured.
 
 ## 4. Tokens from the app, and where they may go
 
@@ -131,8 +142,18 @@ the package does not depend on the Auth package. Tokens are sent only over TLS, 
 as `emulatorHost`, or to a loopback host. A `databaseUrl` must be `https://` (or `wss://`); an `http://` URL
 is refused with a pointer to `emulatorHost`. The environment variable `FIREBASE_DATABASE_EMULATOR_HOST` is
 read only by the explicit helper `FirebaseDatabase.emulatorHostFromEnvironment`, never by default.
-`mockUserToken` without an emulator is refused. A token is refreshed on the live connection (a new `auth`
-request, no reconnect); a token that arrives while the connection is down is used on the next one.
+`mockUserToken` without an emulator is refused. A plain-text target that is not the emulator is refused too:
+`RealtimeTarget` throws `ArgumentError` for it (`lib/src/realtime/realtime_target.dart`), and the connection
+checks `mayReceiveTokens` again before it hands over a token, so a token never goes over plain text. A token
+is refreshed on the live connection (a new `auth` request, no reconnect; `unauth` after a sign-out); a token
+that arrives while the connection is down is used on the next one. Token changes are versioned: a token
+fetched for a connection attempt is dropped when the token changed during the fetch, so a sign-out during a
+fetch wins. The fetch is bounded by the connect timeout and counts as a failed attempt when it runs over.
+
+**Mock tokens.** `mockUserToken` is sent to the emulator as given. A string that is not a JWT, the literal
+`'owner'` included, is an admin credential on the emulator (`gauth`) and bypasses the rules.
+`mockUserTokenFor(uid, projectId:, claims:)` builds the unsigned user token the emulator reads as a signed-in
+user (`lib/src/api/mock_user_token.dart`).
 
 **Why.** JS gives the scheme to the port: `http://x.firebaseio.com:443` sets `secure = false`, so a real ID
 token would go over `ws://` (`J:core/util/libs/parser.ts:121-124,153-157`; `J:api/Database.ts:154`), and
@@ -146,10 +167,13 @@ cannot be used.
 
 **Pinned by.** `test/security/hosts_test.dart` (group "token scope": URLs `http://x.firebaseio.com:443`,
 `http://x.firebaseio.com`, `ws://...` are refused; an emulator on a non-loopback host gets the tokens;
-`127.0.0.1.evil.example` and another port of the emulator host get nothing); `test/connection/auth_test.dart`.
+`127.0.0.1.evil.example` and another port of the emulator host get nothing); `test/realtime/realtime_target_test.dart`
+(the `ArgumentError`); `test/realtime/persistent_connection_review_test.dart` (no token on a plain-text
+WebSocket; a sign-out during a fetch); `test/realtime/auth_session_test.dart`;
+`test/realtime/emulator_token_test.dart` (the mock token and the admin credential).
 
-Status: designed. Emulator behaviour for credentials measured on the emulator (v4.11.2): `auth` needs `sub`
-and `iat`, ignores `exp`, and `gauth` and bearer tokens are administrators.
+Status: built. Emulator behaviour for credentials measured on the emulator (v4.11.2): `auth` needs `sub` and
+`iat`, ignores `exp`, and `gauth` and bearer tokens are administrators.
 
 ## 5. Server-chosen hosts, redirects and URLs
 
@@ -182,13 +206,15 @@ injects a parameter (`J:core/util/libs/parser.ts: 104-191`, `J:core/RepoInfo.ts:
 **What we gave up.** A custom domain whose server host is not on a Google suffix works only when it equals the
 configured host; the host a custom domain receives in its hello has not been seen.
 
-**Pinned by.** `test/security/hosts_test.dart` (group "server host": hellos and resets naming `evil.example`,
-`s-x.firebaseio.com@evil.example`, `s-x.firebaseio.com:444`, a path, a fragment, a longer suffix; group
-"upgrade 3xx is a failure"; "emulator ignores h and r"); `test/security/url_test.dart` (a table of accepted
-and refused URLs); `test/security/limits_test.dart` (group "reset loop").
+**Pinned by.** `test/security/hosts_test.dart` and `test/security/c_hosts_test.dart` (group "server host":
+hellos and resets naming `evil.example`, `s-x.firebaseio.com@evil.example`, `s-x.firebaseio.com:444`, a path, a
+fragment, a longer suffix; "the emulator ignores h and r"); `test/security/t_hosts_test.dart`;
+`test/realtime/ws_channel_io_test.dart` (a 3xx answer to the upgrade is a failure);
+`test/security/url_test.dart` and `test/realtime/database_url_test.dart` (accepted and refused URLs);
+`test/security/c_limits_test.dart` (the reset loop).
 
-Status: designed. The emulator sends the Host header as `h` and never redirects (measured on the emulator,
-v4.11.2); real hosts for `firebaseio.com`, a regional database and a custom domain are to be measured.
+Status: built. The emulator sends the Host header as `h` and never redirects (measured on the emulator,
+v4.11.2); real hosts for `firebaseio.com`, a regional database and a custom domain are not measured.
 
 ## 6. Everything from the server is bounded and validated
 
@@ -219,15 +245,17 @@ not (`A:core/SyncTree.java:300-323`; `A:core/persistence/DefaultPersistenceManag
 Android force-refresh tokens on every revoke (`J:core/PersistentConnection.ts:985-1004`).
 
 **What we gave up.** A server that sends something unexpected makes the client reconnect rather than carry on.
-The default of `maxMessageBytes` (256 MiB) is a guess to be confirmed: the emulator drops messages above 16
-MiB.
+The default of `maxMessageBytes` (256 MiB, `ConnectionTimings`) is a guess to be confirmed: the emulator drops
+messages above 16 MiB.
 
-**Pinned by.** `test/security/limits_test.dart` ("frame counts", deep nesting, "revoke loop", "hello-then-drop
-server"); `test/security/server_input_test.dart` (one case per rule);
-`test/security/persistence_security_test.dart` ("push to an unlistened path writes no row").
+**Pinned by.** `test/security/c_limits_test.dart`, `k_limits_test.dart`, `p_limits_test.dart` and
+`t_limits_test.dart` (frame counts, deep nesting, the revoke loop, a server that says hello and drops);
+`test/security/k_server_input_test.dart` (server paths, merge keys, data keys and values, integers);
+`test/realtime/server_message_test.dart` (the decoder, including a mutation sweep of field types);
+`test/realtime/persistent_connection_test.dart`.
 
-Status: designed. The emulator limits (a 120 s idle timeout, 65,536 bytes per frame, 16 MiB per message, 10
-MiB per string) are measured on the emulator (v4.11.2); production limits are to be measured.
+Status: built. The emulator limits (a 120 s idle timeout, 65,536 bytes per frame, 16 MiB per message, 10 MiB
+per string) are measured on the emulator (v4.11.2); production limits are not measured.
 
 ## 7. Frames are split by code point
 
@@ -243,10 +271,10 @@ works. The limit of the emulator is 65,536 bytes per frame, not 16,384 units, so
 
 **What we gave up.** A frame is occasionally one unit shorter than 16,384.
 
-**Pinned by.** `test/connection/framing_test.dart` (strings with non-BMP characters at every boundary, round
-trip through a fake server); `test/integration/framing_emulator_test.dart`.
+**Pinned by.** `test/realtime/framing_test.dart` (splitter and assembler, with non-BMP characters at the
+boundaries); `test/integration/connection_emulator_test.dart`.
 
-Status: measured on the emulator (v4.11.2) for the corruption and the limits; production to be measured.
+Status: built; measured on the emulator (v4.11.2) for the corruption and the limits; production not measured.
 
 ## 8. Event delivery
 
@@ -288,22 +316,22 @@ their flow on cancel the same way (`A:Database.kt:80-82`).
 **What we gave up.** Order across paused subscriptions; the rest is buffered and not dropped, so a paused
 value stream holds memory. Nothing in 0.1 bounds that buffer.
 
-**Pinned by.** `test/events/delivery_test.dart` (the rules as a table of scenarios, including an `await for`
-whose body does not await, a listener that writes on every event, and a pause during delivery); the sync-point
-specifications (section 2).
+**Pinned by.** `test/api/scenarios_test.dart` (the rules as scenarios, including `onChildEvents` under `await
+for`); `test/core/view/event_dispatcher_test.dart` and `test/core/view/event_generator_test.dart`; the
+sync-point specifications (section 2).
 
-Status: designed.
+Status: built.
 
 ## 9. Snapshot values
 
-**Decision.** `DataSnapshot.value` is built once per snapshot, memoised, and unmodifiable: `null`, `bool`,
-`int`, `double`, `String`, `List<Object?>` and `Map<String, Object?>` at every depth, never `Map<dynamic,
-dynamic>`, so Dart 3 patterns work without casts. Numbers: an integral value within ±2^53 is an `int`,
-everything else is a `double`, and a local optimistic value is normalised the same way before the server's
-echo. Lists follow the JS rule: keys `0..n` with more than half present read as a `List` with null holes, and
-`toJson()` never converts. A transaction handler receives a fresh, mutable deep copy of the current value.
-Every node, child snapshots included, has a `priority`. Keys are ordered as the server orders them (see the
-note below).
+**Decision.** `DataSnapshot.value` is built once per snapshot, memoised, and unmodifiable: `null`, `bool`, `int`,
+`double`, `String`, `List<Object?>` and `Map<String, Object?>` at every depth, never `Map<dynamic, dynamic>`, so Dart 3
+patterns work without casts. Numbers: an integral value within ±2^53 is an `int`, everything else is a `double`, and a
+local optimistic value is normalised the same way before the server's echo. An `int` stays an `int`, also beyond ±2^53
+on the VM and on wasm, where its ordering against other numbers is exact. Lists follow the JS rule: keys `0..n` with
+more than half present read as a `List` with null holes, and `toJson()` never converts. A transaction handler receives a
+fresh, mutable deep copy of the current value. Every node, child snapshots included, has a `priority`. Keys are ordered
+as the server orders them (see the note below).
 
 **Why.** JS rebuilds the value on every `val()` call (`J:api/Reference_impl.ts:461-463`;
 `J:core/snap/ChildrenNode.ts:203-217`). One memoised tree costs one pass and cannot be changed by one reader
@@ -329,33 +357,37 @@ Only the conversion of a node to a `List` uses the strict form, without leading 
 **Numbers.** Measured on the emulator (v4.11.2): the server keeps `1.0` as `1.0`, keeps 64-bit integers exact
 (`9223372036854775807` comes back unchanged) and prints large doubles as `1.0E21`. The client reads an
 integral value within ±2^53 as an `int` on every platform. On the VM, larger integers stay exact; this is
-documented as not portable to web clients, whose numbers lose them. The hash treats `1` and `1.0` the same, as
-JS does (`J:core/snap/LeafNode.ts:183-202`).
+documented as not portable to dart2js clients, whose numbers lose them; the ordering of large ints is exact on
+the VM and on wasm (`compareNumbers`, `lib/src/core/util/numbers.dart`). The hash treats `1` and `1.0` the
+same, as JS does (`J:core/snap/LeafNode.ts:183-202`).
 
-**Negative zero.** A `-0.0` written by the user becomes `0` before it reaches a node, so every platform sends
-`0` and the local value, the server's value and the hash agree. A `-0.0` that arrives from the server is kept
-as the double. The JS hash keeps the sign of zero (`J:core/util/util.ts:400-406`), and the web cannot send it:
-`JSON.stringify(-0)` is `"0"`.
+**Negative zero.** A `-0.0` written by the user becomes `0` before it reaches a node (`normalizeUserNumber`), so every
+platform sends `0` and the local value, the server's value and the hash agree. A `-0.0` that arrives from the server is
+kept as the double (`normalizeNumber`). The JS hash keeps the sign of zero (`J:core/util/util.ts:400-406`), and the web
+cannot send it: `JSON.stringify(-0)` is `"0"`.
 
-**Pinned by.** `test/data/snapshot_value_test.dart` (identical object on two reads, mutation throws, the
-pattern read on VM and web, the list rule with the JS cases including leading zeros, `-0.0`);
-`test/data/key_order_test.dart` (the key list of the probe, including `01`, `007`, `-0`, values outside the
-32-bit range and characters above U+FFFF); `test/data/number_test.dart` (`-0.0`, `1` against `1.0`, ±2^53);
-`test/events/transaction_copy_test.dart`.
+**Pinned by.** `test/api/snapshot_test.dart` (identical object on two reads, mutation throws, the list
+rule); `test/core/util/key_order_test.dart` (integer-like keys including `01` and `007`, UTF-16 order);
+`test/core/util/numbers_test.dart` (`-0.0`, integral doubles, ±2^53, exact comparison of large ints);
+`test/core/snap/node_test.dart`; `test/integration/connection_emulator_test.dart` (numbers and key order
+against the emulator).
 
-Status: designed. The wire numbers and the key order are measured on the emulator (v4.11.2); production is to
-be measured.
+Status: built. The wire numbers and the key order are measured on the emulator (v4.11.2); production is not
+measured.
 
 ## 10. `get()`
 
-**Decision.** `get()` answers in this order: (1) from an active listener whose view covers the query
-completely, with no round trip (`J:core/Repo.ts:470`); (2) otherwise from the server, with no client timer
-while connected; (3) when not connected, wait 3 s for a connection, then answer from the cache (in memory or
-on disk) if it has the data, else fail with `unavailable`; (4) the same from the moment a connection drops
-with a request out; (5) when the server refuses, `permission-denied` and no fallback to the cache. After
-`goOffline()` there is no wait. A successful answer is applied to the cache and raised to other listeners
-before the Future completes. `get()` does not include the caller's own unacknowledged writes unless rule 1
-applied; `once()` does.
+**Decision.** `get()` answers in this order: (1) from an active listener whose view covers the query completely, with no
+round trip (`J:core/Repo.ts:470`); (2) otherwise from the server, with no client timer on the age of the request while
+connected (a `get` fails with `network-error` only after two connections that each ended in link silence, section 14);
+(3) when not connected, wait 3 s for a connection, then answer from the cache (in memory or on disk) if it has the data,
+else fail with `unavailable`; (4) the same from the moment a connection drops with a request out; (5) when the server
+refuses, `permission-denied` and no fallback to the cache. After `goOffline()` there is no wait. A query that only
+orders (no range, no limit) asks the server for the default query at its path and orders the children locally, as a
+listen does, so it needs no `.indexOn` rule; a filtered or limited query is sent with its index and fails with
+`index-not-defined` where the rules have none (`lib/src/core/repo_get.dart`). A successful answer is applied to the
+cache and raised to other listeners before the Future completes. `get()` does not include the caller's own
+unacknowledged writes unless rule 1 applied; `once()` does.
 
 **Why.** The SDKs disagree. JS queues the request until a connection exists, with no limit
 (`J:core/PersistentConnection.ts:194-223`). Android waits 3 s only when a persisted value exists and then
@@ -364,17 +396,21 @@ answers with it, also while connected and after any failure including a refusal
 offline error (`A:core/Repo.java:508`; `A:connection/PersistentConnectionImpl.java:405-436`). iOS fails an
 offline `get` after 3 s and falls back to the disk cache on any failure, a permission error included
 (`I:Core/FPersistentConnection.m:917-933`, `I:Core/FRepo.m:544-575`). A cached answer after a refusal would
-hide a rules change; a timer while connected turns a slow server into a stale answer.
+hide a rules change; a timer while connected turns a slow server into a stale answer. JS always sends the
+index of an ordered `get` and the server refuses it without `.indexOn` (`J:core/Repo.ts:470`); a listen
+already avoids that by asking for the default query, and `get` does the same where no filter needs the index.
 
 **What we gave up.** Android's behaviour of answering from the cache on every failure (a deliberate
 difference, `A:core/Repo.java:535-553`). The 3 s is a named constant, not configurable in 0.1; callers who
 want another bound use `.timeout()`.
 
-**Pinned by.** `test/api/get_test.dart` (each rule: active view, slow server answering at 4 s, offline with
-and without a cache, a drop mid-request, a refusal with a populated cache, `goOffline` first);
-`test/integration/get_emulator_test.dart`.
+**Pinned by.** `test/core/repo_get_test.dart` (the rules: active view, offline with and without a cache, a
+drop mid-request, a refusal with a populated cache, `goOffline` first); `test/api/scenarios_test.dart` (scenarios
+"get() of an ordered query asks for the default query", "of an orderByValue query", "of a limited ordered
+query sends its query"); `test/realtime/persistent_connection_review_test.dart` (the `network-error` count of
+a `get`); `test/integration/public_api_emulator_test.dart`.
 
-Status: designed.
+Status: built.
 
 ## 11. Writes, validation and at-least-once delivery
 
@@ -402,11 +438,11 @@ sent the put again, and the value read back was 2. Android checks the key path
 write under `.info` that JS accepts through `update` and `onDisconnect().cancel` is refused everywhere
 (`J:api/Reference_impl.ts:798-808`, `J:api/OnDisconnect.ts:72-80`).
 
-**Pinned by.** `test/api/validation_test.dart` (one test per rule and per message);
-`test/connection/at_least_once_test.dart` (a put sent but not answered is sent again on the next connection,
-an increment counts twice, a transaction is rerun); `test/integration/at_least_once_emulator_test.dart`.
+**Pinned by.** `test/api/validation_test.dart` and `test/core/util/validation_test.dart` (the rules);
+`test/realtime/replay_test.dart` and `test/realtime/persistent_connection_test.dart` (a put sent but not
+answered is sent again on the next connection); `test/integration/chaos_emulator_test.dart`.
 
-Status: designed. The double-applied increment and the emulator's size limits (768 bytes, depth 32, 10 MiB
+Status: built. The double-applied increment and the emulator's size limits (768 bytes, depth 32, 10 MiB
 string) are measured on the emulator (v4.11.2).
 
 ## 12. Transactions
@@ -431,11 +467,11 @@ the client uses one code, `max-retries`.
 **What we gave up.** A transaction pending when the app quits is lost, as upstream. The handler sees the value
 and not the priority, which Android's `MutableData` and iOS's `FIRMutableData` expose.
 
-**Pinned by.** `test/api/transaction_test.dart` (abort on the first run, a throw reaches the Future unchanged,
-`datastale` forever ends after 25 tries, a lost connection reruns, `applyLocally: false` raises one event);
-`test/integration/transaction_emulator_test.dart`.
+**Pinned by.** `test/core/repo_transaction_test.dart` (abort, a throw, `datastale` ends after 25 tries, a
+lost connection reruns, `applyLocally: false`); `test/api/scenarios_test.dart`;
+`test/integration/public_api_emulator_test.dart`.
 
-Status: designed. The compare-and-set behaviour is measured on the emulator (v4.11.2).
+Status: built. The compare-and-set behaviour is measured on the emulator (v4.11.2).
 
 ## 13. `onDisconnect`
 
@@ -443,39 +479,53 @@ Status: designed. The compare-and-set behaviour is measured on the emulator (v4.
 client remembers them and, when the connection drops, applies them locally and raises the events, as JS does.
 They are never written to disk: after a restart nothing is registered, and the app registers again when
 `onConnected` says it is connected. Requests made while disconnected are queued and sent after the next
-connect. When the signed-in user changes, queued operations fail with `user-changed` and a new socket is
-opened, which makes the server run the old user's registered operations when that user really left.
+connect. A request that was sent and whose connection drops before the answer completes with a disconnect
+status (the code `disconnected`) and is not replayed; only requests queued while offline are sent at the next
+connect, and the app registers again if it needs the operation. When the signed-in user changes, the
+connection sends a new `auth` on the same socket, as JS does; queued operations are kept and the server runs
+the operations registered under the old identity when the socket closes. There is no `user-changed` code.
 
-**Why.** The mechanism is `J:core/Repo.ts:671-705`, `J:core/PersistentConnection.ts:1054-1062`; Android keeps
-its copy in `A:core/Repo.java:813-832`. JS keeps one socket across a token change, so user A's operations
-could run when user B's session ends; the proposal rests on an assumption about the server that is still to be
-measured. The emulator applies registered writes within about a second of the socket closing, also after the
+**Why.** The mechanism is `J:core/Repo.ts:671-705`, `J:core/PersistentConnection.ts:1054-1062`; Android keeps its copy
+in `A:core/Repo.java:813-832`. The server forgets the registrations of a connection when it ends, so a sent request is
+not replayed: its Future completes with the disconnect status and the app decides. JS keeps one socket across a token
+change, so user A's operations could run when user B's session ends; the client does the same, and a new socket per user
+was not built. The emulator applies registered writes within about a second of the socket closing, also after the
 process was killed, and delivers a single merge push whose keys can be paths.
 
-**What we gave up.** Presence data must be registered again on every connect. An application that signs a user
-out and in on one socket loses queued operations.
+**What we gave up.** Presence data must be registered again on every connect. Operations registered by one
+user can run when another user's session on the same socket ends.
 
-**Pinned by.** `test/api/on_disconnect_test.dart`; `test/connection/auth_change_test.dart`;
-`test/integration/on_disconnect_emulator_test.dart`.
+**Pinned by.** `test/realtime/persistent_connection_review_test.dart` (a sent `onDisconnect` whose connection
+drops completes once and is not replayed); `test/realtime/replay_test.dart`;
+`test/contract/server_actions_reconnect_contract.dart`; `test/integration/public_api_emulator_test.dart` (an
+`onDisconnect` write applied when the client goes offline).
 
-Status: designed. The server side is measured on the emulator (v4.11.2); whether the server runs an operation
-with the identity of the registration after a re-`auth` is to be measured.
+Status: built. The server side is measured on the emulator (v4.11.2); whether the server runs an operation
+with the identity of the registration after a re-`auth` is not measured.
 
 ## 14. Connection state on a desktop
 
 **Decision.** `.info/connected` and `.info/serverTimeOffset` are typed members (`onConnected`, `isConnected`,
-`serverTimeOffset`, `estimatedServerTime`) and also readable as paths. `goOffline()` and `goOnline()` are
+`serverTimeOffset`, `estimatedServerTime`) and also readable as paths; `.info/authenticated` is readable as a
+path only. `goOffline()` and `goOnline()` are
 synchronous and valid before the first operation. `purgeOutstandingWrites()` rolls back every pending write,
 fails their Futures with `write-canceled`, aborts transactions and drops queued `onDisconnect` operations.
-After the connection is healthy, the client sends the protocol ping and closes and reconnects when no pong
-arrives; it resets the delay and reconnects at once on a wake from sleep or a network change, from hints the
-platform packages pass in. `keepSynced(true)` keeps a server listen open for a query so its cache stays
-current.
+After the connection is healthy, a link with no inbound frame for 30 s gets the protocol ping, and 15 s more
+without a frame closes the connection and reconnects. The client resets the delay and reconnects at once on a
+network change, a hint from the app's network source (`app.onNetworkConnected`); a wake from sleep gives no
+hint of its own, and the dead-link probe finds a link that died in it. `keepSynced(true)` keeps a
+server listen open for a query so its cache stays current.
 
-Every request sent on a live connection has a timeout: the server never answers a request it cannot parse (it
-sends a control message with no request id, or closes the socket). A request that times out is sent again once
-on the next connection; if it times out twice it fails with `network-error` and is not replayed again. The
-timeout (60 seconds is proposed) is not a measurement.
+**Request timeouts measure link silence.** The server never answers a request it cannot parse (it sends a
+control message with no request id, or closes the socket), so requests need a bound, but not on their age. A
+timer of 60 s (`ConnectionTimings.requestTimeout`) is re-armed by every inbound frame, including the pieces of
+a message still being assembled, and runs while any request waits. When the link has been silent for that
+long with requests outstanding, the connection is closed and the normal replay follows. Writes, `onDisconnect`
+requests and listens are never failed by a timeout: they stay in the replay and complete on an answer, a
+purge or a close. Only a `get` can fail with `network-error`, after two connections that each ended in such a
+silence while it waited; the count belongs to that `get`. A credential request (`auth`, `appcheck`) that is
+never answered closes the connection and is retried under the backoff. The 60 s is a choice, not a
+measurement.
 
 **Why.** JS, Android and iOS only send a `"0"` text frame every 45 s and never expect an answer
 (`J:realtime/WebSocketConnection.ts:425-435`; `A:connection/WebsocketConnection.java:37,321-332`), so a socket
@@ -486,24 +536,28 @@ that died during sleep is noticed when a write fails or the OS closes it. JS res
 connection opens (once before the hello), sends no pings of its own, and closes a connection that sends
 nothing for exactly 120 s; a `0` frame every 45 s kept a connection open.
 
-**What we gave up.** The ping interval and timeout are proposals (30 and 15 seconds) until measured;
-production may answer pings differently.
+**What we gave up.** The ping interval (30 s), its timeout (15 s) and the request timeout (60 s) are chosen,
+not measured; production may answer pings differently. A write that the server never answers keeps its
+Future pending; the app sees the connection state through `onConnected`.
 
-**Pinned by.** `test/connection/dead_link_test.dart` (a half-open fake channel);
-`test/connection/connectivity_test.dart` (a fake network source: going offline stops attempts, coming back
-resets the delay); `test/integration/chaos_test.dart` (section 23).
+**Pinned by.** `test/realtime/liveness_test.dart` (the dead-link probe on a fake clock);
+`test/realtime/replay_test.dart` (the silence timer: one report per silent period, re-armed by frames);
+`test/realtime/persistent_connection_review_test.dart` (group "H1: link silence, not request age", including
+the `get` count); `test/integration/idle_close_emulator_test.dart` (the 120 s idle close);
+`test/integration/chaos_emulator_test.dart` (section 23).
 
-Status: designed. The server's answer to a ping, the 120 s idle close, the absence of server pings and the
-unanswered unparsable requests are measured on the emulator (v4.11.2); the request timeout is to be measured.
+Status: built. The server's answer to a ping, the 120 s idle close, the absence of server pings and the
+unanswered unparsable requests are measured on the emulator (v4.11.2); the three timeouts are not measured.
 
 ## 15. Disk persistence: a separate package, in two tiers
 
 **Decision.** `firebase_database_dart` has no native dependency. The SQLite cache is the package
 `firebase_database_dart_sqlite`, passed in as `FirebaseDatabase(app, persistence:
-sqlitePersistence(directory))`; persistence is off by default. It ships in two tiers. **Tier 1** persists the
-user's pending writes only: they survive a restart and are sent in order; listeners start empty and wait for
-the server, as in JS today. **Tier 2** adds the server cache with tracked queries and pruning. The schema is
-the same for both tiers from the first release, and tier 1 leaves two tables empty. The storage is synchronous
+sqlitePersistence(directory))`; persistence is off by default. Two managers exist in the core. **Tier 2**, the
+one `sqlitePersistence` selects, persists the user's pending writes and the server cache with tracked queries
+and pruning. **Tier 1** (`WritesOnlyPersistenceManager`) persists pending writes only, so listeners start empty
+and wait for the server; it is built and tested at the manager level but no public option selects it. The
+schema is the same for both, and tier 1 would leave two tables empty. The storage is synchronous
 SQLite behind Android's interface (`PersistenceStorageEngine`,
 `A:core/persistence/PersistenceStorageEngine.java:30-128`), so the sync tree keeps Android's structure and its
 tests. A no-op persistence manager sits under the sync tree from the start. The `.info` data uses it, as in
@@ -541,63 +595,84 @@ cold read of a large subtree or a prune can take long enough to drop a frame. A 
 the same interface is the prepared way out. Persisted writes resend an acknowledged write if the removal was
 lost, so increments are at-least-once here too (section 11). Web persistence is not in 0.1.
 
-**Pinned by.** `test/persistence/sqlite/` in the SQLite package: ports of Android's 44 engine tests, the new
-tests for the tiers (tier 1 never reports a cached query as complete; write ids continue after a reopen; an
-acknowledgement is atomic when a failure is injected between its two steps); the tree-level ports
-`PersistenceTest`, `PruningTest`, `KeepSyncedTest` and `RandomPersistenceTest`
-(`A:src/androidTest/.../persistence/`).
+**Pinned by.** In `firebase_database_dart_sqlite/test/`: `sqlite_storage_engine_test.dart` and
+`sqlite_storage_engine_contract_test.dart` (the engine, including Android's engine tests as ported),
+`node_codec_test.dart`, `sqlite_persistence_test.dart`; `android_oracles_test.dart` runs Android's tree-level
+suites on the SQLite engine (the package has 225 tests). In the client, `test/oracle/persistence_test.dart`,
+`pruning_test.dart`, `keep_synced_test.dart` and `random_persistence_test.dart` (ports of Android's
+`PersistenceTest`, `PruningTest`, `KeepSyncedTest` and `RandomPersistenceTest`, run on the in-memory engine),
+and `test/contract/persistence_*_contract_test.dart`.
 
-Status: designed. The benchmarks that decide the open numbers (JSON against a binary codec; `synchronous =
-FULL` against `NORMAL`; the worst synchronous call on the UI isolate for a 10 MiB subtree; the nested layout
-against one row per root at 50 MB) are to be measured.
+Status: built. The benchmarks that decide the open numbers (JSON against a binary codec; `synchronous = FULL`
+against `NORMAL`; the worst synchronous call on the UI isolate for a 10 MiB subtree; the nested layout against
+one row per root at 50 MB) are not measured.
 
 ## 16. One owner per cache, and a cache that never crashes the app
 
-**Decision.** One client owns a cache file at a time, by a lease row: owner id, epoch and expiry, refreshed
-every 4 s and expiring after 5 s, with a fence check inside every write transaction. A second client waits one
-lease period, then runs memory-only with one logged warning, and `persistenceEnabled` reports the truth.
-Closing releases the lease. A cache the engine cannot trust fails closed: a foreign file, a corrupt file, or a
-file of a newer major version is renamed aside together with its `-wal` file (one copy kept) and an empty
-cache starts; if a live owner holds it, the client runs memory-only and leaves the file alone. A write row
-that cannot be decoded is dropped with a warning; a cache row that cannot be decoded clears the cache and its
-tracked queries. A run-time SQLite error rolls back and degrades the engine to memory-only for the rest of the
-session; the app never receives a `SqliteException`. The file name is a hash of the app name and the database
-URL, never the URL, the namespace or the user. On POSIX the directory is 0700 and the file 0600, created
-before SQLite opens it. Tokens, the server host and session ids are never written. The database runs in WAL
-mode with `synchronous = FULL` and never with `locking_mode = EXCLUSIVE`.
+**Decision.** One client owns a cache file at a time, by a lease row (owner id, epoch, expiry). Liveness is
+decided by observation, not by comparing clocks: a connection that finds the row taken reads it, waits one
+refresh interval plus slack (5 s plus 2.5 s), and reads it again; an unchanged row means the owner is not
+refreshing and the observer takes over, a rewritten row means a live owner and the observer runs memory-only
+with one logged warning. The lease lasts 15 s and the owner refreshes it every 5 s, from a timer and inside any
+storage transaction that runs more than half a refresh interval after the last write of the row; a fence check
+inside every write transaction (`BEGIN IMMEDIATE`) stops a former owner. `persistenceEnabled` reports the
+truth. Closing releases the lease; `clearSqlitePersistence` clears under the lease and writes a tombstone row
+before it deletes the files.
+
+**A storage error never deletes pending writes and never wipes the store.** The failed transaction rolls back,
+the engine stops writing, releases the lease and reads as empty for the rest of the session, and the file keeps
+everything committed before the error. `SQLITE_BUSY` and `SQLITE_LOCKED` roll back that transaction and leave
+the store durable; it degrades only after 3 in a row. The busy timeout is 1 s for normal work and 0 for
+clean-up. The app never receives a `SqliteException`. A bad row (a write, a cache row or a lease row that does
+not decode) is a cache miss: it is logged once and skipped, never thrown, and a lease row that does not read
+counts as not ours.
+
+A file the engine cannot trust is handled at the next open: a foreign file, a corrupt file or a file of a
+newer major version is renamed aside together with its `-wal` file (one copy kept) and an empty cache starts;
+if a live owner holds it, the client runs memory-only and leaves the file alone. The file name is a hash of
+the app name and the database URL, never the URL, the namespace or the user. On POSIX the directory is 0700 and
+the file 0600, created before SQLite opens it. Tokens, the server host and session ids are never written. The
+database runs in WAL mode with `synchronous = FULL` and never with `locking_mode = EXCLUSIVE`.
 
 **Why.** Android takes an exclusive SQLite lock and fails the second process
 (`A:android/SqlPersistenceStorageEngine.java:828-868`); C++ opens LevelDB and calls `assert(false)` when it
 cannot (`Cd:persistence/level_db_persistence_storage_engine.cc:298-311`); iOS deletes and recreates a LevelDB
 it cannot open (`I:Persistence/FLevelDBStorageEngine.m:293-318`), and Android rethrows storage errors as a
 `RuntimeException` (`A:core/persistence/DefaultPersistenceManager.java:200-213`). Firestore in this repository
-dropped the exclusive lock because a hot restart leaves the old isolate's handle open, and uses the same 4 s
-and 5 s lease (`F:sqlite_client_metadata.dart:55-62`; `docs/ARCHITECTURE.md`, persistence table). File locks
+dropped the exclusive lock because a hot restart leaves the old isolate's handle open
+(`F:sqlite_client_metadata.dart:55-62`; `docs/ARCHITECTURE.md`, persistence table). File locks
 are per process and a hot restart keeps the old isolate, so a lock would deadlock a developer's restart.
 Neither Android's nor Firestore's SQLite sets file modes.
 
-**What we gave up.** A stalled owner (a paused debugger, an isolate blocked for more than 5 s) can lose the
-lease to a new process that then sends the same pending writes: duplicates, harmless for `set` and double for
-`increment`. A second instance of an app does not get an error; it loses durability and logs a warning. The
+**What we gave up.** A stalled owner (a paused debugger, an isolate blocked for longer than the refresh
+interval plus the slack) can lose the lease to a new process that then sends the same pending writes:
+duplicates, harmless for `set` and double for `increment`. After a storage error the session reads as empty
+and writes are no longer saved, so a write made after the error is not durable. A second instance of an app
+does not get an error; it waits about 7.5 s, then loses durability and logs a warning. The
 cache is in clear text; full-disk encryption is the operating system's job. On macOS `fsync` does not flush
 the drive cache and `fullfsync` is not set.
 
-**Pinned by.** `test/persistence/sqlite/lease_test.dart` (a second connection waits one lease and goes
-memory-only; a crashed owner is taken over after the expiry; a fenced engine writes nothing; two real
-processes); `test/persistence/sqlite/open_test.dart` (foreign, corrupt and newer files; an undecodable row);
-`test/persistence/sqlite/permissions_test.dart` (modes under umask 022; the file name has no `/`, `..` or user
-id).
+**Pinned by.** In `firebase_database_dart_sqlite/test/`: `sqlite_lease_test.dart` (takeover by observation,
+a live owner, the tombstone of a clear, a takeover from the same process); `sqlite_connection_test.dart`
+(rollback, `SQLITE_BUSY` and the 1 s busy timeout, degrade, wrong SQL; group "E-D1 storage errors": after a full
+disk the write committed before the error survives a reopen); `sqlite_open_test.dart` (foreign,
+corrupt and newer files, one moved-aside copy kept); `sqlite_storage_engine_test.dart` (an undecodable row is
+skipped; after a full disk the store is degraded and reads empty without an exception);
+`sqlite_files_test.dart` (the file name); `posix_file_mode_test.dart` (modes).
 
-Status: designed.
+Status: built.
 
 ## 17. Errors
 
 **Decision.** One exception, `FirebaseDatabaseException`, a subclass of `FirebaseException` with the plugin
 `firebase_database`, a kebab-case code, a message that never contains a token or a URL query, the original
 error as `cause`, and `serverStatus`, the raw status and reason from the server. Codes: `permission-denied`,
-`disconnected`, `expired-token`, `invalid-token`, `max-retries`, `overridden-by-set`, `unavailable`,
-`network-error`, `write-canceled`, `operation-failed`, `read-only`, `index-not-defined`, `database-closed`,
-`user-changed`, `unknown`. The server's `datastale` is internal and never surfaced. Programmer errors (a bad
+`disconnected`, `max-retries`, `overridden-by-set`, `unavailable`, `network-error`, `write-canceled`,
+`index-not-defined`, `operation-failed`, `too-big`, `read-only`, `database-closed`, `unknown`
+(`firebaseDatabaseExceptionCodes`). A rejected or expired token is not a code of its own: the server answers
+`permission-denied` to an operation, and the connection retries the token itself. The server's `datastale` and
+the code `user-code-exception` (a throwing transaction handler, whose own exception is rethrown) are internal
+and never surfaced. Programmer errors (a bad
 path, key, value or query) are `ArgumentError` or `StateError` at the call, not exceptions through the Future.
 The Android spelling `write-canceled` is kept; the adapter maps it to FlutterFire's `write-cancelled`.
 
@@ -611,11 +686,12 @@ emulator reports a permission error as `permission_denied` on the socket and 401
 **What we gave up.** Apps that switch on strings depend on the spellings; they are the part of the API that is
 most expensive to change later.
 
-**Pinned by.** `test/api/errors_test.dart` (each failing call and its code; no token in any message,
-`toString` or `cause` chain: `test/security/leakage_test.dart`);
-`test/conformance/errors_conformance_test.dart` (the status table).
+**Pinned by.** `test/core/database_error_test.dart` (the status table); `test/api/public_surface_test.dart`
+(the public codes); `test/api/scenarios_test.dart` (each failing call and its code); the leakage tests
+`test/security/c_leakage_test.dart`, `k_leakage_test.dart` and `p_leakage_test.dart` (no token in any message,
+`toString` or `cause`); `firebase_database_dart_platform/test/errors_test.dart` (the FlutterFire mapping).
 
-Status: designed.
+Status: built.
 
 ## 18. Logging, and nothing secret in it
 
@@ -624,7 +700,7 @@ Function(DatabaseLogLevel level, String message)` with the levels debug, info, w
 repository, the connection and the persistence opener all take it (the lease, a degraded cache, `no_index`
 warnings and failed persisted writes need it). Requests `auth`, `gauth`, `appcheck`, `unauth` and `unappcheck`
 are logged as `<action> (contents hidden)`; URLs are logged without their query; session ids, tokens and
-snapshot data never appear at INFO or above; data appears only at the finest level and is documented as user
+snapshot data never appear at info or above; data appears only at the debug level and is documented as user
 data. Strings the server sends (a shutdown reason, an `e` message, an explanation) are cut at 1 KiB with
 control characters escaped before they reach a log line or an exception.
 
@@ -639,10 +715,11 @@ logs whole frames on a parse error (`A:connection/WebsocketConnection.java:261,2
 **What we gave up.** Three products in this repository now have three shapes of logging (Firestore a static
 `setLogLevel`, Storage none, this one a callback); see the open questions.
 
-**Pinned by.** `test/security/leakage_test.dart` (marker tokens from fake providers; a logger at its finest
-level plus every exception and `toString` across a full session contain no marker).
+**Pinned by.** `test/security/c_leakage_test.dart`, `k_leakage_test.dart` and `p_leakage_test.dart` (marker
+tokens from fake providers; a logger at its finest level plus every exception and `toString` across a full
+session contain no marker).
 
-Status: designed.
+Status: built.
 
 ## 19. The emulator, and what it cannot show
 
@@ -671,18 +748,20 @@ port of its own, with its own hub and logging ports, and signal only the process
   the client applies the limit itself; onDisconnect merges arrive with path keys.
 - The emulator honours `sin` and `ein` (`startAfter` and `endBefore`) when the start or end name is present,
   and implements `ch` and `rm`: one range matches and gets an empty range merge, but a two-range hash did not
-  match in four tries, and the cause is not yet known. The compound hash stays off until a hash of our own is
-  accepted; its status is to be measured.
+  match in four tries, and the cause is not known. The client sends `ch` above 1,024 bytes of cached data
+  (section 3); whether the emulator accepts our two-range hash is not measured.
 - `put` with a right hash returns the new value in `d`.
 
 **What we gave up.** Everything about production that the emulator hides: token refresh, revocation, the real
-`h`, ping behaviour, size limits. A production kit (`tool/verify_production_database`) is planned, run against
-a test project with a throwaway user.
+`h`, ping behaviour, size limits. There is no production kit for the Database yet; it would run against a test
+project with a throwaway user.
 
-**Pinned by.** `test/integration/emulator_conformance_test.dart` (one group per difference above);
-`tool/start_database_emulator.sh` and `tool/stop_database_emulator.sh`.
+**Pinned by.** `test/integration/connection_emulator_test.dart` (listen pushes, hashes, server values, numbers,
+rules cancel, `onDisconnect`, auth), `idle_close_emulator_test.dart` (the idle close), `rest_emulator_test.dart`
+and `public_api_emulator_test.dart` (33 tests in all, tag `emulator`); `tool/start_database_emulator.sh` and
+`tool/stop_database_emulator.sh`.
 
-Status: measured on the emulator (v4.11.2); production to be measured.
+Status: built; measured on the emulator (v4.11.2); production not measured.
 
 ## 20. REST is a read-only fallback, not a public API
 
@@ -701,11 +780,16 @@ URL (`J:core/ReadonlyRestClient.ts:194-206`) and rejects a failed `get` with an 
 
 **What we gave up.** No REST writes, streaming or ETags in 0.1.
 
-**Pinned by.** `test/security/rest_security_test.dart` ("302 not followed", "no query in any error", "body
-cap", "App Check in the header").
+On the web the App Check token goes in the `ac` query value, because a custom header would make every read a
+CORS preflight (`lib/src/realtime/rest_client.dart`); the VM uses the header. On the web a client that follows
+redirects anyway is guarded by refusing an answer from another origin.
 
-Status: designed. REST behaviour of the emulator measured on the emulator (v4.11.2); whether a bearer ID token
-works on production REST is to be measured.
+**Pinned by.** `test/security/rest_security_test.dart` (groups "token scope", "redirects", "body caps", "no
+query or token in a log line or an error"); `test/realtime/rest_client_test.dart`;
+`test/realtime/rest_client_contract_test.dart`; `test/integration/rest_emulator_test.dart`.
+
+Status: built. REST behaviour of the emulator measured on the emulator (v4.11.2); whether a bearer ID token
+works on production REST is not measured.
 
 ## 21. The web, and what is left out
 
@@ -723,10 +807,12 @@ porting it removes a transport, an iframe and a JSONP surface. The browser canno
 
 **What we gave up.** Networks that block WebSocket cannot use the client. Web disk persistence is later.
 
-**Pinned by.** `tool/check_web_imports.dart` (the main library reaches neither `dart:io` nor `dart:ffi`); a
-browser test that asserts both storages are empty after a session.
+**Pinned by.** `tool/check_web_imports.dart` (run with the package directory: the main library reaches neither
+`dart:io` nor `dart:ffi`; no CI step for this package was checked); `test/realtime/browser/ws_channel_web_test.dart`
+(a browser test: nothing is written to `localStorage` or `sessionStorage`); the browser runs of the unit suite
+(section 23).
 
-Status: designed.
+Status: built; the browser runs are in section 23.
 
 ## 22. The FlutterFire adapter
 
@@ -737,15 +823,16 @@ Choices:
 
 - **Streams.** The client's streams already allow a second `listen` on one stream object, each with its own
   registration and initial events, which is what FlutterFire code relies on. The adapter passes them through
-  with `.map`; there is no broadcast wrapper.
+  with `.map` and a transform that converts errors (`guardStream`); there is no broadcast wrapper.
 - **Settings before first use.** The adapter holds the emulator host, the persistence flag and cache size, and
   the logging flag until the client is first needed. After that, a different emulator host throws a
   `StateError` (ignoring it would send traffic to production); persistence settings are ignored, as Android
   ignores them (`FirebaseDatabasePlugin.kt:1036-1055` in FlutterFire); the logging flag takes effect at any
   time.
 - **Values.** Snapshot values and the argument of a transaction handler are mutable deep copies typed
-  `Map<Object?, Object?>`, which is the type FlutterFire's codec produces; map keys that are not strings are
-  stringified on write.
+  `Map<Object?, Object?>`, which is the type FlutterFire's codec produces; a map key that is not a `String`
+  is stringified on write, and a key that is invalid after that (`1.5` contains a dot) is the client's
+  `ArgumentError`, passed through unchanged.
 - **Query modifiers** are applied in one order whatever the call order, so `startAt(...).orderByChild(...)`
   works.
 - **Errors.** The client's code `write-canceled` is mapped to FlutterFire's `write-cancelled`.
@@ -753,10 +840,11 @@ Choices:
   children get `null`); `snapshot.ref` of a child event is the child's reference (FlutterFire gives the
   query's); `startAt(null)` is a real null bound (FlutterFire drops a null cursor, and Android then queries
   the string `"null"`).
-- **Registration.** If the adapter declares `windows` with a plugin class and is a direct dependency of the
-  app, Flutter's tool selects it instead of the native plugin and leaves the native plugin out of the build.
-  On Flutter 3.41.6, with two throwaway plugins, a direct dependency gave the adapter and no native entry in
-  `generated_plugins.cmake`, and a transitive one gave the native plugin. This was not run on Windows.
+- **Registration.** The adapter's `pubspec.yaml` declares `linux` and `windows` with a plugin class. On
+  Windows, when the adapter is a direct dependency of the app, Flutter's tool selects it instead of the native
+  plugin and leaves the native plugin out of the build. On Flutter 3.41.6, with two throwaway plugins, a
+  direct dependency gave the adapter and no native entry in `generated_plugins.cmake`, and a transitive one
+  gave the native plugin. A real Windows build has not been run.
 
 **Why.** The platform interface hands every query call its modifiers, so the adapter holds no query state
 (`firebase_database/lib/src/query.dart:9-27` in FlutterFire 13.1.0). The FlutterFire sources show the quirks:
@@ -772,15 +860,19 @@ inclusive; its own integration tests skip those on Windows (`database_reference_
 
 **What we gave up.** Code that works around the child-event reference quirk by treating `event.snapshot.ref`
 as the list reference changes meaning. A mutable copy costs one deep copy per snapshot whose value is read.
-Declaring `windows` is not decided: the build has to be tried on Windows first.
+`windows` is declared, but a real Windows build of an app with the adapter has not been run.
 
-**Pinned by.** `firebase_database_dart_platform/test/quirks_test.dart` (the three quirks); the FlutterFire
-integration suite (78 tests; 76 run on Linux) run through the adapter against the emulator on port 9000, with
-`tool/database_shim_gate/` patching the example (a Linux case in the options, a `databaseURL`, no workspace
-resolution).
+**Pinned by.** In `firebase_database_dart_platform/test/`: `quirks_test.dart` (the three quirks),
+`values_test.dart` (stringified keys, mutable copies), `transaction_test.dart` (an invalid stringified key is
+the client's `ArgumentError`), `errors_test.dart` (the `write-cancelled` mapping), `registration_test.dart`,
+`instance_test.dart` (settings before first use), `emulator_test.dart`. FlutterFire's own `firebase_database`
+integration suite (77 tests, from the example at the pinned FlutterFire commit) runs through the adapter
+against the emulator with `tool/test_flutterfire_database_gate.sh`: 76 pass and 1 skips itself, on the macOS
+host test runner. The script patches a copy of the example (a Linux case in the options, a `databaseURL`, no
+workspace resolution, the emulator port) and never changes the FlutterFire checkout.
 
-Status: designed. The registration experiment is measured on fake plugins (Flutter 3.41.6) only; the suite has
-not been run against the adapter, and the Windows build is to be measured.
+Status: built. The suite passes against the adapter on macOS; the registration experiment was run on fake
+plugins (Flutter 3.41.6) only, and the Windows build and a built desktop app with the adapter have not been run.
 
 ## 23. How the connection is tested
 
@@ -790,32 +882,51 @@ network test of `Connection` and none for `PersistentConnectionImpl` or `Websock
 upstream material is iOS's 31 unit tests against malformed server messages and C++'s local fake-server tests.
 The client has:
 
-- a scripted fake channel and a protocol-level fake server, with an injected clock, random source and delays,
-  run under `fakeAsync`;
-- a **transcript corpus**: each scenario is run once against the emulator through a frame tap, stored as a
-  JSON file, and replayed as a unit test on the VM and in the browser, where no emulator is available;
-- a **chaos** run: a TCP proxy between the client and the emulator (drop, delay, stall one direction, cut
-  after N bytes, unplug and plug) from a seeded schedule that is printed on failure, with an untouched oracle
-  client and the invariants that the final state equals the oracle's, sets apply once, no listener sees a
-  duplicate or a regression, and `.info/connected` alternates;
-- a **fuzz** of the decoders: every valid server message is generated from the protocol table, each field's
-  JSON type is mutated, and the decoder must never throw and the delegate must see nothing for an invalid
-  shape.
+- a scripted fake channel and a protocol-level fake server (`test/util/fake_ws.dart`,
+  `test/util/fake_rtdb_server.dart`), with an injected clock, random source and timings, run under
+  `fakeAsync`. The fake server models each behaviour measured on the emulator;
+- a **chaos** setup: a TCP proxy between the client and the emulator (`test/util/chaos_proxy.dart`) and a
+  WebSocket frame tap on top of it (`test/util/ws_tap.dart`) that observes whole frames and drops, delays or
+  cuts on them. `test/integration/chaos_emulator_test.dart` uses it for framing on the wire, replay after a
+  cut, the dead-link probe, the keep-alive and requests that are never answered. The schedules are written by
+  hand; there is no seeded random schedule and no oracle client;
+- a **fuzz** of the decoder in `test/realtime/server_message_test.dart`: each field of every valid server
+  message is mutated to another JSON type, and the decoder must not throw and must report nothing for an
+  invalid shape;
+- contract tests (`test/contract/`) that run the same cases against the fake connection and the real one.
 
-**Why.** A recording is an oracle that upstream does not provide. The Firestore package already has the proxy
-and the oracle pattern (`cloud_firestore_dart/test/util/chaos_proxy.dart`), and iOS needed twelve hand-written
-tests for what one table-driven fuzz covers. The emulator never sends `r`, `s`, `ac`, `apc` or `c` by itself,
-so those paths are exercised by injecting frames into a live session.
+There is no recorded transcript corpus.
 
-**What we gave up.** The proxy and tap must be copied into the package (packages cannot share test files), and
-a browser test cannot open a server socket, so the proxy runs on the VM through a hybrid test. The browser
-case has not been tried in this repository.
+**Why.** The Firestore package already has the proxy pattern (`cloud_firestore_dart/test/util/chaos_proxy.dart`),
+and iOS needed twelve hand-written tests for what one table-driven fuzz covers. The emulator never sends `r`,
+`s`, `ac`, `apc` or `c` by itself, so those paths are exercised by injecting frames into a live session or
+through the fake server.
 
-**Pinned by.** `test/connection/`, `test/corpus/*.json`, `test/chaos/`, `test/fuzz/`; tags `emulator`,
-`browser`, `chaos` and `production` in `dart_test.yaml`, where `production` runs only with an explicit project
-and `--yes`.
+**What we gave up.** The proxy and tap are copied into the package (packages cannot share test files), and a
+browser test cannot open a server socket, so the browser channel test starts a loopback server through
+`spawnHybridCode`.
 
-Status: designed.
+**What has run, and where.**
+
+| Where | Result |
+|---|---|
+| macOS, VM | 2,125 tests of the client |
+| Chrome | dart2js 1,125 tests, dart2wasm 1,128 tests |
+| Linux x64, VM | 2,058 tests of the client; SQLite package 168 tests (at an earlier commit) |
+| Linux x64, Chrome | dart2js 1,125 tests, dart2wasm 1,128 tests |
+| Database emulator | 33 tests (tag `emulator`) |
+| Both engines | Android's persistence suites pass on the in-memory and the SQLite engine; SQLite package 225 tests |
+| FlutterFire's own integration suite through the adapter | 76 pass, 1 skips itself (macOS host test runner, emulator) |
+
+Two independent code reviews found, in the connection, 3 high, 8 medium and 7 low findings, and in the SQLite
+engine 1 high, 5 medium and 10 low; each was fixed with a test that fails without the fix.
+
+Not run: Windows, a production project, and a built desktop app with the adapter.
+
+**Pinned by.** `test/realtime/`, `test/integration/`, `test/security/`, `test/contract/` and the tags in
+`dart_test.yaml` (`browser`, `emulator`, `emulator-slow`).
+
+Status: built; the run record above is the measured part.
 
 ## 24. Seams inside the client
 
@@ -839,7 +950,9 @@ interface, `ServerActions`, with a delegate for what the server pushes. The rule
 - **Acknowledging a write takes precomputed server values, not a clock.** Android's `ackUserWrite` takes a
   clock and resolves server values inside the acknowledgement, and its own comment calls that awkward
   (`A:core/SyncTree.java:233-236`).
-- **Shutdown is asynchronous**: closing the repository awaits the connection's shutdown.
+- **Shutdown is asynchronous**: closing the repository awaits the connection's shutdown. It closes the
+  connection first, and every outstanding `get` completes with `database_closed`; no Future that crosses the
+  seam hangs across a shutdown, in the WebSocket and in the REST implementation.
 - A listen's query object and its REST form are computed once by the core and handed over unmodifiable, so the
   realtime half has no query type of its own. Tags start at 1 for each database, not once per process as in JS
   (`J:core/SyncTree.ts:103-105,934-938`).
@@ -850,55 +963,127 @@ lets the two halves be built and tested apart.
 
 **What we gave up.** A change at the seam is a change for both halves; the contract test is the guard.
 
-**Pinned by.** `test/contract/` (the same cases run against the fake and the real connection: path form, error
-mapping, read-only status, start order, tags per database); `test/connection/recording_delegate_test.dart`.
+**Pinned by.** `test/contract/server_actions_contract.dart` and `server_actions_reconnect_contract.dart` (the
+same cases run against the fake and the real connection, in `server_actions_contract_test.dart`,
+`test/realtime/persistent_connection_contract_test.dart` and `test/realtime/rest_client_contract_test.dart`:
+request bodies, path form, a get that fails with `ServerActionsException`, shutdown, the reconnect order).
 
-Status: designed.
+Status: built.
 
-## 25. What is not in 0.1
+## 25. Deliberate differences from the JS SDK
 
-**Decision.** Not in the first release, and listed in `docs/database_parity.md`: long polling; typed
-converters (Dart 3 patterns on the typed value are the typed read); the compound hash and `rm` (later); a
-writing REST client; web disk persistence; a configurable `get()` wait; the compat (namespaced) API;
-admin-only authentication paths; the idle disconnect; `.info/authenticated`.
+**Decision.** The table lists each place where the client knowingly behaves differently from the JS SDK
+(`J:`), what each does, and the test that pins the client's behaviour. The reasons follow the table, keyed by
+the number; the section each reason cites has the upstream lines.
+
+| # | Topic | JS SDK | This client | Pinned by |
+|---|---|---|---|---|
+| 1 | `get()`, order-only | index sent, refused without it | default query, ordered here | `scenarios_test` |
+| 2 | `get()` while offline | queues with no limit | waits 3 s, then cache or `unavailable` | `repo_get_test` D49, D50 |
+| 3 | Request timeout | none | silence timer re-armed by frames | `replay_test` |
+| 4 | Dead link | `0` frame every 45 s, no answer | ping after 30 s, close after 15 s more | `liveness_test` |
+| 5 | Reconnect delay | cap 5 min, reset on browser events | cap 30 s, reset when healthy | `reconnect_backoff_test` |
+| 6 | Snapshot value | `val()` builds a mutable value | one memoised unmodifiable value | `snapshot_test` |
+| 7 | Event delivery | listeners can run inside `set()` | queue, microtask, never inside | `scenarios_test` D1 |
+| 8 | Child events | four callbacks | four getters, `onChildEvents`, `once()` | `scenarios_test` D12 |
+| 9 | Error codes | upper-case status string | kebab-case, no token codes | `database_error_test` |
+| 10 | Configuration | cached instance, setters | constructor only, no cache | `public_surface_test`; no cache test |
+| 11 | Plain text | `http://h:443`, emulator on `ws://` | `ArgumentError`, no token | `realtime_target_test` |
+| 12 | Server hosts | stored unchecked | validated, resets capped | `hosts_test` |
+| 13 | Frame split | by UTF-16 unit | by code point | `framing_test` |
+| 14 | Server input | validates what it sends | bounded and validated | `k_server_input_test` |
+| 15 | Compound hash | simple hash only | `ch` above 1,024 bytes | `replay_test` |
+| 16 | Transaction result | return `undefined` to abort | `Transaction.success`, `abort` | `scenarios_test` D37 |
+| 17 | Logging | bodies logged, tokens too | off, callback, credentials hidden | `c_leakage_test` |
+| 18 | Disk persistence | none | optional SQLite, lease owner | SQLite package tests |
+| 19 | Browser storage | writes `firebase:*` keys | writes nothing | `ws_channel_web_test` |
+| 20 | Writes under `.info` | `update`, `cancel` accepted | refused | `validation_test` |
+| 21 | Long polling | present | absent | no test found |
+| 22 | Acknowledging pipelined `update`s | visible writes rebuilt on each ack | no rebuild, same state | `write_tree_test` |
+
+Test file names are given without their directory: `scenarios_test`, `snapshot_test`, `public_surface_test` and
+`validation_test` are in `test/api/`; `repo_get_test` and `database_error_test` in `test/core/`; `replay_test`,
+`liveness_test`, `reconnect_backoff_test`, `realtime_target_test`, `framing_test` and `ws_channel_web_test`
+(in `browser/`) in `test/realtime/`; `hosts_test`, `k_server_input_test` and `c_leakage_test` in
+`test/security/`.
+
+**Why.**
+
+1. A listen already asks for the default query and orders locally (section 10); a filtered or limited `get`
+   needs the server's index and keeps the `index-not-defined` error.
+2. A request that waits for ever hides an offline app (section 10).
+3. A request that the server drops without an answer would otherwise hang; the rule measures the link, not the
+   age of the request, so a long download is not cut and writes are never failed by it (section 14).
+4. A socket that died in sleep is otherwise noticed only when a write fails (section 14).
+5. A desktop client is often first opened right after a wake (section 3).
+6. One pass per snapshot, and one reader cannot change what another reads (section 9).
+7. A listener that runs inside `set()` can re-enter the caller; one ordered queue removes that (section 8).
+8. A paused `await for` breaks the order across streams; one stream of all child events keeps it (section 8).
+9. JS has no codes to branch on; a refused credential is `permission-denied` and the connection retries the
+   token itself, so there are no token codes (section 17).
+10. Immutable configuration makes the wrong call order impossible (section 1).
+11. A real token must never go over `ws://` (section 4).
+12. A server-sent host or a reset loop must not redirect tokens (section 5).
+13. A lone surrogate corrupts a string on the emulator (section 7).
+14. A malformed frame must not buffer for ever or throw into the app's zone (section 6).
+15. A large cache is not re-downloaded in full on every connect, as on Android (section 3).
+16. `null` is a valid value, so abort needs its own result (section 12).
+17. JS logs credentials (section 18).
+18. Desktop apps restart and keep their pending writes (sections 15 and 16).
+19. A web page of the app should not gain storage keys it did not ask for (section 21).
+20. A write under `.info` can only fail or do nothing useful (section 11).
+21. It serves networks that break the WebSocket upgrade, which a desktop app can cover with a proxy setting
+    (section 21).
+22. Two merges at one location always counted as overlapping upstream, so each acknowledgement rebuilt the
+    visible writes: 802 pipelined updates a second here before the change and 897 in the JS SDK, against about
+    7,000 after it (one run). A merge now counts by its children's paths. The observable state is the same:
+    `write_tree_test` (in `test/core/`) compares any removal order with a rebuild over 200 seeds.
+
+Status: built.
+
+## 26. What is not in 0.1
+
+**Decision.** Not in the first release: long polling; typed converters (Dart 3 patterns on the typed value are
+the typed read); a writing REST client; web disk persistence; a configurable `get()` wait; the compat
+(namespaced) API; admin-only authentication paths; the idle disconnect. No parity page for the Database exists
+yet; this list and section 3 are the record of what differs.
 
 **Why.** Each either exists for another runtime, is a different product, or changes behaviour that apps depend
 on without a clear need on desktop.
 
-**What we gave up.** Parity rows that a user may expect from another SDK; the parity document says which and
-why.
+**What we gave up.** Features that a user may expect from another SDK; the list above says which.
 
-**Pinned by.** `docs/database_parity.md` (the "What is not planned" table).
+**Pinned by.** Nothing: an absent feature has no test. `test/api/public_surface_test.dart` pins the public API
+that is present.
 
-Status: designed.
+Status: built.
 
 ## Open questions for the owner
 
 Each question lists both sides and what the client does until it is decided.
 
-1. **A second app instance on one cache.** Another process or isolate may open the same cache file, for
-   example a second copy of the app or the app plus a command-line tool. *Memory-only with a warning:* the
-   second client waits one lease period, then runs without disk, logs one warning, and `persistenceEnabled` is
-   false; the app keeps working, but its writes are not durable and nobody is stopped. *An error:* opening
-   fails with a typed error (`persistence-unavailable`) through the first operation, which makes the problem
-   impossible to miss and matches Android, which fails the second process, but stops the app. **Default now:**
-   memory-only with a warning.
+1. **A second app instance on one cache.** Another process or isolate may open the same cache file, for example a second
+   copy of the app or the app plus a command-line tool. *Memory-only with a warning:* the second client watches the
+   lease for about 7.5 s, then runs without disk, logs one warning, and `persistenceEnabled` is false; the app keeps
+   working, but its writes are not durable and nobody is stopped. *An error:* opening fails with a typed error
+   (`persistence-unavailable`) through the first operation, which makes the problem impossible to miss and matches
+   Android, which fails the second process, but stops the app. **Default now:** memory-only with a warning.
 2. **Re-sent increments.** A write whose answer was lost is sent again after a reconnect and a restart, and a
    `ServerValue.increment` can then apply twice; the protocol has no idempotency key. *Document it:* the
    README and a test say so, and the exact way to count is a transaction; every official SDK behaves the same.
    *Special treatment:* the client could refuse to re-send an increment whose answer was lost and fail it with
    an error the app handles, trading a possible double count for a possible lost count. **Default now:**
    document it and pin it with a test; no special treatment.
-3. **The cache per app, or per signed-in user.** *Per app and database URL* (upstream): simple, and writes
-   made at start-up before the session is restored (user null, then user X) still go through; the cost is that
-   a second user on a shared machine can see the first user's cached data until `clearPersistence()` is
-   called, which the guide says to do at sign-out. *Per user:* no cross-user reads, but start-up writes made
-   before sign-in completes would fail or be hidden. *A middle option:* the server cache remembers the user it
-   belongs to and is cleared when a different user signs in (a `null` at start-up is ignored, and an explicit
-   sign-out clears it); pending writes are tagged with the user who made them and held, not sent and not
-   dropped, when another user signs in, and reported through a stream until the app purges them. This keeps
-   the start-up pattern working and costs one table, one column and a listener on the token provider.
-   **Default now:** per app and database URL, with `clearPersistence()`.
+3. **The cache per app, or per signed-in user.** *Per app and database URL* (upstream): simple, and writes made at
+   start-up before the session is restored (user null, then user X) still go through; the cost is that a second user on
+   a shared machine can see the first user's cached data until `clearPersistence()` is called (`clearSqlitePersistence`
+   in the SQLite package), which the guide says to do at sign-out. *Per user:* no cross-user reads, but start-up writes
+   made before sign-in completes would fail or be hidden. *A middle option:* the server cache remembers the user it
+   belongs to and is cleared when a different user signs in (a `null` at start-up is ignored, and an explicit sign-out
+   clears it); pending writes are tagged with the user who made them and held, not sent and not dropped, when another
+   user signs in, and reported through a stream until the app purges them. This keeps the start-up pattern working and
+   costs one table, one column and a listener on the token provider. **Default now:** per app and database URL, with
+   `clearPersistence()`.
 4. **Snapshot values: unmodifiable, or fresh mutable copies.** *Unmodifiable and memoised:* one pass per
    snapshot, one reader cannot corrupt another, and a mutation fails loudly; the cost is that code written for
    FlutterFire or JS that edits `value` must copy it. *Fresh mutable copy on each read:* JS's `val()` and
