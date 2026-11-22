@@ -54,7 +54,8 @@ final class TestCachePolicy implements CachePolicy {
   bool shouldCheckCacheSize(int serverUpdatesSinceLastCheck) => true;
 }
 
-const int maxInt = 0x7fffffffffffffff;
+// "No limit" (Android uses Long.MAX_VALUE); 2^53 - 1 also compiles for the web.
+const int maxInt = 9007199254740991;
 
 QuerySpec defaultQueryAt(String path) => QuerySpec.defaultAt(Path(path));
 
