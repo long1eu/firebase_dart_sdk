@@ -10,9 +10,33 @@ final class Merge extends Operation {
   /// The writes, relative to [path].
   final CompoundWrite children;
 
+  /// At the root, the writes below [key] (an [Overwrite] when they set [key] whole, null when
+  /// there are none); else the same merge one level down, or null for an unrelated child.
+  /// Android: `Merge.operationForChild`.
   @override
-  Operation? operationForChild(ChildKey key) => throw UnimplementedError();
+  Operation? operationForChild(ChildKey key) {
+    if (path.isEmpty) {
+      final CompoundWrite childTree = children.childCompoundWrite(
+        Path.fromKeys(<ChildKey>[key]),
+      );
+      if (childTree.isEmpty) {
+        // This child is unaffected.
+        return null;
+      }
+      final Node? rootWrite = childTree.rootWrite();
+      if (rootWrite != null) {
+        return Overwrite(source, Path.empty, rootWrite);
+      }
+      return Merge(source, Path.empty, childTree);
+    } else if (path.front == key) {
+      return Merge(source, path.popFront(), children);
+    }
+    // The merge does not affect this child.
+    return null;
+  }
 
+  /// Android: `Merge.toString`.
   @override
-  String toString() => throw UnimplementedError();
+  String toString() =>
+      'Merge { path=$path, source=$source, children=$children }';
 }
