@@ -4,7 +4,8 @@
 /// listen with its `on<Thing>` streams and write with `set`, `update` and transactions. Errors from the
 /// server are [FirebaseDatabaseException]s. This library imports no `dart:io` and no native code.
 ///
-/// Work in progress: the public API is declared and documented; its bodies are not written yet.
+/// Work in progress: the client runs against the fake server of `testing.dart`; the realtime connection
+/// is not wired into `FirebaseDatabase(app)` yet.
 ///
 /// ```dart
 /// import 'package:firebase_app_dart/firebase_app_dart.dart';

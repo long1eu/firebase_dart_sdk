@@ -16,7 +16,7 @@ import 'package:meta/meta.dart';
 /// | Code | Meaning |
 /// | --- | --- |
 /// | `permission-denied` | the security rules refused the read or write |
-/// | `disconnected` | the connection dropped while a sent transaction waited for its answer |
+/// | `disconnected` | the connection dropped while a sent transaction or onDisconnect request waited for its answer |
 /// | `max-retries` | a transaction ran more than 25 times without committing |
 /// | `overridden-by-set` | a later `set` at the location replaced a running transaction |
 /// | `unavailable` | the server is unavailable, or `Query.get` found no connection and no cache |

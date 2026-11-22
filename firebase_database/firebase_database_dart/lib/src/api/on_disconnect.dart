@@ -20,6 +20,11 @@ import 'package:meta/meta.dart';
 /// false event, and then forgets them. Registrations are never persisted; after a restart, register them
 /// again when `FirebaseDatabase.onConnected` turns true.
 ///
+/// A Future fails with `permission-denied` when the rules refuse the write, and with `disconnected` when the
+/// connection dropped after the request was sent and before the server answered: the registration may not
+/// exist then, so register again at the next connect. A request made while offline waits for the
+/// connection; it is not failed by a timeout.
+///
 /// ```dart
 /// db.onConnected.listen((bool connected) async {
 ///   if (!connected) return;
