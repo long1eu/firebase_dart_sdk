@@ -329,8 +329,12 @@ await queued;
 
 `onConnected` is `.info/connected`; its first event is the current state, `false` until the first connection is up.
 `isConnected`, `serverTimeOffset` and `estimatedServerTime` are plain getters. `purgeOutstandingWrites()` rolls back
-every pending write, fails their Futures with `write-canceled`, aborts transactions and drops queued `onDisconnect`
-operations.
+every pending write, fails their Futures with `write-canceled`, and aborts transactions; `onDisconnect`
+registrations are not touched. A transaction already sent is not undone by `purgeOutstandingWrites()` when the server has accepted it:
+it completes as committed with the server's value.
+
+A new instance does not connect: the first read, listener (also on `.info`), write, transaction, `get`, onDisconnect
+call, `keepSynced(true)` or `goOnline()` does. `goOffline()` before that is kept, so the first operation stays offline.
 
 The client reconnects with a delay that starts at 1 s, grows by 1.3 per failure up to 30 s, with jitter, and resets
 after a connection that stayed healthy for 30 s. When the link has had no inbound frame for 30 s it sends a protocol

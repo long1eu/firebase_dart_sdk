@@ -2,10 +2,7 @@
 /// none; Android: `core/DatabaseConfig.java` (`setPersistenceEnabled`, `setPersistenceCacheSizeBytes`,
 /// :140-170) and `core/Context.java:37` (`DEFAULT_CACHE_SIZE`).
 ///
-/// API contract, sections 6 and 7.2 (`DatabasePersistence`, `databasePersistence`, C38). Public
-/// through `storage_engine.dart` (engine packages, e.g. `sqlitePersistence` of
-/// `firebase_database_dart_sqlite`) once the public libraries exist; the client reads it through
-/// [DatabasePersistenceInternal], which no public library exports.
+/// The client reads it through [DatabasePersistenceInternal], which no public library exports.
 library;
 
 import 'package:firebase_database_dart/src/core/persistence/persistence_storage_engine_opener.dart';
@@ -20,9 +17,10 @@ const int minPersistenceCacheSizeBytes = 1024 * 1024;
 /// The largest cache size, 100 MiB. Android: `core/DatabaseConfig.java:168-170`.
 const int maxPersistenceCacheSizeBytes = 100 * 1024 * 1024;
 
-/// Persistence for one database instance; opaque. Made by [databasePersistence] (or an engine
-/// package's factory on top of it) and passed to the client, which calls the opener once at
-/// start with the (app name, database URL) of the instance.
+/// Persistence for one database instance: an opener of a storage engine plus the cache size. Build
+/// it with `sqlitePersistence` (package `firebase_database_dart_sqlite`) or, for your own engine,
+/// [databasePersistence] of `package:firebase_database_dart/storage_engine.dart`, and pass it as
+/// `FirebaseDatabase(persistence: ...)`.
 final class DatabasePersistence {
   DatabasePersistence._(
     this._opener,
@@ -42,7 +40,7 @@ final class DatabasePersistence {
 /// are sent again, but no server data is kept, so after a restart a listener waits for the
 /// server as it does without persistence. [cacheSizeBytes] then has nothing to prune.
 ///
-/// Throws an [ArgumentError] when [cacheSizeBytes] is below 1 MiB or above 100 MiB (C38).
+/// Throws an [ArgumentError] when [cacheSizeBytes] is below 1 MiB or above 100 MiB.
 /// Android: `core/DatabaseConfig.java:162-171` (`DatabaseException` there).
 DatabasePersistence databasePersistence({
   required PersistenceStorageEngineOpener opener,

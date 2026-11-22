@@ -13,6 +13,8 @@ import 'package:firebase_database_dart/src/core/persistence/persistence_storage_
 import 'package:firebase_database_dart/src/core/persistence/tracked_query.dart';
 import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
 import 'package:firebase_database_dart/src/core/view/query_spec.dart';
+import 'package:firebase_database_dart/src/realtime/auth_session.dart';
+import 'package:firebase_database_dart/src/realtime/connection_timings.dart';
 import 'package:firebase_database_dart/src/testing/in_memory_persistence_storage_engine.dart';
 
 /// A [FirebaseDatabase] of [app] connected to [server] instead of the network.
@@ -28,19 +30,15 @@ FirebaseDatabase databaseWithFakeServer(
   DatabaseLogger? logger,
   Duration reconnectDelay = const Duration(seconds: 1),
 }) {
-  Future<String?> tokenSource(bool forceRefresh) async {
-    final AuthTokenProvider provider = app.authProvider;
-    if (identical(provider, app)) {
-      return null;
-    }
-    try {
-      return (await provider.getAccessToken(forceRefresh: forceRefresh)).token;
-    } on Object {
-      return null;
-    }
-  }
-
   final AuthTokenProvider provider = app.authProvider;
+  // The token source the real connection gets (`persistentConnectionFactory`); with no provider set
+  // the app answers as its own provider and throws, which means no user.
+  final RealtimeTokenSource tokens = ProviderTokenSource(
+    auth: identical(provider, app) ? null : provider,
+    forcedRefreshMinInterval:
+        const ConnectionTimings().forcedRefreshMinInterval,
+    now: DateTime.now,
+  );
   return firebaseDatabaseWithConnection(
     app,
     persistence: persistence,
@@ -49,10 +47,7 @@ FirebaseDatabase databaseWithFakeServer(
         server.connect(
           delegate,
           reconnectDelay: reconnectDelay,
-          tokenSource: tokenSource,
-          tokenChanges: identical(provider, app)
-              ? null
-              : provider.onTokenChanged,
+          tokens: tokens,
         ),
   );
 }

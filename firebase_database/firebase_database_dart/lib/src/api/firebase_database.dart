@@ -432,18 +432,25 @@ final class FirebaseDatabase {
   }
 
   /// The reference for a full [url] of this database (for example
-  /// `https://my-project-default-rtdb.firebaseio.com/a/b`). Throws an [ArgumentError] when [url]
-  /// cannot be parsed, or, outside an emulator, when it names another host. With an emulator the
-  /// host is not compared and only the path is used.
+  /// `https://my-project-default-rtdb.firebaseio.com/a/b`). Outside an emulator the URL without its
+  /// path must be accepted by the constructor's `databaseUrl` rules and name this database's host,
+  /// else an [ArgumentError] is thrown. With an emulator the host is not compared and only the path
+  /// is used. Path segments are percent-decoded.
   DatabaseReference refFromUrl(String url) {
-    final _ParsedUrl parsed = _ParsedUrl.parse(url);
-    if (!_target.info.isUsingEmulator && parsed.host != _target.info.host) {
-      throw ArgumentError(
-        'refFromURL: Host name does not match the current database: '
-        '(found ${parsed.host} but expected ${_target.info.host})',
+    final ({String root, String path}) parts = _splitPath(url);
+    if (!_target.info.isUsingEmulator) {
+      final RepoInfo info = _Target._argument(
+        'url',
+        () => parseDatabaseUrl(parts.root),
       );
+      if (info.host != _target.info.host) {
+        throw ArgumentError(
+          'refFromURL: Host name does not match the current database: '
+          '(found ${info.host} but expected ${_target.info.host})',
+        );
+      }
     }
-    return ref(parsed.path);
+    return ref(parts.path);
   }
 
   /// Disconnects from the server and stays offline until [goOnline]. Writes stay queued and listeners
@@ -702,40 +709,41 @@ final class _FunctionRandom implements Random {
   int nextInt(int max) => (_next() * max).floor().clamp(0, max - 1);
 }
 
-/// The parts of a database URL. JS: `core/util/libs/parser.ts` (`parseDatabaseURL`, `parseRepoInfo`).
-final class _ParsedUrl {
-  _ParsedUrl(this.host, this.namespace, this.secure, this.path);
-
-  factory _ParsedUrl.parse(String url) {
-    final String withScheme = url.contains('://') ? url : 'https://$url';
-    final Uri uri;
-    try {
-      uri = Uri.parse(withScheme);
-    } on FormatException {
-      throw ArgumentError.value(url, 'url', 'Cannot parse the database URL.');
+/// Splits [url] into its root (scheme, host, port and query, given to `parseDatabaseUrl`) and its
+/// path, percent-decoded, with empty segments dropped. Nothing else is checked here.
+({String root, String path}) _splitPath(String url) {
+  final int scheme = url.indexOf('://');
+  final int start = scheme < 0 ? 0 : scheme + 3;
+  int end = url.length;
+  for (final String stop in const <String>['?', '#']) {
+    final int index = url.indexOf(stop, start);
+    if (index >= 0 && index < end) {
+      end = index;
     }
-    if (uri.host.isEmpty) {
+  }
+  final int slash = url.indexOf('/', start);
+  if (slash < 0 || slash > end) {
+    return (root: url, path: '');
+  }
+  final List<String> segments = <String>[];
+  for (final String segment in url.substring(slash, end).split('/')) {
+    if (segment.isEmpty) {
+      continue;
+    }
+    try {
+      segments.add(Uri.decodeComponent(segment));
+    } on ArgumentError {
       throw ArgumentError.value(
         url,
         'url',
-        'Cannot parse Firebase url. Please use https://<YOUR FIREBASE>.firebaseio.com',
+        'The path is not valid percent-encoded UTF-8.',
       );
     }
-    final String hostName = uri.host.contains(':') ? '[${uri.host}]' : uri.host;
-    final String host = uri.hasPort ? '$hostName:${uri.port}' : hostName;
-    final String namespace =
-        uri.queryParameters['ns'] ?? uri.host.split('.').first.toLowerCase();
-    final bool secure = uri.scheme == 'https' || uri.scheme == 'wss';
-    final String path = uri.pathSegments
-        .where((String s) => s.isNotEmpty)
-        .join('/');
-    return _ParsedUrl(host, namespace, secure, path);
   }
-
-  final String host;
-  final String namespace;
-  final bool secure;
-  final String path;
+  return (
+    root: url.substring(0, slash) + url.substring(end),
+    path: segments.join('/'),
+  );
 }
 
 /// Where an instance connects: its [RepoInfo] and public [databaseUrl].
@@ -783,8 +791,10 @@ final class _Target {
     );
   }
 
-  /// The target of the emulator at [emulatorHost], with the namespace of [url] (any scheme, a
-  /// `?ns=` or the first host label) or of the project's default database.
+  /// The target of the emulator at [emulatorHost], with the namespace of [url] or of the project's
+  /// default database. [url] follows the rules of a production URL (`parseDatabaseUrl`), except that
+  /// `http://` and `ws://` are accepted too, so an emulator URL such as
+  /// `http://127.0.0.1:9000?ns=<name>` works.
   factory _Target._emulator(FirebaseApp app, String? url, String emulatorHost) {
     if (emulatorHost.isEmpty) {
       throw ArgumentError.value(
@@ -797,11 +807,14 @@ final class _Target {
     if (url == null || url.isEmpty) {
       namespace = _defaultDatabase(app).namespace;
     } else {
-      final _ParsedUrl parsed = _ParsedUrl.parse(url);
-      if (parsed.path.isNotEmpty) {
-        throw ArgumentError(_rootOnly, 'databaseUrl');
-      }
-      namespace = parsed.namespace;
+      final String secureUrl = url.replaceFirstMapped(
+        RegExp('^(http|ws)://', caseSensitive: false),
+        (Match m) => 'https://',
+      );
+      namespace = _argument(
+        'databaseUrl',
+        () => parseDatabaseUrl(secureUrl),
+      ).namespace;
     }
     final RepoInfo info = _argument('emulatorHost', () {
       final ({String host, int port}) address = parseEmulatorHost(emulatorHost);
@@ -814,9 +827,6 @@ final class _Target {
       ).replace(queryParameters: <String, String>{'ns': info.namespace}),
     );
   }
-
-  static const String _rootOnly =
-      'Database URL must not have a path: give the database root and use ref(path)';
 
   /// The default database of the app's project id; throws an [ArgumentError] without one.
   static RepoInfo _defaultDatabase(FirebaseApp app) {

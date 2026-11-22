@@ -47,7 +47,8 @@ String errorText(Object error) =>
 /// One scenario: an app, a fake server, a database and a log.
 final class Harness {
   /// Creates the database; [persisted] passes `fakePersistence(serverCache: persisted)`. With [settled]
-  /// the setup starts connected.
+  /// the setup starts connected: the database connects on its first operation, so the harness calls
+  /// `goOnline` first. Without it the first operation of the scenario connects.
   Harness(
     this.time, {
     Map<String, Object?>? persisted,
@@ -63,6 +64,7 @@ final class Harness {
           : fakePersistence(serverCache: persisted),
     );
     if (settled) {
+      db.goOnline();
       settle();
     }
   }

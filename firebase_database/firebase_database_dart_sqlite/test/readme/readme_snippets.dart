@@ -152,8 +152,8 @@ Future<void> clientReadmeLine318() async {
   await queued;
 }
 
-// ../firebase_database_dart/README.md:350
-Future<void> clientReadmeLine350() async {
+// ../firebase_database_dart/README.md:354
+Future<void> clientReadmeLine354() async {
   // Before the FirebaseDatabase is constructed: it reads the app's providers then.
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   await auth.signInAnonymously();
@@ -161,8 +161,8 @@ Future<void> clientReadmeLine350() async {
   await signedIn.close();
 }
 
-// ../firebase_database_dart/README.md:369
-Future<void> clientReadmeLine369() async {
+// ../firebase_database_dart/README.md:373
+Future<void> clientReadmeLine373() async {
   final FirebaseDatabase asAda = FirebaseDatabase(
     app,
     emulatorHost: '127.0.0.1:9100',
@@ -175,8 +175,8 @@ Future<void> clientReadmeLine369() async {
   await asAda.close();
 }
 
-// ../firebase_database_dart/README.md:397
-Future<void> clientReadmeLine397() async {
+// ../firebase_database_dart/README.md:401
+Future<void> clientReadmeLine401() async {
   const String supportDirectory = '/path/to/app/support';
   final FirebaseDatabase cached = FirebaseDatabase(
     app,
@@ -202,8 +202,8 @@ Future<void> clientReadmeLine397() async {
   );
 }
 
-// ../firebase_database_dart/README.md:435
-Future<void> clientReadmeLine435() async {
+// ../firebase_database_dart/README.md:439
+Future<void> clientReadmeLine439() async {
   try {
     await ref.get();
   } on FirebaseDatabaseException catch (e) {
@@ -218,8 +218,8 @@ Future<void> clientReadmeLine435() async {
   }
 }
 
-// ../firebase_database_dart/README.md:466
-Future<void> clientReadmeLine466() async {
+// ../firebase_database_dart/README.md:470
+Future<void> clientReadmeLine470() async {
   final FirebaseDatabase logged = FirebaseDatabase(
     app,
     logger: (DatabaseLogLevel level, String message) {

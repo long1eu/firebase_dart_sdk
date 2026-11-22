@@ -764,52 +764,54 @@ void main() {
   });
 
   group('restoreWrites', () {
-    test(
-      'persisted writes are applied and re-sent in write-id order before the '
-      'connection starts',
-      () async {
-        final InMemoryPersistenceStorageEngine engine =
-            InMemoryPersistenceStorageEngine(<UserWriteRecord>[
-              UserWriteRecord.merge(
-                7,
-                Path('b'),
-                CompoundWrite.fromValue(<String, Object?>{'x': 2}),
-              ),
-              UserWriteRecord.overwrite(
-                5,
-                Path('a'),
-                nodeFromJson(1),
-                visible: true,
-              ),
-            ]);
-        final RepoHarness h = RepoHarness(persistence: managerOver(engine));
-        expect(
-          h.server.calls
-              .map((ServerCall c) => '${c.action} ${c.path ?? ''}')
-              .take(3),
-          <String>['put /a', 'merge /b', 'initialize '],
-        );
+    test('persisted writes are applied and re-sent in write-id order before the '
+        'connection starts', () async {
+      final InMemoryPersistenceStorageEngine engine =
+          InMemoryPersistenceStorageEngine(<UserWriteRecord>[
+            UserWriteRecord.merge(
+              7,
+              Path('b'),
+              CompoundWrite.fromValue(<String, Object?>{'x': 2}),
+            ),
+            UserWriteRecord.overwrite(
+              5,
+              Path('a'),
+              nodeFromJson(1),
+              visible: true,
+            ),
+          ]);
+      final RepoHarness h = RepoHarness(persistence: managerOver(engine));
+      // The connection starts on the first operation (lazy start), after the restored writes.
+      expect(
+        h.server.calls.map((ServerCall c) => '${c.action} ${c.path ?? ''}'),
+        <String>['put /a', 'merge /b'],
+      );
 
-        h.listen('S1', 'a');
-        await settle();
-        expect(h.log, <String>['S1:V(1)']);
+      h.listen('S1', 'a');
+      expect(
+        h.server.calls
+            .map((ServerCall c) => '${c.action} ${c.path ?? ''}')
+            .take(3),
+        <String>['put /a', 'merge /b', 'initialize '],
+      );
+      await settle();
+      expect(h.log, <String>['S1:V(1)']);
 
-        // The next user write continues after the highest restored id.
-        h.set('c', 3);
-        expect(
-          engine.loadUserWrites().map((UserWriteRecord w) => w.writeId),
-          <int>[5, 7, 8],
-        );
+      // The next user write continues after the highest restored id.
+      h.set('c', 3);
+      expect(
+        engine.loadUserWrites().map((UserWriteRecord w) => w.writeId),
+        <int>[5, 7, 8],
+      );
 
-        // Acknowledging a restored write removes it from the log.
-        h.server.respond(h.server.callsOf('put').first);
-        await settle();
-        expect(
-          engine.loadUserWrites().map((UserWriteRecord w) => w.writeId),
-          <int>[7, 8],
-        );
-      },
-    );
+      // Acknowledging a restored write removes it from the log.
+      h.server.respond(h.server.callsOf('put').first);
+      await settle();
+      expect(
+        engine.loadUserWrites().map((UserWriteRecord w) => w.writeId),
+        <int>[7, 8],
+      );
+    });
   });
 
   group('close (C3, D32)', () {
@@ -859,26 +861,26 @@ void main() {
     );
   });
 
-  test('a listen answered with a no_index warning is logged', () async {
-    final RepoHarness h = RepoHarness();
-    h.listen('S1', 'l');
-    h.server.respondToListen(
-      QuerySpec.defaultAt(Path('l')).toListenSpec(),
-      data: <String, Object?>{
-        'w': <Object?>['no_index'],
-      },
-    );
-    await settle();
-    expect(
-      h.logs,
-      contains(
-        allOf(
-          startsWith('warning: Using an unspecified index'),
-          contains('/l'),
-        ),
-      ),
-    );
-  });
+  test(
+    'a listen answered with a no_index warning is not logged by the Repo: the connection logs '
+    'it (persistent_connection_test B-4.1c)',
+    () async {
+      final RepoHarness h = RepoHarness();
+      h.listen('S1', 'l');
+      h.server.respondToListen(
+        QuerySpec.defaultAt(Path('l')).toListenSpec(),
+        data: <String, Object?>{
+          'w': <Object?>['no_index'],
+        },
+      );
+      await settle();
+      expect(h.log, <String>['S1:V(null)']);
+      expect(
+        h.logs.where((String l) => l.contains('unspecified index')),
+        isEmpty,
+      );
+    },
+  );
 
   group('.info', () {
     test('serverTimeOffset moves the server clock and is readable', () async {

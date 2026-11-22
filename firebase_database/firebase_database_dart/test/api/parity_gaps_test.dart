@@ -66,11 +66,6 @@ final class _Wire {
 
   void settle() => time.elapse(Duration.zero);
 
-  /// The log entries of the `no_index` warning.
-  List<String> get indexWarnings => logs
-      .where((String l) => l.contains('Using an unspecified index'))
-      .toList();
-
   /// Logs `name:<value>/<priority>` for every value event of [query].
   void listen(String name, Query query) => query.onValue.listen(
     (DatabaseEvent e) =>
@@ -87,6 +82,48 @@ final class _Wire {
       ),
       onError: (Object e) => log.add('$name:${errorText(e)}'),
     );
+  }
+}
+
+/// A database over the real PersistentConnection and a fake WebSocket, logging into [logs].
+final class _Ws {
+  _Ws(this.time) {
+    db = firebaseDatabaseWithConnection(
+      newTestApp(),
+      connectionFactory: persistentConnectionFactory(
+        const RepoInfo(
+          host: 'test-project-default-rtdb.firebaseio.com',
+          namespace: 'test-project-default-rtdb',
+          secure: true,
+        ),
+        authProvider: null,
+        appCheckProvider: null,
+        random: () => 0.5,
+        connector: connector.connect,
+      ),
+      logger: (DatabaseLogLevel level, String message) =>
+          logs.add('${level.name}: $message'),
+    );
+  }
+
+  final FakeTime time;
+  final FakeWsConnector connector = FakeWsConnector(autoHello: true);
+  final List<String> logs = <String>[];
+  late final FirebaseDatabase db;
+
+  FakeWsChannel get channel => connector.last;
+
+  /// The log entries of the `no_index` warning.
+  List<String> get indexWarnings => logs
+      .where((String l) => l.contains('Using an unspecified index'))
+      .toList();
+
+  /// Answers every listen sent so far `ok` with [data].
+  void answerListens(Object? data) {
+    for (final Map<String, Object?> listen in channel.sentRequests('q')) {
+      channel.serverResponse(listen['r']! as int, data: data);
+    }
+    time.elapse(Duration.zero);
   }
 }
 
@@ -162,99 +199,71 @@ void main() {
           expect(server.requests, <String>['g /a']);
         });
       },
-      skip:
-          'DEFECT: the Repo is started in the constructor (firebase_database.dart _setUp) and '
-          'PersistentConnection.initialize connects at once (persistent_connection.dart:170); '
-          'JS starts the repo on first use (api/Database.ts:249-259), the plan says "connects on '
-          'the first operation".',
     );
   });
 
   group('listen.listenWarnings', () {
-    wired('a no_index listen answer logs one warning naming the index', (
-      _Wire w,
-    ) {
-      w.listen('S1', w.db.ref('l').orderByChild('n').limitToFirst(1));
-      w.settle();
-      final ServerCall listen = w.server.callsOf('listen').single;
-      w.server.respond(
-        listen,
-        data: <String, Object?>{
+    // The warning is the connection's (JS PersistentConnection.ts:316-331): these tests run over
+    // the real PersistentConnection and a fake WebSocket, since FakeServerActions logs nothing.
+    test('a no_index listen answer logs one warning naming the index', () {
+      fakeTime((FakeTime time) {
+        final _Ws ws = _Ws(time);
+        ws.db.ref('l').orderByChild('n').limitToFirst(1).onValue.listen((_) {});
+        time.elapse(const Duration(seconds: 1));
+        ws.answerListens(<String, Object?>{
           'w': <Object?>['no_index'],
-        },
-      );
-      w.settle();
-      expect(w.indexWarnings, hasLength(1));
-      expect(
-        w.indexWarnings.single,
-        allOf(
-          startsWith('warning: '),
-          contains('".indexOn": "n"'),
-          contains('/l'),
-        ),
-      );
+        });
+        expect(ws.indexWarnings, hasLength(1));
+        expect(
+          ws.indexWarnings.single,
+          allOf(
+            startsWith('warning: '),
+            contains('".indexOn": "n"'),
+            contains('/l'),
+          ),
+        );
 
-      // A second listener on the same query sends no listen, so no second warning.
-      w.listen('S2', w.db.ref('l').orderByChild('n').limitToFirst(1));
-      w.settle();
-      expect(w.server.callsOf('listen'), hasLength(1));
-      expect(w.indexWarnings, hasLength(1));
+        // A second listener on the same query sends no listen, so no second warning.
+        ws.db.ref('l').orderByChild('n').limitToFirst(1).onValue.listen((_) {});
+        time.elapse(Duration.zero);
+        expect(ws.channel.sentRequests('q'), hasLength(1));
+        expect(ws.indexWarnings, hasLength(1));
+      });
     });
 
-    wired('an answer without the warning logs nothing', (_Wire w) {
-      w.listen('S1', w.db.ref('l').orderByChild('n').limitToFirst(1));
-      w.settle();
-      w.server.respond(w.server.callsOf('listen').single);
-      w.settle();
-      expect(w.indexWarnings, isEmpty);
+    test('an answer without the warning logs nothing', () {
+      fakeTime((FakeTime time) {
+        final _Ws ws = _Ws(time);
+        ws.db.ref('l').orderByChild('n').limitToFirst(1).onValue.listen((_) {});
+        time.elapse(const Duration(seconds: 1));
+        ws.answerListens(null);
+        expect(ws.channel.sentRequests('q'), hasLength(1));
+        expect(ws.indexWarnings, isEmpty);
+      });
     });
 
     test(
       'over the WebSocket connection one listen answer logs the warning once',
       () {
         fakeTime((FakeTime time) {
-          final FakeWsConnector connector = FakeWsConnector(autoHello: true);
-          final List<String> warnings = <String>[];
-          final FirebaseDatabase db = firebaseDatabaseWithConnection(
-            newTestApp(),
-            connectionFactory: persistentConnectionFactory(
-              const RepoInfo(
-                host: 'test-project-default-rtdb.firebaseio.com',
-                namespace: 'test-project-default-rtdb',
-                secure: true,
-              ),
-              authProvider: null,
-              appCheckProvider: null,
-              random: () => 0.5,
-              connector: connector.connect,
-            ),
-            logger: (DatabaseLogLevel level, String message) {
-              if (message.contains('Using an unspecified index')) {
-                warnings.add(message);
-              }
-            },
-          );
-          db.ref('l').orderByChild('n').limitToFirst(1).onValue.listen((_) {});
+          final _Ws ws = _Ws(time);
+          ws.db
+              .ref('l')
+              .orderByChild('n')
+              .limitToFirst(1)
+              .onValue
+              .listen((_) {});
           time.elapse(const Duration(seconds: 1));
-          final FakeWsChannel channel = connector.last;
-          final List<Map<String, Object?>> listens = channel.sentRequests('q');
-          expect(listens, hasLength(1));
-          channel.serverResponse(
-            listens.single['r']! as int,
-            data: <String, Object?>{
-              'w': <Object?>['no_index'],
-            },
+          final List<Map<String, Object?>> listens = ws.channel.sentRequests(
+            'q',
           );
-          time.elapse(Duration.zero);
-          expect(warnings, hasLength(1));
+          expect(listens, hasLength(1));
+          ws.answerListens(<String, Object?>{
+            'w': <Object?>['no_index'],
+          });
+          expect(ws.indexWarnings, hasLength(1));
         });
       },
-      skip:
-          'DEFECT: the warning is logged twice per answer, by '
-          'PersistentConnection._warnOnMissingIndex '
-          '(persistent_connection.dart:280) and by RepoListenProvider._warnOnIndexWarnings '
-          '(repo_listen_providers.dart:47), both to the same logger; JS logs it once, in '
-          'PersistentConnection.ts:316-331.',
     );
   });
 

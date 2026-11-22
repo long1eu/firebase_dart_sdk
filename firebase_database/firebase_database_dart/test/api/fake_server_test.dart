@@ -1,11 +1,43 @@
 // FakeDatabaseServer behaviour the shim's tests rely on (coordinator rulings a to d) and the auth tokens it
 // records.
 
+import 'dart:async';
+
+import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_database_dart/firebase_database_dart.dart';
+import 'package:firebase_database_dart/testing.dart';
 import 'package:test/test.dart';
 
 import 'support/fake_time.dart';
 import 'support/harness.dart';
+
+/// A provider whose change event carries a placeholder, as the published FlutterFire adapter's
+/// did, while [getAccessToken] returns the real [token].
+final class _PlaceholderEventProvider extends AuthTokenProvider {
+  _PlaceholderEventProvider(this.token);
+
+  static const String placeholder = 'flutterfire-bridge:token-changed';
+
+  String token;
+  final StreamController<AuthTokenChange> _changes =
+      StreamController<AuthTokenChange>.broadcast(sync: true);
+
+  /// Switches to [newToken] and emits the placeholder event.
+  void change(String newToken) {
+    token = newToken;
+    _changes.add(const AuthTokenChange(placeholder));
+  }
+
+  @override
+  Future<GetTokenResult> getAccessToken({required bool forceRefresh}) async =>
+      GetTokenResult(token);
+
+  @override
+  String? get uid => 'u1';
+
+  @override
+  Stream<AuthTokenChange> get onTokenChanged => _changes.stream;
+}
 
 void main() {
   void scenario(String name, void Function(Harness h) body) {
@@ -223,6 +255,28 @@ void main() {
         throwsUnsupportedError,
       );
     });
+
+    test(
+      'a token change records the token the client fetches, never the event payload',
+      () {
+        fakeTime((FakeTime time) {
+          final _PlaceholderEventProvider provider = _PlaceholderEventProvider(
+            'token-1',
+          );
+          final FirebaseApp app = newTestApp()..authProvider = provider;
+          final FakeDatabaseServer server = FakeDatabaseServer();
+          databaseWithFakeServer(app, server).goOnline();
+          time.elapse(Duration.zero);
+          provider.change('token-2');
+          time.elapse(Duration.zero);
+          expect(server.receivedAuthTokens, <String?>['token-1', 'token-2']);
+          expect(
+            server.receivedAuthTokens,
+            isNot(contains(_PlaceholderEventProvider.placeholder)),
+          );
+        });
+      },
+    );
 
     scenario('revokeAuth reconnects and sends a token again', (Harness h) {
       h.server.revokeAuth();

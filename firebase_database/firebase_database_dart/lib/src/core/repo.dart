@@ -96,9 +96,12 @@ const String interruptReason = 'repo_interrupt';
 final class Repo implements ServerActionsDelegate {
   /// Creates the Repo for [repoInfo] and builds its connection with [connectionFactory].
   ///
-  /// The start order lives here: load the persisted user writes from [persistenceManager],
-  /// [restoreWrites] them, and only then `connection.initialize()`. A user write made before the
-  /// restore would reuse a restored write id.
+  /// The start order lives here: load the persisted user writes from [persistenceManager] and
+  /// [restoreWrites] them (a user write made before the restore would reuse a restored write id).
+  /// The connection is not started here: `connection.initialize()` runs on the first operation
+  /// that needs the server (a write, a listen on any path, `.info` included, a `get`, a
+  /// transaction, an onDisconnect request, `keepSynced(true)` or [resume]), as JS starts its repo
+  /// on first use (`api/Database.ts` `_repo`). Restored writes wait in the connection until then.
   ///
   /// Events go to [dispatcher] (a fresh [EventDispatcher] by default, one per Repo); messages go
   /// to [logger] (null: dropped), which is also handed to the connection.
@@ -129,11 +132,7 @@ final class Repo implements ServerActionsDelegate {
     infoProvider.syncTree = infoTree;
     repo._infoSyncTree = infoTree;
     repo._serverSyncTree = SyncTree(
-      listenProvider: RepoListenProvider(
-        repo._connection,
-        repo._post,
-        logger: logger,
-      ),
+      listenProvider: RepoListenProvider(repo._connection, repo._post),
       persistenceManager: repo._persistenceManager,
     );
     if (repoInfo.isDemoHost) {
@@ -146,7 +145,6 @@ final class Repo implements ServerActionsDelegate {
     repo.restoreWrites();
     repo._updateInfo('authenticated', false);
     repo._updateInfo('connected', false);
-    repo._connection.initialize();
     return repo;
   }
 
@@ -176,6 +174,7 @@ final class Repo implements ServerActionsDelegate {
   int _dataUpdateCount = 0;
   bool _connected = false;
   bool _closed = false;
+  bool _started = false;
   bool _hijackHash = false;
   bool _loggedTransactionPersistenceWarning = false;
 
@@ -237,6 +236,7 @@ final class Repo implements ServerActionsDelegate {
     if (_closed) {
       return _failClosed(onComplete);
     }
+    _start();
     _log(DatabaseLogLevel.debug, 'set: $path');
     final Node value = _normalizeUserNode(newValue);
     final Node resolved = server_values.resolveDeferredValueTree(
@@ -290,6 +290,7 @@ final class Repo implements ServerActionsDelegate {
     if (_closed) {
       return _failClosed(onComplete);
     }
+    _start();
     _log(DatabaseLogLevel.debug, 'update: $path');
     if (updates.isEmpty) {
       _log(DatabaseLogLevel.debug, 'update called with no changes. No-op');
@@ -350,7 +351,10 @@ final class Repo implements ServerActionsDelegate {
   ///
   /// Android `Repo.getValue`; JS `repoGetValue`; the waiting rules are contract C25 (see
   /// `repo_get.dart`).
-  Future<Node> getValue(QuerySpec query) => _getValue(query);
+  Future<Node> getValue(QuerySpec query) {
+    _start();
+    return _getValue(query);
+  }
 
   /// Registers an onDisconnect overwrite of [path] with [newValue] and remembers it locally.
   /// Android `Repo.onDisconnectSetValue`; JS `repoOnDisconnectSet`.
@@ -358,7 +362,10 @@ final class Repo implements ServerActionsDelegate {
     Path path,
     Node newValue, {
     WriteCompletion? onComplete,
-  }) => _onDisconnectSetValue(path, newValue, onComplete);
+  }) {
+    _start();
+    _onDisconnectSetValue(path, newValue, onComplete);
+  }
 
   /// Registers an onDisconnect merge into [path]. Android `Repo.onDisconnectUpdate`; JS
   /// `repoOnDisconnectUpdate`.
@@ -367,12 +374,17 @@ final class Repo implements ServerActionsDelegate {
     Map<Path, Node> newChildren,
     Map<String, Object?> unparsedUpdates, {
     WriteCompletion? onComplete,
-  }) => _onDisconnectUpdate(path, newChildren, unparsedUpdates, onComplete);
+  }) {
+    _start();
+    _onDisconnectUpdate(path, newChildren, unparsedUpdates, onComplete);
+  }
 
   /// Cancels the onDisconnect operations at and below [path]. Android `Repo.onDisconnectCancel`;
   /// JS `repoOnDisconnectCancel`.
-  void onDisconnectCancel(Path path, {WriteCompletion? onComplete}) =>
-      _onDisconnectCancel(path, onComplete);
+  void onDisconnectCancel(Path path, {WriteCompletion? onComplete}) {
+    _start();
+    _onDisconnectCancel(path, onComplete);
+  }
 
   /// Adds a listener; `.info` queries go to the info tree. After [close] the registration gets a
   /// `database-closed` cancel instead. Android `Repo.addEventCallback`; JS
@@ -384,6 +396,7 @@ final class Repo implements ServerActionsDelegate {
       ]);
       return;
     }
+    _start();
     _registrations
       ..removeWhere((EventRegistration r) => r.isZombied)
       ..add(registration);
@@ -432,6 +445,7 @@ final class Repo implements ServerActionsDelegate {
       );
     }
     if (keep) {
+      _start();
       _keptSynced.add(query);
     } else {
       _keptSynced.remove(query);
@@ -441,6 +455,9 @@ final class Repo implements ServerActionsDelegate {
 
   /// goOffline: interrupts the connection with [interruptReason]; waiting `get` requests answer
   /// from the cache at once (contract C25 rule 3). Android `Repo.interrupt`; JS `repoInterrupt`.
+  ///
+  /// It does not start the connection: before the first operation the interrupt is held by the
+  /// connection, so that operation starts it without connecting.
   void interrupt() {
     if (_closed) {
       return;
@@ -451,11 +468,13 @@ final class Repo implements ServerActionsDelegate {
     }
   }
 
-  /// goOnline: resumes the connection. Android `Repo.resume`; JS `repoResume`.
+  /// goOnline: starts the connection if no operation has, and resumes it. Android `Repo.resume`;
+  /// JS `repoResume`.
   void resume() {
     if (_closed) {
       return;
     }
+    _start();
     _connection.resume(interruptReason);
   }
 
@@ -482,7 +501,10 @@ final class Repo implements ServerActionsDelegate {
     TransactionUpdate update, {
     TransactionCompletion? onComplete,
     bool applyLocally = true,
-  }) => _startTransaction(path, update, onComplete, applyLocally);
+  }) {
+    _start();
+    _startTransaction(path, update, onComplete, applyLocally);
+  }
 
   /// Replays the persisted writes into the server tree (unpersisted) and re-sends them in
   /// write-id order; called by the factory before the connection starts, never by users.
@@ -664,6 +686,15 @@ final class Repo implements ServerActionsDelegate {
   }
 
   // Helpers shared by the parts.
+
+  /// Starts the connection once, on the first operation that needs the server.
+  void _start() {
+    if (_started) {
+      return;
+    }
+    _started = true;
+    _connection.initialize();
+  }
 
   void _post(List<Event> events) {
     if (events.isNotEmpty) {

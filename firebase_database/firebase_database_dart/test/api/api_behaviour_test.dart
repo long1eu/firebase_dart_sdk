@@ -670,6 +670,64 @@ void main() {
     });
   });
 
+  group('one URL parser (database_url.dart)', () {
+    timed('an emulatorHost without a port is refused at construction', (
+      FakeTime time,
+    ) {
+      for (final String host in <String>['localhost', '127.0.0.1', '[::1]']) {
+        expect(
+          () => FirebaseDatabase(newTestApp(), emulatorHost: host),
+          throwsArgumentError,
+          reason: host,
+        );
+      }
+    });
+
+    timed('refFromUrl refuses what parseDatabaseUrl refuses', (FakeTime time) {
+      final FirebaseDatabase db = FirebaseDatabase(newTestApp());
+      for (final String url in <String>[
+        'https://user@test-project-default-rtdb.firebaseio.com/a',
+        'http://test-project-default-rtdb.firebaseio.com/a',
+        'https://test-project-default-rtdb.firebaseio.com:8443/a',
+        'https://test-project-default-rtdb.firebaseio.com/a?x=1',
+      ]) {
+        expect(() => db.refFromUrl(url), throwsArgumentError, reason: url);
+      }
+      expect(
+        db
+            .refFromUrl(
+              'https://Test-Project-Default-RTDB.firebaseio.com:443/a/b%20c',
+            )
+            .path,
+        '/a/b c',
+      );
+      expect(
+        db.refFromUrl('test-project-default-rtdb.firebaseio.com/a').path,
+        '/a',
+      );
+    });
+
+    timed('the databaseUrl of an emulator instance goes through the same '
+        'parser', (FakeTime time) {
+      expect(
+        () => FirebaseDatabase(
+          newTestApp(),
+          databaseUrl: 'https://user@x.firebaseio.com',
+          emulatorHost: '127.0.0.1:9000',
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        FirebaseDatabase(
+          newTestApp(),
+          databaseUrl: 'http://localhost:9000?ns=Ns-1',
+          emulatorHost: '127.0.0.1:9000',
+        ).databaseUrl.queryParameters['ns'],
+        'ns-1',
+      );
+    });
+  });
+
   group('limits', () {
     timed('limitToLast and limitToFirst refuse 0 and below (m17)', (
       FakeTime time,

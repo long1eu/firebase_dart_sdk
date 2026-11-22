@@ -13,6 +13,7 @@ import 'package:firebase_database_dart/src/core/snap/node.dart';
 import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
 import 'package:firebase_database_dart/src/core/util/server_values.dart';
 import 'package:firebase_database_dart/src/core/view/query_params.dart';
+import 'package:firebase_database_dart/src/realtime/auth_session.dart';
 import 'package:firebase_database_dart/src/testing/fake_server_actions.dart';
 import 'package:meta/meta.dart';
 
@@ -22,7 +23,7 @@ import 'package:meta/meta.dart';
 /// until the test answers them. Drive time with `fakeAsync`.
 ///
 /// It behaves as the real connection does around it: the first connection is made in a timer after the
-/// database is created; requests made while offline are queued and sent when the connection comes up,
+/// database's first operation (or `goOnline`), not when it is created; requests made while offline are queued and sent when the connection comes up,
 /// after the listens are sent again; a dropped connection is retried after the database's reconnect delay
 /// for as long as [acceptConnections] is false.
 ///
@@ -65,6 +66,10 @@ final class FakeDatabaseServer {
   /// The auth token the client sent with each connection (and each token change while connected), oldest
   /// first: null for a connection made without a user. A connection after [revokeAuth] sends a token
   /// fetched with `forceRefresh: true`.
+  ///
+  /// The tokens come through the client's token source, as the real connection gets them: a change
+  /// event of the auth provider is a signal, and the token recorded is the one the source then fetches
+  /// with `getAccessToken`, never the payload of the event.
   List<String?> get receivedAuthTokens =>
       List<String?>.unmodifiable(_authTokens);
 
@@ -401,13 +406,13 @@ final class FakeDatabaseServer {
 @internal
 extension FakeDatabaseServerInternal on FakeDatabaseServer {
   /// The connection of a new database: [delegate] is its Repo; a dropped connection is retried after
-  /// [reconnectDelay]; [tokenSource] gives the auth token sent with each connection (null: no user), and
-  /// each event of [tokenChanges] sends the current token again while connected.
+  /// [reconnectDelay]. [tokens] is the token source the real connection would get: its auth token is
+  /// fetched for each connection (null: no user), and each event of its `authChanges` is a signal to
+  /// fetch the token again and send it while connected (the payload of the event is not used).
   ServerActions connect(
     ServerActionsDelegate delegate, {
     required Duration reconnectDelay,
-    required Future<String?> Function(bool forceRefresh) tokenSource,
-    Stream<Object?>? tokenChanges,
+    required RealtimeTokenSource tokens,
   }) {
     _connection?._close();
     _wire
@@ -417,10 +422,10 @@ extension FakeDatabaseServerInternal on FakeDatabaseServer {
       this,
       delegate,
       reconnectDelay,
-      tokenSource,
+      tokens,
     );
-    connection._tokenSubscription = tokenChanges?.listen(
-      (Object? _) => connection._sendAuth(),
+    connection._tokenSubscription = tokens.authChanges.listen(
+      (_) => connection._sendAuth(),
     );
     _connection = connection;
     return connection;
@@ -482,13 +487,13 @@ final class _FakeConnection implements ServerActions {
     this._server,
     this._delegate,
     this._reconnectDelay,
-    this._tokenSource,
+    this._tokens,
   );
 
   final FakeDatabaseServer _server;
   final ServerActionsDelegate _delegate;
   final Duration _reconnectDelay;
-  final Future<String?> Function(bool forceRefresh) _tokenSource;
+  final RealtimeTokenSource _tokens;
   StreamSubscription<Object?>? _tokenSubscription;
 
   final Map<ListenSpec, _Listen> _listens = <ListenSpec, _Listen>{};
@@ -546,7 +551,7 @@ final class _FakeConnection implements ServerActions {
     _connecting = true;
     final bool force = _forceToken;
     _forceToken = false;
-    _tokenSource(force).then((String? token) {
+    _authToken(forceRefresh: force).then((String? token) {
       _connecting = false;
       if (!_mayConnect) {
         return;
@@ -571,11 +576,20 @@ final class _FakeConnection implements ServerActions {
     if (!_connected) {
       return;
     }
-    _tokenSource(false).then((String? token) {
+    _authToken(forceRefresh: false).then((String? token) {
       if (_connected) {
         _server._authTokens.add(token);
       }
     });
+  }
+
+  /// The auth token from [_tokens]; a failing provider counts as no user here, so a test sees null.
+  Future<String?> _authToken({required bool forceRefresh}) async {
+    try {
+      return await _tokens.authToken(forceRefresh: forceRefresh);
+    } on Object {
+      return null;
+    }
   }
 
   /// Drops the connection: sent transaction puts and sent onDisconnect requests not answered yet complete
