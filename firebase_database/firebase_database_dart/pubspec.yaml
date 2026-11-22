@@ -30,6 +30,8 @@ dependencies:
   # Local development resolves this from ../../firebase_core/firebase_app_dart
   # through pubspec_overrides.yaml (not published).
   firebase_app_dart: ^0.2.0
+  # The REST client (rest_client.dart); 1.5.0 is the version firebase_storage_dart uses.
+  http: ^1.5.0
   meta: ^1.11.0
   web: ^1.1.0
 
