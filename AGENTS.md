@@ -20,6 +20,9 @@ Maintained, tested and published (`cloud_firestore_dart` 0.3.2, Dart `^3.8.0`):
 | `firebase_storage_dart` (0.1.0) | `firebase_storage/firebase_storage_dart` |
 | `firebase_storage_dart_platform` (0.1.0, Flutter) | `firebase_storage/firebase_storage_dart_platform` |
 | `firebase_admin_dart` (0.1.0; trusted code only, never ship a service account key) | `firebase_admin/firebase_admin_dart` |
+| `firebase_database_dart` (0.0.1, not published yet) | `firebase_database/firebase_database_dart` |
+| `firebase_database_dart_sqlite` (0.0.1, not published yet) | `firebase_database/firebase_database_dart_sqlite` |
+| `firebase_database_dart_platform` (0.0.1, Flutter, not published yet) | `firebase_database/firebase_database_dart_platform` |
 
 - `examples/`: complete example packages (`server_shelf`, `cli`, `storage_cli`, `cloud_run_job`).
 - `docs/`: guides (`docs/guides/`), parity, support policy, how we test, upstream sync records.
