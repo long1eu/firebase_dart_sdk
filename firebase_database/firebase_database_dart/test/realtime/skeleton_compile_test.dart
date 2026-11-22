@@ -17,6 +17,7 @@ import 'package:firebase_database_dart/src/realtime/persistent_connection.dart';
 import 'package:firebase_database_dart/src/realtime/realtime_error.dart';
 import 'package:firebase_database_dart/src/realtime/realtime_target.dart';
 import 'package:firebase_database_dart/src/realtime/reconnect_backoff.dart';
+import 'package:firebase_database_dart/src/realtime/replay.dart';
 import 'package:firebase_database_dart/src/realtime/request_table.dart';
 import 'package:firebase_database_dart/src/realtime/rest_client.dart';
 import 'package:firebase_database_dart/src/realtime/server_message.dart';
@@ -127,6 +128,13 @@ final List<Object?> _topLevel = <Object?>[
   safeServerText,
   // reconnect_backoff.dart
   ReconnectBackoff.new,
+  // replay.dart
+  TimedRequest,
+  ListenRecord.new,
+  OutstandingWrite.new,
+  OutstandingGet.new,
+  QueuedOnDisconnect.new,
+  ReplayQueues.new,
   // request_table.dart
   RequestTable.new,
   // rest_client.dart
@@ -176,6 +184,11 @@ List<Object?> _members({
   required PersistentConnection persistent,
   required ReconnectBackoff backoff,
   required RequestTable table,
+  required ListenRecord listenRecord,
+  required OutstandingWrite write,
+  required OutstandingGet outstandingGet,
+  required QueuedOnDisconnect queued,
+  required ReplayQueues queues,
   required RestClient rest,
   required Response response,
   required DataPush dataPush,
@@ -277,6 +290,34 @@ List<Object?> _members({
     table.complete,
     table.clear,
     table.pending,
+    listenRecord.spec,
+    listenRecord.tag,
+    listenRecord.hashProvider,
+    listenRecord.onComplete,
+    listenRecord.wireBody,
+    listenRecord.timeouts,
+    write.action,
+    write.body,
+    write.onComplete,
+    write.isTransaction,
+    write.sent,
+    outstandingGet.body,
+    outstandingGet.completer,
+    outstandingGet.sent,
+    queued.action,
+    queued.body,
+    queued.onComplete,
+    queues.writes,
+    queues.onDisconnects,
+    queues.gets,
+    queues.listens,
+    queues.addListen,
+    queues.hasListen,
+    queues.removeListen,
+    queues.removeListensAt,
+    queues.takeSentTransactions,
+    queues.markAllUnsent,
+    queues.clear,
     response.r,
     response.status,
     response.data,

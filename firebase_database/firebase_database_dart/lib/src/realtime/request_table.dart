@@ -2,6 +2,8 @@
 /// (envelope).
 library;
 
+import 'dart:async';
+
 /// The requests of one `PersistentConnection` that were sent on the current connection and wait
 /// for an answer, keyed by request number.
 ///
@@ -19,9 +21,11 @@ library;
 final class RequestTable {
   /// Creates an empty table whose first number is 1; [timeout] is
   /// `ConnectionTimings.requestTimeout`.
-  RequestTable({required Duration timeout}) {
-    throw UnimplementedError();
-  }
+  RequestTable({required Duration timeout}) : _timeout = timeout;
+
+  final Duration _timeout;
+  final Map<int, _Entry> _entries = <int, _Entry>{};
+  int _lastNumber = 0;
 
   /// Takes the next request number for a request being sent now on a connected socket. With
   /// [onResponse] the request waits for an answer: [onResponse] gets the response body
@@ -31,20 +35,46 @@ final class RequestTable {
     void Function(Map<String, Object?> body)? onResponse, {
     void Function()? onTimeout,
   }) {
-    throw UnimplementedError();
+    final int number = ++_lastNumber;
+    if (onResponse == null) {
+      return number;
+    }
+    final Timer timer = Timer(_timeout, () {
+      if (_entries.remove(number) != null) {
+        onTimeout?.call();
+      }
+    });
+    _entries[number] = _Entry(onResponse, timer);
+    return number;
   }
 
   /// Runs and removes the callback of request [r] with [body], cancelling its timer. Returns false
   /// when [r] is unknown (the response is ignored, iOS U-I09).
   bool complete(int r, Map<String, Object?> body) {
-    throw UnimplementedError();
+    final _Entry? entry = _entries.remove(r);
+    if (entry == null) {
+      return false;
+    }
+    entry.timer.cancel();
+    entry.onResponse(body);
+    return true;
   }
 
   /// Drops every entry and cancels every timer (the connection is gone). No callback runs.
   void clear() {
-    throw UnimplementedError();
+    for (final _Entry entry in _entries.values) {
+      entry.timer.cancel();
+    }
+    _entries.clear();
   }
 
   /// How many requests wait for a response.
-  int get pending => throw UnimplementedError();
+  int get pending => _entries.length;
+}
+
+final class _Entry {
+  _Entry(this.onResponse, this.timer);
+
+  final void Function(Map<String, Object?> body) onResponse;
+  final Timer timer;
 }
