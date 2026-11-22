@@ -1,5 +1,5 @@
-/// The wiring the core's Repo calls (owner P): one [ServerActionsFactory] for the WebSocket
-/// connection and one for the read-only REST client (`lib/src/core/repo.dart`).
+/// The wiring the core's Repo calls (owner P): the [ServerActionsFactory] of the WebSocket
+/// connection (`lib/src/core/repo.dart`).
 ///
 /// Repo calls the factory once, in its constructor, with itself as the delegate; its start order
 /// is: load persisted writes, `restoreWrites`, then `ServerActions.initialize`. So the objects
@@ -23,10 +23,8 @@ import 'package:firebase_database_dart/src/realtime/connection_timings.dart';
 import 'package:firebase_database_dart/src/realtime/persistent_connection.dart';
 import 'package:firebase_database_dart/src/realtime/realtime_target.dart';
 import 'package:firebase_database_dart/src/realtime/reconnect_backoff.dart';
-import 'package:firebase_database_dart/src/realtime/rest_client.dart';
 import 'package:firebase_database_dart/src/realtime/transport/ws_channel.dart';
 import 'package:firebase_database_dart/src/realtime/transport/ws_connector.dart';
-import 'package:http/http.dart' as http;
 
 /// The factory of the WebSocket [PersistentConnection] of the database at [repoInfo].
 ///
@@ -100,39 +98,4 @@ ServerActionsFactory persistentConnectionFactory(
       connectivityHints: connectivityHints,
     );
   };
-}
-
-/// The factory of the read-only REST [RestClient] of the database at [repoInfo]: reads only;
-/// writes and onDisconnect requests complete with `read_only` (`rtdb_seam_changes.md` A.7).
-///
-/// [authProvider] and [appCheckProvider] as for [persistentConnectionFactory]; [httpClient] is
-/// used and left open when given, else each client creates and closes its own; [timings] gives
-/// the body cap (`maxMessageBytes`), the answer wait (`requestTimeout`), the nesting limit
-/// (`maxJsonDepth`) and the forced-refresh limit; [clock] the time of that limit. The App Check
-/// header switch is the platform's, as for the WebSocket.
-ServerActionsFactory restClientFactory(
-  RepoInfo repoInfo, {
-  required AuthTokenProvider? authProvider,
-  required AppCheckTokenProvider? appCheckProvider,
-  http.Client? httpClient,
-  ConnectionTimings timings = const ConnectionTimings(),
-  Clock? clock,
-}) {
-  final Clock now = clock ?? DateTime.now;
-  return (ServerActionsDelegate delegate, DatabaseLogger? logger) => RestClient(
-    target: RealtimeTarget(repoInfo, useHeaders: wsConnectorSendsHeaders),
-    tokens: ProviderTokenSource(
-      auth: authProvider,
-      appCheck: appCheckProvider,
-      forcedRefreshMinInterval: timings.forcedRefreshMinInterval,
-      now: now,
-    ),
-    delegate: delegate,
-    logger: logger,
-    httpClient: httpClient,
-    maxResponseBytes: timings.maxMessageBytes,
-    useHeaders: wsConnectorSendsHeaders,
-    requestTimeout: timings.requestTimeout,
-    maxJsonDepth: timings.maxJsonDepth,
-  );
 }

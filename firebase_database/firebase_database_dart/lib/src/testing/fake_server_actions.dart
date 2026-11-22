@@ -97,8 +97,8 @@ final class FakeServerActions implements ServerActions {
   /// Creates a fake; set [delegate] before delivering anything.
   FakeServerActions([this.delegate]) : readOnly = false;
 
-  /// Creates a read-only fake, as the REST client is: every write and onDisconnect request is
-  /// recorded and completed with [statusReadOnly] in a microtask.
+  /// Creates a read-only fake: every write and onDisconnect request is recorded and completed
+  /// with [statusReadOnly] in a microtask.
   FakeServerActions.readOnly([this.delegate]) : readOnly = true;
 
   /// Whether writes and onDisconnect requests are refused with [statusReadOnly].

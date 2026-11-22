@@ -1,6 +1,6 @@
-// Owner P. The factories the core's Repo calls (server_actions_factories.dart): they build without
-// connecting, nothing reaches the delegate before initialize(), two factories share no state, the
-// REST client is read-only, and every named parameter reaches what it configures.
+// Owner P. The factory the core's Repo calls (server_actions_factories.dart): it builds without
+// connecting, nothing reaches the delegate before initialize(), two factories share no state, and
+// every named parameter reaches what it configures.
 import 'dart:async';
 
 import 'package:fake_async/fake_async.dart';
@@ -10,13 +10,10 @@ import 'package:firebase_database_dart/src/core/repo_info.dart';
 import 'package:firebase_database_dart/src/realtime/connection_timings.dart';
 import 'package:firebase_database_dart/src/realtime/server_actions_factories.dart';
 import 'package:firebase_database_dart/src/testing/recording_server_actions_delegate.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 import 'package:test/test.dart';
 
 import '../util/fake_ws.dart';
 import '../util/fakes.dart';
-import '../util/persistent_connection_harness.dart';
 
 /// A user-shaped JWT (claims {"iat":0}): sent as `auth`.
 const String _jwt = 'eyJhbGciOiJub25lIn0.eyJpYXQiOjB9.sig';
@@ -231,67 +228,6 @@ void main() {
         two.shutdown(async);
       });
     });
-  });
-
-  group('restClientFactory', () {
-    test('its client refuses writes with read_only, asynchronously', () async {
-      final ServerActions client = restClientFactory(
-        _repo,
-        authProvider: null,
-        appCheckProvider: null,
-        httpClient: MockClient((_) async => http.Response('null', 200)),
-      )(RecordingServerActionsDelegate(), null);
-      final List<String> statuses = <String>[];
-      client.put('/a', 1, onComplete: (String s, _) => statuses.add(s));
-      client.onDisconnectPut(
-        '/a',
-        1,
-        onComplete: (String s, _) => statuses.add(s),
-      );
-      expect(statuses, isEmpty);
-      await pumpEventQueue();
-      expect(statuses, <String>[statusReadOnly, statusReadOnly]);
-      await client.shutdown();
-    });
-
-    test(
-      'the http client, the token providers and the timings reach it',
-      () async {
-        final List<http.Request> requests = <http.Request>[];
-        final MockClient httpClient = MockClient((http.Request request) async {
-          requests.add(request);
-          return http.Response('"0123456789"', 200);
-        });
-        final ServerActions client = restClientFactory(
-          _repo,
-          authProvider: FakeAuth(<String?>[_jwt]),
-          appCheckProvider: FakeAppCheck('app-check-token'),
-          httpClient: httpClient,
-          timings: const ConnectionTimings(maxMessageBytes: 5),
-        )(RecordingServerActionsDelegate(), null);
-        final Future<void> tooBig = expectLater(
-          client.get(defaultListen('/a')),
-          throwsA(
-            isA<ServerActionsException>().having(
-              (ServerActionsException e) => e.status,
-              'status',
-              'too_big',
-            ),
-          ),
-        );
-        await tooBig;
-        final http.Request request = requests.single;
-        expect(request.url.queryParameters['auth'], _jwt);
-        if (_isWeb) {
-          expect(request.url.queryParameters['ac'], 'app-check-token');
-          expect(request.headers.containsKey('X-Firebase-AppCheck'), isFalse);
-        } else {
-          expect(request.headers['X-Firebase-AppCheck'], 'app-check-token');
-        }
-        expect(request.url.host, 'test-ns.firebaseio.com');
-        await client.shutdown();
-      },
-    );
   });
 }
 

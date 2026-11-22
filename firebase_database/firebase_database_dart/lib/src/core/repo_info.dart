@@ -3,7 +3,7 @@
 ///
 /// The core owns the identity (host, namespace, secure, emulator). The realtime half builds its
 /// `ConnectionTarget` (`realtime/connection_target.dart`: `connectionUri`, `connectionHeaders`,
-/// `acceptServerHost`, `forgetServerHost`, `restUri`, `mayReceiveTokens`) from a [RepoInfo].
+/// `acceptServerHost`, `forgetServerHost`, `mayReceiveTokens`) from a [RepoInfo].
 library;
 
 /// The host, namespace and transport security of one database.

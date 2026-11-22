@@ -1,30 +1,10 @@
-// Owner K. Status strings of the connection half (rtdb_protocol.md 9 and 10, threat model T7,
-// test plan B-9.2).
+// Owner K. Status strings of the connection half (rtdb_protocol.md 9, threat model T7).
 import 'dart:convert';
 
 import 'package:firebase_database_dart/src/realtime/realtime_error.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('restListenStatus (B-9.2)', () {
-    test('401 is permission_denied', () {
-      expect(restListenStatus(401), 'permission_denied');
-    });
-
-    test('2xx and 404 are ok (404 is null data)', () {
-      for (final int status in <int>[200, 204, 299, 404]) {
-        expect(restListenStatus(status), 'ok', reason: '$status');
-      }
-    });
-
-    test('every other status is rest_error:<status>', () {
-      for (final int status in <int>[199, 300, 302, 400, 403, 500, 503]) {
-        expect(restListenStatus(status), 'rest_error:$status');
-        expect(restListenStatus(status), startsWith(restErrorPrefix));
-      }
-    });
-  });
-
   group('countsAsInvalidToken (8.3)', () {
     test('invalid_token and permission_denied count', () {
       expect(countsAsInvalidToken('invalid_token'), isTrue);

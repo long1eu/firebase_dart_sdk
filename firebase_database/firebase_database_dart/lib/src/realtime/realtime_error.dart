@@ -4,31 +4,14 @@
 /// One error vocabulary for the package: the core's `DatabaseErrorCode` / `DatabaseError`
 /// (`rtdb_seam_changes.md` A.9). Statuses cross the seam as strings (and a failed `get` as a
 /// `ServerActionsException`); mapping them to codes is the core's `DatabaseError.fromStatus`. This
-/// file only holds what the connection half itself needs: the REST status rule, the invalid-token
-/// rule and the cleaning of server text. It declares no exception type.
+/// file only holds what the connection half itself needs: the invalid-token rule and the cleaning
+/// of server text. It declares no exception type.
 library;
 
 import 'package:firebase_database_dart/src/core/database_error.dart';
 
 /// The listen-response warning key value for a query without an index rule (4.1): `no_index`.
 const String noIndexWarning = 'no_index';
-
-/// Prefix of the status a REST listen synthesises for a non-2xx answer other than 401:
-/// `rest_error:<code>` (10, ReadonlyRestClient.ts:124).
-const String restErrorPrefix = 'rest_error:';
-
-/// The status of a REST listen answered with [httpStatus] (10, ReadonlyRestClient.ts:118-126):
-/// `ok` for 2xx and for 404 (404 is null data, not an error), `permission_denied` for 401,
-/// `rest_error:<httpStatus>` for every other status.
-String restListenStatus(int httpStatus) {
-  if (httpStatus >= 200 && httpStatus < 300 || httpStatus == 404) {
-    return _ok;
-  }
-  if (httpStatus == 401) {
-    return DatabaseErrorCode.permissionDenied.wireStatus;
-  }
-  return '$restErrorPrefix$httpStatus';
-}
 
 /// The status the server answers an `auth` request with when the token is not valid.
 const String invalidTokenStatus = 'invalid_token';
@@ -82,8 +65,6 @@ String safeServerText(String text) {
 }
 
 const int _maxBytes = 1024;
-
-const String _ok = 'ok';
 
 const String _cutMarker = '...(cut)';
 

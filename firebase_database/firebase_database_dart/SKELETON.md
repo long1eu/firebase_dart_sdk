@@ -151,8 +151,8 @@ owned by API above); `lib/testing.dart` exports section 7.1 and `lib/storage_eng
 persistence types, `databasePersistence` and the opener types, plus `InMemoryPersistenceStorageEngine`). `test/api/public_surface_test.dart` pins every public
 signature at analysis time.
 
-Not here on purpose: `lib/src/realtime/*`, `PersistentConnection`, `ConnectionTarget`, `RealtimeTokenSource`, the REST
-client (connection team); the SQLite engine (separate package `firebase_database_dart_sqlite`).
+Not here on purpose: `lib/src/realtime/*`, `PersistentConnection`, `ConnectionTarget`, `RealtimeTokenSource`
+(connection team); the SQLite engine (separate package `firebase_database_dart_sqlite`).
 
 ## Places where JS and Android disagree and which one the signature follows
 

@@ -126,10 +126,10 @@ extension _RepoGet on Repo {
     _serverSyncTree.releaseQuery(query);
   }
 
-  /// Applies the server's answer as a listen would (the REST path sends no data update), raising
-  /// events on listeners it completes, then answers (JS `repoGetValue`; Android `getValue`). A
-  /// filtered query's answer goes to its tagged view only, so it never makes the default query
-  /// complete.
+  /// Applies the server's answer as a listen would (a get answer comes with no data update),
+  /// raising events on listeners it completes, then answers (JS `repoGetValue`; Android
+  /// `getValue`). A filtered query's answer goes to its tagged view only, so it never makes the
+  /// default query complete.
   void _onGetResult(_PendingGet request, Object? payload) {
     if (request.completer.isCompleted || _closed) {
       return;

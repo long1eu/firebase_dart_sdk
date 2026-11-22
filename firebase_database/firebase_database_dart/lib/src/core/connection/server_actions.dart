@@ -31,8 +31,8 @@ const String statusDisconnect = 'disconnect';
 /// closed and the request replayed). Maps to `DatabaseErrorCode.networkError`.
 const String statusNetworkError = 'network_error';
 
-/// The status a read-only [ServerActions] (the REST client) completes every write and
-/// onDisconnect request with; maps to `DatabaseErrorCode.readOnly`.
+/// The status a read-only [ServerActions] completes every write and onDisconnect request with;
+/// maps to `DatabaseErrorCode.readOnly`.
 const String statusReadOnly = 'read_only';
 
 /// The failure of [ServerActions.get]: the wire [status] (`permission_denied`, ...) and the
@@ -72,16 +72,14 @@ typedef RequestResultCallback = void Function(String status, Object? data);
 ///
 /// Tokens belong to the connection: each implementation gets its token source in its
 /// constructor (`PersistentConnection` takes a `RealtimeTokenSource`, an adapter over the app's
-/// `AuthTokenProvider` and `AppCheckTokenProvider`, and builds its own `AuthSession`; the REST
-/// client takes the same source) and subscribes to token changes itself. Repo never pushes
-/// tokens, so no token is sent twice.
+/// `AuthTokenProvider` and `AppCheckTokenProvider`, and builds its own `AuthSession`) and
+/// subscribes to token changes itself. Repo never pushes tokens, so no token is sent twice.
 ///
 /// Paths cross this seam as `/a/b`, root `/`, in both directions. The server pushes `a/b` and
 /// `""` for the root; the connection normalises before calling the delegate.
 ///
-/// A read-only implementation (the REST client) completes every write and onDisconnect request
-/// ([put], [merge], [onDisconnectPut], [onDisconnectMerge], [onDisconnectCancel]) with
-/// [statusReadOnly].
+/// A read-only implementation completes every write and onDisconnect request ([put], [merge],
+/// [onDisconnectPut], [onDisconnectMerge], [onDisconnectCancel]) with [statusReadOnly].
 ///
 /// Reconnect contract: after a reconnect the connection replays by itself, in this order: `auth`,
 /// `appcheck`, every listen still registered (with a freshly computed hash), every put and merge
