@@ -163,7 +163,6 @@ void main() {
     test('every URL the target builds may carry tokens', () {
       final RealtimeTarget t = target(production, useHeaders: false);
       expect(t.mayReceiveTokens(t.connectionUri()), isTrue);
-      expect(t.mayReceiveTokens(t.restUri('/a', <String, String>{})), isTrue);
       t.acceptServerHost('s-1.firebaseio.com');
       expect(t.mayReceiveTokens(t.connectionUri()), isTrue);
     });
@@ -179,7 +178,6 @@ void main() {
         isTrue,
       );
       expect(t.mayReceiveTokens(t.connectionUri()), isTrue);
-      expect(t.mayReceiveTokens(t.restUri('/', <String, String>{})), isTrue);
       for (final String url in <String>[
         'ws://10.0.0.5:9001/.ws',
         'ws://10.0.0.5/.ws',

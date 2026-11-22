@@ -21,7 +21,6 @@ import 'package:firebase_database_dart/src/realtime/database_url.dart';
 import 'package:firebase_database_dart/src/realtime/persistent_connection.dart';
 import 'package:firebase_database_dart/src/realtime/realtime_target.dart';
 import 'package:firebase_database_dart/src/realtime/reconnect_backoff.dart';
-import 'package:firebase_database_dart/src/realtime/rest_client.dart';
 import 'package:firebase_database_dart/src/realtime/transport/ws_connector.dart';
 import 'package:firebase_database_dart/src/testing/recording_server_actions_delegate.dart';
 import 'package:http/http.dart' as http;
@@ -157,10 +156,26 @@ final class EmulatorRig {
   /// The emulator database of this namespace, reached directly.
   RepoInfo get repoInfo => emulatorDatabase(host, port, namespace: namespace);
 
-  Uri _rest(
-    String path, [
-    Map<String, String> params = const <String, String>{},
-  ]) => RealtimeTarget(repoInfo, useHeaders: true).restUri(path, params);
+  /// The REST URL of [path] (`/a/b` gives `/a/b.json`) in this namespace: each segment
+  /// percent-encoded, `ns` in the query.
+  Uri _rest(String path) {
+    final List<String> segments = path.split('/')
+      ..removeWhere((String s) => s.isEmpty);
+    return Uri(
+      scheme: repoInfo.secure ? 'https' : 'http',
+      host: host,
+      port: port,
+      pathSegments: segments.isEmpty
+          ? <String>['.json']
+          : <String>[
+              ...segments.take(segments.length - 1),
+              '${segments.last}.json',
+            ],
+      queryParameters: <String, String>{
+        RealtimeProtocol.namespaceParam: namespace,
+      },
+    );
+  }
 
   Map<String, String> get _owner => const <String, String>{
     'Authorization': 'Bearer owner',
@@ -240,22 +255,6 @@ final class EmulatorRig {
     return client;
   }
 
-  /// A REST client of this namespace (`RestClient`) with [tokens].
-  RestRigClient openRest({FakeTokenSource? tokens}) {
-    final RecordingServerActionsDelegate delegate =
-        RecordingServerActionsDelegate();
-    final RestClient client = RestClient(
-      target: RealtimeTarget(repoInfo, useHeaders: true),
-      tokens: tokens ?? FakeTokenSource(),
-      delegate: delegate,
-      maxResponseBytes: testTimings.maxMessageBytes,
-      useHeaders: true,
-      requestTimeout: quick,
-    );
-    addTearDown(client.shutdown);
-    return (client: client, delegate: delegate);
-  }
-
   /// Shuts every client down, closes the proxies and the HTTP client.
   Future<void> close() async {
     for (final RigClient client in _clients) {
@@ -267,12 +266,6 @@ final class EmulatorRig {
     _http.close();
   }
 }
-
-/// A [RestClient] and the delegate it reports to.
-typedef RestRigClient = ({
-  RestClient client,
-  RecordingServerActionsDelegate delegate,
-});
 
 /// One [PersistentConnection] with its recording delegate and the reasons its connections
 /// closed with (seen through a wrapper around the connection's own delegate).

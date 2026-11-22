@@ -1,7 +1,7 @@
-// RealtimeTarget: WebSocket URL, upgrade headers, server host, REST URL (rtdb_protocol.md 2.2 to
-// 2.4, 10; test matrix B-2.2, B-2.3, B-2.3a, B-2.4; JS repoinfo.test.ts and
-// websocketconnection.test.ts; iOS FConnectionHostTest.m and FRealtime.m:44). The hostile-host
-// and token-scope tables are test/security/hosts_test.dart.
+// RealtimeTarget: WebSocket URL, upgrade headers, server host (rtdb_protocol.md 2.2 to 2.4; test
+// matrix B-2.2, B-2.3, B-2.3a, B-2.4; JS repoinfo.test.ts and websocketconnection.test.ts; iOS
+// FConnectionHostTest.m and FRealtime.m:44). The hostile-host and token-scope tables are
+// test/security/hosts_test.dart.
 import 'package:firebase_database_dart/src/core/repo_info.dart';
 import 'package:firebase_database_dart/src/realtime/database_url.dart';
 import 'package:firebase_database_dart/src/realtime/realtime_target.dart';
@@ -258,80 +258,6 @@ void main() {
       final RealtimeTarget first = vmTarget(plain);
       first.acceptServerHost('s-1.firebaseio.com');
       expect(vmTarget(plain).internalHost, 'test-ns.firebaseio.com');
-    });
-  });
-
-  group('restUri (10)', () {
-    test('path is /.json for the root and /a/b.json below it (addendum 4)', () {
-      final RealtimeTarget target = vmTarget(plain);
-      expect(target.restUri('/', <String, String>{}).path, '/.json');
-      expect(target.restUri('/a/b', <String, String>{}).path, '/a/b.json');
-    });
-
-    test('ns first, then params in insertion order, values percent-encoded '
-        '(addendum 4)', () {
-      final Uri uri = vmTarget(regional).restUri('/a', <String, String>{
-        'z': '1 2',
-        'auth': 'a&b=c',
-        'a': '"x"',
-      });
-      expect(uri.query, 'ns=db&z=1+2&auth=a%26b%3Dc&a=%22x%22');
-      expect(uri.queryParameters.keys.toList(), <String>[
-        'ns',
-        'z',
-        'auth',
-        'a',
-      ]);
-    });
-
-    test('root is /.json with ns first', () {
-      expect(
-        vmTarget(plain).restUri('/', <String, String>{}).toString(),
-        'https://test-ns.firebaseio.com/.json?ns=test-ns',
-      );
-    });
-
-    test('segments are encoded one by one, params follow ns in order', () {
-      expect(
-        vmTarget(plain).restUri('/a b/c%d/é', <String, String>{
-          'orderBy': r'"$key"',
-          'format': 'export',
-        }).toString(),
-        'https://test-ns.firebaseio.com/a%20b/c%25d/%C3%A9.json'
-        '?ns=test-ns&orderBy=%22%24key%22&format=export',
-      );
-    });
-
-    test('uses the configured host, never the server one', () {
-      final RealtimeTarget target = vmTarget(plain);
-      target.acceptServerHost('s-1.firebaseio.com');
-      expect(
-        target.restUri('/a', <String, String>{}).host,
-        'test-ns.firebaseio.com',
-      );
-    });
-
-    test('emulator: http and host:port', () {
-      expect(
-        vmTarget(emulator).restUri('/x/y', <String, String>{}).toString(),
-        'http://127.0.0.1:9000/x/y.json?ns=demo-test-default-rtdb',
-      );
-    });
-
-    test('refuses dot segments and an ns parameter', () {
-      final RealtimeTarget target = vmTarget(plain);
-      expect(
-        () => target.restUri('/a/../b', <String, String>{}),
-        throwsArgumentError,
-      );
-      expect(
-        () => target.restUri('/.', <String, String>{}),
-        throwsArgumentError,
-      );
-      expect(
-        () => target.restUri('/a', <String, String>{'ns': 'other'}),
-        throwsArgumentError,
-      );
     });
   });
 

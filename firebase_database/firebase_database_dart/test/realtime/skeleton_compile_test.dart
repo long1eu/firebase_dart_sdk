@@ -19,7 +19,6 @@ import 'package:firebase_database_dart/src/realtime/realtime_target.dart';
 import 'package:firebase_database_dart/src/realtime/reconnect_backoff.dart';
 import 'package:firebase_database_dart/src/realtime/replay.dart';
 import 'package:firebase_database_dart/src/realtime/request_table.dart';
-import 'package:firebase_database_dart/src/realtime/rest_client.dart';
 import 'package:firebase_database_dart/src/realtime/server_actions_factories.dart';
 import 'package:firebase_database_dart/src/realtime/server_message.dart';
 import 'package:firebase_database_dart/src/realtime/transport/ws_channel.dart';
@@ -124,8 +123,6 @@ final List<Object?> _topLevel = <Object?>[
   PersistentConnection.new,
   // realtime_error.dart
   noIndexWarning,
-  restErrorPrefix,
-  restListenStatus,
   countsAsInvalidToken,
   safeServerText,
   // reconnect_backoff.dart
@@ -138,11 +135,8 @@ final List<Object?> _topLevel = <Object?>[
   ReplayQueues.new,
   // request_table.dart
   RequestTable.new,
-  // rest_client.dart
-  RestClient.new,
   // server_actions_factories.dart
   persistentConnectionFactory,
-  restClientFactory,
   // server_message.dart
   ServerMessage,
   Response.new,
@@ -193,7 +187,6 @@ List<Object?> _members({
   required OutstandingGet outstandingGet,
   required QueuedOnDisconnect queued,
   required ReplayQueues queues,
-  required RestClient rest,
   required Response response,
   required DataPush dataPush,
   required ListenRevokedPush revoked,
@@ -212,7 +205,6 @@ List<Object?> _members({
   required RealtimeDelegate delegate,
 }) {
   final ServerActions actions = persistent;
-  final ServerActions readOnly = rest;
   return <Object?>[
     source.authToken,
     source.appCheckToken,
@@ -245,7 +237,6 @@ List<Object?> _members({
     target.connectionHeaders,
     target.acceptServerHost,
     target.forgetServerHost,
-    target.restUri,
     target.mayReceiveTokens,
     t.maxFrameUnits,
     t.keepAlive,
@@ -284,7 +275,6 @@ List<Object?> _members({
     liveness.stop,
     liveness.probeNow,
     actions,
-    readOnly,
     backoff.min,
     backoff.max,
     backoff.multiplier,

@@ -6,8 +6,7 @@ signature. Spec sections: `rtdb_protocol.md` numbers; `T<n>` = threat model; `A.
 `rtdb_seam_changes.md`; "probe" = `rtdb_emulator_probe.md` (measured).
 
 Owners: **T** transport and framing, **C** connection, **P** persistent connection, **K** tokens,
-backoff, message decoding and status strings, **R** REST client, **U** URL, `RealtimeTarget`,
-emulator and test rig.
+backoff, message decoding and status strings, **U** URL, `RealtimeTarget`, emulator and test rig.
 
 The seam with the core is `lib/src/core/connection/` (`ServerActions`, `ServerActionsDelegate`,
 `ListenSpec`, `ListenHashProvider`, `WireRangeMerge`), with `core/repo_info.dart` (`RepoInfo`) and
@@ -38,10 +37,9 @@ calls `ConnectionTarget`.
 | `auth_session.dart` | K | `firebase_app_dart` (`AuthTokenProvider`, `AppCheckTokenProvider`); C: `RealtimeProtocol` | 4.6, 4.7, 4.8, 8.1, 8.3; A.1; T7, T14 |
 | `reconnect_backoff.dart` | K | nothing | 8.2; T13 |
 | `server_message.dart` | K | core: `WireRangeMerge` | 4 (responses), 5 (pushes, `rm` as measured), `wirePathFromServer` (A.3); T11 |
-| `realtime_error.dart` | K | core: `DatabaseErrorCode` | 9, 10 (status strings to `DatabaseErrorCode`, REST status); A.9; T7 (`safeServerText`) |
-| `rest_client.dart` | R | core: implements `ServerActions` read-only, reads `ListenSpec` (`restParams`); U: `RealtimeTarget.restUri`, `RealtimeTarget.mayReceiveTokens`; K: `RealtimeTokenSource`, `restListenStatus`; `package:http`; core: `ServerActionsException`, `statusReadOnly`, `DatabaseLogger` | 6.4, 9, 10; A.2, A.4, A.7; T7, T8, T23 |
+| `realtime_error.dart` | K | core: `DatabaseErrorCode` | 9 (status strings to `DatabaseErrorCode`); A.9; T7 (`safeServerText`) |
 | `database_url.dart` | U | core: `RepoInfo` | 1.1, 2.1, 2.4 (env value); T3, T6; bad URL = `FormatException`/`ArgumentError` |
-| `realtime_target.dart` | U | core: `RepoInfo` | 2.2, 2.3, 2.4, 10 (REST URL); A.5; T1, T3, T6 |
+| `realtime_target.dart` | U | core: `RepoInfo` | 2.2, 2.3, 2.4; A.5; T1, T3, T6 |
 | `emulator_token.dart` | U | nothing | 2.4; T3 |
 
 ## test
@@ -55,13 +53,11 @@ calls `ConnectionTarget`.
 | `test/util/ws_tap.dart` | U | U: `chaos_proxy.dart` | test plan 2.5 |
 | `test/contract/server_actions_reconnect_contract.dart` | P | core: `ServerActionsHarness` (`server_actions_contract.dart`), `ServerActions` | reconnect contract: replay order, revoked/failed listens, offline onDisconnect queue, typed `get` error, two timeouts -> `network_error`, re-auth after revoke |
 | `test/realtime/persistent_connection_contract_test.dart` | P | core: `runServerActionsContract`; P: `runServerActionsReconnectContract`; T: `FakeRtdbServer` | the seam contract against `PersistentConnection` |
-| `test/realtime/rest_client_contract_test.dart` | R | core: `runReadOnlyServerActionsContract`; `MockClient` | the read-only seam contract against `RestClient` |
 | `test/realtime/skeleton_compile_test.dart` | lead | every lib file but `ws_channel_web.dart` | references every public symbol; a builder who adds or renames a public symbol updates it |
 
-The recording `ServerActionsDelegate` for the tests of P and R is the core's
-`lib/src/testing/recording_server_actions_delegate.dart` (A.8). P and R run the core's
-`runServerActionsContract` (R also `runReadOnlyServerActionsContract`) with harnesses over
-`FakeRtdbServer` and a `MockClient`.
+The recording `ServerActionsDelegate` for the tests of P is the core's
+`lib/src/testing/recording_server_actions_delegate.dart` (A.8). P runs the core's
+`runServerActionsContract` with a harness over `FakeRtdbServer`.
 
 ## Rules for every file
 

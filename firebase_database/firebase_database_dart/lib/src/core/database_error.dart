@@ -42,8 +42,8 @@ enum DatabaseErrorCode {
   /// The write was canceled by the user (purgeOutstandingWrites).
   writeCanceled('write-canceled', 'write_canceled'),
 
-  /// The database is read-only here: a read-only connection (the REST client) completes every
-  /// write and onDisconnect request with this status.
+  /// The database is read-only here: a read-only connection completes every write and
+  /// onDisconnect request with this status.
   readOnly('read-only', 'read_only'),
 
   /// The query orders by a child the security rules give no `.indexOn` (the server's `no_index`).

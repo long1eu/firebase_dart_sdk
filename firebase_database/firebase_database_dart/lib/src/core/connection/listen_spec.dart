@@ -47,8 +47,7 @@ final class ListenSpec {
   final String indexName;
 
   /// The REST query string parameters (`orderBy`, `startAt`, `limitToFirst`, ...), from
-  /// `QueryParams.toRestQueryStringParameters()`; `{}` for the default query. Used by the REST
-  /// client. Unmodifiable.
+  /// `QueryParams.toRestQueryStringParameters()`; `{}` for the default query. Unmodifiable.
   final Map<String, String> restParams;
 
   // Identity is path + queryIdentifier, as JS `PersistentConnection.listens_` keys its table

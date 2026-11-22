@@ -1,5 +1,5 @@
-/// How to reach the database (owner U): the WebSocket and REST URLs, the upgrade headers and the
-/// server-chosen host (`rtdb_protocol.md` 2.2 to 2.4, 10; threat model T1, T3, T6).
+/// How to reach the database (owner U): the WebSocket URL, the upgrade headers and the
+/// server-chosen host (`rtdb_protocol.md` 2.2 to 2.4; threat model T1, T3, T6).
 library;
 
 import 'package:firebase_database_dart/src/core/repo_info.dart';
@@ -154,46 +154,6 @@ final class RealtimeTarget {
   /// or a reset named an invalid host (3.5; iOS U-I21).
   void forgetServerHost() {
     _serverHost = null;
-  }
-
-  /// The REST URL of [path] (`/a/b`) with [params] (10): the configured host (never the internal
-  /// one), path segments percent-encoded one by one, `.json` appended, `ns` first, then [params]
-  /// in order.
-  ///
-  /// Throws [ArgumentError] for a `.` or `..` segment (a URL would resolve it away) and for an
-  /// `ns` key in [params] (the namespace is the target's).
-  Uri restUri(String path, Map<String, String> params) {
-    final List<String> segments = <String>[
-      for (final String segment in path.split('/'))
-        if (segment.isNotEmpty) segment,
-    ];
-    for (final String segment in segments) {
-      if (segment == '.' || segment == '..') {
-        throw ArgumentError.value(
-          path,
-          'path',
-          'must not have a "." or ".." segment',
-        );
-      }
-    }
-    if (params.containsKey(RealtimeProtocol.namespaceParam)) {
-      throw ArgumentError.value(params.keys, 'params', 'must not set ns');
-    }
-    if (segments.isEmpty) {
-      segments.add('.json');
-    } else {
-      segments.last = '${segments.last}.json';
-    }
-    return Uri(
-      scheme: repoInfo.secure ? 'https' : 'http',
-      host: _address.host,
-      port: _address.port,
-      pathSegments: segments,
-      queryParameters: <String, String>{
-        RealtimeProtocol.namespaceParam: repoInfo.namespace,
-        ...params,
-      },
-    );
   }
 
   /// Whether a credential may be sent to [uri]: TLS to the configured or an accepted host, or the
