@@ -6,7 +6,7 @@
 | Platform | Dart VM on a server or a desktop (Linux, macOS, Windows); no Flutter |
 | Backend | Realtime Database emulator (project `demo-example`), or a real database by URL |
 | Run | `FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9000 dart run bin/presence_worker.dart --id worker-a` |
-| CI | none: the connection of `FirebaseDatabase` is not wired yet, so this example has not been run |
+| CI | none; run by hand against the emulator |
 | Web gallery | - |
 
 A long-running process that keeps `status/<id>` in the Realtime Database true: `online` while
@@ -54,5 +54,6 @@ The project is `demo-example`. For `watch` on a real database add `".indexOn": "
 
 ## Status
 
-`FirebaseDatabase(app)` does not connect yet, so this example is written against the documented
-API and has been analyzed, not run. No tests.
+Run by hand against the Database emulator: a worker goes online, a watcher sees it, and after the
+worker is killed with `SIGKILL` the watcher sees it leave, from the server's `onDisconnect` write.
+No tests.

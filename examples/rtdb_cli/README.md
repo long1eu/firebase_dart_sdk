@@ -47,3 +47,6 @@ dart run rtdb_cli --emulator 127.0.0.1:9000 set /users/ann '{"age": 31}'
 dart run rtdb_cli --emulator 127.0.0.1:9000 get /users --order-by-child age --start-at 18
 dart run rtdb_cli --emulator 127.0.0.1:9000 export /users users.json
 ```
+
+The second command needs `".indexOn": "age"` at `/users` in the rules: the server refuses a filtered
+`get` on an unindexed child with `index-not-defined`.

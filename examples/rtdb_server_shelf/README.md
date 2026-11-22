@@ -6,7 +6,7 @@
 | Platform | Dart server (VM), `package:shelf` |
 | Backend | Realtime Database emulator, project `demo-example` |
 | Run | `FIREBASE_DATABASE_EMULATOR_HOST=127.0.0.1:9000 PORT=8000 dart run bin/server.dart` |
-| CI | not in CI yet (the connection is not wired in this branch) |
+| CI | not in CI yet; run by hand against the emulator |
 | Web gallery | - |
 
 A small notes API that shares **one** `FirebaseDatabase` between all requests, plus a

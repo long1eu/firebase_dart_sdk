@@ -36,6 +36,13 @@ database. Without `FIREBASE_DATABASE_EMULATOR_HOST` they stop with a message. Th
 `FIREBASE_DATABASE_EMULATOR_HOST`, adds port 9000 when the value has none), `freshKey()` and `runExample()`
 (a database plus a fresh key, removed and closed afterwards).
 
-The real connection is not wired yet in this version of the package: constructing a `FirebaseDatabase`
-throws until it is merged, so these programs are checked by the analyzer only. Not yet here: offline
-persistence and a server that shares one instance.
+Every program was run against the Database emulator; none against a real database. Limits to know:
+
+- A `get()` with a range or a limit on `orderByChild` or `orderByValue` needs an `.indexOn` rule
+  (`index-not-defined` without it). The programs read such queries with a listener, see `once` in
+  `common.dart`.
+- On the Dart VM a `wss` connection that hangs inside its TLS handshake cannot be closed (`dart:io`
+  has no way to do it): the client gives up on it after its timeout and tries again, and the
+  socket stays until the peer or the system ends it.
+
+Not yet here: offline persistence and a server that shares one instance.
