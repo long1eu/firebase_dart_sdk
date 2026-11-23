@@ -336,7 +336,13 @@ final class _Server {
   /// above the write gets it as written, one below it its whole data.
   void _publish(_Write w, Node before) {
     final String wp = _wire(w.path);
-    for (final ServerCall l in listens) {
+    // The emulator sends a write's tagged frames before the untagged ones (measured, 18 runs:
+    // reports/limit_merge_order.md). The other order would let an untagged put push a child out of
+    // the limit view's server cache before the tagged merge removes another one.
+    for (final ServerCall l in <ServerCall>[
+      ...listens.where((ServerCall l) => l.tag != null),
+      ...listens.where((ServerCall l) => l.tag == null),
+    ]) {
       final String lp = l.spec!.path;
       if (l.tag != null) {
         if (_covers(lp, wp) || _covers(wp, lp)) {
