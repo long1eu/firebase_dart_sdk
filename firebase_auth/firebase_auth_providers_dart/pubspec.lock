@@ -68,10 +68,11 @@ packages:
   cloud_firestore_dart:
     dependency: "direct dev"
     description:
-      path: "../../cloud_firestore/cloud_firestore_dart"
-      relative: true
-    source: path
-    version: "0.3.2"
+      name: cloud_firestore_dart
+      sha256: "07998231bb03706a09ba1da2ba8fcb516e0f68f79f87eaca2913c397eefde853"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.0"
   collection:
     dependency: transitive
     description:
@@ -123,10 +124,11 @@ packages:
   firebase_app_dart:
     dependency: "direct main"
     description:
-      path: "../../firebase_core/firebase_app_dart"
-      relative: true
-    source: path
-    version: "0.2.1"
+      name: firebase_app_dart
+      sha256: dfddfa73fdf1b0fb2df06a57dd14fad45169f6eef43ad0199ddb69607fcc9fe7
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.2"
   fixnum:
     dependency: transitive
     description:
@@ -322,9 +324,10 @@ packages:
   secure_flow:
     dependency: "direct main"
     description:
-      path: "../../secure_flow/secure_flow"
-      relative: true
-    source: path
+      name: secure_flow
+      sha256: "4ad7942e221fffc6cc833772cc5fae190c5cb1c2c7eaf8a963b02ece7c66ed3e"
+      url: "https://pub.dev"
+    source: hosted
     version: "0.2.0"
   semaphore:
     dependency: transitive
@@ -474,10 +477,10 @@ packages:
     dependency: "direct main"
     description:
       name: web
-      sha256: "868d88a33d8a87b18ffc05f9f030ba328ffefba92d6c127917a2ba740f9cfe4a"
+      sha256: e119e82ac4795c7925103b7cf3768191f33941b99e7ccffbd6c645201d9f606b
       url: "https://pub.dev"
     source: hosted
-    version: "1.1.1"
+    version: "1.1.2"
   web_socket:
     dependency: transitive
     description:
