@@ -13,7 +13,12 @@
 // whole write; one update applies all its children at once, so its node keeps its priority unless
 // the update writes `.priority`; a node with no value and no children has no priority, except
 // that the emulator keeps it when the node is emptied by a write below it (not verified on
-// production), so B accepts either answer.
+// production), so B accepts either answer. The server sends a write to the listens it holds,
+// from reading a listen to reading its unlisten: as written to a plain listen at or above it,
+// as whole data to one below it. The limit query gets a write below its path at the write's
+// path while the touched child stays in the window, an entering child whole at its path, a
+// child leaving while another enters as one merge at its path, and the whole window for a write
+// at its path; a write above its path, not measured, also sends the window.
 //
 // The unchanged code fails some seeds, for behaviours that are documented and kept. The test
 // fails when a seed outside [_knownFailures] fails, or a listed seed passes.
@@ -52,10 +57,13 @@ const (int, int) _defaultSeeds = (0, 10000);
 /// listener that differs from its own server cache with nothing pending. Each group starts with
 /// its shortest sequence, found by shrinking one of its seeds; data as in [_initial].
 const Map<String, List<int>> _knownFailures = <String, List<int>>{
-  // listen limit /a, answered; listen /; set /a/x/u 1; / answered; set /a/x/u null; another
-  // client's update /a {.priority: null}. Settled, the limit listener still shows x: 1, the leaf
-  // the two writes below it replaced and removed; its server cache has no x (seed 1335).
-  'row 1: a write below a leaf, changed again': <int>[1335],
+  // listen limit /a, answered; listen /; set /a/x/u 1; / answered, the unlisten of the limit
+  // query not read yet; set /a/x/u null; another client's update /a {.priority: null}, which
+  // the server still sends to the limit query as the window {x: 1, y}. Settled, the limit
+  // listener shows x: 1, which the two writes replaced and removed (seed 1335). Without the
+  // race, the server reading the unlisten right after the listen, the seed passes.
+  'row 7: a root listen over a limit query, a write read before the unlisten':
+      <int>[1335],
   // listen /b; update /b {y: 1, x: null}. The listener shows {y: 1} without the priority 3 the
   // server keeps (seed 9709). The other seeds lose a priority the same way, in the listener or in
   // the client's server cache (then property A fails first): an update that writes the priority
@@ -240,6 +248,15 @@ Node _shown(QuerySpec q, Node data) => q.loadsAllData
         null,
       );
 
+/// The children of [n] in export form, by key.
+Map<String, Object?> _children(Node n) => <String, Object?>{
+  for (final MapEntry<String, Object?> e
+      in ((n.toJson(exportFormat: true) as Map<String, Object?>?) ??
+              <String, Object?>{})
+          .entries)
+    if (e.key != '.priority') e.key: e.value,
+};
+
 String _json(Node? n) =>
     n == null ? 'nothing' : jsonEncode(n.toJson(exportFormat: true));
 
@@ -256,6 +273,7 @@ final class _Server {
 
   /// Applies [w]; false when the server refuses it.
   bool apply(_Write w) {
+    final Node before = data;
     final Path at = Path(w.path);
     final Map<String, Object?> entries = w.merge
         ? (w.data! as Map<String, Object?>)
@@ -280,7 +298,7 @@ final class _Server {
       data = data.updateChild(p, n);
       _emulate(p, n);
     }
-    _publish(w);
+    _publish(w, before);
     return true;
   }
 
@@ -314,22 +332,15 @@ final class _Server {
     }
   }
 
-  /// Sends [w] to the listens it touches: as written below a plain listen, the listen's whole
-  /// data above one, and the whole window to the limit query.
-  void _publish(_Write w) {
+  /// Sends [w] to the listens it touches; [before] is the data before it. A plain listen at or
+  /// above the write gets it as written, one below it its whole data.
+  void _publish(_Write w, Node before) {
     final String wp = _wire(w.path);
     for (final ServerCall l in listens) {
       final String lp = l.spec!.path;
       if (l.tag != null) {
         if (_covers(lp, wp) || _covers(wp, lp)) {
-          final QuerySpec q = _queries.firstWhere(
-            (QuerySpec q) => q.toListenSpec() == l.spec,
-          );
-          fake.deliverDataUpdate(
-            lp,
-            _shown(q, data.getChild(Path(lp))).toJson(exportFormat: true),
-            tag: l.tag,
-          );
+          _publishTagged(l, w, before);
         }
       } else if (_covers(lp, wp)) {
         fake.deliverDataUpdate(wp, w.data, isMerge: w.merge);
@@ -339,6 +350,53 @@ final class _Server {
           data.getChild(Path(lp)).toJson(exportFormat: true),
         );
       }
+    }
+  }
+
+  /// Sends [w] to the limit query's listen [l] as the emulator does (measured; the shapes are
+  /// listed at [FakeServerActions.taggedListensGetWholeData]): a write below the
+  /// query's path goes at its own path when its child of the query is in the window, a child
+  /// that enters the window is sent whole at its path, and a child leaving while another enters
+  /// comes as one merge at the query's path. A write at the query's path gets the whole window;
+  /// so does a write above it, which was not measured.
+  void _publishTagged(ServerCall l, _Write w, Node before) {
+    final QuerySpec q = _queries.firstWhere(
+      (QuerySpec q) => q.toListenSpec() == l.spec,
+    );
+    final String lp = l.spec!.path;
+    final Node now = _shown(q, data.getChild(q.path));
+    void send(String path, Object? json, {bool merge = false}) =>
+        fake.deliverDataUpdate(path, json, isMerge: merge, tag: l.tag);
+    final Path at = Path(w.path);
+    if (at.length <= q.path.length) {
+      send(lp, now.toJson(exportFormat: true));
+      return;
+    }
+    final String child = Path.relative(q.path, at).front!.name;
+    final Map<String, Object?> was = _children(
+      _shown(q, before.getChild(q.path)),
+    );
+    final Map<String, Object?> kids = _children(now);
+    final List<String> left = <String>[
+      for (final String k in was.keys)
+        if (!kids.containsKey(k)) k,
+    ];
+    final List<String> entered = <String>[
+      for (final String k in kids.keys)
+        if (!was.containsKey(k)) k,
+    ];
+    if (left.isNotEmpty && entered.isNotEmpty) {
+      send(lp, <String, Object?>{
+        for (final String k in left) k: null,
+        for (final String k in kids.keys)
+          if (k == child || entered.contains(k)) k: kids[k],
+      }, merge: true);
+    } else if (entered.isNotEmpty) {
+      for (final String k in entered) {
+        send('$lp/$k', kids[k]);
+      }
+    } else if (was.containsKey(child)) {
+      send(_wire(w.path), w.data, merge: w.merge);
     }
   }
 
