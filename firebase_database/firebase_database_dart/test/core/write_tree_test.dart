@@ -168,6 +168,60 @@ void main() {
       expect(tree.getCompleteWriteData(p('a/b')), isNull);
       expect(tree.getCompleteWriteData(p('a/c')), n(2));
     });
+
+    // Not in JS or Android, which treat a write as shadowed only when one later write contains
+    // its whole path: a merge whose every child later writes rewrite is not visible either.
+    test('merge rewritten child by child by later writes was not visible', () {
+      tree.addMerge(p('a'), cw(<String, Object?>{'b/x': 1, 'c': 2}), 1);
+      tree.addOverwrite(
+        p('a/b'),
+        n(<String, Object?>{'y': 3}),
+        2,
+        visible: true,
+      );
+      tree.addMerge(p(''), cw(<String, Object?>{'a/c': 4, 'z': 5}), 3);
+      expect(tree.removeWrite(1), isFalse);
+      expect(tree.getCompleteWriteData(p('a/b')), n(<String, Object?>{'y': 3}));
+      expect(tree.getCompleteWriteData(p('a/c')), n(4));
+    });
+
+    test('merge rewritten only in part stays visible', () {
+      tree.addMerge(p('a'), cw(<String, Object?>{'b': 1, 'c': 2}), 1);
+      tree.addMerge(p('a'), cw(<String, Object?>{'b': 3}), 2);
+      expect(tree.removeWrite(1), isTrue);
+      expect(tree.getCompleteWriteData(p('a/b')), n(3));
+      expect(tree.getCompleteWriteData(p('a/c')), isNull);
+    });
+
+    test('a hidden later merge does not rewrite a merge', () {
+      tree.addMerge(p('a'), cw(<String, Object?>{'b': 1}), 1);
+      tree.addOverwrite(p('a/b'), n(2), 2, visible: false);
+      expect(tree.removeWrite(1), isTrue);
+      expect(tree.getCompleteWriteData(p('a/b')), isNull);
+    });
+
+    // The bench scenario write_update_same: n pending `update` calls of the same children,
+    // acknowledged in order. Only the last acknowledgement changes the visible writes, so the
+    // others need no events (with JS's rule each one rebuilds the visible writes of all pending).
+    test(
+      'acks of merges of the same children need no events until the last',
+      () {
+        const int count = 50;
+        for (int i = 1; i <= count; i++) {
+          tree.addMerge(
+            p('r'),
+            cw(<String, Object?>{'x/i': i, 'x/name': 'n$i'}),
+            i,
+          );
+        }
+        for (int i = 1; i < count; i++) {
+          expect(tree.removeWrite(i), isFalse, reason: 'write $i');
+          expect(tree.getCompleteWriteData(p('r/x/i')), n(count));
+        }
+        expect(tree.removeWrite(count), isTrue);
+        expect(tree.getCompleteWriteData(p('r/x/i')), isNull);
+      },
+    );
   });
 
   group('calcCompleteEventCache', () {
@@ -320,6 +374,65 @@ void main() {
     expect(ref.writeTree, same(tree));
   });
 
+  // A write folded into the node of an earlier write above it can change that node in ways a later
+  // rewrite of its paths does not undo, so later writes do not shadow it. Found by review; the
+  // overwrite-only case fails on JS's rule too.
+  group('removeWrite of a write folded into an earlier one', () {
+    void expectRebuilt(WriteTree t, List<void Function(WriteTree)> remaining) {
+      final WriteTree rebuilt = WriteTree();
+      for (final void Function(WriteTree) add in remaining) {
+        add(rebuilt);
+      }
+      expect(
+        t.calcCompleteEventCache(p(''), ChildrenNode.empty),
+        rebuilt.calcCompleteEventCache(p(''), ChildrenNode.empty),
+      );
+    }
+
+    test('a null child that emptied a prioritised node (A)', () {
+      void w1(WriteTree t) => t.addOverwrite(
+        p('a'),
+        n(<String, Object?>{'x': 1, '.priority': 7}),
+        1,
+        visible: true,
+      );
+      void w3(WriteTree t) => t.addOverwrite(p('a/x'), n(2), 3, visible: true);
+      w1(tree);
+      tree.addMerge(p('a'), cw(<String, Object?>{'x': null}), 2);
+      w3(tree);
+      expect(tree.removeWrite(2), isTrue);
+      expectRebuilt(tree, <void Function(WriteTree)>[w1, w3]);
+      expect(
+        tree.getCompleteWriteData(p('a')),
+        n(<String, Object?>{'x': 2, '.priority': 7}),
+      );
+    });
+
+    test('a merge child under a leaf, later deleted (B)', () {
+      void w1(WriteTree t) => t.addOverwrite(p('a'), n(5), 1, visible: true);
+      void w3(WriteTree t) =>
+          t.addOverwrite(p('a/b'), n(null), 3, visible: true);
+      w1(tree);
+      tree.addMerge(p('a'), cw(<String, Object?>{'b': 1}), 2);
+      w3(tree);
+      expect(tree.removeWrite(2), isTrue);
+      expectRebuilt(tree, <void Function(WriteTree)>[w1, w3]);
+      expect(tree.getCompleteWriteData(p('a')), n(5));
+    });
+
+    test('an overwrite under a leaf, later deleted (JS rule)', () {
+      void w1(WriteTree t) => t.addOverwrite(p('a'), n(5), 1, visible: true);
+      void w3(WriteTree t) =>
+          t.addOverwrite(p('a/b'), n(null), 3, visible: true);
+      w1(tree);
+      tree.addOverwrite(p('a/b'), n(1), 2, visible: true);
+      w3(tree);
+      expect(tree.removeWrite(2), isTrue);
+      expectRebuilt(tree, <void Function(WriteTree)>[w1, w3]);
+      expect(tree.getCompleteWriteData(p('a')), n(5));
+    });
+  });
+
   group('removeWrite of merges at one location', () {
     // Upstream rebuilds the visible writes whenever two merges share a location; here merges of
     // different children are removed one by one. The state must be the one a rebuild gives.
@@ -358,6 +471,15 @@ void main() {
       }
     });
 
+    // Random writes at several depths: overwrites (one in five hidden, as transactions make) and
+    // merges, with leaf, null, empty and prioritised values, `.priority` children, deep merge child
+    // paths and empty merges, removed in random order. After each removal the visible data, over
+    // an empty and over a non-empty server node, must equal a tree rebuilt from the remaining
+    // writes, and removeWrite may return false only when that data did not change.
+    test('random writes: any removal order gives a rebuild', () {
+      expect(_removalFailures(0, 2000), isEmpty);
+    });
+
     test('1000 merges of different children are removed without a rebuild', () {
       final WriteTree tree = WriteTree();
       for (int id = 1; id <= 1000; id++) {
@@ -376,4 +498,93 @@ void main() {
       expect(visible(tree), ChildrenNode.empty);
     });
   });
+}
+
+/// Runs seeds [from] to [to] (exclusive) of the random removal check and returns one line per
+/// failing seed: the visible data after a removal differs from a rebuild, or removeWrite returned
+/// false although the visible data changed.
+List<String> _removalFailures(int from, int to) {
+  const List<String> locations = <String>['', 'a', 'a/b', 'a/x', 'r', 'a/b/c'];
+  const List<String> keys = <String>[
+    'a',
+    'b',
+    'x',
+    'c',
+    'a/b',
+    'a/x',
+    'b/c',
+    '.priority',
+    'x/.priority',
+  ];
+  const List<Object?> values = <Object?>[
+    null,
+    1,
+    5,
+    'v',
+    <String, Object?>{'c': 1},
+    <String, Object?>{'x': 1, '.priority': 7},
+    <String, Object?>{'.value': 4, '.priority': 2},
+    <String, Object?>{},
+  ];
+  const List<Object?> priorities = <Object?>[null, 1, 'v'];
+  final Node server = n(<String, Object?>{
+    'a': <String, Object?>{'b': 1, 'x': 2},
+    'r': 3,
+    '.priority': 1,
+  });
+  List<Node?> visible(WriteTree t) => <Node?>[
+    t.calcCompleteEventCache(p(''), ChildrenNode.empty),
+    t.calcCompleteEventCache(p(''), server),
+  ];
+  final List<String> failures = <String>[];
+  for (int seed = from; seed < to; seed++) {
+    final math.Random random = math.Random(seed);
+    final Map<int, void Function(WriteTree)> pending =
+        <int, void Function(WriteTree)>{};
+    final WriteTree tree = WriteTree();
+    final int count = 2 + random.nextInt(5);
+    for (int id = 1; id <= count; id++) {
+      final Path at = p(locations[random.nextInt(locations.length)]);
+      final void Function(WriteTree) add;
+      if (random.nextBool()) {
+        final Node value = n(values[random.nextInt(values.length)]);
+        final bool isVisible = random.nextInt(5) != 0;
+        add = (WriteTree t) =>
+            t.addOverwrite(at, value, id, visible: isVisible);
+      } else {
+        final Map<String, Object?> merge = <String, Object?>{
+          for (int j = random.nextInt(4); j > 0; j--)
+            if (keys[random.nextInt(keys.length)] case final String key)
+              key: key.endsWith('.priority')
+                  ? priorities[random.nextInt(priorities.length)]
+                  : values[random.nextInt(values.length)],
+        };
+        final CompoundWrite children = cw(merge);
+        add = (WriteTree t) => t.addMerge(at, children, id);
+      }
+      pending[id] = add;
+      add(tree);
+    }
+    final List<int> order = pending.keys.toList()..shuffle(random);
+    for (final int id in order) {
+      final List<Node?> before = visible(tree);
+      final bool result = tree.removeWrite(id);
+      pending.remove(id);
+      final WriteTree rebuilt = WriteTree();
+      for (final void Function(WriteTree) add in pending.values) {
+        add(rebuilt);
+      }
+      final List<Node?> expected = visible(rebuilt);
+      final List<Node?> actual = visible(tree);
+      if (actual[0] != expected[0] || actual[1] != expected[1]) {
+        failures.add('seed $seed: data after removing $id');
+        break;
+      }
+      if (!result && (before[0] != expected[0] || before[1] != expected[1])) {
+        failures.add('seed $seed: false after removing $id');
+        break;
+      }
+    }
+  }
+  return failures;
 }

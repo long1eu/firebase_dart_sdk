@@ -1102,10 +1102,13 @@ the number; the section each reason cites has the upstream lines.
 | 26 | Server change below a leaf in the event cache | upstream: updated child by child, the leaf is kept | the event cache is rebuilt from the server cache | `view_leaf_test` |
 | 27 | Proxies | Node: `HTTPS_PROXY` or `HTTP_PROXY` read by the `ws` package (`J:realtime/WebSocketConnection.ts:166-198`); a browser uses its own settings | a secure VM connection honours `HTTPS_PROXY` and `NO_PROXY` (and lower-case forms) only; loopback and the emulator are always direct; no API option | `ws_channel_io_test` |
 | 28 | REST fallback | read-only REST for crawlers and tests | none: the WebSocket is the only transport | no test found |
+| 29 | A pending write removed while later writes rewrite it | an overwrite counts as invisible when a later write covers it; a merge never does, so each answered `update` of the same children rebuilds the write tree | a merge whose every child is rewritten by later visible writes also counts as invisible; neither shortcut is taken when an earlier visible write lies above the removed one | `write_tree_test` ("merge rewritten child by child by later writes was not visible", "random writes: any removal order gives a rebuild"), `write_tree_fuzz_test` |
+| 30 | A removed write that was folded into an earlier write above it | the later-write shortcut is still taken: `set(a, 5)`, `set(a/b, 1)`, `set(a/b, null)`, then the second is refused, leaves `a` without its `5` (by the source; not run on the JS SDK) | the tree is rebuilt | `write_tree_test` ("an overwrite under a leaf, later deleted (JS rule)", and cases A and B beside it) |
+| 31 | A refused write below a pending write above it | only writes at or below the removed one count as overlapping it, so under a pending write above it nothing is rebuilt and a new listener below receives the refused data until the upper write is answered (reproduced on the JS SDK 13.4.0 against the emulator) | a visible write above counts too: the tree is rebuilt and a new listener sees no refused data; a listener that was already open still keeps it, as in JS (open, pinned as a skipped test) | `revert_under_pending_write_test` |
 
 Test file names are given without their directory: `scenarios_test`, `snapshot_test`, `public_surface_test`,
-`validation_test` and `api_behaviour_test` are in `test/api/`; `repo_get_test` and `database_error_test` in
-`test/core/`; `replay_test`, `liveness_test`, `reconnect_backoff_test`, `realtime_target_test`, `framing_test`,
+`validation_test`, `api_behaviour_test` and `revert_under_pending_write_test` are in `test/api/`; `repo_get_test`,
+`database_error_test`, `write_tree_test` and `write_tree_fuzz_test` in `test/core/`; `replay_test`, `liveness_test`, `reconnect_backoff_test`, `realtime_target_test`, `framing_test`,
 `ws_channel_io_test` and `ws_channel_web_test` (in `browser/`) in `test/realtime/`; `hosts_test`, `k_server_input_test`
 and `c_leakage_test` in `test/security/`.
 

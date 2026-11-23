@@ -99,16 +99,45 @@ final class WriteTree {
 
     bool removedWriteWasVisible = writeToRemove.visible;
     bool removedWriteOverlapsWithOtherWrites = false;
+    // The children of a removed merge (relative paths) that no later write has rewritten yet.
+    final List<Path>? unshadowedChildren = writeToRemove.isOverwrite
+        ? null
+        : <Path>[
+            for (final MapEntry<Path, Node> entry
+                in writeToRemove.merge!.entries)
+              entry.key,
+          ];
+    // Later writes can shadow the removed one only when it was not folded into the node of an
+    // earlier write above it: there it may have changed that node in ways a later rewrite of its
+    // paths does not undo (a null child empties the node and drops its priority; a child written
+    // under a leaf turns the leaf into children). JS and Android do not check this.
+    final bool mayBeShadowed = !_foldedIntoEarlierWrite(writeToRemove, idx);
     int i = _allWrites.length - 1;
     while (removedWriteWasVisible && i >= 0) {
       final UserWriteRecord currentWrite = _allWrites[i];
-      if (currentWrite.visible) {
-        if (i >= idx && _recordContainsPath(currentWrite, writeToRemove.path)) {
-          // A later write shadowed the removed one completely.
+      // Writes at unrelated paths, and merges at one location with no first key in common,
+      // neither shadow nor overlap.
+      if (currentWrite.visible &&
+          (writeToRemove.path.contains(currentWrite.path) ||
+              currentWrite.path.contains(writeToRemove.path)) &&
+          !_mergesAtOneLocationApart(writeToRemove, currentWrite)) {
+        if (i >= idx &&
+            mayBeShadowed &&
+            (_recordContainsPath(currentWrite, writeToRemove.path) ||
+                (unshadowedChildren != null &&
+                    _shadowsRemainingChildren(
+                      currentWrite,
+                      writeToRemove,
+                      unshadowedChildren,
+                    )))) {
+          // Later writes shadowed the removed one completely.
           removedWriteWasVisible = false;
-        } else if (writeToRemove.path.contains(currentWrite.path) &&
+        } else if (!removedWriteOverlapsWithOtherWrites &&
             _recordsOverlap(writeToRemove, currentWrite)) {
-          // Either we cover some writes or they cover part of us.
+          // Either we cover some writes or they cover part of us. JS and Android count only
+          // writes at or below the removed one; a write above it that overlaps it counts too, as
+          // the visible writes fold the data of one into the node of the other and removing the
+          // removed one's paths would leave its data there or drop the other's.
           removedWriteOverlapsWithOtherWrites = true;
         }
       }
@@ -305,33 +334,13 @@ final class WriteTree {
   /// always count as overlapping and each acknowledgement rebuilds the visible writes: with n
   /// pending `update` calls at one location that is n rebuilds of n writes. Here a merge counts by
   /// the paths of its children, so merges of different children are removed one by one.
+  /// The caller has ruled out [_mergesAtOneLocationApart].
   bool _recordsOverlap(UserWriteRecord a, UserWriteRecord b) {
     if (a.isOverwrite && b.isOverwrite) {
       return true;
     }
-    if (!a.isOverwrite && !b.isOverwrite && a.path == b.path) {
-      // The common case, checked without building paths: two merges at one location overlap
-      // only when they share a first key. Sharing one is not yet an overlap (`x/a` and `x/b`),
-      // so that case goes on to the exact check.
-      final SortedMap<ChildKey, ImmutableTree<Node>> aChildren =
-          a.merge!.writeTree.children;
-      final bool shared = b.merge!.writeTree.children.inOrderTraversal(
-        (ChildKey key, ImmutableTree<Node> _) => aChildren.containsKey(key),
-      );
-      if (!shared) {
-        return false;
-      }
-    }
-    final Iterable<Path> aPaths = a.isOverwrite
-        ? <Path>[a.path]
-        : a.merge!.entries.map(
-            (MapEntry<Path, Node> entry) => a.path.childPath(entry.key),
-          );
-    final List<Path> bPaths = b.isOverwrite
-        ? <Path>[b.path]
-        : b.merge!.entries
-              .map((MapEntry<Path, Node> entry) => b.path.childPath(entry.key))
-              .toList(growable: false);
+    final List<Path> aPaths = _writtenPaths(a);
+    final List<Path> bPaths = _writtenPaths(b);
     for (final Path aPath in aPaths) {
       for (final Path bPath in bPaths) {
         if (aPath.contains(bPath) || bPath.contains(aPath)) {
@@ -340,6 +349,77 @@ final class WriteTree {
       }
     }
     return false;
+  }
+
+  /// Whether a visible write before index [idx] of the remaining writes writes a path strictly
+  /// above a path [removed] writes, so that [removed] was folded into that write's node.
+  bool _foldedIntoEarlierWrite(UserWriteRecord removed, int idx) {
+    List<Path>? removedPaths;
+    for (int i = 0; i < idx; i++) {
+      final UserWriteRecord earlier = _allWrites[i];
+      if (!earlier.visible ||
+          !(earlier.path.contains(removed.path) ||
+              removed.path.contains(earlier.path)) ||
+          _mergesAtOneLocationApart(earlier, removed)) {
+        continue;
+      }
+      removedPaths ??= _writtenPaths(removed);
+      for (final Path above in _writtenPaths(earlier)) {
+        for (final Path path in removedPaths) {
+          if (above.length < path.length && above.contains(path)) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  /// The paths [record] writes: its path for an overwrite, each child's path for a merge.
+  static List<Path> _writtenPaths(UserWriteRecord record) => record.isOverwrite
+      ? <Path>[record.path]
+      : <Path>[
+          for (final MapEntry<Path, Node> entry in record.merge!.entries)
+            record.path.childPath(entry.key),
+        ];
+
+  /// Whether [a] and [b] are merges at one location with no first key in common, checked without
+  /// building paths. This is the common case of many `update` calls at one location; sharing a
+  /// first key does not yet mean an overlap (`x/a` and `x/b`).
+  bool _mergesAtOneLocationApart(UserWriteRecord a, UserWriteRecord b) {
+    if (a.isOverwrite || b.isOverwrite || a.path != b.path) {
+      return false;
+    }
+    final SortedMap<ChildKey, ImmutableTree<Node>> aChildren =
+        a.merge!.writeTree.children;
+    final bool shared = b.merge!.writeTree.children.inOrderTraversal(
+      (ChildKey key, ImmutableTree<Node> _) => aChildren.containsKey(key),
+    );
+    return !shared;
+  }
+
+  /// Drops from [children] (paths relative to the merge [removed]) the ones that [later], a
+  /// visible write made after [removed], rewrites; returns whether none is left. The caller has
+  /// checked that one of the two paths contains the other and ruled out
+  /// [_mergesAtOneLocationApart].
+  ///
+  /// A later write replaces everything at and below the paths it writes, so a merge whose every
+  /// child is rewritten by later writes no longer shows, and removing it changes no visible data.
+  /// JS and Android treat a write as shadowed only when one later write contains its whole path;
+  /// with n pending `update` calls of the same children each acknowledgement there rebuilds the
+  /// visible writes of the n writes, here it stops at the latest one.
+  bool _shadowsRemainingChildren(
+    UserWriteRecord later,
+    UserWriteRecord removed,
+    List<Path> children,
+  ) {
+    final Path path = removed.path;
+    final List<Path> written = _writtenPaths(later);
+    children.removeWhere((Path child) {
+      final Path at = path.childPath(child);
+      return written.any((Path w) => w.contains(at));
+    });
+    return children.isEmpty;
   }
 
   bool _recordContainsPath(UserWriteRecord writeRecord, Path path) {
