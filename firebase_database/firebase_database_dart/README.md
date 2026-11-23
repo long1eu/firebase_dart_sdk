@@ -217,6 +217,9 @@ whose order survives that. A server refusal (a rule) ends a stream with an error
 and a listener simply gets its data again after the reconnect. Closing the database ends streams with
 `database-closed`.
 
+A listener can occasionally get two identical `null` value events in a row, after a write that the server refuses; an
+app that counts events should compare with the previous value.
+
 More: [listeners.dart](example/listeners.dart).
 
 ## Queries
@@ -587,6 +590,12 @@ The 17 you notice are below. The full table, 28 rows with the test that pins eac
   Dart's `HttpClient` does, and nothing else configures it. Loopback addresses and the emulator are always reached
   directly. There is no option in the API. A proxy that refuses the tunnel fails the connection attempt with an error
   that names the proxy and the status.
+- **Priorities and pending writes.** As in the JS SDK, the local view can differ from the server until the server
+  answers. A priority written on a node that does not exist is shown until the server refuses it, and a node that is
+  emptied and refilled, by one update or by two writes, loses its priority locally (the server keeps it). A limit
+  query's window is not refilled after a local removal until the server sends it. See "Behaviours shared with the JS
+  SDK that are kept" in
+  [docs/database_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_decisions.md).
 - **Transactions and `onDisconnect` registrations are not persisted.** After a restart, register them again.
 - **The server's behaviour was measured on the emulator only.** Token refresh, revocation, ping answers and the
   size limits of a production server are not measured; the three connection timeouts (30 s, 15 s, 60 s) are chosen,
