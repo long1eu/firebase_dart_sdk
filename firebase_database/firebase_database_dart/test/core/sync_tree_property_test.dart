@@ -15,10 +15,17 @@
 // that the emulator keeps it when the node is emptied by a write below it (not verified on
 // production), so B accepts either answer. The server sends a write to the listens it holds,
 // from reading a listen to reading its unlisten: as written to a plain listen at or above it,
-// as whole data to one below it. The limit query gets a write below its path at the write's
-// path while the touched child stays in the window, an entering child whole at its path, a
-// child leaving while another enters as one merge at its path, and the whole window for a write
-// at its path; a write above its path, not measured, also sends the window.
+// as whole data to one below it. To the limit query it sends the frames measured for a
+// key-ordered limitToFirst query (rtdb/from_helper/reports/limit_query_frames.md): a set at or
+// above its path puts the whole window; an update at or above it merges its relative paths
+// when the window keeps its children, the entering child whole and the removed one null when it
+// changes, and nothing when no window child is touched (its own priority included); a write
+// below it goes as written while its child stays in the window, nothing for a child outside, the
+// entering child alone at its path when it pushes another out, and a merge of entering and
+// removed children otherwise. Not measured, and kept as the model's guess: the order by
+// priority of this query, an update that changes one window child while another enters or that
+// pushes a child out (the whole window is put), an update key at or above the query path, and
+// a window merge whose entering child sorts before a child that stays (measured only after it).
 //
 // The unchanged code fails some seeds, for behaviours that are documented and kept. The test
 // fails when a seed outside [_knownFailures] fails, or a listed seed passes.
@@ -57,13 +64,6 @@ const (int, int) _defaultSeeds = (0, 10000);
 /// listener that differs from its own server cache with nothing pending. Each group starts with
 /// its shortest sequence, found by shrinking one of its seeds; data as in [_initial].
 const Map<String, List<int>> _knownFailures = <String, List<int>>{
-  // listen limit /a, answered; listen /; set /a/x/u 1; / answered, the unlisten of the limit
-  // query not read yet; set /a/x/u null; another client's update /a {.priority: null}, which
-  // the server still sends to the limit query as the window {x: 1, y}. Settled, the limit
-  // listener shows x: 1, which the two writes replaced and removed (seed 1335). Without the
-  // race, the server reading the unlisten right after the listen, the seed passes.
-  'row 7: a root listen over a limit query, a write read before the unlisten':
-      <int>[1335],
   // listen /b; update /b {y: 1, x: null}. The listener shows {y: 1} without the priority 3 the
   // server keeps (seed 9709). The other seeds lose a priority the same way, in the listener or in
   // the client's server cache (then property A fails first): an update that writes the priority
@@ -353,50 +353,95 @@ final class _Server {
     }
   }
 
-  /// Sends [w] to the limit query's listen [l] as the emulator does (measured; the shapes are
-  /// listed at [FakeServerActions.taggedListensGetWholeData]): a write below the
-  /// query's path goes at its own path when its child of the query is in the window, a child
-  /// that enters the window is sent whole at its path, and a child leaving while another enters
-  /// comes as one merge at the query's path. A write at the query's path gets the whole window;
-  /// so does a write above it, which was not measured.
+  /// Sends [w] to the limit query's listen [l] in the frames the emulator sent for a key-ordered
+  /// `limitToFirst(2)` query (rtdb/from_helper/reports/limit_query_frames.md, cases A1 to C5).
+  /// Shapes it did not measure keep the whole window as a put at the query path.
   void _publishTagged(ServerCall l, _Write w, Node before) {
     final QuerySpec q = _queries.firstWhere(
       (QuerySpec q) => q.toListenSpec() == l.spec,
     );
     final String lp = l.spec!.path;
-    final Node now = _shown(q, data.getChild(q.path));
     void send(String path, Object? json, {bool merge = false}) =>
         fake.deliverDataUpdate(path, json, isMerge: merge, tag: l.tag);
-    final Path at = Path(w.path);
-    if (at.length <= q.path.length) {
-      send(lp, now.toJson(exportFormat: true));
-      return;
-    }
-    final String child = Path.relative(q.path, at).front!.name;
+    final Node window = _shown(q, data.getChild(q.path));
+    void sendWindow() => send(lp, window.toJson(exportFormat: true));
     final Map<String, Object?> was = _children(
       _shown(q, before.getChild(q.path)),
     );
-    final Map<String, Object?> kids = _children(now);
+    final Map<String, Object?> now = _children(window);
     final List<String> left = <String>[
       for (final String k in was.keys)
-        if (!kids.containsKey(k)) k,
+        if (!now.containsKey(k)) k,
     ];
     final List<String> entered = <String>[
-      for (final String k in kids.keys)
+      for (final String k in now.keys)
         if (!was.containsKey(k)) k,
     ];
-    if (left.isNotEmpty && entered.isNotEmpty) {
-      send(lp, <String, Object?>{
-        for (final String k in left) k: null,
-        for (final String k in kids.keys)
-          if (k == child || entered.contains(k)) k: kids[k],
-      }, merge: true);
-    } else if (entered.isNotEmpty) {
-      for (final String k in entered) {
-        send('$lp/$k', kids[k]);
+    // A child that left the window but still exists was pushed out by one that entered.
+    bool removed(String k) => data.getChild(q.path.childPath(Path(k))).isEmpty;
+    final Map<String, Object?> diff = <String, Object?>{
+      for (final String k in entered) k: now[k],
+      for (final String k in left) k: null,
+    };
+    final Path at = Path(w.path);
+    if (at.length > q.path.length) {
+      final String child = Path.relative(q.path, at).front!.name;
+      if (left.isEmpty && entered.isEmpty) {
+        // In the window: as written (C1, C5); outside it: nothing (C3).
+        if (was.containsKey(child)) {
+          send(_wire(w.path), w.data, merge: w.merge);
+        }
+      } else if (entered.length == 1 &&
+          entered.single == child &&
+          !left.any(removed)) {
+        // The entering child alone, whole; the client drops what it pushes out (C4).
+        send('$lp/$child', now[child]);
+      } else if (entered.isEmpty) {
+        if (was.containsKey(child)) {
+          send(_wire(w.path), w.data, merge: w.merge);
+        }
+      } else {
+        send(lp, diff, merge: true); // C2
       }
-    } else if (was.containsKey(child)) {
-      send(_wire(w.path), w.data, merge: w.merge);
+      return;
+    }
+    if (!w.merge) {
+      sendWindow(); // A1, A2, B1
+      return;
+    }
+    // An update at or above the query path, by its paths below the query path.
+    final Map<String, Object?> below = <String, Object?>{};
+    for (final MapEntry<String, Object?> e
+        in (w.data! as Map<String, Object?>).entries) {
+      final Path full = at.childPath(Path(e.key));
+      if (full.contains(q.path)) {
+        sendWindow(); // replaces the query node: not measured
+        return;
+      }
+      if (q.path.contains(full)) {
+        final Path relative = Path.relative(q.path, full);
+        // The query node's own priority moves no child (A6, B4).
+        if (!relative.front!.isPriorityKey) {
+          below[relative.segments.map((k) => k.name).join('/')] = e.value;
+        }
+      }
+    }
+    final Set<String> touched = <String>{
+      for (final String k in below.keys) k.split('/').first,
+    };
+    if (!touched.any((String k) => was.containsKey(k) || now.containsKey(k))) {
+      return; // A5, A6, B4
+    }
+    if (left.isEmpty && entered.isEmpty) {
+      send(lp, <String, Object?>{
+        for (final MapEntry<String, Object?> e in below.entries)
+          if (now.containsKey(e.key.split('/').first)) e.key: e.value,
+      }, merge: true); // A3, B3
+    } else if (left.every(removed) &&
+        !touched.any((String k) => was.containsKey(k) && now.containsKey(k))) {
+      send(lp, diff, merge: true); // A4, B2
+    } else {
+      sendWindow(); // a child pushed out, or one changed while another enters: not measured
     }
   }
 
