@@ -5,7 +5,12 @@
 // a listener opened after the refusal saw the refused data until the parent write was answered.
 // lib/src/core/write_tree.dart counts the parent write as overlapping and rebuilds. A listener
 // open during the refusal kept the data too, because JS viewProcessorRevertUserWrite returns the
-// view unchanged under a shadowing write; lib/src/core/view/view_processor.dart recomputes.
+// view unchanged under a shadowing write; lib/src/core/view/view_processor.dart takes what the
+// write tree holds instead.
+//
+// The fake server refuses the last write while the earlier one is pending, which a server
+// answering in order does not do. Through the public API the same state comes from a queued
+// transaction aborted while an ancestor transaction is in flight (last test).
 
 import 'package:firebase_database_dart/firebase_database_dart.dart';
 import 'package:test/test.dart';
@@ -90,32 +95,64 @@ void main() {
     expectNewListenerSeesNothing(h);
   });
 
-  // What should happen: the listener open during the refusal drops the refused data at once, and
-  // `get`, which answers from that view, does too. It does not yet: ViewProcessor.revertUserWrite,
-  // like JS viewProcessorRevertUserWrite, returns the view unchanged when a pending write shadows
-  // the reverted path, so the refused data stays until the parent write is answered (reproduced
-  // on the JS SDK 13.4.0). Always recomputing instead was tried and breaks a listener whose listen
-  // is not answered yet, so this stays skipped until that fix exists.
+  // The listener open during the refusal drops the refused data at once, and `get`, which
+  // answers from that view, does too. JS viewProcessorRevertUserWrite returns the view unchanged
+  // when a pending write shadows the reverted path and keeps the refused data until the parent
+  // write is answered (reproduced on the JS SDK 13.4.0).
+  scenario('an open listener drops refused data below a pending set at once', (
+    Harness h,
+  ) {
+    setUnderPendingSet(
+      h,
+      () => h.track('W2', h.ref('r/b').update(<String, Object?>{'c': 2})),
+    );
+    h.server.failLastWrite('permission_denied');
+    h.settle();
+    expect(h.named('S'), <String>[
+      'S:V(null)',
+      'S:V({a:1})',
+      'S:V({a:1,b:{c:2}})',
+      'S:V({a:1})',
+    ]);
+    h.trackValue('G', h.ref('r').get());
+    h.settle();
+    expect(h.named('G'), <String>['G:={a:1}']);
+  });
+
+  // A transaction waits while a transaction above it is in flight, and that one's write shadows
+  // it. A set below the waiting transaction aborts it at once: its data must leave the listener
+  // then, not when the transaction above is answered. Measured on the emulator before the fix:
+  // the aborted data stayed until the first transaction committed.
   scenario(
-    'an open listener drops refused data below a pending set at once',
+    'a queued transaction aborted under an ancestor transaction in flight '
+    'leaves the listener at once',
     (Harness h) {
-      setUnderPendingSet(
-        h,
-        () => h.track('W2', h.ref('r/b').update(<String, Object?>{'c': 2})),
+      h.listenAnswered('S', h.ref('r').onValue, 'r', <String, Object?>{'x': 0});
+      h.trackTransaction(
+        'T1',
+        h
+            .ref('r')
+            .runTransaction(
+              (Object? value) =>
+                  Transaction.success(const <String, Object?>{'x': 1}),
+            ),
       );
-      h.server.failLastWrite('permission_denied');
+      h.trackTransaction(
+        'T2',
+        h
+            .ref('r/b')
+            .runTransaction(
+              (Object? value) =>
+                  Transaction.success(const <String, Object?>{'c': 1}),
+            ),
+      );
+      h.track('W', h.ref('r/b/z').set(5));
       h.settle();
-      expect(h.named('S'), <String>[
-        'S:V(null)',
-        'S:V({a:1})',
-        'S:V({a:1,b:{c:2}})',
-        'S:V({a:1})',
-      ]);
+      expect(h.named('T2'), <String>['T2:E(overridden-by-set)']);
+      expect(h.named('S').last, 'S:V({b:{z:5},x:1})');
       h.trackValue('G', h.ref('r').get());
       h.settle();
-      expect(h.named('G'), <String>['G:={a:1}']);
+      expect(h.named('G'), <String>['G:={b:{z:5},x:1}']);
     },
-    skip:
-        'open defect shared with the JS SDK: the open listener keeps refused data',
   );
 }

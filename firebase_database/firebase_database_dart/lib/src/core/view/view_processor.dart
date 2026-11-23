@@ -273,6 +273,8 @@ final class ViewProcessor {
   }
 
   /// Reverts a rejected user write at [path] (JS `viewProcessorRevertUserWrite`).
+  ///
+  /// Differs from JS where a remaining write shadows [path]; see the comment in the body.
   ViewCache revertUserWrite(
     ViewCache viewCache,
     Path path,
@@ -280,8 +282,26 @@ final class ViewProcessor {
     Node? optCompleteServerCache,
     ChildChangeAccumulator accumulator,
   ) {
-    if (writesCache.shadowingWrite(path) != null) {
-      return viewCache;
+    // JS: `if (writeTreeRefShadowingWrite(writesCache, path) != null) return viewCache;`.
+    // That holds for a write made after the reverted one, but then WriteTree.removeWrite
+    // returns false and no revert reaches the view. A write made before the reverted one can
+    // shadow [path] too (a transaction aborted below an ancestor transaction still in flight),
+    // and the view still holds the reverted data. So the view takes what the write tree holds:
+    // a write over the whole view replaces the view; otherwise the code below recomputes the
+    // touched child as for an unshadowed revert. The incomplete-cache branch below must not
+    // see a write over the whole view: it would keep only that node's children (a leaf gives
+    // an empty node).
+    final Node? viewShadow = writesCache.shadowingWrite(Path.empty);
+    if (viewShadow != null) {
+      return viewCache.updateEventSnap(
+        filter.updateFullNode(
+          viewCache.eventCache.node,
+          viewShadow,
+          accumulator,
+        ),
+        complete: true,
+        filtered: filter.filtersNodes,
+      );
     }
     final WriteTreeCompleteChildSource source = WriteTreeCompleteChildSource(
       writesCache,
