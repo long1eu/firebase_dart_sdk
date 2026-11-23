@@ -998,16 +998,17 @@ earlier commit.
 
 | Where | Result | Whose run |
 |---|---|---|
-| Dart VM | 2,363 tests of the client (after the REST client and its tests were removed) | the other session |
-| Chrome, the whole test tree | dart2js 2,320 tests, dart2wasm 2,324 tests | the other session |
+| Dart VM | 2,371 tests of the client | the other session |
+| Chrome, the whole test tree | dart2js 2,328 tests, dart2wasm 2,332 tests | the other session |
 | SQLite package | 247 tests on Dart 3.11.5 and on Dart 3.8.0 | lead |
-| Adapter | 133 tests, 5 skipped without the emulator; 138 with it | the other session |
+| Adapter | 136 tests, 5 skipped without the emulator; 141 with it | the other session |
 | FlutterFire's own `firebase_database` integration suite through the adapter | 76 pass, 1 skips itself (macOS host test runner, emulator) | lead |
 | Database emulator (v4.11.2, macOS) | the tests tagged `emulator`: 29 pass, 2 skip themselves | the other session |
 | Windows 11 x64 | the client's VM suite passed at an earlier commit (2,126); the Windows example app passes its 4 integration tests through the adapter (Flutter 3.47.8, debug); its disk cache test passed with an earlier version of the app | lead |
 | Linux x64 (Debian 13 container) | the client's VM suite and both browser legs passed at an earlier commit (2,058; 1,125; 1,128); the Linux example app builds and passes its 4 integration tests under a virtual display | lead |
 | Web gallery | a smoke script passes 66 steps on both compilers | the other session |
 | Both engines | Android's persistence suites pass on the in-memory and the SQLite engine (inside the counts above) | lead |
+| GitHub Actions (run 45086670535) | all 25 jobs pass: the emulator tests (29 pass, 2 skip), Chrome dart2js (2,328) and dart2wasm (2,332), the adapter with the emulator (141), FlutterFire's suite through the adapter (76 pass, 1 skips), the gallery smoke script (66 steps) | CI |
 
 Mutation testing: 45 mutations were tried; 39 of them survived the suites as they were before the last pass, and all
 45 are caught now. Independent reviews: the connection (3 high, 8 medium and 7 low findings), the SQLite engine (1

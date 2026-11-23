@@ -8,8 +8,8 @@ the JS SDK or FlutterFire, offline behaviour, the connection on a desktop or a s
 README](../../firebase_database/firebase_database_dart/README.md) has the install steps and one example of each call;
 this guide does not repeat them. The client is at 0.0.1 and has run against the Database emulator only, never against a
 production project; where a statement below depends on the server, it says what was measured. What has run is in section
-23 of the [decisions document](../database_decisions.md): the client's test suite on the Dart VM (2,363 tests) and in
-Chrome on dart2js (2,320) and dart2wasm (2,324), the SQLite package (247 tests), the adapter (133 tests, 5 skipped
+23 of the [decisions document](../database_decisions.md): the client's test suite on the Dart VM (2,371 tests) and in
+Chrome on dart2js (2,328) and dart2wasm (2,332), the SQLite package (247 tests), the adapter (136 tests, 5 skipped
 without the emulator), and example apps on Windows 11 and Linux x64 (4 integration tests each). Not run: a production
 project, a release build of a desktop app, Safari, Firefox, a real display and CI on a runner.
 
