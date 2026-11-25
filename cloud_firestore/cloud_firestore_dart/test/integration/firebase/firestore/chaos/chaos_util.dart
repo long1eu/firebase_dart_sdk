@@ -98,11 +98,24 @@ class ChaosEnv {
   }
 
   /// The documents of [collectionPath] on the backend, by id, as the oracle reads them.
+  ///
+  /// The oracle is the referee, not the client under test: a server read fails with `unavailable` after one failed
+  /// connection attempt, so the read is tried up to three times before the failure counts.
   Future<Map<String, Map<String, Object?>>> serverDocs(
       String collectionPath) async {
-    final QuerySnapshot<Map<String, Object?>> snapshot =
-        await oracle.collection(collectionPath).get(GetOptions(source: Source.server));
-    return docsById(snapshot);
+    for (int attempt = 1;; attempt++) {
+      try {
+        final QuerySnapshot<Map<String, Object?>> snapshot = await oracle
+            .collection(collectionPath)
+            .get(GetOptions(source: Source.server));
+        return docsById(snapshot);
+      } on FirestoreException catch (e) {
+        if (e.errorCode != FirestoreErrorCode.unavailable || attempt == 3) {
+          rethrow;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      }
+    }
   }
 
   Future<void> close() async {
