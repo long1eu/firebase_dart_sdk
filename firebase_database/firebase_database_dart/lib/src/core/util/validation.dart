@@ -294,7 +294,8 @@ bool _holdsValue(String errorPrefix, Object? data, Path path) {
     return true;
   }
   if (data.containsKey('.sv')) {
-    // A server value is a leaf (checked by validateServerValues).
+    // A server value is a leaf (checked by validateServerValues). The loop below would reach the same
+    // answer through the '.sv' key; this branch says it outright and never descends into the placeholder.
     return true;
   }
   bool holds = false;
