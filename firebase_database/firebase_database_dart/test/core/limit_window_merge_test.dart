@@ -368,4 +368,51 @@ void main() {
       });
     },
   );
+
+  test('a child leaving the window for a merge key the window did not hold pulls the next child '
+      'with the values of the same merge', () {
+    // A tagged merge after the default listen was answered (sent before the server took the
+    // limit unlisten) filters the limit view's server cache to its window {p, q}. A pending
+    // write puts s into the event window; the merge removes s (a key outside the server window,
+    // second loop) and changes q, which the window then pulls.
+    final _Client c = _Client();
+    final _Reg limit = c.listen(limitA);
+    c.listen(QuerySpec.defaultAt(Path.empty));
+    final Map<String, Object?> window = <String, Object?>{
+      'p': <String, Object?>{'u': 1, '.priority': 1},
+      'q': <String, Object?>{'u': 1, '.priority': 2},
+    };
+    c.taggedPut('a', window);
+    c.put('', <String, Object?>{
+      'a': <String, Object?>{
+        ...window,
+        'r': <String, Object?>{'u': 1, '.priority': 3},
+        's': <String, Object?>{'u': 1, '.priority': 4},
+      },
+    });
+    c._take(
+      c.tree.applyTaggedQueryMerge(p('a'), <Path, Node>{
+        p('p/u'): n(1),
+      }, c.tree.tagForQuery(limitA)!),
+    );
+    c._take(
+      c.tree.applyUserOverwrite(
+        p('a/s/.priority'),
+        n(0),
+        n(0),
+        1,
+        visible: true,
+        persist: false,
+      ),
+    );
+    expect(c.values[limit], <String, Object?>{
+      's': <String, Object?>{'u': 1, '.priority': 0},
+      'p': <String, Object?>{'u': 1, '.priority': 1},
+    });
+    c.merge('a', <String, Object?>{'q/u': 5, 's': null});
+    expect(c.values[limit], <String, Object?>{
+      'p': <String, Object?>{'u': 1, '.priority': 1},
+      'q': <String, Object?>{'u': 5, '.priority': 2},
+    });
+  });
 }

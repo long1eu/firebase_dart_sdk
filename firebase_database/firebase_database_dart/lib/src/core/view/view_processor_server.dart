@@ -215,8 +215,8 @@ extension _ServerOperations on ViewProcessor {
   /// child from it, and from the cache before the merge it would pull a child with values this
   /// merge changed or removed, which no later frame repairs (docs/database_decisions.md section
   /// 25). An acknowledgement calls this with children copied from the view's own server cache,
-  /// which can be older than the complete cache (a filtered limit cache): applying them would put
-  /// older data into the complete cache, so it keeps the upstream behaviour.
+  /// not with data the server just sent, so it keeps the upstream behaviour: every child gets the
+  /// complete cache as it is.
   ViewCache _applyServerMerge(
     ViewCache viewCache,
     Path path,
