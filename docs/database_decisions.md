@@ -1108,12 +1108,14 @@ the number; the section each reason cites has the upstream lines.
 | 29 | A pending write removed while later writes rewrite it | an overwrite counts as invisible when a later write covers it; a merge never does, so each answered `update` of the same children rebuilds the write tree | a merge whose every child is rewritten by later visible writes also counts as invisible; neither shortcut is taken when an earlier visible write lies above the removed one | `write_tree_test` ("merge rewritten child by child by later writes was not visible", "random writes: any removal order gives a rebuild"), `write_tree_fuzz_test` |
 | 30 | A removed write that was folded into an earlier write above it | the later-write shortcut is still taken: `set(a, 5)`, `set(a/b, 1)`, `set(a/b, null)`, then the second is refused, leaves `a` without its `5` (by the source; not run on the JS SDK) | the tree is rebuilt | `write_tree_test` ("an overwrite under a leaf, later deleted (JS rule)", and cases A and B beside it) |
 | 31 | A write reverted while an earlier pending write lies above it (with a real server: a transaction aborted below an ancestor transaction still in flight) | only writes at or below the removed one count as overlapping it, so nothing is rebuilt, and the view returns unchanged when a write shadows the reverted path: an open listener, `get()` and a new listener below keep the reverted data until the upper write is answered (reproduced on the JS SDK 13.4.0 against the emulator with the answers reordered by a proxy; with a real server's order it lasts milliseconds) | a visible write above counts too and the tree is rebuilt; the view takes what the write tree holds, so no listener keeps the reverted data | `revert_under_pending_write_test`, `revert_under_shadow_test` |
+| 32 | A server merge that moves a child out of a limit window while a complete view covers the query | every child of the merge is applied with the complete server cache from before it, so the child pulled into the window can hold values the same merge changed or removed; it lasts until every listener at the path is removed (read: `J:core/view/ViewProcessor.ts:583-660`; measured: JS 13.4.0 on the emulator, seeds 245589, 4614, 11541 and 174519, one run each) | each child of a merge the server sent gets that cache with the merge's earlier children applied, so the window takes the child that sorts next after them; an acknowledgement keeps the JS behaviour (measured: the same four sequences on the emulator, one run each, right at every check) | `limit_window_merge_test` |
 
 Test file names are given without their directory: `scenarios_test`, `snapshot_test`, `public_surface_test`,
 `validation_test`, `api_behaviour_test` and `revert_under_pending_write_test` are in `test/api/`; `repo_get_test`,
-`database_error_test`, `write_tree_test`, `write_tree_fuzz_test` and `revert_under_shadow_test` in `test/core/`; `replay_test`, `liveness_test`, `reconnect_backoff_test`, `realtime_target_test`, `framing_test`,
-`ws_channel_io_test` and `ws_channel_web_test` (in `browser/`) in `test/realtime/`; `hosts_test`, `k_server_input_test`
-and `c_leakage_test` in `test/security/`.
+`database_error_test`, `write_tree_test`, `write_tree_fuzz_test`, `revert_under_shadow_test` and
+`limit_window_merge_test` in `test/core/`; `replay_test`, `liveness_test`, `reconnect_backoff_test`,
+`realtime_target_test`, `framing_test`, `ws_channel_io_test` and `ws_channel_web_test` (in `browser/`) in
+`test/realtime/`; `hosts_test`, `k_server_input_test` and `c_leakage_test` in `test/security/`.
 
 **Why.**
 
@@ -1166,7 +1168,7 @@ behaviours are kept. They were found by a random differential check of the local
 where the last two columns say so, run. Rows 2 and 7 are shared with the JS SDK 13.4.0 by runs on the emulator, and so is
 row 5 in its simplified form. Row 1 is better here than in JS: the JS SDK showed a wrong value that lasted, this client
 does not. Rows 3, 5 (in the table's form) and 6 were seen only in the differential check; they are not reachable
-through the public API in the forms run on either SDK. Row 4 is a server fact. Rows 29 to 31 above are places where
+through the public API in the forms run on either SDK. Row 4 is a server fact. Rows 29 to 32 above are places where
 this client departs from JS. "Emulator" means the local Firebase emulator (v4.11.2); production was run for rows 4 and
 8 only (2026-11-25), and for no other row. The JS column says what a run of the JS SDK 13.4.0 showed; "Measured on" says what was run with our client.
 

@@ -51,5 +51,8 @@ against the Database emulator.
 - The event dispatcher yields to the event loop after 1,000 events with an unthrottled task in the browser, so a burst
   of events in a hidden tab is delivered in bounded time.
 - Writes are delivered at least once: a re-sent `ServerValue.increment` can apply twice.
+- A limit query under a listener at or above its path keeps the right window when one update by another client
+  moves a child out of it: the child that enters holds the update's earlier changes, and the window ends as the
+  server's. The JS SDK showed a stale or removed child there until every listener at the path was removed.
 - Not included: long polling, typed converters, a REST client or fallback, web disk persistence, an instance cache,
   the compat API, a proxy option in the API.
