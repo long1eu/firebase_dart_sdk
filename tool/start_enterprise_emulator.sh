@@ -11,6 +11,9 @@
 #   FIRESTORE_EMULATOR_JAR    emulator JAR (default: the newest cloud-firestore-emulator-v*.jar in
 #                             ~/.cache/firebase/emulators, where the Firebase CLI downloads it)
 #   ENTERPRISE_EMULATOR_PORT  port to listen on (default: 8181)
+#   ENTERPRISE_EMULATOR_JAVA_OPTS  extra options for the JVM, for example -Xmx8g. The emulator keeps every
+#                             document in memory and copies them for an aggregation, so a full suite can
+#                             exhaust the default heap (a quarter of the machine's memory).
 #
 # Tests find it through FIRESTORE_ENTERPRISE_EMULATOR_HOST=127.0.0.1:8181.
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -52,7 +55,8 @@ fi
 echo "Using $JAR"
 # The pid file holds the pid of the java process itself, so that the stop script can stop
 # exactly this process.
-nohup java -Duser.language=en -jar "$JAR" "${ARGS[@]}" >"$LOG" 2>&1 &
+# shellcheck disable=SC2086 # the options are split on purpose
+nohup java -Duser.language=en ${ENTERPRISE_EMULATOR_JAVA_OPTS:-} -jar "$JAR" "${ARGS[@]}" >"$LOG" 2>&1 &
 echo $! >"$PID"
 
 for _ in $(seq 1 120); do
