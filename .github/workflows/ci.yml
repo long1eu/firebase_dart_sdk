@@ -531,7 +531,13 @@ jobs:
           sdk: stable
       - uses: ./.github/actions/emulators
       - name: Start Enterprise Firestore emulator
-        run: ./tool/start_enterprise_emulator.sh
+        # The whole suite fills the emulator's default heap (a quarter of the runner's memory): aggregation and
+        # vector queries then fail with an empty `unknown` error.
+        env:
+          ENTERPRISE_EMULATOR_JAVA_OPTS: -Xmx8g
+        run: |
+          free -g | head -2
+          ./tool/start_enterprise_emulator.sh
       - name: Run the standard suite against the Enterprise emulator
         run: |
           (cd cloud_firestore/cloud_firestore_dart && dart pub get)
