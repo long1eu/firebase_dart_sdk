@@ -26,6 +26,7 @@ import 'package:meta/meta.dart';
 /// | `operation-failed` | the server reported that the operation failed (server status `failure`) |
 /// | `too-big` | the data is larger than the server accepts in one request (server status `too_big`) |
 /// | `database-closed` | the `FirebaseDatabase` was closed, or its app deleted |
+/// | `data-stale` | the server answered `datastale` to a request other than a transaction's (a fake server can) |
 /// | `unknown` | any other server status (`invalid_parameters`, `internal_error`, ...); the raw status is in [serverStatus] |
 ///
 /// FlutterFire spells `write-canceled` as `write-cancelled`; the FlutterFire shim maps it.
@@ -56,8 +57,9 @@ final class FirebaseDatabaseException extends FirebaseException {
   /// when the error did not come from the server. It never holds a token.
   final String? serverStatus;
 
-  /// The error that caused this one, when it came from outside the package. It is never part of [message]
-  /// or [toString]: its text may hold credentials.
+  /// The error that caused this one, when there is one (an error from outside the package, or the
+  /// error behind a failure the client raised itself). It is never part of [message] or [toString]: its
+  /// text may hold credentials.
   final Object? cause;
 
   @override
@@ -69,8 +71,8 @@ final class FirebaseDatabaseException extends FirebaseException {
 }
 
 /// The codes a [FirebaseDatabaseException] can carry, in the order of its documentation table.
-/// `data-stale` and `user-code-exception` are internal: a stale transaction is run again, and a throwing
-/// transaction handler fails with its own error object.
+/// `user-code-exception` is internal: a throwing transaction handler fails with its own error object. A
+/// transaction answered `datastale` is run again; `data-stale` reaches a caller only for another request.
 @internal
 const List<String> firebaseDatabaseExceptionCodes = <String>[
   'permission-denied',
@@ -84,14 +86,16 @@ const List<String> firebaseDatabaseExceptionCodes = <String>[
   'operation-failed',
   'too-big',
   'database-closed',
+  'data-stale',
   'unknown',
 ];
 
 /// The public exception for a core [error]: the kebab-case code of [DatabaseError.code], its message, and
-/// the wire status followed by the server's reason as [FirebaseDatabaseException.serverStatus] (none for
-/// [DatabaseErrorCode.databaseClosed], which is local). For a status the client does not know, the
-/// details already hold `status: reason` and are the [FirebaseDatabaseException.serverStatus] as they
-/// are, as [exceptionFromServerStatus] writes it.
+/// the wire status followed by the server's reason as [FirebaseDatabaseException.serverStatus]. There is
+/// none for [DatabaseErrorCode.databaseClosed] and for a [DatabaseError.isLocal] error, which did not come
+/// from the server; the cause of a local error is [FirebaseDatabaseException.cause]. For a status the
+/// client does not know, the details already hold `status: reason` and are the
+/// [FirebaseDatabaseException.serverStatus] as they are.
 @internal
 FirebaseDatabaseException exceptionFromDatabaseError(
   DatabaseError error, {
@@ -102,43 +106,15 @@ FirebaseDatabaseException exceptionFromDatabaseError(
   return FirebaseDatabaseException(
     code: error.code.code,
     message: error.message,
-    serverStatus: error.code == DatabaseErrorCode.databaseClosed
+    serverStatus:
+        error.code == DatabaseErrorCode.databaseClosed || error.isLocal
         ? null
         : error.rawStatus != null
         ? details
         : details == null
         ? status
         : '$status: $details',
+    cause: error.cause,
     stackTrace: stackTrace,
   );
 }
-
-/// The public code for a server [status]: `no_index` is `index-not-defined`, `too_big` is `too-big`,
-/// `failure` is `operation-failed`, the other statuses the client knows map to their own code, and any
-/// other status (`invalid_parameters`, `internal_error`, `unknown`, ...) is `unknown`; the caller keeps
-/// the raw status in [FirebaseDatabaseException.serverStatus].
-@internal
-String publicCodeForServerStatus(String status) {
-  for (final DatabaseErrorCode code in DatabaseErrorCode.values) {
-    if (code.wireStatus == status &&
-        firebaseDatabaseExceptionCodes.contains(code.code)) {
-      return code.code;
-    }
-  }
-  return 'unknown';
-}
-
-/// The public exception for a failed server request with [status] and the server's optional [reason]:
-/// the code of [publicCodeForServerStatus], and `status: reason` as
-/// [FirebaseDatabaseException.serverStatus].
-@internal
-FirebaseDatabaseException exceptionFromServerStatus(
-  String status, [
-  String? reason,
-  StackTrace? stackTrace,
-]) => FirebaseDatabaseException(
-  code: publicCodeForServerStatus(status),
-  message: reason ?? status,
-  serverStatus: reason == null ? status : '$status: $reason',
-  stackTrace: stackTrace,
-);

@@ -48,13 +48,14 @@ void main() {
       'operation-failed',
       'too-big',
       'database-closed',
+      'data-stale',
       'unknown',
     ]);
     // Every core code is public (with this code) or internal (null); a code added to or removed from
     // the core enum fails this switch.
     for (final DatabaseErrorCode c in DatabaseErrorCode.values) {
       final String? public = switch (c) {
-        DatabaseErrorCode.dataStale => null,
+        DatabaseErrorCode.dataStale => 'data-stale',
         DatabaseErrorCode.userCodeException => null,
         DatabaseErrorCode.operationFailed => 'operation-failed',
         DatabaseErrorCode.permissionDenied => 'permission-denied',
@@ -79,10 +80,14 @@ void main() {
   });
 
   test('server statuses map to public codes', () {
-    expect(publicCodeForServerStatus('no_index'), 'index-not-defined');
-    expect(publicCodeForServerStatus('too_big'), 'too-big');
-    expect(publicCodeForServerStatus('failure'), 'operation-failed');
-    expect(publicCodeForServerStatus('permission_denied'), 'permission-denied');
+    FirebaseDatabaseException fromServer(String status, [String? reason]) =>
+        exceptionFromDatabaseError(DatabaseError.fromStatus(status, reason));
+
+    expect(fromServer('no_index').code, 'index-not-defined');
+    expect(fromServer('too_big').code, 'too-big');
+    expect(fromServer('failure').code, 'operation-failed');
+    expect(fromServer('permission_denied').code, 'permission-denied');
+    expect(fromServer('datastale').code, 'data-stale');
     for (final String other in <String>[
       'invalid_parameters',
       'internal_error',
@@ -90,14 +95,39 @@ void main() {
       'expired_token',
       'invalid_token',
     ]) {
-      expect(publicCodeForServerStatus(other), 'unknown');
+      expect(fromServer(other).code, 'unknown');
     }
-    final FirebaseDatabaseException e = exceptionFromServerStatus(
-      'internal_error',
-      'boom',
+    final FirebaseDatabaseException e = fromServer('internal_error', 'boom');
+    expect(e.code, 'unknown');
+    expect(e.message, 'boom');
+    expect(e.serverStatus, 'internal_error: boom');
+    final FirebaseDatabaseException bare = fromServer('internal_error');
+    expect(bare.message, 'An unknown error occurred.');
+    expect(bare.serverStatus, 'internal_error');
+    final FirebaseDatabaseException denied = fromServer(
+      'permission_denied',
+      'Permission denied',
+    );
+    expect(
+      denied.message,
+      'This client does not have permission to perform this operation.',
+    );
+    expect(denied.serverStatus, 'permission_denied: Permission denied');
+  });
+
+  test('a local error has no server status', () {
+    final StateError cause = StateError('x');
+    final FirebaseDatabaseException e = exceptionFromDatabaseError(
+      DatabaseError.local(
+        DatabaseErrorCode.unknown,
+        'get() failed.',
+        cause: cause,
+      ),
     );
     expect(e.code, 'unknown');
-    expect(e.serverStatus, 'internal_error: boom');
+    expect(e.message, 'get() failed.');
+    expect(e.cause, same(cause));
+    expect(e.serverStatus, isNull);
   });
 }
 

@@ -32,8 +32,10 @@ against the Database emulator.
   the emulator.
 - `FirebaseDatabaseException` with the codes `permission-denied`, `disconnected`, `max-retries`, `overridden-by-set`,
   `unavailable`, `network-error`, `write-canceled`, `index-not-defined`, `operation-failed`, `too-big`,
-  `database-closed` and `unknown`. For a server status the client does not know, `unknown` carries the server's
-  reason as its message and `status: reason` as `serverStatus`, as for the other codes.
+  `database-closed`, `data-stale` and `unknown`. For a server status the client does not know, `unknown` carries the
+  server's reason as its message and `status: reason` as `serverStatus`, as for the other codes; a `get()` fails the
+  same way as a write. A `get()` whose answer the client cannot read fails with `unknown`, a fixed message, the
+  original error as `cause` and no `serverStatus`.
 - Logging through a callback, off by default; credentials are never logged.
 - Optional disk persistence through `firebase_database_dart_sqlite`; only data under a listener or `keepSynced` is
   written to the cache; an offline `get()` answers from the cache only when it holds the complete value for the query;

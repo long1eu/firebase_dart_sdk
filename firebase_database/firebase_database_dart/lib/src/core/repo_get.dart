@@ -146,7 +146,11 @@ extension _RepoGet on Repo {
       );
       _releaseGetQuery(query);
       request.completer.completeError(
-        DatabaseError.fromStatus(DatabaseErrorCode.unknown.wireStatus, '$e'),
+        DatabaseError.local(
+          DatabaseErrorCode.unknown,
+          'The server answer to get() could not be read.',
+          cause: e,
+        ),
       );
       return;
     }
@@ -186,9 +190,10 @@ extension _RepoGet on Repo {
     request.completer.completeError(
       error is ServerActionsException
           ? DatabaseError.fromStatus(error.status, error.reason)
-          : DatabaseError.fromStatus(
-              DatabaseErrorCode.unknown.wireStatus,
-              '$error',
+          : DatabaseError.local(
+              DatabaseErrorCode.unknown,
+              'get() failed with an error the client did not expect.',
+              cause: error,
             ),
     );
   }

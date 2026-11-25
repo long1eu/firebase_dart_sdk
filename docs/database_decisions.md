@@ -732,13 +732,15 @@ Status: built.
 `firebase_database`, a kebab-case code, a message that never contains a token or a URL query, the original
 error as `cause`, and `serverStatus`, the raw status and reason from the server. Codes: `permission-denied`,
 `disconnected`, `max-retries`, `overridden-by-set`, `unavailable`, `network-error`, `write-canceled`,
-`index-not-defined`, `operation-failed`, `too-big`, `database-closed`, `unknown`
+`index-not-defined`, `operation-failed`, `too-big`, `database-closed`, `data-stale`, `unknown`
 (`firebaseDatabaseExceptionCodes`). A rejected or expired token is not a code of its own: the server answers
-`permission-denied` to an operation, and the connection retries the token itself. The server's `datastale` and
-the code `user-code-exception` (a throwing transaction handler, whose own exception is rethrown) are internal
-and never surfaced. Programmer errors (a bad
-path, key, value or query) are `ArgumentError` or `StateError` at the call, not exceptions through the Future.
-The Android spelling `write-canceled` is kept; the adapter maps it to FlutterFire's `write-cancelled`.
+`permission-denied` to an operation, and the connection retries the token itself. The server's `datastale` to a
+transaction's put reruns the transaction; `data-stale` reaches a caller only for another request answered
+`datastale` (the testing library's `FakeDatabaseServer.failLastWrite('datastale')` does it). The code
+`user-code-exception` (a throwing transaction handler, whose own exception is rethrown) is internal and never
+surfaced. An error the client raises itself (a `get()` answer it cannot read) has a fixed message, the original
+error as `cause` and no `serverStatus`. Programmer errors (a bad path, key, value or query) are `ArgumentError`
+or `StateError` at the call, not exceptions through the Future. The Android spelling `write-canceled` is kept; the adapter maps it to FlutterFire's `write-cancelled`.
 
 **Why.** JS has no error codes: the status string is the only machine-readable part, upper-cased into
 `Error.code` (`J:core/Repo.ts:892-917`). Android has a catalogue of thirteen integer codes

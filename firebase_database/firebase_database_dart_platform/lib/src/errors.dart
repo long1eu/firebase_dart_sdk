@@ -19,7 +19,10 @@ const String databasePlugin = 'firebase_database';
 /// * `operation-failed` is `failure` on Android (`DatabaseError.OPERATION_FAILED`).
 ///
 /// `too-big` and `database-closed` have no FlutterFire
-/// counterpart and pass through, as every other code does. The client has no
+/// counterpart and pass through, as every other code does. `data-stale` is
+/// FlutterFire's code on Android, iOS and macOS; FlutterFire's web package
+/// maps it from a message the JS SDK does not produce, and its Windows plugin
+/// has no case for it (`unknown`). The client has no
 /// `expired-token` or `invalid-token` code (nothing raises them).
 const Map<String, String> flutterFireCodes = <String, String>{
   'permission-denied': 'permission-denied',
@@ -33,6 +36,7 @@ const Map<String, String> flutterFireCodes = <String, String>{
   'operation-failed': 'failure',
   'too-big': 'too-big',
   'database-closed': 'database-closed',
+  'data-stale': 'data-stale',
   'unknown': 'unknown',
 };
 

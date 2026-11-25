@@ -391,6 +391,112 @@ void main() {
       );
       expect(e.serverStatus, 'permission_denied: Permission denied');
     });
+
+    timed('a set answered datastale fails with data-stale', (FakeTime time) {
+      final FirebaseDatabaseException e = failedSet(time, 'datastale');
+      expect(e.code, 'data-stale');
+      expect(e.serverStatus, 'datastale');
+    });
+
+    /// The error of a get of `a` whose server call [answer] completes.
+    Object failedGet(
+      FakeTime time,
+      void Function(FakeServerActions server, ServerCall get) answer,
+    ) {
+      final _Wire w = _Wire(time);
+      Object? error;
+      w.db.ref('a').get().then<void>((_) {}, onError: (Object e) => error = e);
+      time.elapse(Duration.zero);
+      answer(w.server, w.server.callsOf('get').last);
+      time.elapse(Duration.zero);
+      return error!;
+    }
+
+    /// The exception of a get the server answers with [status] and [reason].
+    FirebaseDatabaseException refusedGet(
+      FakeTime time,
+      String status, [
+      String? reason,
+    ]) =>
+        failedGet(
+              time,
+              (FakeServerActions server, ServerCall get) =>
+                  server.respond(get, status: status, data: reason),
+            )
+            as FirebaseDatabaseException;
+
+    timed(
+      'a get refused with an unknown status and a reason gives the reason',
+      (FakeTime time) {
+        final FirebaseDatabaseException e = refusedGet(
+          time,
+          'invalid_parameters',
+          'Bad path.',
+        );
+        expect(e.code, 'unknown');
+        expect(e.message, 'Bad path.');
+        expect(e.serverStatus, 'invalid_parameters: Bad path.');
+      },
+    );
+
+    timed('a get refused with an unknown status alone keeps the generic '
+        'message', (FakeTime time) {
+      final FirebaseDatabaseException e = refusedGet(time, 'internal_error');
+      expect(e.code, 'unknown');
+      expect(e.message, 'An unknown error occurred.');
+      expect(e.serverStatus, 'internal_error');
+    });
+
+    timed('a get refused with a known status keeps its own message', (
+      FakeTime time,
+    ) {
+      final FirebaseDatabaseException e = refusedGet(
+        time,
+        'permission_denied',
+        'Permission denied',
+      );
+      expect(e.code, 'permission-denied');
+      expect(
+        e.message,
+        'This client does not have permission to perform this operation.',
+      );
+      expect(e.serverStatus, 'permission_denied: Permission denied');
+    });
+
+    timed('a get answer the client cannot read is a local unknown', (
+      FakeTime time,
+    ) {
+      final FirebaseDatabaseException e =
+          failedGet(
+                time,
+                (FakeServerActions server, ServerCall get) =>
+                    server.respond(get, data: Object()),
+              )
+              as FirebaseDatabaseException;
+      expect(e.code, 'unknown');
+      expect(e.message, 'The server answer to get() could not be read.');
+      expect(e.cause, isA<ArgumentError>());
+      expect(e.serverStatus, isNull);
+    });
+
+    timed('a get failed by the connection with another error is a local '
+        'unknown', (FakeTime time) {
+      final StateError boom = StateError('boom');
+      final FirebaseDatabaseException e =
+          failedGet(
+                time,
+                (FakeServerActions server, ServerCall get) =>
+                    get.getCompleter!.completeError(boom),
+              )
+              as FirebaseDatabaseException;
+      expect(e.code, 'unknown');
+      expect(
+        e.message,
+        'get() failed with an error the client did not expect.',
+      );
+      expect(e.cause, same(boom));
+      expect(e.serverStatus, isNull);
+    });
   });
 
   group('construction', () {
