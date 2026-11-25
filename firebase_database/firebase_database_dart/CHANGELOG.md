@@ -57,5 +57,9 @@ against the Database emulator.
   with an error that names no request, so its Future would never complete. `update({'.priority': p})`, a
   `'n/.priority'` key, `{'.value': v, '.priority': p}` and empty objects (removals) are accepted as before; `set` and
   transactions are unchanged and leave such an object out.
+- One update is applied in two passes, independent of key order, as production does: every value entry first, then
+  every priority entry, parents before children. A node whose last child goes keeps its priority as an emptied node,
+  so `update` with `{'.priority': 2, 'x/v': null, 'x/.priority': null}` on `{x: {v: 1, .priority: 1}}` leaves
+  `{'.priority': 2}` in either key order.
 - Not included: long polling, typed converters, a REST client or fallback, web disk persistence, an instance cache,
   the compat API, a proxy option in the API.
