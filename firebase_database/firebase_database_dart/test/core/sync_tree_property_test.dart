@@ -110,14 +110,9 @@ const Map<String, List<int>> _knownFailures = <String, List<int>>{
     174285, 177344, 178722, 210298, 215182, 227643, 250134, 251256, 251431, 252308, 255037,
     255287, 256221, 256506, 288075,
   ],
-  // Group S: a server merge refills a full window from the pre-merge complete cache (JS passes
-  // the same cache to every child; a trunk matter). Shortest (245589): listen
-  // /a:{"l":2,"vf":"l"}; listen /:default; serve; serve (refuse a write); serve (refuse a
-  // write); other update /a {"y/.priority":2,"z":{"v":3,"u":2}}; other update /a
-  // {".priority":null,"z":{"u":3,"v":{".value":3,".priority":1},".priority":2},"y/.priority":3}
-  'group S: a server merge refills the window from the pre-merge cache': <int>[
-    4614, 11541, 174519, 245589,
-  ],
+  // Group S of that report (a server merge refilling a full window from the complete cache as
+  // it was before the merge: 4614, 11541, 174519, 245589) passes since each child of a server
+  // merge sees the merge's earlier children (row 32 of docs/database_decisions.md section 25).
   // Group V: a refused update at the view path reverted over a filtered cache (row 5).
   'group V: a revert at the view path over a filtered cache': <int>[279390],
   // dart format on

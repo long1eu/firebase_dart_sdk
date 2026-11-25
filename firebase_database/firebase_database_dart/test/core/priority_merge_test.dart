@@ -732,8 +732,8 @@ void main() {
       'its priority, the window kept from a complete cache', () {
     // A limit view below a default listen (its server cache complete, its event cache the
     // window {x, y}). One merge writes x/.priority 1 and z {u: 1}: x moves behind y and z, so the
-    // window is {y, z}. The window is updated child by child from the complete cache as it was
-    // before the merge, so x must move out before z competes for its place.
+    // window is {y, z}. When x moves out, the window pulls its next child from the complete
+    // cache with the merge's values applied (z among them).
     final QuerySpec atA = QuerySpec.defaultAt(Path('a'));
     final QuerySpec limit = QuerySpec(
       Path('a'),
@@ -796,6 +796,45 @@ void main() {
           if (e is DataEvent && identical(e.eventRegistration, reg)) e,
       ]),
       <String>['R(a)', 'A(b)', 'V({b: {x: 1, .priority: 0}})'],
+    );
+  });
+
+  group('a limit of pending writes, not a rule: separate updates are layered', () {
+    // The write tree layers separate pending updates into one CompoundWrite and orders their
+    // priorities by depth, not by write order; JS and the trunk never kept that order either.
+    // Here the server removes r with the first update and refuses the second (a priority on a
+    // node that does not exist), while the layered writes give r the priority 2 in hidden state
+    // until both are answered.
+    test(
+      'update r {x/.priority: null}, then update r {.priority: 2}, both pending',
+      () {
+        final QuerySpec atRoot = QuerySpec.defaultAt(Path(''));
+        listen(atRoot);
+        answer(atRoot, <String, Object?>{
+          'r': <String, Object?>{
+            'x': <String, Object?>{'.priority': 1},
+          },
+        });
+        update('r', <String, Object?>{'x/.priority': null}, 1);
+        update('r', <String, Object?>{'.priority': 2}, 2);
+        // A listener added now: no value, and the priority 2 held as hidden state.
+        expect(values(listen(atR)), <String>['V(null)']);
+        ChildrenNode atRNode() =>
+            tree.syncPointTree.get(Path('r'))!.viewForQuery(atR)!.eventCache
+                as ChildrenNode;
+        expect(atRNode().toServerJson(), <String, Object?>{'.priority': 2});
+        // The server: the first update removes r; the second is refused.
+        serverMerge('r', <String, Object?>{'x/.priority': null});
+        ack(1);
+        tree.ackUserWrite(
+          2,
+          revert: true,
+          persist: false,
+          serverValues: const <String, Object?>{},
+        );
+        expect(atRNode().toServerJson(), isNull);
+        expect(tree.calcCompleteEventCache(Path('r'))!.hash(), '');
+      },
     );
   });
 }
