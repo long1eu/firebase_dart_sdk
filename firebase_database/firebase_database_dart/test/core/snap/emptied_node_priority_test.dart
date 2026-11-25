@@ -11,11 +11,13 @@ import 'package:firebase_database_dart/src/core/connection/wire_range_merge.dart
 import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:firebase_database_dart/src/core/snap/child_key.dart';
 import 'package:firebase_database_dart/src/core/snap/children_node.dart';
+import 'package:firebase_database_dart/src/core/snap/compound_hash.dart';
 import 'package:firebase_database_dart/src/core/snap/indexes/priority_index.dart';
 import 'package:firebase_database_dart/src/core/snap/leaf_node.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
 import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
 import 'package:firebase_database_dart/src/core/snap/range_merge.dart';
+import 'package:firebase_database_dart/src/testing/json_server_model.dart';
 import 'package:test/test.dart';
 
 /// sha1('priority:number:4014000000000000:'): an emptied node with priority 5.
@@ -142,32 +144,144 @@ void main() {
       expect(_children(p).holdsHiddenState, isFalse);
     });
 
-    test('a priority on an empty node that keeps none is ignored', () {
-      // Only hidden children, no priority of its own: the priority is not taken.
-      final Node p = nodeFromServerJson(<String, Object?>{
-        'n': <String, Object?>{'.priority': 5},
+    test('a node holding only emptied children takes a priority (Q2)', () {
+      // Production check 39 Q2: n {c: {x: 1} priority 3}, remove n/c/x, put n/.priority 9:
+      //   p n/.priority 9 answered {"s":"ok","d":""}
+      //   get answered {"s":"ok","d":{".priority":9,"c":{".priority":3.0}}}
+      Node n = _node(<String, Object?>{
+        'c': <String, Object?>{'x': 1, '.priority': 3.0},
       });
-      expect(p.updatePriority(LeafNode(3)), same(p));
-      expect(ChildrenNode.keepsPriority(p), isFalse);
-      expect(ChildrenNode.keepsPriority(p.getChild(Path('n'))), isTrue);
+      n = n.updateChild(Path('c/x'), ChildrenNode.empty);
+      expect(ChildrenNode.takesPriority(n), isTrue);
+      n = n.updateChild(Path('.priority'), LeafNode(9));
+      expect(_children(n).toServerJson(), <String, Object?>{
+        '.priority': 9,
+        'c': <String, Object?>{'.priority': 3.0},
+      });
+      expect(ChildrenNode.takesPriority(ChildrenNode.empty), isFalse);
+      expect(
+        ChildrenNode.empty.updatePriority(LeafNode(3)),
+        same(ChildrenNode.empty),
+      );
     });
 
-    test('a merge applies the priority after the children', () {
-      final Node n = _node(<String, Object?>{'a': 1, '.priority': 5});
-      final Node merged = CompoundWrite.fromValue(<String, Object?>{
-        'a': null,
-        '.priority': 7,
-      }).apply(n);
-      expect(_children(merged).toServerJson(), <String, Object?>{
-        '.priority': 7,
+    group('one update: the children first, then the priority (Q1, Q6)', () {
+      Object? merge(Object? node, Map<String, Object?> update) =>
+          (CompoundWrite.fromValue(update).apply(nodeFromServerJson(node))
+                  as ChildrenNode)
+              .toServerJson();
+
+      test('Q1: {a: 1} without a priority, {a: null, .priority: 7}: removed', () {
+        // m n {"a":null,".priority":7} answered ok; get answered {"s":"ok","d":null}
+        expect(
+          merge(
+            <String, Object?>{'a': 1},
+            <String, Object?>{'a': null, '.priority': 7},
+          ),
+          isNull,
+        );
       });
-      final Node added = CompoundWrite.empty
-          .addWrite(Path(''), n)
-          .addWrite(Path('a'), ChildrenNode.empty)
-          .addWrite(Path('.priority'), LeafNode(9))
-          .apply(ChildrenNode.empty);
-      expect(_children(added).toServerJson(), <String, Object?>{
-        '.priority': 9,
+
+      test('Q1: {a: 1, b: 2}, {a: null, b: null, .priority: 7}: removed', () {
+        // m n {"a":null,"b":null,".priority":7} answered ok; get answered {"s":"ok","d":null}
+        expect(
+          merge(
+            <String, Object?>{'a': 1, 'b': 2},
+            <String, Object?>{'a': null, 'b': null, '.priority': 7},
+          ),
+          isNull,
+        );
+      });
+
+      test('Q1 control: with priority 5, {a: null, .priority: 7}: kept 7', () {
+        // get answered {"s":"ok","d":{".priority":7}}
+        expect(
+          merge(
+            <String, Object?>{'a': 1, '.priority': 5},
+            <String, Object?>{'a': null, '.priority': 7},
+          ),
+          <String, Object?>{'.priority': 7},
+        );
+      });
+
+      test('Q6: the deep form per node', () {
+        // p {x: {a: 1}}, update at p {x/a: null, x/.priority: 3}: get answered {"d":null}
+        expect(
+          merge(
+            <String, Object?>{
+              'x': <String, Object?>{'a': 1},
+            },
+            <String, Object?>{'x/a': null, 'x/.priority': 3},
+          ),
+          isNull,
+        );
+        // Control, x with priority 5: get answered {"d":{"x":{".priority":3}}}
+        expect(
+          merge(
+            <String, Object?>{
+              'x': <String, Object?>{'a': 1, '.priority': 5},
+            },
+            <String, Object?>{'x/a': null, 'x/.priority': 3},
+          ),
+          <String, Object?>{
+            'x': <String, Object?>{'.priority': 3},
+          },
+        );
+      });
+
+      test(
+        'own priority next to a deeper priority null that removes the last child',
+        () {
+          // Property seeds 59755 and 76701. b = {x: {v: 2, .priority: 1}}, no priority of its
+          // own; update /b {".priority": 2, "x/v": null, "x/.priority": null}. The client
+          // finishes x's subtree first: x is removed, b is left with nothing and its priority
+          // is dropped. The shared server model applies the priorities in the update's key
+          // order: b takes 2 while x still holds its kept priority, and keeps it when x goes.
+          // Unmeasured: one raw `m` of this update (in both key orders), then `g b`.
+          final Object? client = merge(
+            <String, Object?>{
+              'x': <String, Object?>{'v': 2, '.priority': 1},
+            },
+            <String, Object?>{'.priority': 2, 'x/v': null, 'x/.priority': null},
+          );
+          final JsonServerModel model =
+              JsonServerModel(<String, Object?>{
+                'b': <String, Object?>{
+                  'x': <String, Object?>{'v': 2, '.priority': 1},
+                },
+              })..write('b', <String, Object?>{
+                '.priority': 2,
+                'x/v': null,
+                'x/.priority': null,
+              }, merge: true);
+          expect(client, isNull);
+          expect(model.export('b', hidden: true), client);
+        },
+        skip:
+            "server order unmeasured: a node's own priority next to a deeper "
+            'priority in one update (property M9)',
+      );
+
+      test('a refilling update keeps the priority (production check 22)', () {
+        expect(
+          merge(
+            <String, Object?>{'a': 1, '.priority': 0},
+            <String, Object?>{'a': null, 'b': 1},
+          ),
+          <String, Object?>{'b': 1, '.priority': 0},
+        );
+      });
+
+      test('layered writes keep a priority written on a node with a value', () {
+        final Node n = _node(<String, Object?>{'a': 1, '.priority': 5});
+        final Node added = CompoundWrite.empty
+            .addWrite(Path(''), n)
+            .addWrite(Path('a'), ChildrenNode.empty)
+            .addWrite(Path('.priority'), LeafNode(9))
+            .apply(ChildrenNode.empty);
+        expect(_children(added).toServerJson(), <String, Object?>{
+          '.priority': 9,
+        });
       });
     });
 
@@ -374,6 +488,69 @@ void main() {
         },
       );
       expect(_children(got).toServerJson(), server);
+    });
+  });
+
+  group('compound hash: kept priorities as .priority leaves (Q5)', () {
+    // Production check 39 Q5. The node, as the get answered (the kit writes "<540 x>" for 540
+    // times "x"):
+    //   {"a":"<540 x>","b":{".priority":5.0},"c":"<540 y>",
+    //    "d":{"e":"<100 z>","f":{".priority":2.0},"g":"<100 k>"}}
+    // simple hash as stored sRWxeuBc4owa0z6qxwPow1Q1CxI=, without kept priorities
+    // +84ymKWvp0jIfve/rTLAuK+XFJw=. With the kept priorities as a .priority leaf the server
+    // answered `rm []`; without them, an rm carrying b and d/f.
+    final Map<String, Object?> q5 = <String, Object?>{
+      'a': 'x' * 540,
+      'b': <String, Object?>{'.priority': 5.0},
+      'c': 'y' * 540,
+      'd': <String, Object?>{
+        'e': 'z' * 100,
+        'f': <String, Object?>{'.priority': 2.0},
+        'g': 'k' * 100,
+      },
+    };
+
+    List<String> posts(CompoundHash h) => <String>[
+      for (final Path p in h.posts) p.toString(),
+    ];
+
+    test('the client sends the form the server matches', () {
+      final Node node = nodeFromServerJson(q5);
+      expect(node.hash(), 'sRWxeuBc4owa0z6qxwPow1Q1CxI=');
+      final CompoundHash hash = CompoundHash.fromNode(node);
+      // ch {"ps":["/a","/c","/d/g"],"hs":["Y2j5JgavfCS4TsxyLghrO4yezUU=",
+      //   "Y/Yk/xh7wSVKRow59iWoMK7lwMc=","65bojvyWrdrpx2wZii9Kk5oefY0=",""]} -> rm []
+      expect(posts(hash), <String>['/a', '/c', '/d/g']);
+      expect(hash.hashes, <String>[
+        'Y2j5JgavfCS4TsxyLghrO4yezUU=',
+        'Y/Yk/xh7wSVKRow59iWoMK7lwMc=',
+        '65bojvyWrdrpx2wZii9Kk5oefY0=',
+        '',
+      ]);
+    });
+
+    test(
+      'without the kept priorities: the form the server answers with an rm',
+      () {
+        final Node node = nodeFromJson(q5);
+        expect(node.hash(), '+84ymKWvp0jIfve/rTLAuK+XFJw=');
+        final CompoundHash hash = CompoundHash.fromNode(node);
+        expect(posts(hash), <String>['/a', '/c', '/d/g']);
+        expect(hash.hashes, <String>[
+          'Y2j5JgavfCS4TsxyLghrO4yezUU=',
+          '0trf09srj8To3oUB2Z+bCgm3Ilk=',
+          'ReHoXLVbiUHHW1axbsdmfIcj91s=',
+          '',
+        ]);
+      },
+    );
+
+    test('a node that only keeps a priority hashes as its .priority leaf', () {
+      final CompoundHash hash = CompoundHash.fromNode(
+        nodeFromServerJson(<String, Object?>{'.priority': 5}),
+      );
+      expect(hash.hashes, hasLength(2));
+      expect(hash.hashes.first, isNot(''));
     });
   });
 

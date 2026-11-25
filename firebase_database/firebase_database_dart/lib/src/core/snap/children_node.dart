@@ -141,13 +141,18 @@ class ChildrenNode implements Node {
       node._children.isEmpty &&
       !(node._priorityNode?.isEmpty ?? true);
 
-  /// [newPriority] on a node with children. On an empty node that keeps a priority, it replaces
-  /// the kept one (empty clears it), as the server accepts a priority written there; on any other
-  /// empty node it is ignored.
+  /// Whether a priority written on [node] lands: it has a value, or it is an empty node that
+  /// holds hidden state (a kept priority, or emptied children: production check 39 Q2).
+  static bool takesPriority(Node node) =>
+      !node.isEmpty || node is ChildrenNode && node.holdsHiddenState;
+
+  /// [newPriority] on a node with children. On an empty node that holds hidden state it becomes
+  /// the kept priority (empty clears it), as the server accepts a priority written there
+  /// (production check 38 (b), check 39 Q2); on the plain empty node it is ignored.
   @override
   Node updatePriority(Node newPriority) {
     if (_children.isEmpty) {
-      if (_priorityNode == null || _priorityNode.isEmpty) {
+      if (!holdsHiddenState) {
         return this;
       }
       if (newPriority.isEmpty) {

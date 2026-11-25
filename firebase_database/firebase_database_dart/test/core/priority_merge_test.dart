@@ -519,6 +519,30 @@ void main() {
       });
     }
 
+    test('Q4: three pipelined writes n/a 1, n/.priority 7, n/a null', () {
+      // Production check 39 Q4: frames d q4/a 1 | d q4/.priority 7 | d q4/a null;
+      // get answered {"s":"ok","d":{".priority":7}}.
+      final QuerySpec atP = QuerySpec.defaultAt(Path('p'));
+      listen(atP);
+      answer(atP, <String, Object?>{'z': 1});
+      set('p/n/a', 1, 1);
+      set('p/n/.priority', 7, 2);
+      set('p/n/a', null, 3);
+      serverSet('p/n/a', 1);
+      ack(1);
+      serverSet('p/n/.priority', 7);
+      ack(2);
+      serverSet('p/n/a', null);
+      ack(3);
+      expect(eventAt(atP).toServerJson(), <String, Object?>{
+        'z': 1,
+        'n': <String, Object?>{'.priority': 7},
+      });
+      expect(values(set('p/n/b', 1, 4)), <String>[
+        'V({z: 1, n: {b: 1, .priority: 7}})',
+      ]);
+    });
+
     test('A1b: the hidden form, last ack on another path', () {
       final QuerySpec atRoot = QuerySpec.defaultAt(Path(''));
       listen(atRoot);

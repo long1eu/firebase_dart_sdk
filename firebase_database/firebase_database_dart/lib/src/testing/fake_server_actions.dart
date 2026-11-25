@@ -12,10 +12,10 @@ import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
 import 'package:firebase_database_dart/src/core/connection/wire_range_merge.dart';
 import 'package:firebase_database_dart/src/core/database_error.dart';
 import 'package:firebase_database_dart/src/core/path.dart';
-import 'package:firebase_database_dart/src/core/snap/children_node.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
 import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
 import 'package:firebase_database_dart/src/core/util/server_values.dart';
+import 'package:firebase_database_dart/src/testing/json_server_model.dart';
 
 /// One call made on a [FakeServerActions], in the order made.
 final class ServerCall {
@@ -420,18 +420,18 @@ final class FakeServerActions implements ServerActions {
   int Function() serverTimeMillis = () => DateTime.now().millisecondsSinceEpoch;
 
   /// The data the fake server holds: untagged pushes ([deliverDataUpdate]) and acknowledged
-  /// writes, in export form.
-  Object? get data => _store.toJson(exportFormat: true);
-  Node _store = ChildrenNode.empty;
+  /// writes, in export form, as a reader sees it.
+  Object? get data => _model.export('', hidden: false);
+
+  /// The server's data and write rules (shared with the property test's server model).
+  final JsonServerModel _model = JsonServerModel();
 
   /// The stored data at [path] (either form), in export form, as the server sends it: a node
   /// emptied by a write below it, which keeps its priority, reads `{".priority": p}`.
-  Object? dataAt(String path) {
-    final Node node = _store.getChild(Path(path));
-    return node is ChildrenNode
-        ? node.toServerJson()
-        : node.toJson(exportFormat: true);
-  }
+  Object? dataAt(String path) => _model.export(path, hidden: true);
+
+  /// The stored node at [path], read back as a client node (for resolving server values).
+  Node _nodeAt(String path) => nodeFromServerJson(dataAt(path));
 
   /// Acknowledges the most recent unanswered put or merge (see [ackWrite]).
   void ackLastWrite() => ackWrite(_lastPending(const <String>{'put', 'merge'}));
@@ -452,7 +452,7 @@ final class FakeServerActions implements ServerActions {
     }
     final String writePath = normalizePath(call.path!);
     final String? hash = call.hash;
-    if (hash != null && _store.getChild(Path(writePath)).hash() != hash) {
+    if (hash != null && _model.hash(writePath) != hash) {
       respond(call, status: 'datastale', data: dataAt(writePath));
       return;
     }
@@ -463,7 +463,7 @@ final class FakeServerActions implements ServerActions {
     if (call.action == 'put') {
       resolved = resolveDeferredValueSnapshot(
         nodeFromJson(call.data),
-        _store.getChild(Path(writePath)),
+        _nodeAt(writePath),
         serverValues,
       ).toJson(exportFormat: true);
     } else {
@@ -472,12 +472,19 @@ final class FakeServerActions implements ServerActions {
             in (call.data! as Map<String, Object?>).entries)
           entry.key: resolveDeferredValueSnapshot(
             nodeFromJson(entry.value),
-            _store.getChild(Path(writePath).childPath(Path(entry.key))),
+            _nodeAt(Path(writePath).childPath(Path(entry.key)).toString()),
             serverValues,
           ).toJson(exportFormat: true),
       };
     }
-    _storeUpdate(writePath, resolved, isMerge: call.action == 'merge');
+    if (!_storeUpdate(writePath, resolved, isMerge: call.action == 'merge')) {
+      respond(
+        call,
+        status: 'invalid_parameters',
+        data: 'could not set priority on non-existent node',
+      );
+      return;
+    }
     _pushWrite(writePath, resolved, isMerge: call.action == 'merge');
     respond(call);
   }
@@ -509,29 +516,10 @@ final class FakeServerActions implements ServerActions {
     return pending.last;
   }
 
-  void _storeUpdate(String path, Object? data, {required bool isMerge}) {
-    final Path at = Path(path);
-    if (!isMerge) {
-      _store = _store.updateChild(at, nodeFromServerJson(data));
-      return;
-    }
-    // One update: the children first, then the priorities, as the server applies it.
-    final List<MapEntry<Object?, Object?>> entries =
-        <MapEntry<Object?, Object?>>[
-          ...(data! as Map<Object?, Object?>).entries.where(
-            (MapEntry<Object?, Object?> e) => !'${e.key}'.endsWith('.priority'),
-          ),
-          ...(data as Map<Object?, Object?>).entries.where(
-            (MapEntry<Object?, Object?> e) => '${e.key}'.endsWith('.priority'),
-          ),
-        ];
-    for (final MapEntry<Object?, Object?> entry in entries) {
-      _store = _store.updateChild(
-        at.childPath(Path('${entry.key}')),
-        nodeFromServerJson(entry.value),
-      );
-    }
-  }
+  /// Applies a write to the stored data as the server does ([JsonServerModel.write]); false when
+  /// the server refuses it (a priority on a node that does not exist).
+  bool _storeUpdate(String path, Object? data, {required bool isMerge}) =>
+      _model.write(path, data, merge: isMerge);
 
   /// Whether a tagged listen gets the whole data at its path for every write that overlaps it,
   /// instead of the write itself.
@@ -566,10 +554,13 @@ final class FakeServerActions implements ServerActions {
   }
 
   /// Another client writes [data] at [path] (either form; a map of children when [isMerge]):
-  /// the data is stored, and pushed once to each overlapping listen while [isConnected].
+  /// the data is stored, and pushed once to each overlapping listen while [isConnected]. A write
+  /// the server refuses (a priority on a node that does not exist) changes and pushes nothing.
   void writeByOtherClient(String path, Object? data, {bool isMerge = false}) {
     final String writePath = normalizePath(path);
-    _storeUpdate(writePath, data, isMerge: isMerge);
+    if (!_storeUpdate(writePath, data, isMerge: isMerge)) {
+      return;
+    }
     if (isConnected) {
       _pushWrite(writePath, data, isMerge: isMerge);
     }

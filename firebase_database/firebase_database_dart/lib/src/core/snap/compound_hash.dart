@@ -6,6 +6,7 @@ import 'dart:math' as math;
 
 import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:firebase_database_dart/src/core/snap/child_key.dart';
+import 'package:firebase_database_dart/src/core/snap/children_node.dart';
 import 'package:firebase_database_dart/src/core/snap/indexes/key_index.dart';
 import 'package:firebase_database_dart/src/core/snap/leaf_node.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
@@ -36,7 +37,7 @@ final class CompoundHash {
   /// Builds the hash of [node], splitting with [strategy] (by default ranges of
   /// `max(512, sqrt(size * 100))` characters).
   factory CompoundHash.fromNode(Node node, [SplitStrategy? strategy]) {
-    if (node.isEmpty) {
+    if (node.isEmpty && !(node is ChildrenNode && node.holdsHiddenState)) {
       return const CompoundHash(<Path>[], <String>['']);
     }
     final _CompoundHashBuilder state = _CompoundHashBuilder(
@@ -60,7 +61,7 @@ final class CompoundHash {
 /// Splits for 1k -> 512 (2 parts), 5k -> 715 (7 parts), 100k -> 3.2k (32 parts), 500k -> 7k
 /// (71 parts), 5M -> 23k (228 parts). Never splits on a priority.
 SplitStrategy _simpleSizeSplitStrategy(Node node) {
-  final int estimatedNodeSize = estimateSerializedNodeSize(node);
+  final int estimatedNodeSize = _estimateServerSize(node);
   final int splitThreshold = math.max(
     512,
     math.sqrt(estimatedNodeSize * 100).floor(),
@@ -75,28 +76,81 @@ SplitStrategy _simpleSizeSplitStrategy(Node node) {
 void _processNode(Node node, _CompoundHashBuilder state) {
   if (node.isLeafNode) {
     state.processLeaf(node as LeafNode);
-  } else if (node.isEmpty) {
-    throw ArgumentError("Can't calculate hash on empty node!");
-  } else {
-    void visit(ChildKey key, Node child) {
-      state.startChild(key);
-      _processNode(child, state);
-      state.endChild();
-    }
-
-    // Android `forEachChild(visitor, includePriority: true)`: the priority is visited just before
-    // the first key that sorts after `.priority` (and not at all if no key does).
-    final Node priority = node.priority;
-    bool passedPriorityKey = priority.isEmpty;
-    node.forEachChild(keyIndex, (ChildKey key, Node child) {
-      if (!passedPriorityKey && key.compareTo(ChildKey.priority) > 0) {
-        passedPriorityKey = true;
-        visit(ChildKey.priority, priority);
-      }
-      visit(key, child);
-      return false;
-    });
+    return;
   }
+  final List<(ChildKey, Node)> children = _serverChildren(node);
+  if (children.isEmpty && !(node is ChildrenNode && node.holdsHiddenState)) {
+    throw ArgumentError("Can't calculate hash on empty node!");
+  }
+  void visit(ChildKey key, Node child) {
+    state.startChild(key);
+    _processNode(child, state);
+    state.endChild();
+  }
+
+  // Android `forEachChild(visitor, includePriority: true)`: the priority is visited just before
+  // the first key that sorts after `.priority` (and not at all if no key does). A node emptied
+  // below it, with no child left, gives its kept priority as a `.priority` leaf: the form the
+  // server hashes (production check 39 Q5: it answers `rm []` to that form only).
+  final Node priority = _keptPriority(node);
+  bool passedPriorityKey = priority.isEmpty;
+  for (final (ChildKey key, Node child) in children) {
+    if (!passedPriorityKey && key.compareTo(ChildKey.priority) > 0) {
+      passedPriorityKey = true;
+      visit(ChildKey.priority, priority);
+    }
+    visit(key, child);
+  }
+  if (!passedPriorityKey && children.isEmpty) {
+    visit(ChildKey.priority, priority);
+  }
+}
+
+/// The children the server holds under [node] in key order: the visible ones and the hidden ones
+/// (nodes emptied below that keep a priority).
+List<(ChildKey, Node)> _serverChildren(Node node) {
+  final List<(ChildKey, Node)> children = <(ChildKey, Node)>[];
+  node.forEachChild(keyIndex, (ChildKey key, Node child) {
+    children.add((key, child));
+    return false;
+  });
+  if (node is ChildrenNode) {
+    final List<ChildKey> hidden = node.hiddenKeys.toList();
+    if (hidden.isNotEmpty) {
+      children
+        ..addAll(<(ChildKey, Node)>[
+          for (final ChildKey key in hidden) (key, node.getImmediateChild(key)),
+        ])
+        ..sort(
+          ((ChildKey, Node) a, (ChildKey, Node) b) => a.$1.compareTo(b.$1),
+        );
+    }
+  }
+  return children;
+}
+
+Node _keptPriority(Node node) =>
+    node is ChildrenNode ? node.keptPriority : node.priority;
+
+/// [estimateSerializedNodeSize] of the node the server holds: hidden children and kept
+/// priorities count (the split threshold of the server's ranges).
+int _estimateServerSize(Node node) {
+  if (node.isLeafNode) {
+    return estimateSerializedNodeSize(node);
+  }
+  final List<(ChildKey, Node)> children = _serverChildren(node);
+  final Node priority = _keptPriority(node);
+  if (children.isEmpty && priority.isEmpty) {
+    return 4; // null
+  }
+  int sum = 1; // opening bracket
+  for (final (ChildKey key, Node child) in children) {
+    sum += key.name.length + 4 + _estimateServerSize(child);
+  }
+  if (!priority.isEmpty) {
+    sum += 12 + estimateSerializedNodeSize(priority);
+  }
+  return sum;
 }
 
 /// The V2 hash text of a leaf (Android `getHashRepresentation(HashVersion.V2)`): as V1, except

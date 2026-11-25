@@ -273,14 +273,9 @@ extension _ServerOperations on ViewProcessor {
       );
     }
 
-    // The node's own priority as the server applies one update: before the children when the
-    // node takes a priority now (emptying it then keeps it), else after them.
+    // The node's own priority after its children, as the server applies one update
+    // (production check 39 Q1).
     final CompoundWrite? priority = childCompoundWrites[ChildKey.priority];
-    final bool priorityFirst =
-        !serverNode.isEmpty || ChildrenNode.keepsPriority(serverNode);
-    if (priority != null && priorityFirst) {
-      apply(ChildKey.priority, priority);
-    }
     for (final MapEntry<ChildKey, CompoundWrite> childMerge
         in childCompoundWrites.entries) {
       if (serverNode.hasChild(childMerge.key)) {
@@ -299,7 +294,7 @@ extension _ServerOperations on ViewProcessor {
         apply(childKey, childMerge.value);
       }
     }
-    if (priority != null && !priorityFirst) {
+    if (priority != null) {
       apply(ChildKey.priority, priority);
     }
     return curViewCache;

@@ -120,13 +120,10 @@ void main() {
     expect(server.dataAt('n'), <String, Object?>{'b': 1, '.priority': 5});
   });
 
-  test('update {a: null, .priority: 7} on a node without a priority: the client '
-      'and the fake server agree', () {
-    // The client writes the priority first (the node has a value then) and the emptied node
-    // keeps it: {".priority": 7}. FakeServerActions applies the children first, the node is
-    // gone and the priority lands on nothing: null. A transaction on such a node fails with
-    // max-retries against whichever is wrong. Production measured only a node that had a
-    // priority (check 38 (b)), where both orders give 7.
+  test('Q1: update {a: null, .priority: 7} on a node without a priority removes it; '
+      'a transaction after it commits in one run', () async {
+    // Production check 39 Q1: n {a:1} (no priority), m n {"a":null,".priority":7} answered ok;
+    // get answered {"s":"ok","d":null}; transaction put with hash '' accepted.
     final Object? client =
         (CompoundWrite.fromValue(<String, Object?>{
                   'a': null,
@@ -134,13 +131,62 @@ void main() {
                 }).apply(nodeFromJson(<String, Object?>{'a': 1}))
                 as ChildrenNode)
             .toServerJson();
-    expect(client, <String, Object?>{'.priority': 7});
+    expect(client, isNull);
+
     final FakeServerActions server = FakeServerActions()
-      ..writeByOtherClient('n', <String, Object?>{'a': 1})
-      ..writeByOtherClient('n', <String, Object?>{
-        'a': null,
-        '.priority': 7,
-      }, isMerge: true);
+      ..writeByOtherClient('n', <String, Object?>{'a': 1});
+    final FirebaseDatabase db = firebaseDatabaseWithConnection(
+      _newApp(),
+      connectionFactory: (ServerActionsDelegate delegate, DatabaseLogger? _) =>
+          server..delegate = delegate,
+    );
+    addTearDown(db.close);
+    server.connect();
+    final List<Object?> seen = <Object?>[];
+    final StreamSubscription<DatabaseEvent> sub = db
+        .ref('n')
+        .onValue
+        .listen((DatabaseEvent e) => seen.add(e.snapshot.value));
+    addTearDown(sub.cancel);
+    await pumpEventQueue();
+    server
+      ..deliverDataUpdate('n', server.dataAt('n'))
+      ..respond(server.callsOf('listen').single);
+    await pumpEventQueue();
+    final Future<void> updated = db.ref('n').update(<String, Object?>{
+      'a': null,
+      '.priority': 7,
+    });
+    await pumpEventQueue();
+    server.ackLastWrite();
+    await updated;
+    expect(server.dataAt('n'), isNull);
     expect(server.dataAt('n'), client);
-  }, skip: 'server rule unmeasured, see prodkit_dart_gaps3 Q1');
+
+    final List<Object?> runs = <Object?>[];
+    final Future<TransactionResult> result = db.ref('n').runTransaction((
+      Object? v,
+    ) {
+      runs.add(v);
+      return Transaction.success(const <String, Object?>{'b': 1});
+    });
+    await pumpEventQueue();
+    for (int i = 0; i < 30 && server.pendingWrites.isNotEmpty; i++) {
+      server.ackWrite(server.pendingWrites.first);
+      await pumpEventQueue();
+    }
+    final TransactionResult r = await result;
+    expect(r.committed, isTrue);
+    expect(runs, <Object?>[null]);
+    expect(server.callsOf('put').last.hash, '');
+    expect(seen.last, <String, Object?>{'b': 1});
+  });
+
+  test('a priority on a node that does not exist is refused', () async {
+    // Production check 27 line 2: "invalid_parameters: could not set priority on non-existent
+    // node". The fake server stores and pushes nothing.
+    final FakeServerActions server = FakeServerActions()
+      ..writeByOtherClient('n/.priority', 5);
+    expect(server.data, isNull);
+  });
 }

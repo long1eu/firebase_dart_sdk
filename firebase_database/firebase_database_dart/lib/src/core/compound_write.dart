@@ -79,8 +79,8 @@ final class CompoundWrite {
       final ChildKey? back = relativePath.back;
       if (back != null && back.isPriorityKey) {
         final Node target = value.getChild(relativePath.parent!);
-        if (target.isEmpty && !ChildrenNode.keepsPriority(target)) {
-          // Ignore priority updates on empty nodes, except one that keeps a priority.
+        if (!ChildrenNode.takesPriority(target)) {
+          // Ignore priority updates on empty nodes, except one that holds hidden state.
           return this;
         }
       }
@@ -196,13 +196,9 @@ final class CompoundWrite {
         priorityWrite = entry.value.value;
       }
     }
-    // A priority lands as the server applies one update: first on a node that takes one now
-    // (emptying it then keeps it), else after the children (a node they fill takes it).
-    final bool priorityFirst =
-        priorityWrite != null && _takesPriority(node.getChild(relativePath));
-    Node result = priorityFirst
-        ? node.updateChild(relativePath.child(ChildKey.priority), priorityWrite)
-        : node;
+    // As the server applies one update (production check 39 Q1, Q6): the children first, then
+    // the priority, which lands only on a node that then has a value or holds hidden state.
+    Node result = node;
     for (final MapEntry<ChildKey, ImmutableTree<Node>> entry
         in writeTree.children.entries) {
       if (!entry.key.isPriorityKey) {
@@ -214,8 +210,7 @@ final class CompoundWrite {
       }
     }
     if (priorityWrite != null &&
-        !priorityFirst &&
-        _takesPriority(result.getChild(relativePath))) {
+        ChildrenNode.takesPriority(result.getChild(relativePath))) {
       result = result.updateChild(
         relativePath.child(ChildKey.priority),
         priorityWrite,
@@ -223,10 +218,6 @@ final class CompoundWrite {
     }
     return result;
   }
-
-  /// Whether a priority written on [node] lands: it has a value, or it keeps a priority.
-  static bool _takesPriority(Node node) =>
-      !node.isEmpty || ChildrenNode.keepsPriority(node);
 
   /// The writes as a JSON map from path strings to values (export form when [exportFormat]).
   ///

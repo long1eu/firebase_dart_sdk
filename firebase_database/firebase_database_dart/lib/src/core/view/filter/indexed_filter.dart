@@ -121,7 +121,7 @@ final class IndexedFilter implements NodeFilter {
   /// one that keeps a priority, whose kept priority is replaced.
   @override
   Node updatePriority(Node oldSnap, Node newPriority) {
-    if (oldSnap.isEmpty && !ChildrenNode.keepsPriority(oldSnap)) {
+    if (!ChildrenNode.takesPriority(oldSnap)) {
       return oldSnap;
     }
     return oldSnap.updatePriority(newPriority);

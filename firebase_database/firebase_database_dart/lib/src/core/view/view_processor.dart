@@ -237,14 +237,13 @@ final class ViewProcessor {
     );
   }
 
-  /// Whether a priority written on [node] is ignored: it is empty and keeps no priority.
-  static bool _ignoresPriority(Node node) =>
-      node.isEmpty && !ChildrenNode.keepsPriority(node);
+  /// Whether a priority written on [node] is ignored: it is empty and holds no hidden state.
+  static bool _ignoresPriority(Node node) => !ChildrenNode.takesPriority(node);
 
   /// JS `viewProcessorApplyUserMerge`: the writes to children in view first (a limit window may
-  /// make room), then the others. A priority write lands as the server applies one update: on a
-  /// node that takes a priority before the children change it is written first (emptying the
-  /// node then keeps it), on any other node after the children (a node they fill takes it).
+  /// make room), then the others; priority writes after every child write, as the server applies
+  /// one update (production check 39 Q1, Q6: a priority lands only on a node the children leave
+  /// with a value or with hidden state).
   ViewCache _applyUserMerge(
     ViewCache viewCache,
     Path path,
@@ -258,34 +257,18 @@ final class ViewProcessor {
       "Can't have a merge that is an overwrite",
     );
     ViewCache curViewCache = viewCache;
-    // 0: a priority on a node that takes one now; 1: a child; 2: any other priority.
-    int phase(Path writePath) {
-      if (!(writePath.back?.isPriorityKey ?? false)) {
-        return 1;
-      }
-      final Node owner = viewCache.eventCache.node.getChild(writePath.parent!);
-      return _ignoresPriority(owner) ? 2 : 0;
-    }
-
-    final List<(int, Path, Node)> writes = <(int, Path, Node)>[
-      for (final MapEntry<Path, Node> entry in changedChildren.entries)
-        (
-          phase(path.childPath(entry.key)),
-          path.childPath(entry.key),
-          entry.value,
-        ),
-    ];
-    for (int p = 0; p < 3; p++) {
+    final List<MapEntry<Path, Node>> writes = changedChildren.entries.toList();
+    for (final bool priorities in <bool>[false, true]) {
       for (final bool inView in <bool>[true, false]) {
-        for (final (int, Path, Node) write in writes) {
-          final Path writePath = write.$2;
-          if (write.$1 == p &&
+        for (final MapEntry<Path, Node> entry in writes) {
+          final Path writePath = path.childPath(entry.key);
+          if ((writePath.back?.isPriorityKey ?? false) == priorities &&
               viewCache.eventCache.isCompleteForChild(writePath.front!) ==
                   inView) {
             curViewCache = _applyUserOverwrite(
               curViewCache,
               writePath,
-              write.$3,
+              entry.value,
               writesCache,
               serverCache,
               accumulator,

@@ -10,31 +10,58 @@
 //    model's data; a new listener and get() of a query that loads all data also hash as the
 //    model's server does.
 //
-// The model is a plain JSON tree (no client node code). Measured on production
-// (rtdb/from_boss/prodkit_production_run3_2026-11-25.txt check 38; run 2 check 22; check 27):
-// writes apply in the order sent; a node whose last child is removed by a write below it keeps
-// its priority (no value, the priority kept), and a write at or above it drops it; an update
-// writing `.priority` on a node with a priority while emptying it keeps the new one; setPriority
-// on an emptied node that keeps a priority is accepted and kept; a priority on a node that never
-// existed refuses the write; the hash counts kept priorities (JS `ChildrenNode.hash`); listen
-// answers and get answers carry `{".priority": p}` for an emptied node, also inside its parent.
+// The model is the shared server model of lib/src/testing/json_server_model.dart (a plain JSON
+// tree, no client node code), which FakeServerActions plays too. Measured on production
+// (rtdb/from_boss/prodkit_production_run3_2026-11-25.txt checks 27 and 38; run 2 check 22;
+// prodkit_production_run4_check39_2026-11-25.txt check 39): writes apply in the order sent; a
+// node whose last child is removed by a write below it keeps its priority, and a write at or
+// above it drops it; one update applies its children first, then its priorities, and a priority
+// lands only on a node that then has a value or holds hidden state (Q1, Q6; three separate
+// writes keep it, Q4); a node holding only emptied children takes a priority (Q2); a priority on
+// a node that does not exist refuses the write (check 27); the hash counts kept priorities;
+// listen and get answers carry `{".priority": p}` for an emptied node, also inside its parent;
+// the compound hash counts a kept priority as a `.priority` leaf (Q5).
 //
-// Model rules no production frame covers (the model's choice, the client agrees):
-// - M1. In one update, a priority on a node WITHOUT a priority that the children empty: the
-//   priority is written first and kept (priority_merge_test.dart has the skipped test that
-//   states both outcomes; FakeServerActions drops it). On a node with a priority both orders
-//   give the same result (measured).
-// - M2. A priority on a node holding only emptied children (no priority of its own) is refused
-//   as a write, and inside an update it is dropped.
-// - M3. A priority written by `.priority: null` on an emptied node drops it (by analogy with M1).
-// - M4. Whole data pushed to a listen below another client's write carries `{".priority": p}`
+// Model rules no production frame covers (the model's choice; the client agrees):
+// - M1. An update that writes a priority and creates its node in the same message is refused,
+//   as a priority on a missing node.
+// - M2. `.priority: null` on an emptied node drops it.
+// - M3. Whole data pushed to a listen below another client's write carries `{".priority": p}`
 //   like a listen answer.
-// - M5. The children of a limit window are sent with their `{".priority": p}` descendants; an
+// - M4. The children of a limit window are sent with their `{".priority": p}` descendants; an
 //   emptied child is not a window member, and a child leaving the window because it was emptied
 //   is sent as null.
-// - M6. A write forwarded as written to a listen at or above it carries nothing more.
-// - M7. Range merges (`rm`) and compound hashes are not modelled (the model never sends `rm`).
-// - M8. A leaf with a priority at depth 3 takes `.priority` writes like any node with a value.
+// - M5. A write forwarded as written to a listen at or above it carries nothing more.
+// - M6. The model never sends a range merge (`rm`) and ignores compound hashes.
+// - M7. A leaf with a priority at depth 3 takes `.priority` writes like any node with a value.
+// - M8. A value written below a leaf keeps the leaf's priority on the new children (the
+//   generator never writes below a leaf).
+// - M9. In one update, a node's own `.priority` next to a deeper `x/.priority: null` that
+//   removes the node's last (emptied) child: the model applies the priorities in the update's
+//   key order (own priority first in seeds 59755 and 76701: the node keeps it); the client
+//   applies the child's subtree, its priority included, before the node's own priority (the
+//   node is left with nothing and the priority is dropped). No frame measures it; see
+//   [_knownFailures].
+//
+// The server sends a write to the listens it holds, from reading a listen to reading its
+// unlisten: as written to a plain listen at or above it, as whole data to one below it. To the
+// limit query it sends the frames measured for a key-ordered limitToFirst query
+// (rtdb/from_helper/reports/limit_query_frames.md): a set at or above its path puts the whole
+// window; an update at or above it merges its relative paths when the window keeps its children,
+// the entering child whole and the removed one null when it changes, and nothing when no window
+// child is touched (its own priority included); an update that writes below one window child
+// next to a key outside the window puts that child whole at its path; a write below it goes as
+// written while its child stays in the window, a put of null at the child's path when it empties
+// a window child and none enters, nothing for a child outside, the entering child alone at its
+// path when it pushes another out, and a merge of the entering children and the leaving ones
+// otherwise: null for a removed child, whole for one moved out by its priority. The production
+// run of 2026-11-25 (rtdb/from_boss/prodkit_production_run_2026-11-25.txt, checks 28, 29 and 37)
+// sent the same frames for the shapes it covered, the tagged frame first; the put of null for an
+// emptied child was measured on the emulator only. Not measured, and kept as the model's guess:
+// the order by priority of this query beyond a child moved in and out by its priority, an update
+// that changes one window child while another enters or that pushes a child out (the whole
+// window is put), an update key at or above the query path, and a window merge whose entering
+// child sorts before a child that stays (measured only after it).
 //
 // The test fails when a seed outside [_knownFailures] fails, or a listed seed passes.
 //
@@ -45,9 +72,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
-
-import 'package:crypto/crypto.dart';
 
 import 'package:firebase_database_dart/src/core/callback_event_registration.dart';
 import 'package:firebase_database_dart/src/core/compound_write.dart';
@@ -68,6 +92,7 @@ import 'package:firebase_database_dart/src/core/view/query_params.dart';
 import 'package:firebase_database_dart/src/core/view/query_spec.dart';
 import 'package:firebase_database_dart/src/core/view/view.dart';
 import 'package:firebase_database_dart/src/testing/fake_server_actions.dart';
+import 'package:firebase_database_dart/src/testing/json_server_model.dart';
 import 'package:test/test.dart';
 
 const (int, int) _defaultSeeds = (0, 10000);
@@ -75,17 +100,36 @@ const (int, int) _defaultSeeds = (0, 10000);
 /// The failing seeds by cause; [_defaultSeeds] holds none. A new group starts with its shortest
 /// sequence, found by shrinking one of its seeds; data as in [_initial].
 const Map<String, List<int>> _knownFailures = <String, List<int>>{
-  // A limit query by priority after a default listen at its path took over, with a priority
-  // moved inside the window: the limit view's caches disagree (6892: the listener is right and
-  // the view's server cache short, the group R shape of
-  // rtdb/from_helper/reports/wide_seeds_limit_groups.md; 4614: the listener keeps a child the
-  // server removed). No hidden state in either minimal sequence; not traced in the client.
-  // 4614 shrinks to: listen /a:{"l":2,"vf":"l"}; set /a/x/.priority 1; serve; other update /a
-  // {"y":{"u":2},"z":{"v":{".value":1,".priority":1}}}; serve; listen /a:default; serve; serve;
-  // other update /a {"z":null,"y/.priority":1,"x":null}
+  // The groups of rtdb/from_helper/reports/wide_seeds_round3_limit_classification.md (seeds 0 to
+  // 299999, limit query /a orderByPriority limitToFirst(2)); in none does hidden state decide the
+  // failure, and all fail the same on the trunk.
   // dart format off
-  'limit view after a default listen took over, priority moved in the window': <int>[
-    4614, 6892,
+  // Group R: the limit view's server cache short after a default listen took over (row 7 of
+  // "Behaviours shared with the JS SDK that are kept"); 24768, 165358 and 167845 leave the
+  // listener wrong (property B), the others the cache only. Shortest (95040): listen
+  // /a:{"l":2,"vf":"l"}; serve; listen /a:default; set /a/x/u 1; serve; other update /a {"x":null}
+  'group R: limit view server cache short after a default listen took over': <int>[
+    6892, 12944, 15580, 17434, 22925, 24768, 28802, 53038, 60676, 61383, 81628, 95040, 95959,
+    108626, 118921, 130468, 131009, 137624, 152480, 153895, 155494, 156387, 165358, 167845,
+    174285, 177344, 178722, 210298, 215182, 227643, 250134, 251256, 251431, 252308, 255037,
+    255287, 256221, 256506, 288075,
+  ],
+  // Group S: a server merge refills a full window from the pre-merge complete cache (JS passes
+  // the same cache to every child; a trunk matter). Shortest (245589): listen
+  // /a:{"l":2,"vf":"l"}; listen /:default; serve; serve (refuse a write); serve (refuse a
+  // write); other update /a {"y/.priority":2,"z":{"v":3,"u":2}}; other update /a
+  // {".priority":null,"z":{"u":3,"v":{".value":3,".priority":1},".priority":2},"y/.priority":3}
+  'group S: a server merge refills the window from the pre-merge cache': <int>[
+    4614, 11541, 174519, 245589,
+  ],
+  // Group V: a refused update at the view path reverted over a filtered cache (row 5).
+  'group V: a revert at the view path over a filtered cache': <int>[279390],
+  // M9, unmeasured: b = {x: {v, .priority}} without a priority of its own, then
+  // update /b {".priority":2,"x/v":null,"x/.priority":null}. The model ends with b
+  // {".priority":2}, the client with nothing. Shortest (76701): listen /b:default; set /
+  // {"b":{"x":{"v":2,".priority":1}}}; update /b {".priority":2,"x/v":null,"x/.priority":null}
+  'M9: own priority next to a deeper priority null in one update (unmeasured)': <int>[
+    59755, 76701,
   ],
   // dart format on
 };
@@ -276,141 +320,21 @@ String _wire(String path) => '/$path'.replaceAll('//', '/');
 List<String> _keys(String path) =>
     path.split('/').where((String k) => k.isNotEmpty).toList();
 
-/// A node the model server holds: a leaf, or children; either with a priority. A node with no
-/// value keeps its priority (and its children that keep one): the server's rule.
-final class _M {
-  Object? leaf;
-  Object? priority;
-  final Map<String, _M> children = <String, _M>{};
-
-  /// Nothing left: no value, no priority, no child.
-  bool get isAbsent => leaf == null && priority == null && children.isEmpty;
-
-  _M copy() {
-    final _M c = _M()
-      ..leaf = leaf
-      ..priority = priority;
-    children.forEach((String k, _M v) => c.children[k] = v.copy());
-    return c;
-  }
-}
+// The server's data and rules: the shared model of lib/src/testing/json_server_model.dart,
+// which FakeServerActions plays too.
+typedef _M = JsonServerNode;
 
 /// Whether [n] has a value (a leaf, or a child with one).
-bool _visible(_M? n) =>
-    n != null && (n.leaf != null || n.children.values.any(_visible));
+bool _visible(_M? n) => n != null && n.hasValue;
 
-/// Whether a priority written on [n] lands: it has a value or keeps a priority of its own.
-bool _takesPriority(_M? n) => n != null && (_visible(n) || n.priority != null);
+/// The export JSON of [n]: what readers see, or with [hidden] what the server sends.
+Object? _export(_M? n, {required bool hidden}) => n?.toJson(hidden: hidden);
 
-/// The node of a user's value in export form; an object without children is no value.
-_M? _fromUser(Object? json) {
-  if (json == null) {
-    return null;
-  }
-  if (json is Map<String, Object?>) {
-    if (json.containsKey('.value')) {
-      return _M()
-        ..leaf = json['.value']
-        ..priority = json['.priority'];
-    }
-    final _M n = _M()..priority = json['.priority'];
-    json.forEach((String k, Object? v) {
-      final _M? c = k.startsWith('.') ? null : _fromUser(v);
-      if (c != null) {
-        n.children[k] = c;
-      }
-    });
-    return n.children.isEmpty ? null : n;
-  }
-  return _M()..leaf = json;
-}
-
-/// The export JSON of [n]: what readers see, or with [hidden] what the server sends (a node
-/// with no value that keeps a priority as `{".priority": p}`, check 38 (a)).
-Object? _export(_M? n, {required bool hidden}) {
-  if (n == null) {
-    return null;
-  }
-  if (n.leaf != null) {
-    return n.priority == null
-        ? n.leaf
-        : <String, Object?>{'.value': n.leaf, '.priority': n.priority};
-  }
-  final Map<String, Object?> m = <String, Object?>{};
-  n.children.forEach((String k, _M c) {
-    final Object? json = _export(c, hidden: hidden);
-    if (json != null) {
-      m[k] = json;
-    }
-  });
-  if (m.isEmpty && (!hidden || n.priority == null)) {
-    return null;
-  }
-  if (n.priority != null) {
-    m['.priority'] = n.priority;
-  }
-  return m;
-}
-
-/// The priority order of the JS SDK for the generator's data: no priority, numbers, strings;
-/// then the key (the generator's keys are letters).
-int _comparePriority(Object? a, Object? b) {
-  int rank(Object? p) => p == null ? 0 : (p is num ? 1 : 2);
-  if (rank(a) != rank(b)) {
-    return rank(a) - rank(b);
-  }
-  if (a is num && b is num) {
-    return a.compareTo(b);
-  }
-  return a is String && b is String ? a.compareTo(b) : 0;
-}
+/// The hash the server compares (kept priorities included).
+String _hash(_M? n) => n?.hash() ?? '';
 
 List<MapEntry<String, _M>> _byPriority(Map<String, _M> children) =>
-    children.entries.toList()
-      ..sort((MapEntry<String, _M> a, MapEntry<String, _M> b) {
-        final int c = _comparePriority(a.value.priority, b.value.priority);
-        return c != 0 ? c : a.key.compareTo(b.key);
-      });
-
-String _sha1(String text) =>
-    base64.encode(sha1.convert(utf8.encode(text)).bytes);
-
-String _ieee754(num value) {
-  final ByteData bytes = ByteData(8)..setFloat64(0, value.toDouble());
-  return <String>[
-    for (int i = 0; i < 8; i++)
-      bytes.getUint8(i).toRadixString(16).padLeft(2, '0'),
-  ].join();
-}
-
-String _hashText(Object value) => switch (value) {
-  final num n => 'number:${_ieee754(n)}',
-  final bool b => 'boolean:$b',
-  _ => 'string:$value',
-};
-
-/// The hash the server compares (JS `LeafNode.hash` and `ChildrenNode.hash`), kept priorities
-/// included (check 38 (c)).
-String _hash(_M? n) {
-  if (n == null) {
-    return '';
-  }
-  final StringBuffer text = StringBuffer();
-  if (n.priority != null) {
-    text.write('priority:${_hashText(n.priority!)}:');
-  }
-  if (n.leaf != null) {
-    text.write(_hashText(n.leaf!));
-    return _sha1(text.toString());
-  }
-  for (final MapEntry<String, _M> e in _byPriority(n.children)) {
-    final String h = _hash(e.value);
-    if (h.isNotEmpty) {
-      text.write(':${e.key}:$h');
-    }
-  }
-  return text.isEmpty ? '' : _sha1(text.toString());
-}
+    JsonServerNode.byPriority(children);
 
 _M? _get(_M? n, List<String> keys) {
   _M? at = n;
@@ -418,48 +342,6 @@ _M? _get(_M? n, List<String> keys) {
     at = at?.children[k];
   }
   return at;
-}
-
-/// [n] with [value] at [keys] from [i]; a node left with nothing is removed.
-_M? _put(_M? n, List<String> keys, int i, _M? value) {
-  if (i == keys.length) {
-    return value;
-  }
-  if (n == null || n.leaf != null) {
-    // Nothing to remove below a leaf or nothing; a value below a leaf replaces it (the
-    // generator's leaves carry no priority).
-    if (value == null) {
-      return n;
-    }
-  }
-  final _M node = n == null || n.leaf != null ? _M() : n;
-  final _M? child = _put(node.children[keys[i]], keys, i + 1, value);
-  if (child == null) {
-    node.children.remove(keys[i]);
-  } else {
-    node.children[keys[i]] = child;
-  }
-  return node.isAbsent ? null : node;
-}
-
-/// [n] with [priority] on the node at [keys] from [i], when that node takes it.
-_M? _putPriority(_M? n, List<String> keys, int i, Object? priority) {
-  if (n == null) {
-    return null;
-  }
-  if (i == keys.length) {
-    if (_takesPriority(n)) {
-      n.priority = priority;
-    }
-    return n.isAbsent ? null : n;
-  }
-  final _M? child = _putPriority(n.children[keys[i]], keys, i + 1, priority);
-  if (child == null) {
-    n.children.remove(keys[i]);
-  } else {
-    n.children[keys[i]] = child;
-  }
-  return n.isAbsent ? null : n;
 }
 
 /// The window of the limit query at [n]: its first two children with a value by priority.
@@ -514,7 +396,10 @@ String _server(Node n) => jsonEncode(
 final class _Server {
   _Server(this.fake);
   final FakeServerActions fake;
-  _M? data = _fromUser(_initial);
+  JsonServerModel model = JsonServerModel(_initial);
+
+  /// The root node.
+  _M? get data => model.root;
 
   /// The listens the server holds (it has handled the listen and not the unlisten).
   final List<ServerCall> listens = <ServerCall>[];
@@ -522,54 +407,17 @@ final class _Server {
   /// How many of the client's messages the server has handled.
   int handled = 0;
 
-  _M? at(String path) => _get(data, _keys(path));
+  _M? at(String path) => model.at(path);
 
   /// The data at [path] as the server sends it (kept priorities included).
   Object? sent(String path) => _export(at(path), hidden: true);
 
-  /// Applies [w] as one write: the children first, then the priorities; false when the server
-  /// refuses it (a priority on a node that holds no value and no priority of its own).
+  /// Applies [w] as the server does ([JsonServerModel.write]); false when the server refuses it.
   bool apply(_Write w) {
     final _M? before = data?.copy();
-    final List<String> at = _keys(w.path);
-    final Map<String, Object?> entries = w.merge
-        ? (w.data! as Map<String, Object?>)
-        : <String, Object?>{'': w.data};
-    bool isPriority(String k) =>
-        <String>[...at, ..._keys(k)].lastOrNull == '.priority';
-    for (final String k in entries.keys.where(isPriority)) {
-      final List<String> full = <String>[...at, ..._keys(k)];
-      if (!_takesPriority(_get(data, full.sublist(0, full.length - 1)))) {
-        return false;
-      }
+    if (!model.write(w.path, w.data, merge: w.merge)) {
+      return false;
     }
-    // A priority lands on a node that takes one before the children change (written first,
-    // emptying the node then keeps it), else on one the children leave with a value.
-    void priorities({required bool first}) {
-      for (final MapEntry<String, Object?> e in entries.entries) {
-        if (!isPriority(e.key)) {
-          continue;
-        }
-        final List<String> full = <String>[...at, ..._keys(e.key)];
-        final List<String> owner = full.sublist(0, full.length - 1);
-        if (_takesPriority(_get(before, owner)) == first) {
-          data = _putPriority(data, owner, 0, e.value);
-        }
-      }
-    }
-
-    priorities(first: true);
-    for (final MapEntry<String, Object?> e in entries.entries) {
-      if (!isPriority(e.key)) {
-        data = _put(
-          data,
-          <String>[...at, ..._keys(e.key)],
-          0,
-          _fromUser(e.value),
-        );
-      }
-    }
-    priorities(first: false);
     _publish(w, before);
     return true;
   }
