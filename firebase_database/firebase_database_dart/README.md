@@ -606,7 +606,8 @@ The 17 you notice are below. The full table, 28 rows with the test that pins eac
   SDK that are kept" in
   [docs/database_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_decisions.md).
 - **Transactions and `onDisconnect` registrations are not persisted.** After a restart, register them again.
-- **The server's behaviour was measured on the emulator only.** Token refresh, revocation, ping answers and the
+- **The server's behaviour was measured on the emulator and, for rows 33, 34 and 4 and the update rules of section 25
+  of `docs/database_decisions.md`, on production (2026-11-25).** Token refresh, revocation, ping answers and the
   size limits of a production server are not measured; the three connection timeouts (30 s, 15 s, 60 s) are chosen,
   not measured.
 - **Not in this version:**
