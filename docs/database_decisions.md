@@ -463,6 +463,19 @@ leaf of at most 10 MiB, a non-`String` map key, and a write under `.info`. A `Li
 index keys. **Writes are at-least-once**: a put whose answer was lost is sent again after the reconnect, and a
 re-sent `ServerValue.increment` can apply twice. A transaction is the exact way to count.
 
+`update` and `OnDisconnect.update` also refuse, with an `ArgumentError` that names the object's path, a value
+below a merge key that holds, at any depth (a list element, a `.value` and a multi-path key included), an object
+with a non-null `.priority` and no value: no non-null `.value` and no child that holds a value once nulls and empty
+objects are dropped, recursively. Examples: `{'n': {'.priority': 5}}`, `{'n': {'.value': null, '.priority': 5}}`,
+`{'n': {'.priority': 5, 'a': {'b': null}}}`, `{'n': [{'.priority': 5}]}`, `{'n/x': {'.priority': 5}}`
+(`validateNoPriorityWithoutValue` in `lib/src/core/util/validation.dart`, called from
+`validateFirebaseMergeDataArg`). The message says to remove the child with `null`, give it a value with its
+priority, or write `'n/.priority'`. Still accepted: `update({'.priority': p})` on the node itself, a `'n/.priority'`
+key, `{'.value': v, '.priority': p}`, a priority next to a child with a value, and an object that ends up empty with
+no priority or with `.priority: null` (`{}`, `{'a': {}}`, `{'.priority': null}`, a removal). `set`,
+`OnDisconnect.set`, `push().set` and transaction results are not checked: they send the parsed node, in which such
+an object is empty and left out (`set(null, priority: p)` sends `d:null`), so they never put it on the wire.
+
 **Why.** Every SDK re-sends unacknowledged puts after a reconnect and none de-duplicates, because the request
 number restarts with each connection (`J:core/PersistentConnection.ts:1048-1052`;
 `A:connection/PersistentConnectionImpl.java:1171-1177`; `Cd:connection/persistent_connection.cc:1044`). The
@@ -473,12 +486,31 @@ sent the put again, and the value read back was 2. Android checks the key path
 `J:core/util/validation.ts:56`. C++ only logs a warning and returns an invalid query
 (`Cd:query_desktop.cc:48-90`).
 
+A merge sends the caller's JSON as it is (`lib/src/core/repo.dart`, `updateChildren`; JS `J:core/Repo.ts:627-629`;
+Android `A:core/Repo.java:633-635`). The rule is the one measured on the emulator on 2026-11-25 over 30 writes (ten
+value forms, each through `update` on a missing parent, `update` on an existing child and `onDisconnect.update`):
+for an object with a priority and no value the server sends only a control error that names no request and stores
+nothing of the merge, whether or not the target exists, for `m` and `om` alike; `{}`, `{'a': {}}` and
+`{'.priority': null}` are answered `ok` as removals, and `{'.value': 1, '.priority': 5}` is stored. Nothing fails
+such a write: the Future of `update({'n': {'.priority': 5}})` was still pending after 220 s on a live connection, the
+local view kept showing the unacknowledged write, and a sibling in the same merge was shown locally but never stored.
+The link-silence timer does not end it, because every inbound frame and the dead-link probe's pong re-arm it.
+The client logs such a control error as a warning that says the server dropped a request that will never be
+answered. The JS
+SDK 13.x hangs the same way on the emulator. Production answers the same way as the emulator (measured on
+2026-11-25 with raw merge frames, one run: seven refused forms got no answer and stored nothing, two valid forms
+were answered, and the connection stayed usable); a REST PUT of the same shape got HTTP 400 there. No such write
+can already be persisted on a user's disk, because there has been no release.
+
 **What we gave up.** Nothing makes an increment exact after a lost answer; the README and a test say so. A
 write under `.info` that JS accepts through `update` and `onDisconnect().cancel` is refused
 (`J:api/Reference_impl.ts:798-808`, `J:api/OnDisconnect.ts:72-80`): `set`, `update`, `remove` and
 `OnDisconnect.cancel()` are refused. `update({'': v})` with the empty key alone is accepted, as in the JS SDK.
+Such an object in a merge is refused, where JS sends it and hangs (measured) and Android sends it too (read,
+`A:core/Repo.java:633-635`); the same object nested in a `set` value is dropped without an error, as in JS.
 
-**Pinned by.** `test/api/validation_test.dart` and `test/core/util/validation_test.dart` (the rules);
+**Pinned by.** `test/api/validation_test.dart` (the rules; group "an object with a priority and no value") and
+`test/core/util/validation_test.dart` (the rules);
 `test/realtime/replay_test.dart` and `test/realtime/persistent_connection_test.dart` (a put sent but not
 answered is sent again on the next connection); `test/integration/chaos_emulator_test.dart`.
 

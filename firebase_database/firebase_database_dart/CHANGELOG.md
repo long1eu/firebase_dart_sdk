@@ -51,5 +51,11 @@ against the Database emulator.
 - The event dispatcher yields to the event loop after 1,000 events with an unthrottled task in the browser, so a burst
   of events in a hidden tab is delivered in bounded time.
 - Writes are delivered at least once: a re-sent `ServerValue.increment` can apply twice.
+- `update` and `OnDisconnect.update` throw an `ArgumentError` at the call for an object, at any depth, with a non-null
+  priority and no value once nulls and empty objects are dropped (`{'n': {'.priority': 5}}`,
+  `{'n': {'.value': null, '.priority': 5}}`, `{'n': {'.priority': 5, 'a': {}}}`): the server answers such a merge
+  with an error that names no request, so its Future would never complete. `update({'.priority': p})`, a
+  `'n/.priority'` key, `{'.value': v, '.priority': p}` and empty objects (removals) are accepted as before; `set` and
+  transactions are unchanged and leave such an object out.
 - Not included: long polling, typed converters, a REST client or fallback, web disk persistence, an instance cache,
   the compat API, a proxy option in the API.

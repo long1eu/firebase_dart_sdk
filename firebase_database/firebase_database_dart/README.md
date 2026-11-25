@@ -171,7 +171,11 @@ is not an error, and the local events fire at once. A rejected write rolls back 
 `Map<String, Object?>`, so patterns work without casts. It is built once and unmodifiable; copy it to change it. An
 integral number within 2^53 reads as an `int` even if you wrote `5.0`. A map whose keys are `0..n` with more than half
 present reads as a `List`, so iterate `snapshot.children` when the shape can vary. Bad keys, paths, depths and numbers
-throw an `ArgumentError` or `StateError` at the call, before anything is sent.
+throw an `ArgumentError` or `StateError` at the call, before anything is sent. So does an `update` (or
+`OnDisconnect.update`) with an object that has a priority and no value (only nulls or empty objects), such as
+`{'n': {'.priority': 5}}` or `{'n': {'.value': null, '.priority': 5}}`, which the server never answers: remove the
+child with `null`, give it a value (`{'.value': 1, '.priority': 5}`), or write `'n/.priority'` to change the priority
+of a child that exists.
 
 `set` and `OnDisconnect.set` take an optional `priority:`, and `setPriority` changes only the priority.
 `DatabaseReference.key`, `parent`, `root` and `child` build paths without a request; `FirebaseDatabase.refFromUrl` takes
