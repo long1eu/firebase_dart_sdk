@@ -1378,6 +1378,7 @@ void main() {
             )!
             as String;
 
+    // This test pins cost, not content: the warning count shows how often the branch is read.
     // Mutation: in ServerCacheRows.prune, replace the top-most test by `true`. The rows, content
     // and size stay the same (every lower row re-saves a copy of what the top-most row already
     // re-saves); only the loads repeat, so the unreadable row below 'a/big' is reported once by

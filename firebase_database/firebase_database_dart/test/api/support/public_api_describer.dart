@@ -45,14 +45,15 @@ String _normalizeTypedef(String type) => type
 String _name(Symbol symbol) => MirrorSystem.getName(symbol);
 
 /// Whether the `show` / `hide` combinators of the export `dep` let `symbol`
-/// through, so names hidden in the barrel do not appear in the listing.
+/// through, so names hidden in the barrel do not appear in the listing. Also
+/// used by public_api_type_reachability.dart, for imports as well as exports.
 ///
 /// Mirrors report `show A, B` as one combinator per name, so the shown names
 /// are the union of all `show` combinators.
 ///
 /// Mirrors list the members of an extension as library members named
 /// `Extension.member`; they are exported when the extension is.
-bool _isExportedBy(LibraryDependencyMirror dep, Symbol member) {
+bool isExportedBy(LibraryDependencyMirror dep, Symbol member) {
   final String name = MirrorSystem.getName(member);
   final Symbol symbol = name.contains('.')
       ? Symbol(name.substring(0, name.indexOf('.')))
@@ -187,7 +188,7 @@ void _collect(
   Map<String, List<String>> entries,
 ) {
   bool passes(Symbol symbol) =>
-      chain.every((LibraryDependencyMirror dep) => _isExportedBy(dep, symbol));
+      chain.every((LibraryDependencyMirror dep) => isExportedBy(dep, symbol));
   if (chain.isNotEmpty) {
     for (final DeclarationMirror d in library.declarations.values) {
       if (!_isPublic(d.simpleName) || !passes(d.simpleName)) {

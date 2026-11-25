@@ -38,6 +38,10 @@ against the Database emulator.
   written to the cache; an offline `get()` answers from the cache only when it holds the complete value for the query;
   `cacheServerData: false` keeps only the pending writes. `package:firebase_database_dart/storage_engine.dart` is the
   library for custom persistence engines.
+  It names only types it exports: an engine stores a query as its path and `QuerySpec.toWireObject()` and rebuilds
+  it with `QuerySpec.fromPathAndWireObject`; `Index`, `KeyIndex` and `NamedNode` are exported there; the
+  `QuerySpec(path, params)` and `ImmutableTree(value, children)` constructors, `QuerySpec.params`,
+  `QuerySpec.toListenSpec` and `ImmutableTree.children` are `@internal`.
 - `package:firebase_database_dart/testing.dart`: a fake server for tests of your own code.
 - The event dispatcher yields to the event loop after 1,000 events with an unthrottled task in the browser, so a burst
   of events in a hidden tab is delivered in bounded time.
