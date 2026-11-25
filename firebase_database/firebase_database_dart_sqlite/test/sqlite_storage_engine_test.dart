@@ -1351,6 +1351,123 @@ void main() {
       h.run(() => h.engine.pruneCache(Path.empty, PruneForest()));
       expect(h.cache('a'), node(1));
     });
+
+    /// Applies [writes] to the SQLite engine and to the reference engine, runs [beforePrune] on
+    /// the SQLite store, prunes both at the root with [forest] and returns the reference's cache.
+    Node pruneBoth(
+      List<(String, Node)> writes,
+      PruneForest forest, {
+      void Function()? beforePrune,
+    }) {
+      final InMemoryPersistenceStorageEngine reference =
+          InMemoryPersistenceStorageEngine()..disableTransactionCheck = true;
+      for (final (String path, Node value) in writes) {
+        h.overwrite(path, value);
+        reference.overwriteServerCache(Path(path), value);
+      }
+      beforePrune?.call();
+      h.run(() => h.engine.pruneCache(Path.empty, forest));
+      reference.pruneCache(Path.empty, forest);
+      return reference.serverCache(Path.empty);
+    }
+
+    String rowPaths() =>
+        h.rawScalar(
+              "SELECT coalesce(group_concat(path, ','), '') "
+              'FROM (SELECT path FROM server_cache ORDER BY path)',
+            )!
+            as String;
+
+    // Mutation: in ServerCacheRows.prune, replace the top-most test by `true`. The rows, content
+    // and size stay the same (every lower row re-saves a copy of what the top-most row already
+    // re-saves); only the loads repeat, so the unreadable row below 'a/big' is reported once by
+    // load('a') and again by load('a/big').
+    test('a prune reads a pruned branch once, through its top-most row', () {
+      final Node a = node(<String, Object?>{
+        'other': 'o',
+        'big': <String, Object?>{
+          for (int i = 0; i < 40; i++)
+            'c$i': i == 1
+                ? <String, Object?>{'sub': 'kv', 'drop': 'dv'}
+                : 'v' * 1024,
+        },
+      });
+      final Node expected = pruneBoth(
+        <(String, Node)>[('a', a)],
+        PruneForest().prune(Path('a')).keep(Path('a/big/c1/sub')),
+        beforePrune: () {
+          // 'a' and 'a/big' are both split: the row /a/big/ lies below the row /a/.
+          expect(
+            h.rawScalar("SELECT count(*) FROM server_cache WHERE path = '/a/'"),
+            1,
+          );
+          expect(
+            h.rawScalar(
+              "SELECT count(*) FROM server_cache WHERE path = '/a/big/'",
+            ),
+            1,
+          );
+          h.rawExecute(
+            "UPDATE server_cache SET value = x'7b7b' WHERE path = '/a/big/c2/'",
+          );
+        },
+      );
+      expect(
+        expected,
+        node(<String, Object?>{
+          'a': <String, Object?>{
+            'big': <String, Object?>{
+              'c1': <String, Object?>{'sub': 'kv'},
+            },
+          },
+        }),
+      );
+      expect(h.cache(''), expected);
+      expect(rowPaths(), '/a/big/c1/sub/');
+      expect(h.rawScalar('SELECT count(*) FROM server_cache'), 1);
+      expect(h.warnings.single, contains('1 cached row(s) could not be read'));
+      expect(h.engine.serverCacheEstimatedSizeInBytes(), h.fullSum());
+    });
+
+    // Mutation: in ServerCacheRows.prune, pass `toKeep` instead of `toKeep.subtree(row.key)`:
+    // the kept path 'a/k' is looked up as 'k', finds the kept row /k/ on another branch, and is
+    // not re-saved.
+    test('a kept part of a row below the root is looked up below that row', () {
+      final Node expected = pruneBoth(
+        <(String, Node)>[
+          (
+            'a',
+            node(<String, Object?>{
+              'k': 'inside',
+              'z': 'zz',
+              'r': <String, Object?>{'deep': 1},
+            }),
+          ),
+          ('a/r', node(<String, Object?>{'deep': 2})),
+          ('k', node('other')),
+        ],
+        PruneForest()
+            .prune(Path('a'))
+            .keep(Path('a/k'))
+            .keep(Path('a/r'))
+            .keep(Path('k')),
+      );
+      expect(
+        expected,
+        node(<String, Object?>{
+          'a': <String, Object?>{
+            'k': 'inside',
+            'r': <String, Object?>{'deep': 2},
+          },
+          'k': 'other',
+        }),
+      );
+      expect(h.cache(''), expected);
+      expect(rowPaths(), '/a/k/,/a/r/,/k/');
+      expect(h.rawScalar('SELECT count(*) FROM server_cache'), 3);
+      expect(h.warnings, isEmpty);
+      expect(h.engine.serverCacheEstimatedSizeInBytes(), h.fullSum());
+    });
   });
 
   // Mutation: in SqliteStorageEngine.serverCacheEstimatedSizeInBytes, return the counter whatever
