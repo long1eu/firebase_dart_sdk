@@ -9,6 +9,7 @@ import 'package:firebase_database_dart/src/core/snap/indexes/index.dart';
 import 'package:firebase_database_dart/src/core/snap/indexes/priority_index.dart';
 import 'package:firebase_database_dart/src/core/snap/named_node.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
+import 'package:firebase_database_dart/src/core/util/numbers.dart';
 import 'package:firebase_database_dart/src/core/util/validation.dart';
 import 'package:firebase_database_dart/src/core/view/query_spec.dart';
 import 'package:meta/meta.dart';
@@ -123,9 +124,21 @@ final class DataSnapshot {
   }
 
   /// The data in export form, as the JS SDK's `exportVal()`: a node with a priority becomes a map with
-  /// `.value` (for a leaf) or its children plus `.priority`. So `jsonEncode(snapshot)` works.
-  Object? toJson() => _node.toJson(exportFormat: true);
+  /// `.value` (for a leaf) or its children plus `.priority`. So `jsonEncode(snapshot)` works. Numbers,
+  /// priorities included, follow the rule of [value]: the server's `1.0` exports as the `int` 1.
+  Object? toJson() => _readForm(_node.toJson(exportFormat: true));
 }
+
+/// [json], a fresh export-form tree, with every number in the read form of [DataSnapshot.value]
+/// (`normalizeNumber`). The node keeps the server's form for the hash, the cache and the wire.
+Object? _readForm(Object? json) => switch (json) {
+  final num n => normalizeNumber(n),
+  final Map<String, Object?> m => <String, Object?>{
+    for (final MapEntry<String, Object?> e in m.entries)
+      e.key: _readForm(e.value),
+  },
+  _ => json,
+};
 
 /// Members of [DataSnapshot] for the SDK itself and its tests. Not exported by the public
 /// libraries.

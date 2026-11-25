@@ -170,6 +170,29 @@ void main() {
     });
   });
 
+  test(
+    'toJson exports a value and a priority stored as 1.0 as 1, and 1.5 as 1.5',
+    () {
+      withDb((FirebaseDatabase db) {
+        // The emulator sends every stored numeric priority as a double (`".priority":1.0`). The
+        // checks hold on every compiler: on dart2js `1.0 is int` is already true, `1.5 is int` never.
+        final DataSnapshot s = snap(db, <String, Object?>{
+          'whole': <String, Object?>{'.value': 1.0, '.priority': 1.0},
+          'frac': <String, Object?>{'.value': 1.5, '.priority': 1.5},
+        });
+        final Map<String, Object?> json = s.toJson()! as Map<String, Object?>;
+        final Map<String, Object?> whole =
+            json['whole']! as Map<String, Object?>;
+        final Map<String, Object?> frac = json['frac']! as Map<String, Object?>;
+        expect(whole['.value'], allOf(isA<int>(), 1));
+        expect(whole['.priority'], allOf(isA<int>(), 1));
+        expect(frac['.value'], allOf(isNot(isA<int>()), 1.5));
+        expect(frac['.priority'], allOf(isNot(isA<int>()), 1.5));
+        expect(jsonEncode(s.child('whole')), '{".value":1,".priority":1}');
+      });
+    },
+  );
+
   test('a written 5.0 reads back as int 5 before the server answers (C12)', () {
     fakeTime((FakeTime time) {
       final FirebaseDatabase db = databaseWithFakeServer(

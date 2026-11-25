@@ -207,6 +207,8 @@ that same object. With `applyLocally: false`, listeners see no local event befor
 - **A stream ends after the server cancels its listen** (`permission-denied`, then done), as the client's streams do;
   on Android the stream reports the error and stays open, so an `await for` loop ends here and waits there.
 - **A child snapshot keeps its priority** (`snapshot.child('a').priority`, `children`); the native plugins give null.
+- **A whole-number priority is an `int`** (`1`, not `1.0`), as values are; on Android FlutterFire returns every
+  numeric priority as a `double`, so `priority as double` must become `(priority as num).toDouble()`.
 - **The snapshot of a child event has the child's reference** (`event.snapshot.ref` of `onChildAdded` is the child,
   as in the JS and native SDKs); FlutterFire gives the query's reference. Code that used `event.snapshot.ref` as the
   list's reference must use the query's reference instead.
