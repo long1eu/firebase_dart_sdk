@@ -110,7 +110,10 @@ downloads more than you asked for.
 
 The codes are listed in the [README](../../firebase_database/firebase_database_dart/README.md#errors) and in the
 documentation of `FirebaseDatabaseException`. A bad path, key, value or query is an `ArgumentError` or `StateError` at
-the call, before anything is sent, not an exception through a Future.
+the call, before anything is sent, not an exception through a Future. One limit only the server checks: in one `set`,
+a value whose longest chain of keys together with the path is longer than 768 bytes is refused with `unknown`
+(`invalid_parameters` in `serverStatus`), while a flat multi-path `update` is checked path by path and avoids it
+(measured on the emulator).
 
 ## What surprises people from the JS SDK or FlutterFire
 

@@ -267,8 +267,8 @@ Future<void> databaseGuideLine86() async {
   }
 }
 
-// ../../docs/guides/database.md:184
-Future<void> databaseGuideLine184() async {
+// ../../docs/guides/database.md:187
+Future<void> databaseGuideLine187() async {
   final FirebaseDatabase cached = FirebaseDatabase(
     app,
     persistence: sqlitePersistence('/var/lib/my-app/rtdb', cacheSizeBytes: 50 * 1024 * 1024),
@@ -279,8 +279,8 @@ Future<void> databaseGuideLine184() async {
   await cached.close();
 }
 
-// ../../docs/guides/database.md:241
-Future<void> databaseGuideLine241() async {
+// ../../docs/guides/database.md:244
+Future<void> databaseGuideLine244() async {
   database.onConnected.listen((bool connected) => print('connected: $connected'));
   ProcessSignal.sigterm.watch().first.then((ProcessSignal _) async {
     await database.close();
@@ -288,8 +288,8 @@ Future<void> databaseGuideLine241() async {
   });
 }
 
-// ../../docs/guides/database.md:272
-Future<void> databaseGuideLine272() async {
+// ../../docs/guides/database.md:275
+Future<void> databaseGuideLine275() async {
   final FirebaseDatabase asAda = FirebaseDatabase(
     app,
     emulatorHost: '127.0.0.1:9100',

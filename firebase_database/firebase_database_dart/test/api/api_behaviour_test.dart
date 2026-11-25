@@ -335,6 +335,62 @@ void main() {
             ),
       );
     });
+
+    /// The exception of a set the server answers with [status] and [reason].
+    FirebaseDatabaseException failedSet(
+      FakeTime time,
+      String status, [
+      String? reason,
+    ]) {
+      final _Wire w = _Wire(time);
+      Object? error;
+      w.db.ref('a').set(1).catchError((Object e) => error = e);
+      time.elapse(Duration.zero);
+      w.server.failLastWrite(status, reason);
+      time.elapse(Duration.zero);
+      return error! as FirebaseDatabaseException;
+    }
+
+    timed('an unknown status with a reason gives the reason as message', (
+      FakeTime time,
+    ) {
+      const String reason =
+          'Path specified exceeds the maximum length that can be written '
+          '(768 bytes).';
+      final FirebaseDatabaseException e = failedSet(
+        time,
+        'invalid_parameters',
+        reason,
+      );
+      expect(e.code, 'unknown');
+      expect(e.message, reason);
+      expect(e.serverStatus, 'invalid_parameters: $reason');
+    });
+
+    timed('an unknown status without a reason keeps the generic message', (
+      FakeTime time,
+    ) {
+      final FirebaseDatabaseException e = failedSet(time, 'internal_error');
+      expect(e.code, 'unknown');
+      expect(e.message, 'An unknown error occurred.');
+      expect(e.serverStatus, 'internal_error');
+    });
+
+    timed('a known status keeps its own message and the reason', (
+      FakeTime time,
+    ) {
+      final FirebaseDatabaseException e = failedSet(
+        time,
+        'permission_denied',
+        'Permission denied',
+      );
+      expect(e.code, 'permission-denied');
+      expect(
+        e.message,
+        'This client does not have permission to perform this operation.',
+      );
+      expect(e.serverStatus, 'permission_denied: Permission denied');
+    });
   });
 
   group('construction', () {

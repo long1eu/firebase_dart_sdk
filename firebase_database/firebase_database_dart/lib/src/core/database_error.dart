@@ -90,22 +90,29 @@ enum DatabaseErrorCode {
 /// [details] (for example the server's reason text).
 final class DatabaseError {
   /// Creates an error.
-  const DatabaseError(this.code, this.message, {this.details});
+  const DatabaseError(this.code, this.message, {this.details, this.rawStatus});
 
   /// Creates the error for a wire [status] with the server's optional [reason], as Repo does for
   /// a failed request.
   ///
   /// The code comes from [DatabaseErrorCode.fromWireStatus], the message from the code. [details]
-  /// is [reason]; for a status the client does not know (mapped to [DatabaseErrorCode.unknown])
-  /// it is the raw status followed by the reason (`invalid_parameters: ...`), so the public
-  /// `serverStatus` keeps it. JS: `errorForServerCode`; Android: `DatabaseError.fromStatus`.
+  /// is [reason]. For a status the client does not know (mapped to [DatabaseErrorCode.unknown]),
+  /// [rawStatus] is that status, [details] is the status followed by the reason
+  /// (`invalid_parameters: ...`), so the public `serverStatus` keeps it, and the message is the
+  /// reason when there is one (as Android). JS: `errorForServerCode`; Android:
+  /// `DatabaseError.fromStatus`.
   factory DatabaseError.fromStatus(String status, [String? reason]) {
     final DatabaseErrorCode code = DatabaseErrorCode.fromWireStatus(status);
-    final String? details =
-        code == DatabaseErrorCode.unknown && status.toLowerCase() != 'unknown'
-        ? (reason == null ? status : '$status: $reason')
-        : reason;
-    return DatabaseError(code, _messageFor(code), details: details);
+    if (code == DatabaseErrorCode.unknown &&
+        status.toLowerCase() != 'unknown') {
+      return DatabaseError(
+        code,
+        reason ?? _messageFor(code),
+        details: reason == null ? status : '$status: $reason',
+        rawStatus: status,
+      );
+    }
+    return DatabaseError(code, _messageFor(code), details: reason);
   }
 
   /// The error code.
@@ -116,6 +123,10 @@ final class DatabaseError {
 
   /// Extra details, never containing tokens.
   final String? details;
+
+  /// The status the server sent when the client does not know it (the code is then
+  /// [DatabaseErrorCode.unknown] and [details] starts with this status); null otherwise.
+  final String? rawStatus;
 
   /// The code, message and details; never a token (Android `DatabaseError.toString`).
   @override
