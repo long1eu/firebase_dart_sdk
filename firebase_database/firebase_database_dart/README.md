@@ -177,6 +177,11 @@ throw an `ArgumentError` or `StateError` at the call, before anything is sent. S
 child with `null`, give it a value (`{'.value': 1, '.priority': 5}`), or write `'n/.priority'` to change the priority
 of a child that exists.
 
+A multi-path `update` cannot create a node and set its priority through separate keys (`'x/v'` with `'x/.priority'`,
+`x` missing): the server refuses the whole update, so the listeners show the write, then revert, and the Future fails
+with `unknown` and the server's reason. An `OnDisconnect.update` with such keys completes and writes nothing when it
+runs (measured on the emulator). Write the node as one object, `{'x': {'v': 1, '.priority': 3}}`.
+
 `set` and `OnDisconnect.set` take an optional `priority:`, and `setPriority` changes only the priority.
 `DatabaseReference.key`, `parent`, `root` and `child` build paths without a request; `FirebaseDatabase.refFromUrl` takes
 a full URL of this database (it throws for another one), `FirebaseDatabase.app` is the app and `databaseUrl` the URL in

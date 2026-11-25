@@ -125,6 +125,11 @@ final class DatabaseReference extends Query {
   /// that child. Two keys where one is a prefix of the other throw an [ArgumentError].
   ///
   /// An empty [values] map writes nothing and completes the Future in a microtask, with no request.
+  ///
+  /// The server refuses the whole update when keys create a node and set its priority separately
+  /// (`{'x/v': 1, 'x/.priority': 3}` with `x` missing): the local write reverts and the Future
+  /// fails with `unknown` and the server's reason. Write the node as one object instead,
+  /// `{'x': {'v': 1, '.priority': 3}}`.
   Future<void> update(Map<String, Object?> values) {
     final Path path = spec.path;
     validateWritablePath('update', path);
