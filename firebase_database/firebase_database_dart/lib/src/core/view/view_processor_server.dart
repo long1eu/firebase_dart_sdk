@@ -208,6 +208,17 @@ extension _ServerOperations on ViewProcessor {
 
   /// JS `viewProcessorApplyServerMerge` (Android `applyServerMerge` for the [CompoundWrite]):
   /// the children the server cache has first (a limit window may make room), then the others.
+  ///
+  /// With [fromServer] (a merge the server sent), unlike JS and Android, which give every child
+  /// the complete server cache from before the merge, each child gets that cache with the
+  /// merge's earlier children and itself applied: a limit window that makes room pulls its next
+  /// child from it, and from the cache before the merge it would pull a child with values this
+  /// merge changed or removed, which no later frame repairs (docs/database_decisions.md section
+  /// 25). A deep entry this view skips (below a child its filtered server cache does not hold) is
+  /// not applied to that cache either, so a child pulled in later can still be the old one; that
+  /// state was wrong before this change too. An acknowledgement calls this with children copied
+  /// from the view's own server cache, not with data the server just sent, so it keeps the
+  /// upstream behaviour: every child gets the complete cache as it is.
   ViewCache _applyServerMerge(
     ViewCache viewCache,
     Path path,
@@ -215,8 +226,9 @@ extension _ServerOperations on ViewProcessor {
     WriteTreeRef writesCache,
     Node? serverCache,
     bool filterServerNode,
-    ChildChangeAccumulator accumulator,
-  ) {
+    ChildChangeAccumulator accumulator, {
+    bool fromServer = false,
+  }) {
     // Without a cache yet, this merge was meant for an earlier listen at this location: ignore
     // it and wait for the complete data coming soon.
     if (viewCache.serverCache.node.isEmpty &&
@@ -234,10 +246,22 @@ extension _ServerOperations on ViewProcessor {
     final Node serverNode = viewCache.serverCache.node;
     final Map<ChildKey, CompoundWrite> childCompoundWrites = actualMerge
         .childCompoundWrites();
+    Node? curServerCache = serverCache;
+    void applyToServerCache(ChildKey childKey, CompoundWrite childMerge) {
+      final Node? before = curServerCache;
+      if (fromServer && before != null) {
+        curServerCache = before.updateImmediateChild(
+          childKey,
+          childMerge.apply(before.getImmediateChild(childKey)),
+        );
+      }
+    }
+
     for (final MapEntry<ChildKey, CompoundWrite> childMerge
         in childCompoundWrites.entries) {
       final ChildKey childKey = childMerge.key;
       if (serverNode.hasChild(childKey)) {
+        applyToServerCache(childKey, childMerge.value);
         final Node serverChild = serverNode.getImmediateChild(childKey);
         final Node newChild = childMerge.value.apply(serverChild);
         curViewCache = _applyServerOverwrite(
@@ -245,7 +269,7 @@ extension _ServerOperations on ViewProcessor {
           Path.fromKeys(<ChildKey>[childKey]),
           newChild,
           writesCache,
-          serverCache,
+          curServerCache,
           filterServerNode,
           accumulator,
         );
@@ -258,6 +282,7 @@ extension _ServerOperations on ViewProcessor {
           !viewCache.serverCache.isCompleteForChild(childKey) &&
           childMerge.value.rootWrite() == null;
       if (!serverNode.hasChild(childKey) && !isUnknownDeepMerge) {
+        applyToServerCache(childKey, childMerge.value);
         final Node serverChild = serverNode.getImmediateChild(childKey);
         final Node newChild = childMerge.value.apply(serverChild);
         curViewCache = _applyServerOverwrite(
@@ -265,7 +290,7 @@ extension _ServerOperations on ViewProcessor {
           Path.fromKeys(<ChildKey>[childKey]),
           newChild,
           writesCache,
-          serverCache,
+          curServerCache,
           filterServerNode,
           accumulator,
         );

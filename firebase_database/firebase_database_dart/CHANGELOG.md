@@ -51,6 +51,9 @@ against the Database emulator.
 - The event dispatcher yields to the event loop after 1,000 events with an unthrottled task in the browser, so a burst
   of events in a hidden tab is delivered in bounded time.
 - Writes are delivered at least once: a re-sent `ServerValue.increment` can apply twice.
+- A limit query under a listener at or above its path keeps the right window when one update by another client
+  moves a child out of it: the child that enters holds the update's earlier changes, and the window ends as the
+  server's. The JS SDK showed a stale or removed child there until every listener at the path was removed.
 - `update` and `OnDisconnect.update` throw an `ArgumentError` at the call for an object, at any depth, with a non-null
   priority and no value once nulls and empty objects are dropped (`{'n': {'.priority': 5}}`,
   `{'n': {'.value': null, '.priority': 5}}`, `{'n': {'.priority': 5, 'a': {}}}`): the server answers such a merge
