@@ -89,7 +89,9 @@ const List<String> firebaseDatabaseExceptionCodes = <String>[
 
 /// The public exception for a core [error]: the kebab-case code of [DatabaseError.code], its message, and
 /// the wire status followed by the server's reason as [FirebaseDatabaseException.serverStatus] (none for
-/// [DatabaseErrorCode.databaseClosed], which is local).
+/// [DatabaseErrorCode.databaseClosed], which is local). For a status the client does not know, the
+/// details already hold `status: reason` and are the [FirebaseDatabaseException.serverStatus] as they
+/// are, as [exceptionFromServerStatus] writes it.
 @internal
 FirebaseDatabaseException exceptionFromDatabaseError(
   DatabaseError error, {
@@ -102,6 +104,8 @@ FirebaseDatabaseException exceptionFromDatabaseError(
     message: error.message,
     serverStatus: error.code == DatabaseErrorCode.databaseClosed
         ? null
+        : error.rawStatus != null
+        ? details
         : details == null
         ? status
         : '$status: $details',

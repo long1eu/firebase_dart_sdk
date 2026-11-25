@@ -99,7 +99,9 @@ final class DatabaseReference extends Query {
   /// A `null` [value] removes the data. Fires local events before the Future completes; see the
   /// class documentation for completion, rollback and value rules. With `persistence` the write is
   /// stored on disk and sent again after a restart; the Future of the run that made it is gone
-  /// then.
+  /// then. The server refuses, with `unknown`, a [value] whose longest chain of keys together with
+  /// this path is longer than 768 bytes; a flat multi-path [update] is checked path by path and
+  /// avoids it (measured on the emulator).
   Future<void> set(Object? value, {Object? priority}) =>
       _set('set', value, priority);
 
