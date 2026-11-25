@@ -354,7 +354,18 @@ final class ServerCacheRows {
       return;
     }
     final List<MapEntry<Path, Node>> resave = <MapEntry<Path, Node>>[];
-    _collectResaves(root, Path.empty, toPrune, toKeep, forest, resave);
+    for (final MapEntry<Path, String> row in toPrune.entries) {
+      // Only the top-most row on each branch: the rows below it are inside its node.
+      if (toPrune.findRootMostValueAndPath(row.key)!.path == row.key) {
+        _collectResaves(
+          root,
+          row.key,
+          toKeep.subtree(row.key),
+          forest.childAtPath(row.key),
+          resave,
+        );
+      }
+    }
     _deleteRows(<String>[
       for (final MapEntry<Path, String> e in toPrune.entries) e.value,
     ]);
@@ -382,30 +393,16 @@ final class ServerCacheRows {
     }
   }
 
-  /// Walks the rows to prune; for the top-most row on each branch, adds the kept parts of its
-  /// node that have no kept row of their own to [resave] (paths relative to [pruneRoot]).
+  /// For the top-most row to prune at [relativePath] (relative to [pruneRoot]), adds the kept
+  /// parts of its node that have no kept row of their own to [resave]. [toKeep] and [forest] are
+  /// the kept rows and the forest at [relativePath].
   void _collectResaves(
     Path pruneRoot,
     Path relativePath,
-    ImmutableTree<String> toPrune,
     ImmutableTree<String> toKeep,
     PruneForest forest,
     List<MapEntry<Path, Node>> resave,
   ) {
-    if (toPrune.value == null) {
-      for (final MapEntry<ChildKey, ImmutableTree<String>> child
-          in toPrune.children.entries) {
-        _collectResaves(
-          pruneRoot,
-          relativePath.child(child.key),
-          child.value,
-          toKeep.getChild(child.key),
-          forest.child(child.key),
-          resave,
-        );
-      }
-      return;
-    }
     final List<Path> keptWithoutRow = forest.foldKeptNodes<List<Path>>(
       <Path>[],
       (Path keepPath, List<Path> paths) {

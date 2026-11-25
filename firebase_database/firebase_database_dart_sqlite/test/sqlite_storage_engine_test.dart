@@ -39,7 +39,10 @@ final QueryParams sampleParams = QueryParams.defaultParams
     .endAt(node('endVal'), ChildKey('endKey'))
     .limitToLast(5);
 
-final QuerySpec sampleQuery = QuerySpec(Path('foo'), sampleParams);
+final QuerySpec sampleQuery = QuerySpec.fromPathAndWireObject(
+  Path('foo'),
+  sampleParams.toWireObject(),
+);
 
 QuerySpec defaultAt(String path) => QuerySpec.defaultAt(Path(path));
 

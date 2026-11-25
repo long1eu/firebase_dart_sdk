@@ -1,6 +1,7 @@
 // QuerySpec (Android core/view/QuerySpec.java) and its ListenSpec form.
 import 'package:firebase_database_dart/src/core/connection/listen_spec.dart';
 import 'package:firebase_database_dart/src/core/path.dart';
+import 'package:firebase_database_dart/src/core/snap/child_key.dart';
 import 'package:firebase_database_dart/src/core/snap/indexes/path_index.dart';
 import 'package:firebase_database_dart/src/core/snap/indexes/priority_index.dart';
 import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
@@ -65,5 +66,35 @@ void main() {
     expect(parsed == QuerySpec(Path('q'), params), isFalse);
     expect(spec == QuerySpec.defaultAt(Path('p')), isFalse);
     expect(spec.toString(), '/p:{"i":"age","l":3,"vf":"r"}');
+  });
+
+  test('toWireObject round-trips through fromPathAndWireObject', () {
+    final Map<String, QuerySpec> specs = <String, QuerySpec>{
+      'default': QuerySpec.defaultAt(Path('p')),
+      'limit with orderByChild': QuerySpec(
+        Path('p'),
+        QueryParams.defaultParams
+            .orderBy(PathIndex(Path('age')))
+            .limitToFirst(2),
+      ),
+      'range': QuerySpec(
+        Path('p'),
+        QueryParams.defaultParams
+            .orderBy(PathIndex(Path('age')))
+            .startAt(nodeFromJson(18), ChildKey('a'))
+            .endBefore(nodeFromJson('z')),
+      ),
+    };
+    expect(specs['default']!.toWireObject(), isEmpty);
+    for (final MapEntry<String, QuerySpec> entry in specs.entries) {
+      final QuerySpec spec = entry.value;
+      final Map<String, Object?> wire = spec.toWireObject();
+      expect(wire, spec.params.toWireObject(), reason: entry.key);
+      expect(
+        QuerySpec.fromPathAndWireObject(spec.path, wire),
+        spec,
+        reason: entry.key,
+      );
+    }
   });
 }

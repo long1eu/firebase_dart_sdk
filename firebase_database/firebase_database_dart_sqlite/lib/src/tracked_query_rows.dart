@@ -22,7 +22,7 @@ final class TrackedQueryRows {
   /// object (an integral double within 2^53 is already an int there, so `1.0` and `1` are one
   /// query); `jsonEncode` adds no rule of its own.
   static String encodeParams(QuerySpec spec) =>
-      jsonEncode(_sortedKeys(spec.params.toWireObject()));
+      jsonEncode(_sortedKeys(spec.toWireObject()));
 
   static Object? _sortedKeys(Object? value) {
     if (value is! Map) {
