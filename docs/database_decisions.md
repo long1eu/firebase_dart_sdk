@@ -502,6 +502,12 @@ SDK 13.x hangs the same way on the emulator. Production answers the same way as 
 were answered, and the connection stayed usable); a REST PUT of the same shape got HTTP 400 there. No such write
 can already be persisted on a user's disk, because there has been no release.
 
+A merge whose keys create a node and set its priority separately (`{'x/v': 1, 'x/.priority': 3}` with `x` missing)
+is refused whole, in either key order, with `invalid_parameters` "could not set priority on non-existent node" and
+nothing written, while `{'x': {'v': 1, '.priority': 3}}` is stored (measured on production and on the emulator on
+2026-11-26); the client shows the write, reverts it and fails the Future with `unknown` and that reason, and on the
+emulator an `onDisconnect.update` of the same keys is answered `ok` and writes nothing when it runs.
+
 **What we gave up.** Nothing makes an increment exact after a lost answer; the README and a test say so. A
 write under `.info` that JS accepts through `update` and `onDisconnect().cancel` is refused
 (`J:api/Reference_impl.ts:798-808`, `J:api/OnDisconnect.ts:72-80`): `set`, `update`, `remove` and
@@ -510,7 +516,8 @@ Such an object in a merge is refused, where JS sends it and hangs (measured) and
 `A:core/Repo.java:633-635`); the same object nested in a `set` value is dropped without an error, as in JS.
 
 **Pinned by.** `test/api/validation_test.dart` (the rules; group "an object with a priority and no value") and
-`test/core/util/validation_test.dart` (the rules);
+`test/core/util/validation_test.dart` (the rules); `test/api/update_priority_keys_test.dart` (the refused
+separate priority key);
 `test/realtime/replay_test.dart` and `test/realtime/persistent_connection_test.dart` (a put sent but not
 answered is sent again on the next connection); `test/integration/chaos_emulator_test.dart`.
 

@@ -67,6 +67,10 @@ final class OnDisconnect {
   ///
   /// An empty [values] map registers nothing and completes the Future in a microtask, with no
   /// request.
+  ///
+  /// Keys that create a node and set its priority separately (`{'x/v': 1, 'x/.priority': 3}` with
+  /// `x` missing) complete the Future, and the server writes nothing on disconnect (measured on
+  /// the emulator). Write the node as one object instead, `{'x': {'v': 1, '.priority': 3}}`.
   Future<void> update(Map<String, Object?> values) {
     const String fnName = 'OnDisconnect.update';
     final Path path = reference.spec.path;
