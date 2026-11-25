@@ -147,7 +147,16 @@ void main() {
       await recovered.future.timeout(const Duration(seconds: 90));
       stopwatch.stop();
 
-      expect(signals, hint ? 1 : 0);
+      // With next to no backoff left, the stream's own retry can work before the detector's next poll sees the new
+      // address; the detector then stops without a signal.
+      final bool retryMayWinTheRace =
+          backoffLeftAtRecovery < const Duration(milliseconds: 500);
+      expect(
+        signals,
+        hint ? (retryMayWinTheRace ? anyOf(0, 1) : 1) : 0,
+        reason:
+            '${backoffLeftAtRecovery.inMilliseconds} ms of backoff were left',
+      );
       // Let the stream settle: once it works the detector stops.
       await Future<void>.delayed(const Duration(milliseconds: 500));
       expect(
