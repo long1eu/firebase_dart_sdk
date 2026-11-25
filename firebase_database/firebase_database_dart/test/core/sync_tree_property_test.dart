@@ -19,13 +19,20 @@
 // key-ordered limitToFirst query (rtdb/from_helper/reports/limit_query_frames.md): a set at or
 // above its path puts the whole window; an update at or above it merges its relative paths
 // when the window keeps its children, the entering child whole and the removed one null when it
-// changes, and nothing when no window child is touched (its own priority included); a write
-// below it goes as written while its child stays in the window, nothing for a child outside, the
-// entering child alone at its path when it pushes another out, and a merge of entering and
-// removed children otherwise. Not measured, and kept as the model's guess: the order by
-// priority of this query, an update that changes one window child while another enters or that
-// pushes a child out (the whole window is put), an update key at or above the query path, and
-// a window merge whose entering child sorts before a child that stays (measured only after it).
+// changes, and nothing when no window child is touched (its own priority included); an update
+// that writes below one window child next to a key outside the window puts that child whole at
+// its path; a write below it goes as written while its child stays in the window, a put of null
+// at the child's path when it empties a window child and none enters, nothing for a child
+// outside, the entering child alone at its path when it pushes another out, and a merge of the
+// entering children and the leaving ones otherwise: null for a removed child, whole for one moved
+// out by its priority. The production run of 2026-11-25 (rtdb/from_boss/
+// prodkit_production_run_2026-11-25.txt, checks 28, 29 and 37) sent the same frames for the
+// shapes it covered, the tagged frame first; the put of null for an emptied child was measured
+// on the emulator only. Not measured, and kept as the model's guess: the order by priority of
+// this query beyond a child moved in and out by its priority, an update that changes one window
+// child while another enters or that pushes a child out (the whole window is put), an update key
+// at or above the query path, and a window merge whose entering child sorts before a child that
+// stays (measured only after it).
 //
 // The unchanged code fails some seeds, for behaviours that are documented and kept. The test
 // fails when a seed outside [_knownFailures] fails, or a listed seed passes.
@@ -360,8 +367,9 @@ final class _Server {
   }
 
   /// Sends [w] to the limit query's listen [l] in the frames the emulator sent for a key-ordered
-  /// `limitToFirst(2)` query (rtdb/from_helper/reports/limit_query_frames.md, cases A1 to C5).
-  /// Shapes it did not measure keep the whole window as a put at the query path.
+  /// `limitToFirst(2)` query (rtdb/from_helper/reports/limit_query_frames.md, cases A1 to C5),
+  /// as production sent them (prodkit_production_run_2026-11-25.txt, checks 28 and 37).
+  /// Shapes neither measured keep the whole window as a put at the query path.
   void _publishTagged(ServerCall l, _Write w, Node before) {
     final QuerySpec q = _queries.firstWhere(
       (QuerySpec q) => q.toListenSpec() == l.spec,
@@ -385,9 +393,12 @@ final class _Server {
     ];
     // A child that left the window but still exists was pushed out by one that entered.
     bool removed(String k) => data.getChild(q.path.childPath(Path(k))).isEmpty;
+    // The entering children whole; a leaving child null when it was removed, else whole with its
+    // new value and priority (production: c4 moved out by its priority, check 37).
     final Map<String, Object?> diff = <String, Object?>{
       for (final String k in entered) k: now[k],
-      for (final String k in left) k: null,
+      for (final String k in left)
+        k: data.getChild(q.path.childPath(Path(k))).toJson(exportFormat: true),
     };
     final Path at = Path(w.path);
     if (at.length > q.path.length) {
@@ -403,7 +414,11 @@ final class _Server {
         // The entering child alone, whole; the client drops what it pushes out (C4).
         send('$lp/$child', now[child]);
       } else if (entered.isEmpty) {
-        if (was.containsKey(child)) {
+        // A window child emptied by a write below it, nothing entering: a put of null at the
+        // child's path, not the write as written (emulator: set a/x/u null on x {u}).
+        if (removed(child)) {
+          send('$lp/$child', null);
+        } else if (was.containsKey(child)) {
           send(_wire(w.path), w.data, merge: w.merge);
         }
       } else {
@@ -438,11 +453,23 @@ final class _Server {
     if (!touched.any((String k) => was.containsKey(k) || now.containsKey(k))) {
       return; // A5, A6, B4
     }
+    final Map<String, Object?> inWindow = <String, Object?>{
+      for (final MapEntry<String, Object?> e in below.entries)
+        if (now.containsKey(e.key.split('/').first)) e.key: e.value,
+    };
+    final Set<String> changed = <String>{
+      for (final String k in inWindow.keys) k.split('/').first,
+    };
     if (left.isEmpty && entered.isEmpty) {
-      send(lp, <String, Object?>{
-        for (final MapEntry<String, Object?> e in below.entries)
-          if (now.containsKey(e.key.split('/').first)) e.key: e.value,
-      }, merge: true); // A3, B3
+      if (inWindow.length < below.length &&
+          changed.length == 1 &&
+          inWindow.keys.any((String k) => k.contains('/'))) {
+        // One window child written below it, next to a key outside the window: that child
+        // whole at its path (production, line mixed: update a/n and d/n).
+        send('$lp/${changed.single}', now[changed.single]);
+      } else {
+        send(lp, inWindow, merge: true); // A3, B3
+      }
     } else if (left.every(removed) &&
         !touched.any((String k) => was.containsKey(k) && now.containsKey(k))) {
       send(lp, diff, merge: true); // A4, B2
