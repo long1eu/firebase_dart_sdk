@@ -56,8 +56,8 @@ Future<void> clientReadmeLine144() async {
   await ada.remove(); // set(null)
 }
 
-// ../firebase_database_dart/README.md:187
-Future<void> clientReadmeLine187() async {
+// ../firebase_database_dart/README.md:191
+Future<void> clientReadmeLine191() async {
   final DatabaseReference items = database.ref('items');
 
   final subscription = items.onValue.listen((DatabaseEvent event) {
@@ -77,8 +77,8 @@ Future<void> clientReadmeLine187() async {
   await subscription.cancel();
 }
 
-// ../firebase_database_dart/README.md:224
-Future<void> clientReadmeLine224() async {
+// ../firebase_database_dart/README.md:228
+Future<void> clientReadmeLine228() async {
   final Query players = database.ref('players');
 
   // Results are ascending; for a top three take the last three and reverse them.
@@ -101,8 +101,8 @@ Future<void> clientReadmeLine224() async {
   print(sorted.children.length);
 }
 
-// ../firebase_database_dart/README.md:272
-Future<void> clientReadmeLine272() async {
+// ../firebase_database_dart/README.md:276
+Future<void> clientReadmeLine276() async {
   final TransactionResult result = await database.ref('seats').runTransaction((Object? current) {
     if (current == null) {
       return Transaction.success(null); // the first run often sees null, the client has no data yet
@@ -113,8 +113,8 @@ Future<void> clientReadmeLine272() async {
   print('committed: ${result.committed}, value: ${result.snapshot.value}');
 }
 
-// ../firebase_database_dart/README.md:301
-Future<void> clientReadmeLine301() async {
+// ../firebase_database_dart/README.md:305
+Future<void> clientReadmeLine305() async {
   final DatabaseReference status = database.ref('status/ada');
   // Register again at every connection: the server forgets the registrations when the
   // connection ends, and the client does not keep them across a restart.
@@ -129,8 +129,8 @@ Future<void> clientReadmeLine301() async {
   await presence.cancel();
 }
 
-// ../firebase_database_dart/README.md:328
-Future<void> clientReadmeLine328() async {
+// ../firebase_database_dart/README.md:332
+Future<void> clientReadmeLine332() async {
   await database.ref('post').set(<String, Object?>{
     'title': 'Hello',
     'createdAt': ServerValue.timestamp, // milliseconds since the epoch, on the server
@@ -141,8 +141,8 @@ Future<void> clientReadmeLine328() async {
   print('offset: ${database.serverTimeOffset}, now on the server: ${database.estimatedServerTime}');
 }
 
-// ../firebase_database_dart/README.md:349
-Future<void> clientReadmeLine349() async {
+// ../firebase_database_dart/README.md:353
+Future<void> clientReadmeLine353() async {
   database.onConnected.listen((bool connected) => print('connected: $connected'));
   await database.onConnected.firstWhere((bool connected) => connected);
 
@@ -152,8 +152,8 @@ Future<void> clientReadmeLine349() async {
   await queued;
 }
 
-// ../firebase_database_dart/README.md:392
-Future<void> clientReadmeLine392() async {
+// ../firebase_database_dart/README.md:396
+Future<void> clientReadmeLine396() async {
   // Before the FirebaseDatabase is constructed: it reads the app's providers then.
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   await auth.signInAnonymously();
@@ -161,8 +161,8 @@ Future<void> clientReadmeLine392() async {
   await signedIn.close();
 }
 
-// ../firebase_database_dart/README.md:411
-Future<void> clientReadmeLine411() async {
+// ../firebase_database_dart/README.md:415
+Future<void> clientReadmeLine415() async {
   final FirebaseDatabase asAda = FirebaseDatabase(
     app,
     emulatorHost: '127.0.0.1:9100',
@@ -175,8 +175,8 @@ Future<void> clientReadmeLine411() async {
   await asAda.close();
 }
 
-// ../firebase_database_dart/README.md:439
-Future<void> clientReadmeLine439() async {
+// ../firebase_database_dart/README.md:443
+Future<void> clientReadmeLine443() async {
   const String supportDirectory = '/path/to/app/support';
   final FirebaseDatabase cached = FirebaseDatabase(
     app,
@@ -202,8 +202,8 @@ Future<void> clientReadmeLine439() async {
   );
 }
 
-// ../firebase_database_dart/README.md:481
-Future<void> clientReadmeLine481() async {
+// ../firebase_database_dart/README.md:485
+Future<void> clientReadmeLine485() async {
   try {
     await ref.get();
   } on FirebaseDatabaseException catch (e) {
@@ -218,8 +218,8 @@ Future<void> clientReadmeLine481() async {
   }
 }
 
-// ../firebase_database_dart/README.md:520
-Future<void> clientReadmeLine520() async {
+// ../firebase_database_dart/README.md:524
+Future<void> clientReadmeLine524() async {
   final FirebaseDatabase logged = FirebaseDatabase(
     app,
     logger: (DatabaseLogLevel level, String message) {
