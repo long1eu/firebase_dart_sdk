@@ -391,8 +391,15 @@ final class RealtimeConnection {
       case RealtimeProtocol.controlReset:
         _onReset(payload);
       case RealtimeProtocol.controlError:
-        // No state change (Connection.ts:368-369); the request it refers to times out (probe).
-        _log(DatabaseLogLevel.warning, 'server error: ${_describe(payload)}');
+        // No state change (Connection.ts:368-369). The error names no request, so nothing is
+        // failed: the request it refers to stays pending. The link-silence timer does not end
+        // it either, because every inbound frame (this one, and the pong of the dead-link
+        // probe) re-arms that timer (RequestTable.linkActivity).
+        _log(
+          DatabaseLogLevel.warning,
+          'server error: ${_describe(payload)}. The server dropped a request; it will never '
+          'be answered',
+        );
       case RealtimeProtocol.controlPong:
         _liveness?.onResponse(isPong: true);
       case RealtimeProtocol.controlSwitchAck:

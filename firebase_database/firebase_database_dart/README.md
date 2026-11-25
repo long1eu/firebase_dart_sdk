@@ -171,7 +171,11 @@ is not an error, and the local events fire at once. A rejected write rolls back 
 `Map<String, Object?>`, so patterns work without casts. It is built once and unmodifiable; copy it to change it. An
 integral number within 2^53 reads as an `int` even if you wrote `5.0`. A map whose keys are `0..n` with more than half
 present reads as a `List`, so iterate `snapshot.children` when the shape can vary. Bad keys, paths, depths and numbers
-throw an `ArgumentError` or `StateError` at the call, before anything is sent.
+throw an `ArgumentError` or `StateError` at the call, before anything is sent. So does an `update` (or
+`OnDisconnect.update`) with an object that has a priority and no value (only nulls or empty objects), such as
+`{'n': {'.priority': 5}}` or `{'n': {'.value': null, '.priority': 5}}`, which the server never answers: remove the
+child with `null`, give it a value (`{'.value': 1, '.priority': 5}`), or write `'n/.priority'` to change the priority
+of a child that exists.
 
 `set` and `OnDisconnect.set` take an optional `priority:`, and `setPriority` changes only the priority.
 `DatabaseReference.key`, `parent`, `root` and `child` build paths without a request; `FirebaseDatabase.refFromUrl` takes
@@ -596,8 +600,10 @@ The 17 you notice are below. The full table, 28 rows with the test that pins eac
   that names the proxy and the status.
 - **Priorities and pending writes.** As in the JS SDK, the local view can differ from the server until the server
   answers. A node that is emptied and refilled, by one update or by two writes, loses its priority locally (the server
-  keeps it). A limit query's window is short while the client is offline after a local removal, until the server sends
-  it. See "Behaviours shared with the JS SDK that are kept" in
+  keeps it). A transaction on a node that holds only a priority, because its last child was removed by a write below
+  it, fails with `max-retries`; removing the node itself first drops the priority. A limit query's window is short
+  while the client is offline after a local removal, until the server sends it. See "Behaviours shared with the JS
+  SDK that are kept" in
   [docs/database_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_decisions.md).
 - **Transactions and `onDisconnect` registrations are not persisted.** After a restart, register them again.
 - **The server's behaviour was measured on the emulator only.** Token refresh, revocation, ping answers and the

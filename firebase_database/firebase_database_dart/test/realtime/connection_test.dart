@@ -495,6 +495,10 @@ void main() {
         );
         expect(line, contains('Error on incoming message'));
         expect(line, isNot(contains('\n')));
+        expect(
+          line,
+          endsWith('. The server dropped a request; it will never be answered'),
+        );
       });
     });
 
