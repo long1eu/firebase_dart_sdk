@@ -22,9 +22,12 @@ was taken afterwards.
 - Behind: the 100,000-child read with the value (448 against 360 ms; the value takes 95.44 ms here against 29.27 ms,
   an unmodifiable copy that is built once and kept); the 10,000-child read with the value; `update` of the same path
   (483 against 563 a second). `firebase_dart` reads 100,000 children in 197 ms, faster than both.
-- Against this client's own earlier build: `update` of the same path is slower, 483 now against 710 a second;
-  the cause is found (an overlap check that ran for every pending write on each acknowledgement) and the fix is
-  under review, not in this run. The first value of the 100,000-child snapshot, 95.44 against 76.08 ms, has
+- Against this client's own earlier build: in this session `update` of the same path is slower, 483 against 710
+  a second. The cause was an overlap check that ran for every pending write on each acknowledgement; it is fixed
+  since. A later session of that one cell (same machine and method, 5 repeats, the fixed build at `d3adfd82`)
+  measured 6,257 to 10,956 a second for this client against 564 to 863 for the JS SDK (ranges of the repeats'
+  medians; medians 8,485 and 850). The JS SDK's median was 563 in the paired session and 850 in the later one, so
+  the ranges are the figures to quote. The first value of the 100,000-child snapshot, 95.44 against 76.08 ms, has
   overlapping ranges and is not a change in the work done: measured separately on both builds, the first value
   costs about 55 ms of CPU in each, and the newer build's read allocates less, so a garbage collection that used
   to fall inside the read now often falls inside the first value (about 20 ms). That measurement is outside this
@@ -424,12 +427,20 @@ live data; the file measures process peak, not live heap.
 
 ### Open: two differences against this client's own earlier build
 
-Both were found by this session and are not explained. They are under investigation.
+Both were found by this session. The first is explained and fixed since, the second is explained and is not a
+change in the work done; see the notes after each.
 
 1. Pipelined `update` of the same path: 483 operations a second now against 710 on `ours_b` (ranges 477-494 and
    696-714 do not overlap; 0.68 times, computed). Peak memory in the same cell is 64.1 MB against 41.4 MB. Among the
    75 commits between the builds, `a5e448fd` ("Keep a server leaf when a write below it is acknowledged") touches the
    acknowledgement path; it has not been tested as the cause.
+   Since this session: the cause was found by measurement in the write tree (an overlap check repeated for every
+   pending write on each acknowledgement, in `removeWrite`) and fixed in `38e6d8a3` after two independent reviews.
+   A later session of this one cell on the fixed build (`d3adfd82`; same machine, AC power, 5 repeats, driver order
+   rotated) gave 8,485 a second (6,257 to 10,956) for this client and 850 (564 to 863) for the JS SDK; sequential
+   acknowledgements had no winner there (0.28 against 0.24 ms, ranges overlap). Those numbers are from another
+   session than the tables above and are not comparable row by row with them. Source:
+   `tool/bench_rtdb/results/2026-11-23-update-same/` on the branch `rtdb/bench`.
 2. The first value of the 100,000-child snapshot: 95.44 ms now against 76.08 ms on `ours_b`. The ranges overlap
    (89.56-108 and 75.69-104), so this session does not establish a difference; it is listed because the medians moved
    against this client while the read itself got faster.
