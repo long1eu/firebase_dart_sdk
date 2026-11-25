@@ -14,8 +14,9 @@ import 'package:test/test.dart';
 const int beyondDouble = 9007199254740993;
 
 /// The stored text of [params].
-String encodeParams(QueryParams params) =>
-    TrackedQueryRows.encodeParams(QuerySpec(Path.empty, params));
+String encodeParams(QueryParams params) => TrackedQueryRows.encodeParams(
+  QuerySpec.fromPathAndWireObject(Path.empty, params.toWireObject()),
+);
 
 /// Reads the stored form of [node] back as export JSON.
 Object? roundTrip(Node node) =>

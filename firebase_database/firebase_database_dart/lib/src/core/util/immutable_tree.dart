@@ -5,6 +5,7 @@ library;
 import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:firebase_database_dart/src/core/snap/child_key.dart';
 import 'package:firebase_database_dart/src/core/util/sorted_map.dart';
+import 'package:meta/meta.dart';
 
 /// A value found on a path: where and what.
 typedef PathAndValue<T> = ({Path path, T value});
@@ -13,7 +14,9 @@ int _compareKeys(ChildKey a, ChildKey b) => a.compareTo(b);
 
 /// An immutable tree with an optional [value] at every node and children by [ChildKey].
 final class ImmutableTree<T> {
-  /// Creates a tree with [value] and [children] (empty when null).
+  /// Creates a tree with [value] and [children] (empty when null). Outside this package, use
+  /// [ImmutableTree.empty] or [ImmutableTree.fromMap].
+  @internal
   factory ImmutableTree(
     T? value, [
     SortedMap<ChildKey, ImmutableTree<T>>? children,
@@ -39,7 +42,9 @@ final class ImmutableTree<T> {
   /// The value at the root, or null.
   final T? value;
 
-  /// The children.
+  /// The children. Outside this package, walk the tree with [getChild], [subtree], [forEach] or
+  /// [entries].
+  @internal
   final SortedMap<ChildKey, ImmutableTree<T>> children;
 
   /// Whether there is no value anywhere in the tree.

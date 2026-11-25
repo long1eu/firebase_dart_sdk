@@ -39,7 +39,7 @@ class CompoundWrite
 class ImmutableTree
   ==(Object other): bool
   containsMatchingValue((dynamic) -> dart.core.bool predicate): bool
-  final children: SortedMap<ChildKey, ImmutableTree<X0>>
+  final children: SortedMap<ChildKey, ImmutableTree<X0>> @internal
   final value: X0
   findOnPath(Path path, (.Path, dynamic) -> dynamic fn): dynamic
   findRootMostMatchingPathAndValue(Path relativePath, (dynamic) -> dart.core.bool predicate): Record
@@ -56,7 +56,7 @@ class ImmutableTree
   getChild(ChildKey key): ImmutableTree<X0>
   leafMostValue(Path relativePath): X0
   leafMostValueMatching(Path relativePath, (dynamic) -> dart.core.bool predicate): X0
-  new ImmutableTree(dynamic value, [SortedMap<ChildKey, ImmutableTree<dynamic>> children])
+  new ImmutableTree(dynamic value, [SortedMap<ChildKey, ImmutableTree<dynamic>> children]) @internal
   new ImmutableTree.empty()
   new ImmutableTree.fromMap(Map<Path, dynamic> values)
   remove(Path relativePath): ImmutableTree<X0>
@@ -96,6 +96,36 @@ class InMemoryPersistenceStorageEngine
   serverCacheEstimatedSizeInBytes(): int
   setTransactionSuccessful(): void
   updateTrackedQueryKeys(int trackedQueryId, Set<ChildKey> added, Set<ChildKey> removed): void
+abstract class Index
+  compare(NamedNode a, NamedNode b): int
+  get comparator: (.NamedNode, .NamedNode) -> dart.core.int
+  get maxPost: NamedNode
+  get minPost: NamedNode
+  get queryDefinition: String
+  indexedValueChanged(Node oldNode, Node newNode): bool
+  isDefinedOn(Node node): bool
+  makePost(Node indexValue, ChildKey name): NamedNode
+  new Index()
+  toString(): String
+class KeyIndex extends Index
+  compare(NamedNode a, NamedNode b): int
+  get maxPost: NamedNode
+  get minPost: NamedNode
+  get queryDefinition: String
+  indexedValueChanged(Node oldNode, Node newNode): bool
+  isDefinedOn(Node node): bool
+  makePost(Node indexValue, ChildKey name): NamedNode
+  new KeyIndex()
+  toString(): String
+class NamedNode
+  ==(Object other): bool
+  final name: ChildKey
+  final node: Node
+  get hashCode: int
+  new NamedNode(ChildKey name, Node node)
+  static get max: NamedNode
+  static get min: NamedNode
+  toString(): String
 abstract class Node
   forEachChild(Index index, (.ChildKey, .Node) -> dart.core.bool action): bool
   get isEmpty: bool
@@ -190,17 +220,18 @@ class PruneForest
   toString(): String
 class QuerySpec
   ==(Object other): bool
-  final params: QueryParams
+  final params: QueryParams @internal
   final path: Path
   get hashCode: int
   get index: Index
   get isDefault: bool
   get loadsAllData: bool
-  new QuerySpec(Path path, QueryParams params)
+  new QuerySpec(Path path, QueryParams params) @internal
   new QuerySpec.defaultAt(Path path)
   new QuerySpec.fromPathAndWireObject(Path path, Map<String, Object> wire)
-  toListenSpec(): ListenSpec
+  toListenSpec(): ListenSpec @internal
   toString(): String
+  toWireObject(): Map<String, Object>
 class TrackedQuery
   ==(Object other): bool
   final active: bool
