@@ -234,21 +234,31 @@ extension _ServerOperations on ViewProcessor {
     final Node serverNode = viewCache.serverCache.node;
     final Map<ChildKey, CompoundWrite> childCompoundWrites = actualMerge
         .childCompoundWrites();
+    void apply(ChildKey childKey, CompoundWrite childMerge) {
+      final Node serverChild = serverNode.getImmediateChild(childKey);
+      curViewCache = _applyServerOverwrite(
+        curViewCache,
+        Path.fromKeys(<ChildKey>[childKey]),
+        childMerge.apply(serverChild),
+        writesCache,
+        serverCache,
+        filterServerNode,
+        accumulator,
+      );
+    }
+
+    // The node's own priority as the server applies one update: before the children when the
+    // node takes a priority now (emptying it then keeps it), else after them.
+    final CompoundWrite? priority = childCompoundWrites[ChildKey.priority];
+    final bool priorityFirst =
+        !serverNode.isEmpty || ChildrenNode.keepsPriority(serverNode);
+    if (priority != null && priorityFirst) {
+      apply(ChildKey.priority, priority);
+    }
     for (final MapEntry<ChildKey, CompoundWrite> childMerge
         in childCompoundWrites.entries) {
-      final ChildKey childKey = childMerge.key;
-      if (serverNode.hasChild(childKey)) {
-        final Node serverChild = serverNode.getImmediateChild(childKey);
-        final Node newChild = childMerge.value.apply(serverChild);
-        curViewCache = _applyServerOverwrite(
-          curViewCache,
-          Path.fromKeys(<ChildKey>[childKey]),
-          newChild,
-          writesCache,
-          serverCache,
-          filterServerNode,
-          accumulator,
-        );
+      if (serverNode.hasChild(childMerge.key)) {
+        apply(childMerge.key, childMerge.value);
       }
     }
     for (final MapEntry<ChildKey, CompoundWrite> childMerge
@@ -257,19 +267,14 @@ extension _ServerOperations on ViewProcessor {
       final bool isUnknownDeepMerge =
           !viewCache.serverCache.isCompleteForChild(childKey) &&
           childMerge.value.rootWrite() == null;
-      if (!serverNode.hasChild(childKey) && !isUnknownDeepMerge) {
-        final Node serverChild = serverNode.getImmediateChild(childKey);
-        final Node newChild = childMerge.value.apply(serverChild);
-        curViewCache = _applyServerOverwrite(
-          curViewCache,
-          Path.fromKeys(<ChildKey>[childKey]),
-          newChild,
-          writesCache,
-          serverCache,
-          filterServerNode,
-          accumulator,
-        );
+      if (!childKey.isPriorityKey &&
+          !serverNode.hasChild(childKey) &&
+          !isUnknownDeepMerge) {
+        apply(childKey, childMerge.value);
       }
+    }
+    if (priority != null && !priorityFirst) {
+      apply(ChildKey.priority, priority);
     }
     return curViewCache;
   }
@@ -311,7 +316,7 @@ extension _ServerOperations on ViewProcessor {
         return _applyServerOverwrite(
           viewCache,
           ackPath,
-          serverCache.node.getChild(ackPath),
+          ChildrenNode.storedChild(serverCache.node, ackPath),
           writesCache,
           completeCache,
           filterServerNode,
@@ -344,7 +349,7 @@ extension _ServerOperations on ViewProcessor {
       if (serverCache.isCompleteForPath(serverCachePath)) {
         changedChildren = changedChildren.addWrite(
           mergePath,
-          serverCache.node.getChild(serverCachePath),
+          ChildrenNode.storedChild(serverCache.node, serverCachePath),
         );
       }
     });

@@ -138,7 +138,7 @@ extension _RepoGet on Repo {
     final QuerySpec query = request.query;
     final Node node;
     try {
-      node = nodeFromJson(payload);
+      node = nodeFromServerJson(payload);
     } on Object catch (e) {
       _log(
         DatabaseLogLevel.error,

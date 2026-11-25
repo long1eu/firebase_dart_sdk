@@ -148,15 +148,21 @@ void main() {
       expect(y.getChild(Path('test/foo')), same(newValue));
     });
 
-    test('an empty node cannot have a priority', () {
-      expect(
-        () => ChildrenNode(
-          SortedMap<ChildKey, Node>(nameComparator),
-          LeafNode(1),
-          IndexMap.defaultMap,
-        ),
-        throwsStateError,
+    test('an empty node keeps a priority but shows none; the empty node takes '
+        'none', () {
+      // The server keeps the priority of a node emptied by a write below it (production check
+      // 38); readers see no value and no priority.
+      final ChildrenNode kept = ChildrenNode(
+        SortedMap<ChildKey, Node>(nameComparator),
+        LeafNode(1),
+        IndexMap.defaultMap,
       );
+      expect(kept.isEmpty, isTrue);
+      expect(kept.priority.isEmpty, isTrue);
+      expect(kept.keptPriority, LeafNode(1));
+      expect(kept, ChildrenNode.empty);
+      expect(kept.toJson(exportFormat: true), isNull);
+      expect(kept.getImmediateChild(ChildKey.priority).isEmpty, isTrue);
       expect(
         ChildrenNode.empty.updatePriority(LeafNode(1)),
         same(ChildrenNode.empty),

@@ -3,6 +3,7 @@ library;
 
 import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:firebase_database_dart/src/core/snap/child_key.dart';
+import 'package:firebase_database_dart/src/core/snap/children_node.dart';
 import 'package:firebase_database_dart/src/core/snap/indexes/index.dart';
 import 'package:firebase_database_dart/src/core/snap/indexes/priority_index.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
@@ -35,12 +36,24 @@ final class IndexedFilter implements NodeFilter {
       'A node must be indexed if only a child is updated',
     );
     final Node oldChild = snap.getImmediateChild(key);
+    if (oldChild.isEmpty && newChild.isEmpty) {
+      // Neither child has a value: no event. A child that keeps hidden state (a priority kept by
+      // a node emptied below it) is stored without one.
+      if (snap.isLeafNode || ChildrenNode.sameHidden(oldChild, newChild)) {
+        return snap;
+      }
+      return snap.updateImmediateChild(key, newChild).withIndex(_index);
+    }
     // Check if anything actually changed.
     if (oldChild.getChild(affectedPath) == newChild.getChild(affectedPath)) {
       // A child can enter or leave the view because affectedPath was set to null; then the
       // affected path is empty in both, which is not "nothing changed".
       if (oldChild.isEmpty == newChild.isEmpty) {
-        return snap;
+        if (ChildrenNode.sameHiddenAlong(oldChild, newChild, affectedPath)) {
+          return snap;
+        }
+        // Only hidden state below the child changed: stored without an event.
+        return snap.updateImmediateChild(key, newChild).withIndex(_index);
       }
     }
     if (accumulator != null) {
@@ -103,11 +116,12 @@ final class IndexedFilter implements NodeFilter {
     return newSnap.withIndex(_index);
   }
 
-  /// [oldSnap] with [newPriority]; an empty node keeps no priority (Android
-  /// `IndexedFilter.updatePriority`: returns [oldSnap] itself, so its index stays built).
+  /// [oldSnap] with [newPriority]; an empty node takes no priority (Android
+  /// `IndexedFilter.updatePriority`: returns [oldSnap] itself, so its index stays built), except
+  /// one that keeps a priority, whose kept priority is replaced.
   @override
   Node updatePriority(Node oldSnap, Node newPriority) {
-    if (oldSnap.isEmpty) {
+    if (oldSnap.isEmpty && !ChildrenNode.keepsPriority(oldSnap)) {
       return oldSnap;
     }
     return oldSnap.updatePriority(newPriority);

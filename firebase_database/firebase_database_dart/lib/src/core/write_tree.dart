@@ -270,10 +270,12 @@ final class WriteTree {
     final CompoundWrite childMerge = _visibleWrites.childCompoundWrite(path);
     if (childMerge.isEmpty) {
       // Not shadowed at all.
-      return existingServerSnap!.getChild(childPath);
+      return ChildrenNode.storedChild(existingServerSnap!, childPath);
     }
     // Partially shadowed.
-    return childMerge.apply(existingServerSnap!.getChild(childPath));
+    return childMerge.apply(
+      ChildrenNode.storedChild(existingServerSnap!, childPath),
+    );
   }
 
   /// The complete child [childKey] at [treePath] with the writes applied, or null. Android:

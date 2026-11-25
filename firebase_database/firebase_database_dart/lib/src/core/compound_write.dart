@@ -5,6 +5,7 @@ library;
 import 'package:collection/collection.dart';
 import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:firebase_database_dart/src/core/snap/child_key.dart';
+import 'package:firebase_database_dart/src/core/snap/children_node.dart';
 import 'package:firebase_database_dart/src/core/snap/indexes/key_index.dart';
 import 'package:firebase_database_dart/src/core/snap/named_node.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
@@ -76,11 +77,12 @@ final class CompoundWrite {
       final Path relativePath = Path.relative(rootMost.path, path);
       Node value = rootMost.value;
       final ChildKey? back = relativePath.back;
-      if (back != null &&
-          back.isPriorityKey &&
-          value.getChild(relativePath.parent!).isEmpty) {
-        // Ignore priority updates on empty nodes.
-        return this;
+      if (back != null && back.isPriorityKey) {
+        final Node target = value.getChild(relativePath.parent!);
+        if (target.isEmpty && !ChildrenNode.keepsPriority(target)) {
+          // Ignore priority updates on empty nodes, except one that keeps a priority.
+          return this;
+        }
       }
       value = value.updateChild(relativePath, node);
       return CompoundWrite(writeTree.set(rootMost.path, value));
@@ -122,7 +124,10 @@ final class CompoundWrite {
     if (rootMost == null) {
       return null;
     }
-    return rootMost.value.getChild(Path.relative(rootMost.path, path));
+    return ChildrenNode.storedChild(
+      rootMost.value,
+      Path.relative(rootMost.path, path),
+    );
   }
 
   /// The complete children written directly at the root.
@@ -180,19 +185,27 @@ final class CompoundWrite {
       // A write is always complete: done here.
       return node.updateChild(relativePath, value);
     }
-    Node result = node;
     Node? priorityWrite;
     for (final MapEntry<ChildKey, ImmutableTree<Node>> entry
         in writeTree.children.entries) {
       if (entry.key.isPriorityKey) {
-        // Priorities are applied last, so a priority neither lands on an empty node nor is lost
-        // on a node that a later child write fills.
         assert(
           entry.value.value != null,
           'Priority writes must always be leaf nodes',
         );
         priorityWrite = entry.value.value;
-      } else {
+      }
+    }
+    // A priority lands as the server applies one update: first on a node that takes one now
+    // (emptying it then keeps it), else after the children (a node they fill takes it).
+    final bool priorityFirst =
+        priorityWrite != null && _takesPriority(node.getChild(relativePath));
+    Node result = priorityFirst
+        ? node.updateChild(relativePath.child(ChildKey.priority), priorityWrite)
+        : node;
+    for (final MapEntry<ChildKey, ImmutableTree<Node>> entry
+        in writeTree.children.entries) {
+      if (!entry.key.isPriorityKey) {
         result = _applySubtreeWrite(
           relativePath.child(entry.key),
           entry.value,
@@ -200,7 +213,9 @@ final class CompoundWrite {
         );
       }
     }
-    if (priorityWrite != null && !result.getChild(relativePath).isEmpty) {
+    if (priorityWrite != null &&
+        !priorityFirst &&
+        _takesPriority(result.getChild(relativePath))) {
       result = result.updateChild(
         relativePath.child(ChildKey.priority),
         priorityWrite,
@@ -208,6 +223,10 @@ final class CompoundWrite {
     }
     return result;
   }
+
+  /// Whether a priority written on [node] lands: it has a value, or it keeps a priority.
+  static bool _takesPriority(Node node) =>
+      !node.isEmpty || ChildrenNode.keepsPriority(node);
 
   /// The writes as a JSON map from path strings to values (export form when [exportFormat]).
   ///

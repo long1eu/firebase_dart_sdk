@@ -30,14 +30,17 @@ extension _RepoServerActions on Repo {
         } else {
           events = _serverSyncTree.applyTaggedQueryOverwrite(
             path,
-            nodeFromJson(data),
+            nodeFromServerJson(data),
             Tag(tag),
           );
         }
       } else if (isMerge) {
         events = _serverSyncTree.applyServerMerge(path, _changedChildren(data));
       } else {
-        events = _serverSyncTree.applyServerOverwrite(path, nodeFromJson(data));
+        events = _serverSyncTree.applyServerOverwrite(
+          path,
+          nodeFromServerJson(data),
+        );
       }
     } on Object catch (e) {
       // The server sent data the client cannot read; Android logs it as an internal error.
@@ -54,7 +57,7 @@ extension _RepoServerActions on Repo {
   static Map<Path, Node> _changedChildren(Object? data) => <Path, Node>{
     for (final MapEntry<Object?, Object?> entry
         in (data! as Map<Object?, Object?>).entries)
-      Path('${entry.key}'): nodeFromJson(entry.value),
+      Path('${entry.key}'): nodeFromServerJson(entry.value),
   };
 
   /// Android `Repo.onRangeMergeUpdate`.

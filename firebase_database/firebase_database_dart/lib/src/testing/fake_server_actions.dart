@@ -424,9 +424,14 @@ final class FakeServerActions implements ServerActions {
   Object? get data => _store.toJson(exportFormat: true);
   Node _store = ChildrenNode.empty;
 
-  /// The stored data at [path] (either form), in export form.
-  Object? dataAt(String path) =>
-      _store.getChild(Path(path)).toJson(exportFormat: true);
+  /// The stored data at [path] (either form), in export form, as the server sends it: a node
+  /// emptied by a write below it, which keeps its priority, reads `{".priority": p}`.
+  Object? dataAt(String path) {
+    final Node node = _store.getChild(Path(path));
+    return node is ChildrenNode
+        ? node.toServerJson()
+        : node.toJson(exportFormat: true);
+  }
 
   /// Acknowledges the most recent unanswered put or merge (see [ackWrite]).
   void ackLastWrite() => ackWrite(_lastPending(const <String>{'put', 'merge'}));
@@ -507,14 +512,23 @@ final class FakeServerActions implements ServerActions {
   void _storeUpdate(String path, Object? data, {required bool isMerge}) {
     final Path at = Path(path);
     if (!isMerge) {
-      _store = _store.updateChild(at, nodeFromJson(data));
+      _store = _store.updateChild(at, nodeFromServerJson(data));
       return;
     }
-    for (final MapEntry<Object?, Object?> entry
-        in (data! as Map<Object?, Object?>).entries) {
+    // One update: the children first, then the priorities, as the server applies it.
+    final List<MapEntry<Object?, Object?>> entries =
+        <MapEntry<Object?, Object?>>[
+          ...(data! as Map<Object?, Object?>).entries.where(
+            (MapEntry<Object?, Object?> e) => !'${e.key}'.endsWith('.priority'),
+          ),
+          ...(data as Map<Object?, Object?>).entries.where(
+            (MapEntry<Object?, Object?> e) => '${e.key}'.endsWith('.priority'),
+          ),
+        ];
+    for (final MapEntry<Object?, Object?> entry in entries) {
       _store = _store.updateChild(
         at.childPath(Path('${entry.key}')),
-        nodeFromJson(entry.value),
+        nodeFromServerJson(entry.value),
       );
     }
   }
