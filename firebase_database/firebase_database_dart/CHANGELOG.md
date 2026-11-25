@@ -14,6 +14,8 @@ against the Database emulator.
 - Reads and writes: `get`, `once`, `set`, `update`, `push`, `setPriority`, `remove`, `refFromUrl`; `DataSnapshot.value`
   is plain, unmodifiable Dart data. A `get()` with a range or a limit on `orderByChild` or `orderByValue` needs
   `.indexOn` in the rules; an order-only one does not.
+- `DataSnapshot.toJson()` (the export form) reads numbers as `value` and `priority` do: a value or priority the
+  server stores as `1.0` exports as the `int` 1 on every compiler, as JS `exportVal()` gives `1`.
 - Listening: `onValue`, `onChildAdded`, `onChildChanged`, `onChildMoved`, `onChildRemoved` and `onChildEvents`, one
   ordered stream of the four child events.
 - Queries: `orderByChild`, `orderByKey`, `orderByValue`, `orderByPriority`, `startAt`, `startAfter`, `endAt`,
