@@ -229,38 +229,180 @@ void main() {
         );
       });
 
-      test(
-        'own priority next to a deeper priority null that removes the last child',
-        () {
-          // Property seeds 59755 and 76701. b = {x: {v: 2, .priority: 1}}, no priority of its
-          // own; update /b {".priority": 2, "x/v": null, "x/.priority": null}. The client
-          // finishes x's subtree first: x is removed, b is left with nothing and its priority
-          // is dropped. The shared server model applies the priorities in the update's key
-          // order: b takes 2 while x still holds its kept priority, and keeps it when x goes.
-          // Unmeasured: one raw `m` of this update (in both key orders), then `g b`.
-          final Object? client = merge(
-            <String, Object?>{
-              'x': <String, Object?>{'v': 2, '.priority': 1},
-            },
-            <String, Object?>{'.priority': 2, 'x/v': null, 'x/.priority': null},
+      /// [update] on [node] at `b`, by the client and by the shared server model, in the
+      /// update's key order and reversed: each must give [expected].
+      void check(Object? node, Map<String, Object?> update, Object? expected) {
+        for (final Map<String, Object?> u in <Map<String, Object?>>[
+          update,
+          Map<String, Object?>.fromEntries(update.entries.toList().reversed),
+        ]) {
+          expect(merge(node, u), expected, reason: 'client, $u');
+          final JsonServerModel model = JsonServerModel(<String, Object?>{
+            'b': node,
+          });
+          expect(model.write('b', u, merge: true), isTrue);
+          expect(
+            model.export('b', hidden: true),
+            expected,
+            reason: 'model, $u',
           );
-          final JsonServerModel model =
-              JsonServerModel(<String, Object?>{
-                'b': <String, Object?>{
-                  'x': <String, Object?>{'v': 2, '.priority': 1},
-                },
-              })..write('b', <String, Object?>{
-                '.priority': 2,
-                'x/v': null,
-                'x/.priority': null,
-              }, merge: true);
-          expect(client, isNull);
-          expect(model.export('b', hidden: true), client);
-        },
-        skip:
-            "server order unmeasured: a node's own priority next to a deeper "
-            'priority in one update (property M9)',
-      );
+        }
+      }
+
+      final Map<String, Object?> xWithPriority = <String, Object?>{
+        'x': <String, Object?>{'v': 1, '.priority': 1},
+      };
+
+      test('Q10: own priority next to a deeper priority null', () {
+        // b={x:{v:1,.priority:1}}, m b {.priority:2, x/v:null, x/.priority:null}, both orders:
+        // get {".priority":2}.
+        check(
+          xWithPriority,
+          <String, Object?>{'.priority': 2, 'x/v': null, 'x/.priority': null},
+          <String, Object?>{'.priority': 2},
+        );
+        // Control {.priority:2, x:null}: null.
+        check(xWithPriority, <String, Object?>{
+          '.priority': 2,
+          'x': null,
+        }, null);
+      });
+
+      test('F1: three levels, parents first', () {
+        // b={x:{y:{v:1,.priority:1}}}, {x/y/v:null, x/y/.priority:null, x/.priority:3,
+        // .priority:2}: {".priority":2,"x":{".priority":3}}.
+        check(
+          <String, Object?>{
+            'x': <String, Object?>{
+              'y': <String, Object?>{'v': 1, '.priority': 1},
+            },
+          },
+          <String, Object?>{
+            'x/y/v': null,
+            'x/y/.priority': null,
+            'x/.priority': 3,
+            '.priority': 2,
+          },
+          <String, Object?>{
+            '.priority': 2,
+            'x': <String, Object?>{'.priority': 3},
+          },
+        );
+      });
+
+      test('F2: x emptied keeping 1, {x/.priority:null, .priority:2}', () {
+        check(
+          <String, Object?>{
+            'x': <String, Object?>{'.priority': 1},
+          },
+          <String, Object?>{'x/.priority': null, '.priority': 2},
+          <String, Object?>{'.priority': 2},
+        );
+      });
+
+      test('F3 and F4: the emptied child keeps its priority, or goes', () {
+        // F3: {".priority":2,"x":{".priority":1.0}}.
+        check(
+          xWithPriority,
+          <String, Object?>{'.priority': 2, 'x/v': null},
+          <String, Object?>{
+            '.priority': 2,
+            'x': <String, Object?>{'.priority': 1.0},
+          },
+        );
+        // F4, x without a priority: null.
+        check(
+          <String, Object?>{
+            'x': <String, Object?>{'v': 1},
+          },
+          <String, Object?>{'.priority': 2, 'x/v': null},
+          null,
+        );
+      });
+
+      test('F5: the Q10 update as two merges: the second is refused', () {
+        // First merge ok, export null; second invalid_parameters "could not set priority on
+        // non-existent node".
+        final JsonServerModel model = JsonServerModel(<String, Object?>{
+          'b': xWithPriority,
+        });
+        expect(
+          model.write('b', <String, Object?>{
+            'x/v': null,
+            'x/.priority': null,
+          }, merge: true),
+          isTrue,
+        );
+        expect(model.export('b', hidden: true), isNull);
+        expect(
+          model.write('b', <String, Object?>{'.priority': 2}, merge: true),
+          isFalse,
+        );
+        expect(
+          merge(
+            merge(xWithPriority, <String, Object?>{
+              'x/v': null,
+              'x/.priority': null,
+            }),
+            <String, Object?>{'.priority': 2},
+          ),
+          isNull,
+        );
+      });
+
+      test('F6: the Q10 update one level up', () {
+        // {b/.priority:2, b/x/v:null, b/x/.priority:null}: {"b":{".priority":2}}.
+        check(
+          <String, Object?>{'b': xWithPriority},
+          <String, Object?>{
+            'b/.priority': 2,
+            'b/x/v': null,
+            'b/x/.priority': null,
+          },
+          <String, Object?>{
+            'b': <String, Object?>{'.priority': 2},
+          },
+        );
+      });
+
+      test('F7: Q10 with another child removed', () {
+        check(
+          <String, Object?>{...xWithPriority, 'k': 1},
+          <String, Object?>{
+            '.priority': 2,
+            'x/v': null,
+            'x/.priority': null,
+            'k': null,
+          },
+          <String, Object?>{'.priority': 2},
+        );
+      });
+
+      test('F8: x written as an object that reads empty: null', () {
+        check(xWithPriority, <String, Object?>{
+          '.priority': 2,
+          'x': <String, Object?>{'v': null, '.priority': null},
+        }, null);
+        check(xWithPriority, <String, Object?>{
+          '.priority': 2,
+          'x': <String, Object?>{},
+        }, null);
+      });
+
+      test('F9: the emptied child keeps its other children', () {
+        // b={x:{v:1,w:2,.priority:1}}, {.priority:2, x/v:null}:
+        // {".priority":2,"x":{".priority":1.0,"w":2}}.
+        check(
+          <String, Object?>{
+            'x': <String, Object?>{'v': 1, 'w': 2, '.priority': 1},
+          },
+          <String, Object?>{'.priority': 2, 'x/v': null},
+          <String, Object?>{
+            '.priority': 2,
+            'x': <String, Object?>{'.priority': 1.0, 'w': 2},
+          },
+        );
+      });
 
       test('a refilling update keeps the priority (production check 22)', () {
         expect(

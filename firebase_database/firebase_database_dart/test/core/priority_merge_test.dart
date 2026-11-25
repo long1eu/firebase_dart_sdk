@@ -20,6 +20,7 @@ import 'package:firebase_database_dart/src/core/view/change.dart';
 import 'package:firebase_database_dart/src/core/view/event.dart';
 import 'package:firebase_database_dart/src/core/view/query_params.dart';
 import 'package:firebase_database_dart/src/core/view/query_spec.dart';
+import 'package:firebase_database_dart/src/core/view/view.dart';
 import 'package:test/test.dart';
 
 /// Keeps the listens the tree starts so a test can answer them.
@@ -626,5 +627,133 @@ void main() {
         ]);
       },
     );
+  });
+
+  group('Q10: one update, its own priority next to a deeper priority null', () {
+    // Production check 39 Q10 (both key orders): b={x:{v:1,.priority:1}},
+    // m b {.priority:2, x/v:null, x/.priority:null}: get {".priority":2}.
+    final Map<String, Object?> data = <String, Object?>{
+      'b': <String, Object?>{
+        'x': <String, Object?>{'v': 1, '.priority': 1},
+      },
+    };
+    final Map<String, Object?> q10 = <String, Object?>{
+      'x/.priority': null,
+      'x/v': null,
+      '.priority': 2,
+    };
+    for (final String at in <String>['b', '']) {
+      test('local update, the echo and the ack, listener at /$at', () {
+        final QuerySpec q = QuerySpec.defaultAt(Path(at));
+        listen(q);
+        answer(q, at.isEmpty ? data : data['b']);
+        update('b', q10, 1);
+        serverMerge('b', q10);
+        ack(1);
+        expect(
+          (tree.calcCompleteEventCache(Path('b'))! as ChildrenNode)
+              .toServerJson(),
+          <String, Object?>{'.priority': 2},
+        );
+        expect(values(set('b/c', 1, 2)), <String>[
+          at.isEmpty
+              ? 'V({b: {c: 1, .priority: 2}})'
+              : 'V({c: 1, .priority: 2})',
+        ]);
+      });
+
+      test("another client's update, listener at /$at", () {
+        final QuerySpec q = QuerySpec.defaultAt(Path(at));
+        listen(q);
+        answer(q, at.isEmpty ? data : data['b']);
+        serverMerge('b', q10);
+        expect(
+          (tree.calcCompleteEventCache(Path('b'))! as ChildrenNode)
+              .toServerJson(),
+          <String, Object?>{'.priority': 2},
+        );
+      });
+    }
+
+    test(
+      'stacked on a pending set of b (a write tree replayed after a restart)',
+      () {
+        listen(atR);
+        answer(atR, null);
+        set('b', data['b'], 1);
+        update('b', q10, 2);
+        expect(
+          (tree.calcCompleteEventCache(Path('b'))! as ChildrenNode)
+              .toServerJson(),
+          <String, Object?>{'.priority': 2},
+        );
+      },
+    );
+  });
+
+  test('seed 8800: a server merge moving a window child out by its priority lets the next '
+      'one in (filtered cache)', () {
+    // A tagged limit view holds the full window {x, y}. One merge writes z {v: 1} (no
+    // priority, after y by key) and y/.priority 2: on the server y moves behind z, so the window
+    // is {x, z}. The filtered server cache has no source to pull z in later, so y's priority is
+    // applied with y's other writes, before z, and z enters when y leaves.
+    final QuerySpec limit = QuerySpec(
+      Path('a'),
+      QueryParams.defaultParams.orderBy(priorityIndex).limitToFirst(2),
+    );
+    final Reg reg = Reg(limit);
+    tree.addEventRegistration(reg);
+    final Tag tag = tree.tagForQuery(limit)!;
+    tree.applyTaggedQueryOverwrite(
+      Path('a'),
+      nodeFromServerJson(<String, Object?>{
+        'x': <String, Object?>{'u': 1},
+        'y': <String, Object?>{'v': 1},
+      }),
+      tag,
+    );
+    tree.applyTaggedListenComplete(tag);
+    tree.applyTaggedQueryMerge(Path('a'), <Path, Node>{
+      Path('z'): nodeFromServerJson(<String, Object?>{'v': 1}),
+      Path('y/.priority'): nodeFromServerJson(2),
+    }, tag);
+    final View view = tree.syncPointTree.get(Path('a'))!.viewForQuery(limit)!;
+    expect(view.serverCache.toJson(), <String, Object?>{
+      'x': <String, Object?>{'u': 1},
+      'z': <String, Object?>{'v': 1},
+    });
+    expect(view.eventCache.toJson(), <String, Object?>{
+      'x': <String, Object?>{'u': 1},
+      'z': <String, Object?>{'v': 1},
+    });
+  });
+
+  test('seed 187899 (also 152274, 158813, 168575, 237754): a merge moving a window child out by '
+      'its priority, the window kept from a complete cache', () {
+    // A limit view below a default listen (its server cache complete, its event cache the
+    // window {x, y}). One merge writes x/.priority 1 and z {u: 1}: x moves behind y and z, so the
+    // window is {y, z}. The window is updated child by child from the complete cache as it was
+    // before the merge, so x must move out before z competes for its place.
+    final QuerySpec atA = QuerySpec.defaultAt(Path('a'));
+    final QuerySpec limit = QuerySpec(
+      Path('a'),
+      QueryParams.defaultParams.orderBy(priorityIndex).limitToFirst(2),
+    );
+    listen(atA);
+    answer(atA, <String, Object?>{
+      'x': <String, Object?>{'u': 1},
+      'y': <String, Object?>{'v': 1},
+    });
+    final Reg reg = Reg(limit);
+    tree.addEventRegistration(reg);
+    serverMerge('a', <String, Object?>{
+      'x/.priority': 1,
+      'z': <String, Object?>{'u': 1},
+    });
+    final View view = tree.syncPointTree.get(Path('a'))!.viewForQuery(limit)!;
+    expect(view.eventCache.toJson(), <String, Object?>{
+      'y': <String, Object?>{'v': 1},
+      'z': <String, Object?>{'u': 1},
+    });
   });
 }

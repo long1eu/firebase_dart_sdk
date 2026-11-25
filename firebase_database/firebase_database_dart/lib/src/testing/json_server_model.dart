@@ -10,8 +10,10 @@
 /// - a priority written on a node that does not exist refuses the whole write
 ///   (`invalid_parameters: could not set priority on non-existent node`); a node that keeps a
 ///   priority, or holds only emptied children, takes one (check 38 (b), check 39 Q2);
-/// - one update applies its children first, then its priorities, and a priority lands only on a
-///   node that then has a value or holds hidden state (check 39 Q1, Q6);
+/// - one update is applied in two passes, whatever its key order: every value entry first, at any
+///   depth; then every priority entry, parents before children, each landing only on a node that
+///   at that moment has a value or holds hidden state; a null priority removes a kept one, and an
+///   emptied node left with nothing disappears (check 39 Q1, Q6, Q10, F1 to F9);
 /// - the hash is the JS SDK's `ChildrenNode.hash` and `LeafNode.hash` over the node, kept
 ///   priorities included (check 38 (c), check 39 Q2);
 /// - what the server sends of a node carries `{".priority": p}` for an emptied node (check 38 (a)).
@@ -26,6 +28,7 @@ library;
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:collection/collection.dart';
 import 'package:crypto/crypto.dart';
 
 /// A node the server holds: a leaf (with [leaf] set) or children, either with a [priority].
@@ -264,6 +267,12 @@ final class JsonServerModel {
     for (final (List<String> full, Object? value) in children) {
       root = _put(root, full, 0, JsonServerNode.fromJson(value));
     }
+    // Parents first, whatever the key order (check 39 Q10, F1 to F9).
+    mergeSort(
+      priorities,
+      compare: ((List<String>, Object?) a, (List<String>, Object?) b) =>
+          a.$1.length - b.$1.length,
+    );
     for (final (List<String> owner, Object? value) in priorities) {
       root = _putPriority(root, owner, 0, value);
     }

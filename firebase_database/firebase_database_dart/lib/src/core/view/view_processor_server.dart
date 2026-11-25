@@ -258,8 +258,27 @@ extension _ServerOperations on ViewProcessor {
         ? changedChildren
         : CompoundWrite.empty.addWrites(path, changedChildren);
     final Node serverNode = viewCache.serverCache.node;
-    final Map<ChildKey, CompoundWrite> childCompoundWrites = actualMerge
-        .childCompoundWrites();
+    bool isPriority(MapEntry<Path, Node> write) =>
+        write.key.back?.isPriorityKey ?? false;
+    // The server's two passes over one update (production check 39): the values first, then the
+    // priorities, parents first. A filtered view (a limit window, in its server or its event
+    // cache) updates its window child by child and can only pull in a child it is shown in this
+    // pass, so a child that a priority moves out must move before the children that compete for
+    // its place: there each child's writes go together, its priorities included
+    // (CompoundWrite.apply keeps the two passes inside the child), the children the cache has
+    // first, and the node's own priority (which a filter ignores) last.
+    final bool perChild = filterServerNode || filter.filtersNodes;
+    final List<MapEntry<Path, Node>> ordered = writesInServerOrder(actualMerge);
+    final List<MapEntry<Path, Node>> priorities = <MapEntry<Path, Node>>[
+      for (final MapEntry<Path, Node> write in ordered)
+        if (isPriority(write) && (!perChild || write.key.length == 1)) write,
+    ];
+    final Map<ChildKey, CompoundWrite> childCompoundWrites =
+        CompoundWrite.fromPathMerge(<Path, Node>{
+          for (final MapEntry<Path, Node> write in ordered)
+            if (!isPriority(write) || perChild && write.key.length > 1)
+              write.key: write.value,
+        }).childCompoundWrites();
     void apply(ChildKey childKey, CompoundWrite childMerge) {
       final Node serverChild = serverNode.getImmediateChild(childKey);
       curViewCache = _applyServerOverwrite(
@@ -273,9 +292,6 @@ extension _ServerOperations on ViewProcessor {
       );
     }
 
-    // The node's own priority after its children, as the server applies one update
-    // (production check 39 Q1).
-    final CompoundWrite? priority = childCompoundWrites[ChildKey.priority];
     for (final MapEntry<ChildKey, CompoundWrite> childMerge
         in childCompoundWrites.entries) {
       if (serverNode.hasChild(childMerge.key)) {
@@ -288,14 +304,20 @@ extension _ServerOperations on ViewProcessor {
       final bool isUnknownDeepMerge =
           !viewCache.serverCache.isCompleteForChild(childKey) &&
           childMerge.value.rootWrite() == null;
-      if (!childKey.isPriorityKey &&
-          !serverNode.hasChild(childKey) &&
-          !isUnknownDeepMerge) {
+      if (!serverNode.hasChild(childKey) && !isUnknownDeepMerge) {
         apply(childKey, childMerge.value);
       }
     }
-    if (priority != null) {
-      apply(ChildKey.priority, priority);
+    for (final MapEntry<Path, Node> write in priorities) {
+      curViewCache = _applyServerOverwrite(
+        curViewCache,
+        write.key,
+        write.value,
+        writesCache,
+        serverCache,
+        filterServerNode,
+        accumulator,
+      );
     }
     return curViewCache;
   }

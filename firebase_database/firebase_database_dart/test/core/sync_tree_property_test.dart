@@ -13,10 +13,12 @@
 // The model is the shared server model of lib/src/testing/json_server_model.dart (a plain JSON
 // tree, no client node code), which FakeServerActions plays too. Measured on production
 // (rtdb/from_boss/prodkit_production_run3_2026-11-25.txt checks 27 and 38; run 2 check 22;
-// prodkit_production_run4_check39_2026-11-25.txt check 39): writes apply in the order sent; a
+// prodkit_production_run4_check39_2026-11-25.txt check 39;
+// prodkit_production_run8_check39_q11_2026-11-25.txt): writes apply in the order sent; a
 // node whose last child is removed by a write below it keeps its priority, and a write at or
-// above it drops it; one update applies its children first, then its priorities, and a priority
-// lands only on a node that then has a value or holds hidden state (Q1, Q6; three separate
+// above it drops it; one update is applied in two passes whatever its key order: every value
+// entry first, then every priority entry, parents first, each landing only on a node that at
+// that moment has a value or holds hidden state (Q1, Q6, Q10, F1 to F9 of run 8; three separate
 // writes keep it, Q4); a node holding only emptied children takes a priority (Q2); a priority on
 // a node that does not exist refuses the write (check 27); the hash counts kept priorities;
 // listen and get answers carry `{".priority": p}` for an emptied node, also inside its parent;
@@ -36,12 +38,6 @@
 // - M7. A leaf with a priority at depth 3 takes `.priority` writes like any node with a value.
 // - M8. A value written below a leaf keeps the leaf's priority on the new children (the
 //   generator never writes below a leaf).
-// - M9. In one update, a node's own `.priority` next to a deeper `x/.priority: null` that
-//   removes the node's last (emptied) child: the model applies the priorities in the update's
-//   key order (own priority first in seeds 59755 and 76701: the node keeps it); the client
-//   applies the child's subtree, its priority included, before the node's own priority (the
-//   node is left with nothing and the priority is dropped). No frame measures it; see
-//   [_knownFailures].
 //
 // The server sends a write to the listens it holds, from reading a listen to reading its
 // unlisten: as written to a plain listen at or above it, as whole data to one below it. To the
@@ -124,13 +120,6 @@ const Map<String, List<int>> _knownFailures = <String, List<int>>{
   ],
   // Group V: a refused update at the view path reverted over a filtered cache (row 5).
   'group V: a revert at the view path over a filtered cache': <int>[279390],
-  // M9, unmeasured: b = {x: {v, .priority}} without a priority of its own, then
-  // update /b {".priority":2,"x/v":null,"x/.priority":null}. The model ends with b
-  // {".priority":2}, the client with nothing. Shortest (76701): listen /b:default; set /
-  // {"b":{"x":{"v":2,".priority":1}}}; update /b {".priority":2,"x/v":null,"x/.priority":null}
-  'M9: own priority next to a deeper priority null in one update (unmeasured)': <int>[
-    59755, 76701,
-  ],
   // dart format on
 };
 

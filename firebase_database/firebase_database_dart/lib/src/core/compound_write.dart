@@ -94,13 +94,15 @@ final class CompoundWrite {
   CompoundWrite addChildWrite(ChildKey key, Node node) =>
       addWrite(Path.fromKeys(<ChildKey>[key]), node);
 
-  /// This write with every write of [updates] added below [path].
-  CompoundWrite addWrites(Path path, CompoundWrite updates) =>
-      updates.writeTree.foldValues<CompoundWrite>(
-        this,
-        (Path relativePath, Node value, CompoundWrite accum) =>
-            accum.addWrite(path.childPath(relativePath), value),
-      );
+  /// This write with every write of [updates] (one update) added below [path], in the server's
+  /// two passes (see [apply]): the values first, then the priorities, parents first.
+  CompoundWrite addWrites(Path path, CompoundWrite updates) {
+    CompoundWrite result = this;
+    for (final MapEntry<Path, Node> write in writesInServerOrder(updates)) {
+      result = result.addWrite(path.childPath(write.key), write.value);
+    }
+    return result;
+  }
 
   /// This write without the writes at and below [path].
   CompoundWrite removeWrite(Path path) {
@@ -172,49 +174,21 @@ final class CompoundWrite {
   /// Whether nothing is written.
   bool get isEmpty => writeTree.isEmpty;
 
-  /// [node] with every write applied.
-  Node apply(Node node) => _applySubtreeWrite(Path.empty, writeTree, node);
-
-  static Node _applySubtreeWrite(
-    Path relativePath,
-    ImmutableTree<Node> writeTree,
-    Node node,
-  ) {
-    final Node? value = writeTree.value;
-    if (value != null) {
-      // A write is always complete: done here.
-      return node.updateChild(relativePath, value);
-    }
-    Node? priorityWrite;
-    for (final MapEntry<ChildKey, ImmutableTree<Node>> entry
-        in writeTree.children.entries) {
-      if (entry.key.isPriorityKey) {
-        assert(
-          entry.value.value != null,
-          'Priority writes must always be leaf nodes',
-        );
-        priorityWrite = entry.value.value;
-      }
-    }
-    // As the server applies one update (production check 39 Q1, Q6): the children first, then
-    // the priority, which lands only on a node that then has a value or holds hidden state.
+  /// [node] with every write applied, as the server applies one update (production check 39,
+  /// Q1, Q6, Q10 and F1 to F9, both key orders): pass 1 writes every value, at any depth (a node
+  /// whose last child goes keeps its priority as an emptied node); pass 2 writes every priority,
+  /// parents before children, each landing only on a node that then has a value or holds
+  /// hidden state ([ChildrenNode.takesPriority]); a null priority removes a kept one.
+  Node apply(Node node) {
     Node result = node;
-    for (final MapEntry<ChildKey, ImmutableTree<Node>> entry
-        in writeTree.children.entries) {
-      if (!entry.key.isPriorityKey) {
-        result = _applySubtreeWrite(
-          relativePath.child(entry.key),
-          entry.value,
-          result,
-        );
+    for (final MapEntry<Path, Node> write in writesInServerOrder(this)) {
+      final ChildKey? back = write.key.back;
+      if (back != null &&
+          back.isPriorityKey &&
+          !ChildrenNode.takesPriority(result.getChild(write.key.parent!))) {
+        continue;
       }
-    }
-    if (priorityWrite != null &&
-        ChildrenNode.takesPriority(result.getChild(relativePath))) {
-      result = result.updateChild(
-        relativePath.child(ChildKey.priority),
-        priorityWrite,
-      );
+      result = result.updateChild(write.key, write.value);
     }
     return result;
   }
@@ -248,4 +222,21 @@ final class CompoundWrite {
 
   @override
   String toString() => 'CompoundWrite{${toJson(exportFormat: true)}}';
+}
+
+/// The writes in the order the server applies one update: every value write, then every
+/// priority write by depth, parents first (production check 39 Q10, F1 to F9).
+List<MapEntry<Path, Node>> writesInServerOrder(CompoundWrite write) {
+  final List<MapEntry<Path, Node>> values = <MapEntry<Path, Node>>[];
+  final List<MapEntry<Path, Node>> priorities = <MapEntry<Path, Node>>[];
+  for (final MapEntry<Path, Node> entry in write.writeTree.entries) {
+    ((entry.key.back?.isPriorityKey ?? false) ? priorities : values).add(entry);
+  }
+  // Parents first; a stable sort, and writes of one depth never meet.
+  mergeSort(
+    priorities,
+    compare: (MapEntry<Path, Node> a, MapEntry<Path, Node> b) =>
+        a.key.length - b.key.length,
+  );
+  return <MapEntry<Path, Node>>[...values, ...priorities];
 }
