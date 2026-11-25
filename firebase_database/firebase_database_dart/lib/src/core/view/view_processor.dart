@@ -105,6 +105,7 @@ final class ViewProcessor {
             optCompleteCache,
             filterServerNode,
             accumulator,
+            fromServer: true,
           );
         }
       case AckUserWrite():
