@@ -837,4 +837,73 @@ void main() {
       },
     );
   });
+
+  group(
+    'Q12: an update that creates a node and its priority, refused by the server',
+    () {
+      // Production run 9 and the emulator, 2026-11-26, check 39 Q12
+      // (rtdb/from_boss/prodkit_production_run9_check39_q12_2026-11-26.txt): with x missing,
+      // `m r {"x/v": 1, "x/.priority": 3}` is refused whole in both key orders
+      // ("invalid_parameters", "could not set priority on non-existent node"), nothing written; the
+      // server checks the priority against the data before the update. The client cannot make
+      // that check: it shows the value and the priority until the refusal and reverts both then.
+      final List<Map<String, Object?>> orders = <Map<String, Object?>>[
+        <String, Object?>{'x/v': 1, 'x/.priority': 3},
+        <String, Object?>{'x/.priority': 3, 'x/v': 1},
+      ];
+      for (final Map<String, Object?> written in orders) {
+        final String keys = written.keys.join(', ');
+        List<Event> refuse(int id) => tree.ackUserWrite(
+          id,
+          revert: true,
+          persist: false,
+          serverValues: const <String, Object?>{},
+        );
+
+        test('r = {k: 1}, update r {$keys}: shown while pending, reverted', () {
+          expect(values(listen(atR)), <String>[]);
+          expect(values(answer(atR, <String, Object?>{'k': 1})), <String>[
+            'V({k: 1})',
+          ]);
+          expect(describe(update('r', written, 1)), <String>[
+            'A(x)',
+            'V({k: 1, x: {v: 1, .priority: 3}})',
+          ]);
+          expect(describe(refuse(1)), <String>['R(x)', 'V({k: 1})']);
+          final View view = tree.syncPointTree
+              .get(Path('r'))!
+              .viewForQuery(atR)!;
+          expect(
+            (view.eventCache as ChildrenNode).toServerJson(),
+            <String, Object?>{'k': 1},
+          );
+          expect(
+            tree.calcCompleteEventCache(Path('r'))!.hash(),
+            n(<String, Object?>{'k': 1}).hash(),
+          );
+        });
+
+        test(
+          'r = {k: 1}, update r {$keys}: nothing left at r/x after the revert',
+          () {
+            final QuerySpec atX = QuerySpec.defaultAt(Path('r/x'));
+            listen(atR);
+            answer(atR, <String, Object?>{'k': 1});
+            expect(values(listen(atX)), <String>['V(null)']);
+            // The listener at r/x first, then the one at r.
+            expect(values(update('r', written, 1)), <String>[
+              'V({v: 1, .priority: 3})',
+              'V({k: 1, x: {v: 1, .priority: 3}})',
+            ]);
+            expect(values(refuse(1)), <String>['V(null)', 'V({k: 1})']);
+            final View view = tree.syncPointTree
+                .get(Path('r/x'))!
+                .viewForQuery(atX)!;
+            expect((view.eventCache as ChildrenNode).toServerJson(), isNull);
+            expect(tree.calcCompleteEventCache(Path('r/x'))?.hash() ?? '', '');
+          },
+        );
+      }
+    },
+  );
 }

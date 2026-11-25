@@ -9,7 +9,11 @@
 ///   then holds only such children stays too; a write at or above the node drops it;
 /// - a priority written on a node that does not exist refuses the whole write
 ///   (`invalid_parameters: could not set priority on non-existent node`); a node that keeps a
-///   priority, or holds only emptied children, takes one (check 38 (b), check 39 Q2);
+///   priority, or holds only emptied children, takes one (check 38 (b), check 39 Q2); the check
+///   is made on the data before the update, so an update that writes a priority and creates its
+///   node in the same message is refused whole, in either key order (production run 9 and the
+///   emulator, 2026-11-26, check 39 Q12; the object form `{"x": {".priority": p, ...}}` is
+///   accepted);
 /// - one update is applied in two passes, whatever its key order: every value entry first, at any
 ///   depth; then every priority entry, parents before children, each landing only on a node that
 ///   at that moment has a value or holds hidden state; a null priority removes a kept one, and an
@@ -19,8 +23,7 @@
 /// - what the server sends of a node carries `{".priority": p}` for an emptied node (check 38 (a)).
 ///
 /// Not measured, and kept as the client does: a value written below a leaf replaces the leaf with
-/// children that keep the leaf's priority; an update that writes a priority and creates its node
-/// in the same message is refused, as a priority on a missing node.
+/// children that keep the leaf's priority.
 ///
 /// [FakeServerActions]: package:firebase_database_dart/src/testing/fake_server_actions.dart
 library;

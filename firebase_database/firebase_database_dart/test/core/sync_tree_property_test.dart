@@ -25,8 +25,10 @@
 // the compound hash counts a kept priority as a `.priority` leaf (Q5).
 //
 // Model rules no production frame covers (the model's choice; the client agrees):
-// - M1. An update that writes a priority and creates its node in the same message is refused,
-//   as a priority on a missing node.
+// - M1. Measured since (production run 9 and the emulator, 2026-11-26, check 39 Q12,
+//   rtdb/from_boss/prodkit_production_run9_check39_q12_2026-11-26.txt): an update that writes a
+//   priority and creates its node in the same message is refused whole, in either key order, as
+//   a priority on a missing node; the check is made on the data before the update.
 // - M2. `.priority: null` on an emptied node drops it.
 // - M3. Whole data pushed to a listen below another client's write carries `{".priority": p}`
 //   like a listen answer.

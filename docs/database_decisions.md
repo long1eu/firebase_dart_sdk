@@ -1236,7 +1236,15 @@ frames are quoted in `test/core/snap/emptied_node_priority_test.dart` and `test/
 Pass 1 applies every value entry (keys not ending in `.priority`), at any depth. A node whose last child goes keeps
 its priority as an emptied node; a node set to null outright loses everything. Pass 2 applies every priority entry,
 parents before children. A non-null priority lands on a node that, at that moment, has a value, visible children, or
-emptied children below it; otherwise it is dropped. A null priority removes a kept priority, and an emptied node
+emptied children below it; otherwise it is dropped. Before either pass the server checks every non-null priority
+entry against the data as it was before the update: when the entry's node does not exist then (no value, no children,
+no kept priority), the whole update is refused (`invalid_parameters`, "could not set priority on non-existent node")
+and nothing is written, in either key order, even when the update's own value entries would create the node
+(`{"x/v": 1, "x/.priority": 3}` with `x` missing; the object form `{"x": {"v": 1, ".priority": 3}}` is accepted).
+This was measured on production 2026-11-26 (run 9, check 39 Q12) and on the emulator the same day; a node that exists
+before the update and is removed by its pass 1 passes the check and its priority is dropped silently (Q10). The client
+cannot make the server's check: it shows such an update's value and priority until the refusal and reverts both
+then, the ordinary optimistic path. A null priority removes a kept priority, and an emptied node
 left with no priority and nothing below it disappears; a parent that already took its priority in this pass keeps
 it. Example: `b = {x: {v: 1, .priority: 1}}`, then `update b` with `{".priority": 2, "x/v": null,
 "x/.priority": null}` gives `{".priority": 2}`, in either key order, because `x` is emptied in pass 1 and loses its
