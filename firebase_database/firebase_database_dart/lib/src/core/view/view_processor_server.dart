@@ -214,9 +214,11 @@ extension _ServerOperations on ViewProcessor {
   /// merge's earlier children and itself applied: a limit window that makes room pulls its next
   /// child from it, and from the cache before the merge it would pull a child with values this
   /// merge changed or removed, which no later frame repairs (docs/database_decisions.md section
-  /// 25). An acknowledgement calls this with children copied from the view's own server cache,
-  /// not with data the server just sent, so it keeps the upstream behaviour: every child gets the
-  /// complete cache as it is.
+  /// 25). A deep entry this view skips (below a child its filtered server cache does not hold) is
+  /// not applied to that cache either, so a child pulled in later can still be the old one; that
+  /// state was wrong before this change too. An acknowledgement calls this with children copied
+  /// from the view's own server cache, not with data the server just sent, so it keeps the
+  /// upstream behaviour: every child gets the complete cache as it is.
   ViewCache _applyServerMerge(
     ViewCache viewCache,
     Path path,
