@@ -547,4 +547,18 @@ void main() {
       expect(children[ChildKey('b')]!.rootWrite(), nodeFromJson(2));
     });
   });
+
+  test('added updates empty a written node before its priority (Q1)', () {
+    final CompoundWrite write = CompoundWrite.empty
+        .addWrite(Path('a'), nodeFromJson(<String, Object?>{'x': 1}))
+        .addWrites(
+          Path('a'),
+          CompoundWrite.fromValue(<String, Object?>{'x': null, '.priority': 7}),
+        );
+    // a is gone, not an emptied node keeping 7.
+    expect(
+      (write.apply(ChildrenNode.empty) as ChildrenNode).toServerJson(),
+      isNull,
+    );
+  });
 }

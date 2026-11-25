@@ -756,4 +756,46 @@ void main() {
       'z': <String, Object?>{'u': 1},
     });
   });
+
+  test(
+    'a pending set, then one update that empties it and writes its priority: refused (Q1)',
+    () {
+      listen(atR);
+      set('r', <String, Object?>{'x': 1}, 1);
+      expect(
+        values(update('r', <String, Object?>{'x': null, '.priority': 7}, 2)),
+        <String>['V(null)'],
+      );
+      // r is gone, not an emptied node keeping 7.
+      expect(
+        (tree.calcCompleteEventCache(Path('r'))! as ChildrenNode)
+            .toServerJson(),
+        isNull,
+      );
+    },
+  );
+
+  test('a local update moves a child into a limit window by its priority', () {
+    final QuerySpec limit = QuerySpec(
+      Path('r'),
+      QueryParams.defaultParams.orderBy(priorityIndex).limitToFirst(1),
+    );
+    listen(atR);
+    answer(atR, <String, Object?>{
+      'a': <String, Object?>{'x': 1, '.priority': 1},
+      'b': <String, Object?>{'x': 1, '.priority': 2},
+    });
+    final Reg reg = Reg(limit);
+    tree.addEventRegistration(reg);
+    final List<Event> events = update('r', <String, Object?>{
+      'b/.priority': 0,
+    }, 1);
+    expect(
+      describe(<Event>[
+        for (final Event e in events)
+          if (e is DataEvent && identical(e.eventRegistration, reg)) e,
+      ]),
+      <String>['R(a)', 'A(b)', 'V({b: {x: 1, .priority: 0}})'],
+    );
+  });
 }
