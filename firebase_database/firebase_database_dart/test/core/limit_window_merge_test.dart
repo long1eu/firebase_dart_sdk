@@ -415,4 +415,64 @@ void main() {
       'q': <String, Object?>{'u': 5, '.priority': 2},
     });
   });
+
+  test('seed 265 (two-pass review): a merge with no priority refills a limitToLast window with the '
+      'value the same merge wrote', () {
+    // listen /:default; serve {"a":{"x":3,"y":1}}; listen /a orderByPriority limitToLast(1);
+    // other update /a {"y":null,"x":1}
+    // The window is {y}. The merge sets x (outside the window) first, then removes y, and the
+    // window pulls x: it must come with the value 1 of the same merge, not 3.
+    final _Client c = _Client();
+    c.listen(QuerySpec.defaultAt(Path.empty));
+    final _Reg limit = c.listen(
+      QuerySpec(
+        p('a'),
+        QueryParams.defaultParams.orderBy(priorityIndex).limitToLast(1),
+      ),
+    );
+    c.put('', <String, Object?>{
+      'a': <String, Object?>{'x': 3, 'y': 1},
+    });
+    expect(c.values[limit], <String, Object?>{'y': 1});
+    c.merge('a', <String, Object?>{'y': null, 'x': 1});
+    expect(c.values[limit], <String, Object?>{'x': 1});
+  });
+
+  test(
+    'seed 20221 (two-pass review): a child removed by the merge does not enter the window and '
+    'raises no child_added',
+    () {
+      // listen /:default; serve {"a":{"x":{"u":1,".priority":2},"y":1,"z":1}};
+      // listen /a:{"l":2,"vf":"l"}; other update /a {"x":null,"z/.priority":3}
+      // The window is {y, z}. The merge removes x (outside the window) first, then moves z behind
+      // x's old place; z stays in the window, since x is gone.
+      final _Client c = _Client();
+      c.listen(QuerySpec.defaultAt(Path.empty));
+      final _Reg limit = c.listen(limitA);
+      c.put('', <String, Object?>{
+        'a': <String, Object?>{
+          'x': <String, Object?>{'u': 1, '.priority': 2},
+          'y': 1,
+          'z': 1,
+        },
+      });
+      expect(c.values[limit], <String, Object?>{'y': 1, 'z': 1});
+      final List<Event> events = c.tree.applyServerMerge(p('a'), <Path, Node>{
+        p('x'): n(null),
+        p('z/.priority'): n(3),
+      });
+      c._take(events);
+      expect(c.values[limit], <String, Object?>{
+        'y': 1,
+        'z': <String, Object?>{'.value': 1, '.priority': 3},
+      });
+      expect(<String>[
+        for (final Event e in events)
+          if (e is DataEvent &&
+              identical(e.eventRegistration, limit) &&
+              e.eventType == EventType.childAdded)
+            '${e.snapshotPath}',
+      ], isEmpty);
+    },
+  );
 }
