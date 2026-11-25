@@ -285,6 +285,235 @@ void main() {
     });
   });
 
+  // A merge holding an object with a priority and no value gets no answer from the server
+  // (emulator, 30 writes measured on 2026-11-25; V1 to V10 are the variants of that run), so
+  // update and onDisconnect.update refuse it; set and transactions send the parsed node, in which
+  // such an object is empty, and are unchanged (decisions section 11).
+  group('an object with a priority and no value', () {
+    const Map<String, Object?> p5 = <String, Object?>{'.priority': 5};
+    final List<(String, Map<String, Object?>, String)> refused =
+        <(String, Map<String, Object?>, String)>[
+          (
+            'V1 .value null',
+            <String, Object?>{
+              'n': <String, Object?>{'.value': null, '.priority': 5},
+            },
+            '/x/n',
+          ),
+          (
+            'V2 a null child',
+            <String, Object?>{
+              'n': <String, Object?>{'.priority': 5, 'a': null},
+            },
+            '/x/n',
+          ),
+          (
+            'V3 an empty child',
+            <String, Object?>{
+              'n': <String, Object?>{'.priority': 5, 'a': <String, Object?>{}},
+            },
+            '/x/n',
+          ),
+          (
+            'V6 a deeper object',
+            <String, Object?>{
+              'n': <String, Object?>{'a': p5},
+            },
+            '/x/n/a',
+          ),
+          (
+            'V9 a list element',
+            <String, Object?>{
+              'n': <Object?>[p5],
+            },
+            '/x/n/0',
+          ),
+          ('V10 a multi-path key', <String, Object?>{'n/x': p5}, '/x/n/x'),
+          ('a child (A8)', <String, Object?>{'n': p5}, '/x/n'),
+          (
+            'a child next to a valid one (A14)',
+            <String, Object?>{'n': p5, 'y': 1},
+            '/x/n',
+          ),
+          (
+            'a deeper object next to a value (A15)',
+            <String, Object?>{
+              'n': <String, Object?>{'a': p5, 'b': 1},
+            },
+            '/x/n/a',
+          ),
+          (
+            'nulls two levels down',
+            <String, Object?>{
+              'n': <String, Object?>{
+                '.priority': 5,
+                'a': <String, Object?>{'b': null},
+              },
+            },
+            '/x/n',
+          ),
+          (
+            'an object inside .value',
+            <String, Object?>{
+              'n': <String, Object?>{
+                '.value': <String, Object?>{'a': p5},
+                '.priority': 1,
+              },
+            },
+            '/x/n/a',
+          ),
+        ];
+
+    Matcher refusal(String path) => throwsA(
+      isA<ArgumentError>().having(
+        (ArgumentError e) => '${e.message}',
+        'message',
+        allOf(
+          contains("'$path'"),
+          contains('a priority and no value'),
+          contains('null'),
+          contains('.value'),
+        ),
+      ),
+    );
+
+    for (final (String name, Map<String, Object?> values, String path)
+        in refused) {
+      test('update refuses $name', () {
+        withDb((FirebaseDatabase db, FakeTime _) {
+          expect(() => db.ref('x').update(values), refusal(path));
+        });
+      });
+
+      test('onDisconnect.update refuses $name', () {
+        withDb((FirebaseDatabase db, FakeTime _) {
+          expect(() => db.ref('x').onDisconnect.update(values), refusal(path));
+        });
+      });
+    }
+
+    final Map<String, Object?> answered = <String, Object?>{
+      'V4 an empty child, no priority': <String, Object?>{
+        'a': <String, Object?>{},
+      },
+      'V5 an empty object': <String, Object?>{},
+      'V7 a null priority': <String, Object?>{'.priority': null},
+      'V8 a value with a priority': <String, Object?>{
+        '.value': 1,
+        '.priority': 5,
+      },
+    };
+    for (final MapEntry<String, Object?> entry in answered.entries) {
+      test('update and onDisconnect.update accept ${entry.key}', () {
+        withDb((FirebaseDatabase db, FakeTime time) {
+          expectAccepted(time, <Future<void> Function()>[
+            () => db.ref('x').update(<String, Object?>{'n': entry.value}),
+            () => db.ref('x').onDisconnect.update(<String, Object?>{
+              'n': entry.value,
+            }),
+          ]);
+        });
+      });
+    }
+
+    test('a refused update shows nothing locally', () {
+      withDb((FirebaseDatabase db, FakeTime time) {
+        db.ref('x').set(<String, Object?>{'k': 1});
+        final List<Object?> values = <Object?>[];
+        db.ref('x').onValue.listen((DatabaseEvent e) {
+          values.add(e.snapshot.value);
+        });
+        time.elapse(Duration.zero);
+        expect(
+          () => db.ref('x').update(<String, Object?>{
+            'n': <String, Object?>{'.priority': 5},
+            'y': 1,
+          }),
+          throwsArgumentError,
+        );
+        time.elapse(const Duration(seconds: 1));
+        expect(values, <Object?>[
+          <String, Object?>{'k': 1},
+        ]);
+      });
+    });
+
+    test('update accepts the forms the server answers', () {
+      withDb((FirebaseDatabase db, FakeTime time) {
+        expectAccepted(time, <Future<void> Function()>[
+          () => db.ref('x').update(<String, Object?>{'.priority': 5}),
+          () => db.ref('x').update(<String, Object?>{'n/.priority': 5}),
+          () => db.ref('x').update(<String, Object?>{
+            'n': <String, Object?>{'.value': 1, '.priority': 5},
+          }),
+          () => db.ref('x').update(<String, Object?>{
+            'n': <String, Object?>{'a': 1, '.priority': 5},
+          }),
+          () => db.ref('x').update(<String, Object?>{'n': null}),
+        ]);
+      });
+    });
+
+    test('onDisconnect accepts the forms the server answers', () {
+      withDb((FirebaseDatabase db, FakeTime time) {
+        expectAccepted(time, <Future<void> Function()>[
+          () => db.ref('x').onDisconnect.update(<String, Object?>{
+            '.priority': 5,
+          }),
+          () => db.ref('x').onDisconnect.update(<String, Object?>{
+            'n': <String, Object?>{'.value': 1, '.priority': 5},
+          }),
+          () => db.ref('x').onDisconnect.set(null, priority: 5),
+          () => db.ref('x').onDisconnect.set(<String, Object?>{
+            'n': <String, Object?>{'.priority': 5},
+          }),
+        ]);
+      });
+    });
+
+    test('set and push().set are unchanged (the child is dropped)', () {
+      withDb((FirebaseDatabase db, FakeTime time) {
+        expectAccepted(time, <Future<void> Function()>[
+          () => db.ref('x').set(null, priority: 5),
+          () => db.ref('x').set(<String, Object?>{'.priority': 5}),
+          () => db.ref('x').set(<String, Object?>{'.value': 1, '.priority': 5}),
+          () => db.ref('y').set(<String, Object?>{
+            'n': <String, Object?>{'.priority': 5},
+            'k': 1,
+          }),
+          () => db.ref('x').push().set(<String, Object?>{
+            'n': <String, Object?>{'.priority': 5},
+          }),
+        ]);
+        Object? value;
+        db.ref('y').onValue.listen((DatabaseEvent e) {
+          value = e.snapshot.value;
+        });
+        time.elapse(Duration.zero);
+        expect(value, <String, Object?>{'k': 1});
+      });
+    });
+
+    test('a transaction result is unchanged', () {
+      withDb((FirebaseDatabase db, FakeTime time) {
+        expectAccepted(time, <Future<void> Function()>[
+          () => db
+              .ref('x')
+              .runTransaction(
+                (Object? _) => Transaction.success(const <String, Object?>{
+                  'n': <String, Object?>{'.priority': 5},
+                }),
+              ),
+          () => db
+              .ref('y')
+              .runTransaction(
+                (Object? _) => Transaction.success(null, priority: 5),
+              ),
+        ]);
+      });
+    });
+  });
+
   group('.info is read only', () {
     final Map<String, FutureOr<Object?> Function(DatabaseReference r)> writes =
         <String, FutureOr<Object?> Function(DatabaseReference r)>{

@@ -10,6 +10,7 @@
 library;
 
 import 'package:firebase_database_dart/src/core/path.dart';
+import 'package:firebase_database_dart/src/core/snap/child_key.dart';
 import 'package:firebase_database_dart/src/core/util/hash.dart';
 import 'package:firebase_database_dart/src/core/util/numbers.dart';
 
@@ -237,16 +238,85 @@ void validateFirebaseMergeDataArg(
       entry.value,
       ValidationPath(path.childPath(curPath), errorPrefix),
     );
-    if (curPath.back?.name == '.priority' && !isValidPriority(entry.value)) {
-      throw ArgumentError(
-        "${errorPrefix}contains an invalid value for '$curPath', which must be "
-        'a valid Firebase priority (a string, finite number, server value, or '
-        'null).',
+    if (curPath.back?.name == '.priority') {
+      if (!isValidPriority(entry.value)) {
+        throw ArgumentError(
+          "${errorPrefix}contains an invalid value for '$curPath', which must "
+          'be a valid Firebase priority (a string, finite number, server '
+          'value, or null).',
+        );
+      }
+    } else {
+      validateNoPriorityWithoutValue(
+        errorPrefix,
+        entry.value,
+        path.childPath(curPath),
       );
     }
     mergePaths.add(curPath);
   }
   validateFirebaseMergePaths(errorPrefix, mergePaths);
+}
+
+/// Throws an [ArgumentError] when [data], written at [path] by a merge, is or contains (at any
+/// depth, a list element or a `.value` included) an object with a non-null `.priority` and no
+/// value: no non-null `.value` and no child that holds a value once nulls and empty objects are
+/// dropped. Not in JS or Android.
+///
+/// A merge sends the caller's JSON as it is, and the server answers such an object with a control
+/// error that names no request, so the write's Future would never complete (decisions section
+/// 11). An object that ends up empty with no priority, or with `.priority: null`, is a removal and
+/// is accepted. `set` and transactions are not checked: they send the parsed node, in which such
+/// an object is empty and left out.
+void validateNoPriorityWithoutValue(
+  String errorPrefix,
+  Object? data,
+  Path path,
+) {
+  _holdsValue(errorPrefix, data, path);
+}
+
+/// Whether [data] holds a value once nulls and empty objects are dropped; throws as
+/// [validateNoPriorityWithoutValue] does. Every child is checked, also after one holds a value.
+bool _holdsValue(String errorPrefix, Object? data, Path path) {
+  if (data == null) {
+    return false;
+  }
+  if (data is List) {
+    bool holds = false;
+    for (int i = 0; i < data.length; i++) {
+      final Path child = path.child(ChildKey('$i'));
+      holds = _holdsValue(errorPrefix, data[i], child) || holds;
+    }
+    return holds;
+  }
+  if (data is! Map) {
+    return true;
+  }
+  if (data.containsKey('.sv')) {
+    // A server value is a leaf (checked by validateServerValues).
+    return true;
+  }
+  bool holds = false;
+  for (final MapEntry<Object?, Object?> entry in data.entries) {
+    final Object? key = entry.key;
+    if (key == '.value') {
+      holds = _holdsValue(errorPrefix, entry.value, path) || holds;
+    } else if (key is String && key != '.priority') {
+      final Path child = path.child(ChildKey(key));
+      holds = _holdsValue(errorPrefix, entry.value, child) || holds;
+    }
+  }
+  if (!holds && data['.priority'] != null) {
+    throw ArgumentError(
+      "${errorPrefix}contains an object at '$path' with a priority and no "
+      'value (only nulls or empty objects), which the server never answers. '
+      'Remove the child with null, or give it a value with its priority '
+      "({'.value': <value>, '.priority': <priority>}); to change the "
+      "priority of an existing child, write '<child>/.priority'.",
+    );
+  }
+  return holds;
 }
 
 /// Validates a priority argument.
