@@ -505,8 +505,9 @@ can already be persisted on a user's disk, because there has been no release.
 A merge whose keys create a node and set its priority separately (`{'x/v': 1, 'x/.priority': 3}` with `x` missing)
 is refused whole, in either key order, with `invalid_parameters` "could not set priority on non-existent node" and
 nothing written, while `{'x': {'v': 1, '.priority': 3}}` is stored (measured on production and on the emulator on
-2026-11-26); the client shows the write, reverts it and fails the Future with `unknown` and that reason, and on the
-emulator an `onDisconnect.update` of the same keys is answered `ok` and writes nothing when it runs.
+2026-11-26); the client shows the write, reverts it and fails the Future with `unknown` and that reason, and an
+`onDisconnect.update` of the same keys is answered `ok` and writes nothing when it runs (production run 10 and the
+emulator, 2026-11-26).
 
 **What we gave up.** Nothing makes an increment exact after a lost answer; the README and a test say so. A
 write under `.info` that JS accepts through `update` and `onDisconnect().cancel` is refused
