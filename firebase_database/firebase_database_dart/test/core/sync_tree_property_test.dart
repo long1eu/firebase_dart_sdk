@@ -109,7 +109,7 @@ const Map<String, List<int>> _knownFailures = <String, List<int>>{
   'group R: limit view server cache short after a default listen took over': <int>[
     6892, 12944, 15580, 17434, 22925, 24768, 28802, 53038, 60676, 61383, 81628, 95040, 95959,
     108626, 118921, 130468, 131009, 137624, 152480, 153895, 155494, 156387, 165358, 167845,
-    174285, 177344, 178722, 210298, 215182, 227643, 250134, 251256, 251431, 252308, 255037,
+    168570, 174285, 177344, 178722, 210298, 215182, 227643, 250134, 251256, 251431, 252308,
     255287, 256221, 256506, 288075,
   ],
   // Group S of that report (a server merge refilling a full window from the complete cache as

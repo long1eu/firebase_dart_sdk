@@ -8,12 +8,14 @@
 /// - a node whose last child is removed by a write below it keeps its priority, and a node that
 ///   then holds only such children stays too; a write at or above the node drops it;
 /// - a priority written on a node that does not exist refuses the whole write
-///   (`invalid_parameters: could not set priority on non-existent node`); a node that keeps a
-///   priority, or holds only emptied children, takes one (check 38 (b), check 39 Q2); the check
-///   is made on the data before the update, so an update that writes a priority and creates its
-///   node in the same message is refused whole, in either key order (production run 9 and the
-///   emulator, 2026-11-26, check 39 Q12; the object form `{"x": {".priority": p, ...}}` is
-///   accepted);
+///   (`invalid_parameters: could not set priority on non-existent node`), except a null one in
+///   an update, which is answered ok and changes nothing (production run 10 and the emulator,
+///   2026-11-26, check 39 Q14; a set of a null priority there is not measured and stays refused);
+///   a node that keeps a priority, or holds only emptied children, takes one (check 38 (b),
+///   check 39 Q2); the check is made on the data before the update, so an update that writes a
+///   priority and creates its node in the same message is refused whole, in either key order
+///   (production run 9 and the emulator, 2026-11-26, check 39 Q12; the object form
+///   `{"x": {".priority": p, ...}}` is accepted);
 /// - one update is applied in two passes, whatever its key order: every value entry first, at any
 ///   depth; then every priority entry, parents before children, each landing only on a node that
 ///   at that moment has a value or holds hidden state; a null priority removes a kept one, and an
@@ -242,7 +244,7 @@ final class JsonServerModel {
 
   /// Applies a set (or with [merge] an update of the children in the map [data]) at [path];
   /// false, and nothing changed, when the server refuses it: a priority on a node that does not
-  /// exist.
+  /// exist before the write (check 39 Q12), except a null one in an update (Q14).
   bool write(String path, Object? data, {bool merge = false}) {
     final List<String> at = keysOf(path);
     final Map<String, Object?> entries = merge
@@ -259,7 +261,7 @@ final class JsonServerModel {
       final List<String> full = <String>[...at, ...keysOf(e.key)];
       if (full.isNotEmpty && full.last == '.priority') {
         final List<String> owner = full.sublist(0, full.length - 1);
-        if (_get(root, owner) == null) {
+        if ((e.value != null || !merge) && _get(root, owner) == null) {
           return false;
         }
         priorities.add((owner, e.value));

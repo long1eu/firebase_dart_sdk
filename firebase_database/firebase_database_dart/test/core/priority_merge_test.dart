@@ -906,4 +906,57 @@ void main() {
       }
     },
   );
+
+  group(
+    'Q14: an update with a null priority on a node, answered ok by the server',
+    () {
+      // Production run 10 and the emulator, 2026-11-26, check 39 Q14
+      // (rtdb/from_boss/prodkit_production_run10_check39_q13_q14_2026-11-26.txt): with r = {k: 1},
+      // `m r {"x/.priority": null}` is answered ok and r stays {k: 1}; with
+      // r = {k: 1, x: {v: 1, .priority: 2}} it is answered ok and r becomes {k: 1, x: {v: 1}}.
+      final Map<String, Object?> written = <String, Object?>{
+        'x/.priority': null,
+      };
+
+      void expectAtR(Object? json) {
+        final View view = tree.syncPointTree.get(Path('r'))!.viewForQuery(atR)!;
+        expect((view.eventCache as ChildrenNode).toServerJson(), json);
+        expect(tree.calcCompleteEventCache(Path('r'))!.hash(), n(json).hash());
+      }
+
+      test('x missing: no event, nothing changes', () {
+        listen(atR);
+        answer(atR, <String, Object?>{'k': 1});
+        expect(describe(update('r', written, 1)), isEmpty);
+        expect(describe(serverMerge('r', written)), isEmpty);
+        expect(describe(ack(1)), isEmpty);
+        expectAtR(<String, Object?>{'k': 1});
+        expect(describe(listen(atR)), <String>['A(k)', 'V({k: 1})']);
+      });
+
+      test('x = {v: 1, .priority: 2}: the priority goes', () {
+        listen(atR);
+        answer(atR, <String, Object?>{
+          'k': 1,
+          'x': <String, Object?>{'v': 1, '.priority': 2},
+        });
+        expect(describe(update('r', written, 1)), <String>[
+          'C(x)',
+          'V({k: 1, x: {v: 1}})',
+        ]);
+        expect(describe(serverMerge('r', written)), isEmpty);
+        expect(describe(ack(1)), isEmpty);
+        final Map<String, Object?> after = <String, Object?>{
+          'k': 1,
+          'x': <String, Object?>{'v': 1},
+        };
+        expectAtR(after);
+        expect(describe(listen(atR)), <String>[
+          'A(k)',
+          'A(x)',
+          'V({k: 1, x: {v: 1}})',
+        ]);
+      });
+    },
+  );
 }

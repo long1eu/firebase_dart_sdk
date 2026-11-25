@@ -1248,9 +1248,10 @@ entry against the data as it was before the update: when the entry's node does n
 no kept priority), the whole update is refused (`invalid_parameters`, "could not set priority on non-existent node")
 and nothing is written, in either key order, even when the update's own value entries would create the node
 (`{"x/v": 1, "x/.priority": 3}` with `x` missing; the object form `{"x": {"v": 1, ".priority": 3}}` is accepted).
-This was measured on production 2026-11-26 (run 9, check 39 Q12) and on the emulator the same day; a node that exists
-before the update and is removed by its pass 1 passes the check and its priority is dropped silently (Q10). The client
-cannot make the server's check: it shows such an update's value and priority until the refusal and reverts both
+This was measured on production 2026-11-26 (run 9, check 39 Q12) and on the emulator the same day. A null priority
+entry is not checked: `{"x/.priority": null}` with `x` missing is answered `ok` and changes nothing (run 10 and the
+emulator, Q14). A node that exists before the update and is removed by its pass 1 passes the check and its
+priority is dropped silently (Q10). The client cannot make the server's check: it shows such an update's value and priority until the refusal and reverts both
 then, the ordinary optimistic path. A null priority removes a kept priority, and an emptied node
 left with no priority and nothing below it disappears; a parent that already took its priority in this pass keeps
 it. Example: `b = {x: {v: 1, .priority: 1}}`, then `update b` with `{".priority": 2, "x/v": null,
