@@ -7,6 +7,7 @@
 // hand (SHA-1, base64, of the texts in the comments), not by this client: `H5` below is the hash
 // production accepted for the emptied node in check 38 (c).
 import 'package:firebase_database_dart/src/core/compound_write.dart';
+import 'package:firebase_database_dart/src/core/connection/wire_range_merge.dart';
 import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:firebase_database_dart/src/core/snap/child_key.dart';
 import 'package:firebase_database_dart/src/core/snap/children_node.dart';
@@ -14,6 +15,7 @@ import 'package:firebase_database_dart/src/core/snap/indexes/priority_index.dart
 import 'package:firebase_database_dart/src/core/snap/leaf_node.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
 import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
+import 'package:firebase_database_dart/src/core/snap/range_merge.dart';
 import 'package:test/test.dart';
 
 /// sha1('priority:number:4014000000000000:'): an emptied node with priority 5.
@@ -310,6 +312,69 @@ void main() {
         expect(r.hash(), 'oJJpnIaW8ajlb3KSeifBWBnymfo=');
       },
     );
+  });
+
+  group('range merges (rm) carry and drop kept priorities', () {
+    final Map<String, Object?> server = <String, Object?>{
+      'a': 1,
+      'n': <String, Object?>{'.priority': 5},
+      'z': 2,
+    };
+    Node apply(Object? cache, String? start, String? end, Object? data) =>
+        RangeMerge.fromWire(
+          WireRangeMerge(exclusiveStart: start, inclusiveEnd: end, data: data),
+        ).applyTo(nodeFromServerJson(cache));
+
+    test('a full range carrying {".priority": 5}', () {
+      final Node got = apply(
+        <String, Object?>{'a': 1, 'z': 2},
+        null,
+        null,
+        server,
+      );
+      expect(_children(got).toServerJson(), server);
+      expect(got.hash(), nodeFromServerJson(server).hash());
+    });
+
+    test('a partial range carrying {".priority": 5}', () {
+      // (/a, /y] holds n and its priority (/n/.priority sorts after /n).
+      final Node got = apply(
+        <String, Object?>{'a': 1, 'z': 2},
+        '/a',
+        '/y',
+        <String, Object?>{
+          'n': <String, Object?>{'.priority': 5},
+        },
+      );
+      expect(_children(got).toServerJson(), server);
+      expect(got.hash(), nodeFromServerJson(server).hash());
+    });
+
+    test('a partial range from a server that dropped the kept priority', () {
+      final Node got = apply(server, '/a', '/y', null);
+      expect(_children(got).toServerJson(), <String, Object?>{'a': 1, 'z': 2});
+      expect(
+        got.hash(),
+        nodeFromServerJson(<String, Object?>{'a': 1, 'z': 2}).hash(),
+      );
+    });
+
+    test('a partial range that keeps a node emptied in the range', () {
+      // The cache's n is visible; the server emptied it and sends it with its priority.
+      final Node got = apply(
+        <String, Object?>{
+          'a': 1,
+          'n': <String, Object?>{'x': 1, '.priority': 5},
+          'z': 2,
+        },
+        '/a',
+        '/y',
+        <String, Object?>{
+          'n': <String, Object?>{'.priority': 5},
+        },
+      );
+      expect(_children(got).toServerJson(), server);
+    });
   });
 
   test('emptying and refilling 20000 prioritised children is not quadratic', () {

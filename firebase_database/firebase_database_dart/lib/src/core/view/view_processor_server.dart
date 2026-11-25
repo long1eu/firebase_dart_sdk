@@ -61,9 +61,23 @@ extension _ServerOperations on ViewProcessor {
             oldEventNode,
             viewCache.serverCache.node,
           );
-      newEventCache = updatedPriority != null
-          ? filter.updatePriority(oldEventNode, updatedPriority)
-          : oldEventNode;
+      final Node? completeServer = viewCache.completeServerSnap;
+      if (updatedPriority != null &&
+          ViewProcessor._ignoresPriority(oldEventNode) &&
+          completeServer != null) {
+        // The node is empty here only because of a pending write below it; the server node took
+        // the priority and keeps it when that write empties it. Rebuild from the writes over the
+        // server node.
+        newEventCache = filter.updateFullNode(
+          oldEventNode,
+          writesCache.calcCompleteEventCache(completeServer)!,
+          accumulator,
+        );
+      } else {
+        newEventCache = updatedPriority != null
+            ? filter.updatePriority(oldEventNode, updatedPriority)
+            : oldEventNode;
+      }
     } else {
       final Path childChangePath = changePath.popFront();
       final Node? newEventChild;
@@ -75,9 +89,21 @@ extension _ServerOperations on ViewProcessor {
               viewCache.serverCache.node,
             );
         final Node oldChild = oldEventSnap.node.getImmediateChild(childKey);
-        newEventChild = eventChildUpdate != null
-            ? oldChild.updateChild(childChangePath, eventChildUpdate)
-            : oldChild;
+        if (eventChildUpdate != null &&
+            (childChangePath.back?.isPriorityKey ?? false) &&
+            ViewProcessor._ignoresPriority(
+              oldChild.getChild(childChangePath.parent!),
+            )) {
+          // As for the view's own priority above: the owner is empty only because of a pending
+          // write; rebuild the child from the writes over the server cache.
+          newEventChild =
+              writesCache.calcCompleteChild(childKey, viewCache.serverCache) ??
+              oldChild;
+        } else {
+          newEventChild = eventChildUpdate != null
+              ? oldChild.updateChild(childChangePath, eventChildUpdate)
+              : oldChild;
+        }
       } else {
         newEventChild = writesCache.calcCompleteChild(
           childKey,

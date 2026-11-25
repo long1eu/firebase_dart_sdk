@@ -108,7 +108,7 @@ final class ViewProcessor {
           );
         }
       case AckUserWrite():
-        final ViewCache acked = !operation.revert
+        newViewCache = !operation.revert
             ? _ackUserWrite(
                 oldViewCache,
                 operation.path,
@@ -124,12 +124,6 @@ final class ViewProcessor {
                 optCompleteCache,
                 accumulator,
               );
-        newViewCache = _adoptServerHiddenState(
-          acked,
-          operation.path,
-          writesCache,
-          accumulator,
-        );
       case ListenComplete():
         newViewCache = _listenComplete(
           oldViewCache,
@@ -240,47 +234,6 @@ final class ViewProcessor {
       newEventSnap,
       complete: oldEventSnap.fullyInitialized,
       filtered: filter.filtersNodes,
-    );
-  }
-
-  /// [viewCache] with the hidden state of its server cache once no write is left over the view.
-  ///
-  /// An ack or a revert applies the server data again at the written [path] only, while a write
-  /// below a node can change the priority that node keeps (emptying it keeps it; the write tree
-  /// layers separate writes, so an event cache rebuilt from it can miss a priority written
-  /// between them). With no write left over the view the event cache is the server cache: when
-  /// the hidden state along [path] differs, the server cache is taken (events for any visible
-  /// difference, normally none).
-  ViewCache _adoptServerHiddenState(
-    ViewCache viewCache,
-    Path path,
-    WriteTreeRef writesCache,
-    ChildChangeAccumulator accumulator,
-  ) {
-    final CacheNode server = viewCache.serverCache;
-    if (filter.filtersNodes ||
-        server.filtered ||
-        !server.fullyInitialized ||
-        !viewCache.eventCache.fullyInitialized ||
-        !identical(
-          writesCache.calcCompleteEventCache(server.node),
-          server.node,
-        ) ||
-        ChildrenNode.sameHiddenAlong(
-          viewCache.eventCache.node,
-          server.node,
-          path,
-        )) {
-      return viewCache;
-    }
-    return viewCache.updateEventSnap(
-      filter.updateFullNode(
-        viewCache.eventCache.node,
-        server.node,
-        accumulator,
-      ),
-      complete: true,
-      filtered: false,
     );
   }
 

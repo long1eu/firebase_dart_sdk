@@ -62,6 +62,7 @@ class ChildrenNode implements Node {
     this._priorityNode,
     this._indexMap, [
     this._hidden,
+    this._hiddenOrder,
   ]);
 
   final SortedMap<ChildKey, Node> _children;
@@ -74,6 +75,10 @@ class ChildrenNode implements Node {
 
   /// The hidden children by key; null when there are none.
   final SortedMap<ChildKey, Node>? _hidden;
+
+  /// The hidden children in [hash] order (kept priority, then key), built on the first [hash]
+  /// and then carried to the versions this node makes; null when not built.
+  SortedMap<NamedNode, Node>? _hiddenOrder;
 
   String? _lazyHash;
   Object? _lazyValue;
@@ -105,6 +110,11 @@ class ChildrenNode implements Node {
   /// The priority the server holds for this node: [priority], or for a node emptied by a write
   /// below it the priority it kept.
   Node get keptPriority => _priorityNode ?? _empty;
+
+  /// The keys of the hidden children, in key order.
+  Iterable<ChildKey> get hiddenKeys =>
+      _hidden?.entries.map((MapEntry<ChildKey, Node> e) => e.key) ??
+      const <ChildKey>[];
 
   /// Whether this is an empty node that holds hidden state: a kept priority or hidden children.
   bool get holdsHiddenState =>
@@ -141,11 +151,23 @@ class ChildrenNode implements Node {
         return this;
       }
       if (newPriority.isEmpty) {
-        return ChildrenNode._(_children, null, _indexMap, _hidden);
+        return ChildrenNode._(
+          _children,
+          null,
+          _indexMap,
+          _hidden,
+          _hiddenOrder,
+        );
       }
     }
     validatePriorityNode(newPriority);
-    return ChildrenNode._(_children, newPriority, _indexMap, _hidden);
+    return ChildrenNode._(
+      _children,
+      newPriority,
+      _indexMap,
+      _hidden,
+      _hiddenOrder,
+    );
   }
 
   /// The child [key]: a visible child, else a hidden one, else the empty node. `.priority` gives
@@ -200,7 +222,30 @@ class ChildrenNode implements Node {
       newHidden = _withoutHidden(key);
     }
     // The priority stays when the last child goes: the server keeps it.
-    return ChildrenNode._(newChildren, _priorityNode, newIndexMap, newHidden);
+    return ChildrenNode._(
+      newChildren,
+      _priorityNode,
+      newIndexMap,
+      newHidden,
+      _hiddenOrderAfter(key, newHidden?[key]),
+    );
+  }
+
+  /// [_hiddenOrder] with the hidden child [key] replaced by [newHidden] (removed when null); null
+  /// when it is not built or nothing is left.
+  SortedMap<NamedNode, Node>? _hiddenOrderAfter(ChildKey key, Node? newHidden) {
+    SortedMap<NamedNode, Node>? order = _hiddenOrder;
+    if (order == null) {
+      return null;
+    }
+    final Node? old = _hidden?[key];
+    if (old != null) {
+      order = order.remove(NamedNode(key, old));
+    }
+    if (newHidden != null) {
+      order = order.insert(NamedNode(key, newHidden), newHidden);
+    }
+    return order.isEmpty ? null : order;
   }
 
   /// [_hidden] without [key]; null when nothing is left.
@@ -381,10 +426,10 @@ class ChildrenNode implements Node {
   /// The visible and the hidden children in the server's priority order: by priority (kept
   /// priority for a hidden child), then by key.
   List<NamedNode> _childrenWithHidden() {
-    final List<NamedNode> hidden = <NamedNode>[
-      for (final MapEntry<ChildKey, Node> e in _hidden!.entries)
-        NamedNode(e.key, e.value),
-    ]..sort(_comparePriorityKept);
+    final List<NamedNode> hidden = (_hiddenOrder ??= _buildHiddenOrder())
+        .entries
+        .map((MapEntry<NamedNode, Node> e) => e.key)
+        .toList();
     final List<NamedNode> merged = <NamedNode>[];
     int h = 0;
     forEachChild(priorityIndex, (ChildKey key, Node child) {
@@ -398,6 +443,17 @@ class ChildrenNode implements Node {
     });
     merged.addAll(hidden.skip(h));
     return merged;
+  }
+
+  SortedMap<NamedNode, Node> _buildHiddenOrder() {
+    SortedMap<NamedNode, Node> order = SortedMap<NamedNode, Node>(
+      _comparePriorityKept,
+    );
+    _hidden!.inOrderTraversal((ChildKey key, Node child) {
+      order = order.insert(NamedNode(key, child), child);
+      return false;
+    });
+    return order;
   }
 
   /// The priority index order, with the kept priority of an empty node.
@@ -586,6 +642,7 @@ class ChildrenNode implements Node {
       _priorityNode,
       _indexMap.addIndex(index, _children),
       _hidden,
+      _hiddenOrder,
     );
   }
 

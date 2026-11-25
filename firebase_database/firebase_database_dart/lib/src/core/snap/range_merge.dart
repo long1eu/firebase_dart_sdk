@@ -23,7 +23,7 @@ final class RangeMerge {
     return RangeMerge(
       start == null ? null : Path(start),
       end == null ? null : Path(end),
-      nodeFromJson(merge.data),
+      nodeFromServerJson(merge.data),
     );
   }
 
@@ -68,9 +68,16 @@ final class RangeMerge {
 
       node.forEachChild(keyIndex, collect);
       updateNode.forEachChild(keyIndex, collect);
+      // Hidden children (nodes emptied below that keep a priority) are in the range too.
+      for (final Node n in <Node>[node, updateNode]) {
+        if (n is ChildrenNode) {
+          allChildren.addAll(n.hiddenKeys);
+        }
+      }
       final List<ChildKey> inOrder = allChildren.toList();
-      // The priority goes last, so the node is not empty when it is applied.
-      if (!updateNode.priority.isEmpty || !node.priority.isEmpty) {
+      // The priority goes last, so the node is not empty when it is applied; an emptied node's
+      // kept priority counts.
+      if (!_keptPriority(updateNode).isEmpty || !_keptPriority(node).isEmpty) {
         inOrder.add(ChildKey.priority);
       }
       Node newNode = node;
@@ -93,6 +100,9 @@ final class RangeMerge {
       return node;
     }
   }
+
+  static Node _keptPriority(Node node) =>
+      node is ChildrenNode ? node.keptPriority : node.priority;
 
   @override
   String toString() =>

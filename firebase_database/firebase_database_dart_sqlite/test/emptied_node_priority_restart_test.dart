@@ -5,6 +5,7 @@
 // `{".priority": p}`, and a transaction on the node commits. The server is the client package's
 // internal FakeServerActions, which keeps and hashes the priority and sends it as production
 // does; the public FakeDatabaseServer reads its answers with the public nodeFromJson and cannot.
+// The test answers a listen as the server does: data only when the listen's hash differs.
 // The client package's internal test seam (firebaseDatabaseWithConnection) and the app type it
 // takes, as the client's own tests use them.
 // ignore_for_file: invalid_use_of_internal_member, depend_on_referenced_packages
@@ -16,6 +17,7 @@ import 'package:firebase_database_dart/firebase_database_dart.dart';
 import 'package:firebase_database_dart/src/api/firebase_database.dart'
     show firebaseDatabaseWithConnection;
 import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
+import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
 import 'package:firebase_database_dart/src/testing/fake_server_actions.dart';
 import 'package:firebase_database_dart_sqlite/firebase_database_dart_sqlite.dart';
 import 'package:test/test.dart';
@@ -24,10 +26,14 @@ import 'package:test/test.dart';
 /// priority 5 (production accepted it in check 38 (c)).
 const String _emptiedHash = 'Za4HQEOLkfDszOTdKHl8KWNgpRE=';
 
-/// A fake server holding `n` = `{a: 1}` with priority 5, emptied by another client.
+/// A fake server holding `p` = `{m: 1, n: {a: 1}}`, `n` with priority 5, emptied by another
+/// client.
 FakeServerActions _server() => FakeServerActions()
-  ..writeByOtherClient('n', <String, Object?>{'a': 1, '.priority': 5})
-  ..writeByOtherClient('n/a', null);
+  ..writeByOtherClient('p', <String, Object?>{
+    'm': 1,
+    'n': <String, Object?>{'a': 1, '.priority': 5},
+  })
+  ..writeByOtherClient('p/n/a', null);
 
 FirebaseDatabase _open(
   FirebaseApp app,
@@ -39,6 +45,36 @@ FirebaseDatabase _open(
       server..delegate = delegate,
   persistence: sqlitePersistence(directory),
 );
+
+/// Answers the open listen at [path] as the server does: the data only when the listen's hash
+/// differs from the hash of what the server holds, then the completion. Returns whether data
+/// was sent.
+bool _answerListen(FakeServerActions server, String path) {
+  final ServerCall listen = server
+      .callsOf('listen')
+      .lastWhere((ServerCall c) => c.spec!.path == '/$path' && !c.answered);
+  final Object? data = server.dataAt(path);
+  final bool resend =
+      listen.hashProvider!.simpleHash() != nodeFromServerJson(data).hash();
+  if (resend) {
+    server.deliverDataUpdate(path, data);
+  }
+  server.respond(listen);
+  return resend;
+}
+
+typedef _Seen = (Object?, Object?);
+
+StreamSubscription<DatabaseEvent> _listen(
+  FirebaseDatabase db,
+  String path,
+  List<_Seen> seen,
+) => db
+    .ref(path)
+    .onValue
+    .listen(
+      (DatabaseEvent e) => seen.add((e.snapshot.value, e.snapshot.priority)),
+    );
 
 void main() {
   test('after a restart the kept priority is fetched again; a transaction on '
@@ -54,60 +90,54 @@ void main() {
       name: 'rtdb-sqlite-emptied-priority',
     );
 
-    // First run: the node arrives with its priority and is emptied by another client.
+    // First run: p arrives with n's priority, and another client empties n.
     final FakeServerActions first = FakeServerActions()
-      ..writeByOtherClient('n', <String, Object?>{'a': 1, '.priority': 5});
+      ..writeByOtherClient('p', <String, Object?>{
+        'm': 1,
+        'n': <String, Object?>{'a': 1, '.priority': 5},
+      });
     final FirebaseDatabase db1 = _open(app, first, dir.path);
-    final List<(Object?, Object?)> seen1 = <(Object?, Object?)>[];
-    final StreamSubscription<DatabaseEvent> sub1 = db1
-        .ref('n')
-        .onValue
-        .listen(
-          (DatabaseEvent e) =>
-              seen1.add((e.snapshot.value, e.snapshot.priority)),
-        );
+    final List<_Seen> seen1 = <_Seen>[];
+    final StreamSubscription<DatabaseEvent> sub1 = _listen(db1, 'p', seen1);
     await pumpEventQueue();
     first.connect();
     await pumpEventQueue();
-    first
-      ..deliverDataUpdate('n', first.dataAt('n'))
-      ..respond(first.callsOf('listen').single);
+    expect(_answerListen(first, 'p'), isTrue);
     await pumpEventQueue();
-    first.writeByOtherClient('n/a', null);
+    first.writeByOtherClient('p/n/a', null);
     await pumpEventQueue();
-    expect(first.dataAt('n'), <String, Object?>{'.priority': 5});
-    expect(seen1.last, (null, null));
+    expect(first.dataAt('p'), <String, Object?>{
+      'm': 1,
+      'n': <String, Object?>{'.priority': 5},
+    });
+    expect(seen1.last.$1, <String, Object?>{'m': 1});
     await sub1.cancel();
     await db1.close();
 
-    // Second run on the same database file: the cache does not hold the kept priority, so the
-    // listen hash is not the server's and the server sends the node again.
+    // Second run on the same database file. Offline, the cache gives {m: 1}: it was read. It
+    // does not hold n's kept priority, so the listen hash is not the server's and the server
+    // sends p again.
     final FakeServerActions second = _server();
     final FirebaseDatabase db2 = _open(app, second, dir.path);
     addTearDown(db2.close);
-    final List<(Object?, Object?)> seen2 = <(Object?, Object?)>[];
-    final StreamSubscription<DatabaseEvent> sub2 = db2
-        .ref('n')
-        .onValue
-        .listen(
-          (DatabaseEvent e) =>
-              seen2.add((e.snapshot.value, e.snapshot.priority)),
-        );
+    final List<_Seen> seen2 = <_Seen>[];
+    final StreamSubscription<DatabaseEvent> sub2 = _listen(db2, 'p', seen2);
     addTearDown(sub2.cancel);
     await pumpEventQueue();
+    expect(seen2.single.$1, <String, Object?>{'m': 1});
     second.connect();
     await pumpEventQueue();
-    final ServerCall listen = second.callsOf('listen').single;
-    expect(listen.hashProvider!.simpleHash(), '');
-    second
-      ..deliverDataUpdate('n', second.dataAt('n'))
-      ..respond(listen);
+    expect(
+      second.callsOf('listen').single.hashProvider!.simpleHash(),
+      nodeFromServerJson(<String, Object?>{'m': 1}).hash(),
+    );
+    expect(_answerListen(second, 'p'), isTrue);
     await pumpEventQueue();
-    // Readers see no value and no priority for the emptied node.
-    expect(seen2.last, (null, null));
+    // Readers see no value and no priority for the emptied n; no new event for p.
+    expect(seen2, hasLength(1));
 
     final List<Object?> runs = <Object?>[];
-    final Future<TransactionResult> result = db2.ref('n').runTransaction((
+    final Future<TransactionResult> result = db2.ref('p/n').runTransaction((
       Object? v,
     ) {
       runs.add(v);
@@ -122,8 +152,13 @@ void main() {
     expect(r.committed, isTrue);
     expect(runs.length, lessThanOrEqualTo(2), reason: 'runs: $runs');
     expect(second.callsOf('put').last.hash, _emptiedHash);
-    expect(second.dataAt('n'), <String, Object?>{'b': 1});
-    expect(seen2.last.$1, <String, Object?>{'b': 1});
-    expect(seen2.last.$2, isNull);
+    expect(second.dataAt('p'), <String, Object?>{
+      'm': 1,
+      'n': <String, Object?>{'b': 1},
+    });
+    expect(seen2.last.$1, <String, Object?>{
+      'm': 1,
+      'n': <String, Object?>{'b': 1},
+    });
   });
 }

@@ -473,13 +473,81 @@ void main() {
     });
   });
 
-  group('the server priority after the last ack (wide-range seeds)', () {
-    // The write tree layers separate writes, so an event cache rebuilt from it while writes are
-    // pending can miss a priority written between them; the ack of the last write over the view
-    // takes the server cache's kept priority back.
+  group('a server priority on a node a pending write empties', () {
+    // The event cache holds the node empty only because of a pending write; the server node took
+    // the priority (it had a value then) and keeps it when that write empties it. The event cache
+    // is rebuilt from the writes over the server cache, so the refill shows the priority.
     ChildrenNode eventAt(QuerySpec q) =>
         tree.syncPointTree.get(q.path)!.viewForQuery(q)!.eventCache
             as ChildrenNode;
+
+    final Map<String, Object?> start = <String, Object?>{
+      'p': <String, Object?>{
+        'n': <String, Object?>{'a': 1},
+        'z': 1,
+      },
+    };
+    for (final String at in <String>['p/n', 'p', '']) {
+      test('another client prioritises n while set n/a null is pending, '
+          'listener at /$at', () {
+        final QuerySpec q = QuerySpec.defaultAt(Path(at));
+        Object? data = start;
+        for (final String k
+            in at.split('/').where((String k) => k.isNotEmpty)) {
+          data = (data! as Map<String, Object?>)[k];
+        }
+        listen(q);
+        answer(q, data);
+        set('p/n/a', null, 1);
+        serverSet('p/n/.priority', 2);
+        set('p/n/b', 1, 2);
+        serverSet('p/n/a', null);
+        ack(1);
+        serverSet('p/n/b', 1);
+        ack(2);
+        final Object? n = eventAt(q).toServerJson();
+        Object? got = n;
+        for (final String k
+            in 'p/n'
+                .substring(at.length)
+                .split('/')
+                .where((k) => k.isNotEmpty)) {
+          got = (got! as Map<String, Object?>)[k];
+        }
+        expect(got, <String, Object?>{'b': 1, '.priority': 2});
+        expect(tree.calcCompleteEventCache(Path('p/n'))!.priority.value, 2);
+      });
+    }
+
+    test('A1b: the hidden form, last ack on another path', () {
+      final QuerySpec atRoot = QuerySpec.defaultAt(Path(''));
+      listen(atRoot);
+      answer(atRoot, <String, Object?>{
+        'a': 1,
+        'b': <String, Object?>{
+          'k': 1,
+          'x': <String, Object?>{'v': 2},
+        },
+      });
+      set('b/x/v', null, 3);
+      set('z', 1, 4);
+      serverSet('b/x/.priority', 1);
+      serverSet('b/x/v', null);
+      ack(3);
+      serverSet('z', 1);
+      ack(4);
+      expect(
+        eventAt(atRoot).hash(),
+        tree.syncPointTree
+            .get(Path.empty)!
+            .viewForQuery(atRoot)!
+            .serverCache
+            .hash(),
+      );
+      expect(values(set('b/x/y', 1, 5)), <String>[
+        'V({a: 1, b: {k: 1, x: {y: 1, .priority: 1}}, z: 1})',
+      ]);
+    });
 
     test('seed 77640: a child added, a priority, the child removed', () {
       final QuerySpec atA = QuerySpec.defaultAt(Path('a'));

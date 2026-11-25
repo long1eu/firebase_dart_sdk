@@ -9,7 +9,10 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_database_dart/firebase_database_dart.dart';
 import 'package:firebase_database_dart/src/api/firebase_database.dart'
     show firebaseDatabaseWithConnection;
+import 'package:firebase_database_dart/src/core/compound_write.dart';
 import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
+import 'package:firebase_database_dart/src/core/snap/children_node.dart';
+import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
 import 'package:firebase_database_dart/src/testing/fake_server_actions.dart';
 import 'package:test/test.dart';
 
@@ -116,4 +119,28 @@ void main() {
     await written;
     expect(server.dataAt('n'), <String, Object?>{'b': 1, '.priority': 5});
   });
+
+  test('update {a: null, .priority: 7} on a node without a priority: the client '
+      'and the fake server agree', () {
+    // The client writes the priority first (the node has a value then) and the emptied node
+    // keeps it: {".priority": 7}. FakeServerActions applies the children first, the node is
+    // gone and the priority lands on nothing: null. A transaction on such a node fails with
+    // max-retries against whichever is wrong. Production measured only a node that had a
+    // priority (check 38 (b)), where both orders give 7.
+    final Object? client =
+        (CompoundWrite.fromValue(<String, Object?>{
+                  'a': null,
+                  '.priority': 7,
+                }).apply(nodeFromJson(<String, Object?>{'a': 1}))
+                as ChildrenNode)
+            .toServerJson();
+    expect(client, <String, Object?>{'.priority': 7});
+    final FakeServerActions server = FakeServerActions()
+      ..writeByOtherClient('n', <String, Object?>{'a': 1})
+      ..writeByOtherClient('n', <String, Object?>{
+        'a': null,
+        '.priority': 7,
+      }, isMerge: true);
+    expect(server.dataAt('n'), client);
+  }, skip: 'server rule unmeasured, see prodkit_dart_gaps3 Q1');
 }
