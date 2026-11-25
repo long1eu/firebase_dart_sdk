@@ -218,8 +218,8 @@ Future<void> clientReadmeLine481() async {
   }
 }
 
-// ../firebase_database_dart/README.md:518
-Future<void> clientReadmeLine518() async {
+// ../firebase_database_dart/README.md:520
+Future<void> clientReadmeLine520() async {
   final FirebaseDatabase logged = FirebaseDatabase(
     app,
     logger: (DatabaseLogLevel level, String message) {

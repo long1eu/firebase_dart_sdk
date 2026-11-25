@@ -497,17 +497,19 @@ try {
 
 `FirebaseDatabaseException.cause` holds the underlying error when it came from outside the package; it is never part of
 the message. The codes are `permission-denied`, `disconnected`, `max-retries`, `overridden-by-set`, `unavailable`,
-`network-error`, `write-canceled`, `index-not-defined`, `operation-failed`, `too-big`, `database-closed`
-and `unknown`. `serverStatus` is the raw status and reason from the server. A message never contains a token or a URL
+`network-error`, `write-canceled`, `index-not-defined`, `operation-failed`, `too-big`, `database-closed`,
+`data-stale` (the server's `datastale` for a request other than a transaction's, which a fake server can send) and
+`unknown`. `serverStatus` is the raw status and reason from the server, and null for an error the client raised
+itself. A message never contains a token or a URL
 query. A rejected or expired token is not a code of its own: the server answers `permission-denied` and the connection
 retries the token itself. A bad path, key, value or query is an `ArgumentError` or `StateError` at the call, not an
 exception through a Future; fix the code instead of catching it. Offline is not an error: writes stay pending and
 listeners keep their data.
 
-A status the client has no code for arrives as `unknown`, with the raw status in `serverStatus` and in `toString()`. For
-example, `setPriority` on a location with no data is refused by the server with the status `invalid_parameters`, and the
-exception has code `unknown` and `serverStatus` `unknown: invalid_parameters: could not set priority on non-existent
-node`.
+A status the client has no code for arrives as `unknown`, with the server's reason as the message and the raw status
+and reason in `serverStatus` and in `toString()`. For example, `setPriority` on a location with no data is refused by
+the server with the status `invalid_parameters`, and the exception has code `unknown`, message `could not set priority
+on non-existent node` and `serverStatus` `invalid_parameters: could not set priority on non-existent node`.
 
 More: [error_handling.dart](example/error_handling.dart).
 

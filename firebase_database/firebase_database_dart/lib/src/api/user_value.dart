@@ -6,7 +6,6 @@
 library;
 
 import 'package:firebase_database_dart/src/api/firebase_database_exception.dart';
-import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
 import 'package:firebase_database_dart/src/core/database_error.dart';
 import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
@@ -106,14 +105,10 @@ void validateNotReadOnlyKey(String fnName, Path path) {
   }
 }
 
-/// The public form of an error that crossed from the core: a [DatabaseError] or a
-/// [ServerActionsException] becomes a [FirebaseDatabaseException]; anything else is returned as it
-/// is.
+/// The public form of an error that crossed from the core: a [DatabaseError] becomes a
+/// [FirebaseDatabaseException]; anything else is returned as it is. Repo turns the connection's
+/// `ServerActionsException` of a failed get into a [DatabaseError] before it gets here.
 Object toApiError(Object error) => switch (error) {
   final DatabaseError e => exceptionFromDatabaseError(e),
-  final ServerActionsException e => exceptionFromServerStatus(
-    e.status,
-    e.reason,
-  ),
   _ => error,
 };

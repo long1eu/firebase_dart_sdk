@@ -42,6 +42,7 @@ void main() {
         'index-not-defined',
         'too-big',
         'database-closed',
+        'data-stale',
         'unknown',
       ];
       for (final String code in same) {
