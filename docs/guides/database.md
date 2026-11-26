@@ -6,12 +6,13 @@ WebSocket protocol of the Firebase JS SDK), `firebase_database_dart_sqlite` (a d
 is the entry point: which package to add, what a connection carries, rules and errors, what surprises people who know
 the JS SDK or FlutterFire, offline behaviour, the connection on a desktop or a server, and tests. The [client
 README](../../firebase_database/firebase_database_dart/README.md) has the install steps and one example of each call;
-this guide does not repeat them. The client is at 0.0.1 and has run against the Database emulator only, never against a
-production project; where a statement below depends on the server, it says what was measured. What has run is in section
-23 of the [decisions document](../database_decisions.md): the client's test suite on the Dart VM (2,371 tests) and in
-Chrome on dart2js (2,328) and dart2wasm (2,332), the SQLite package (247 tests), the adapter (136 tests, 5 skipped
-without the emulator), and example apps on Windows 11 and Linux x64 (4 integration tests each). Not run: a production
-project, a release build of a desktop app, Safari, Firefox, a real display and CI on a runner.
+this guide does not repeat them. The client is at 0.0.1. It has run against the Database emulator and, once, against a
+production database (the verification kit, 39 checks); where a statement below depends on the server, it says what was
+measured. What has run, and what never ran against production, is in section 23 of the [decisions
+document](../database_decisions.md). It includes the client's test suite on the Dart VM (2,371 tests) and in Chrome on
+dart2js (2,328) and dart2wasm (2,332), the SQLite package (247 tests), the adapter (136 tests, 5 skipped without the
+emulator), and example apps on Windows 11 and Linux x64 (4 integration tests each). CI runs on GitHub Actions
+(`.github/workflows/ci.yml`) and passes. Not run: a release build of a desktop app, Safari, Firefox and a real display.
 
 ## Which package do I add
 
@@ -306,7 +307,7 @@ unit-testing library.
   [`firebase_database_dart_sqlite`](../../firebase_database/firebase_database_dart_sqlite/README.md) and
   [`firebase_database_dart_platform`](../../firebase_database/firebase_database_dart_platform/README.md).
 - [docs/database_decisions.md](../database_decisions.md): 26 sections of decisions with the reason for each, what was
-  measured on the emulator, and the table of deliberate differences from the JS SDK (section 25).
+  measured on the emulator and on production, and the table of deliberate differences from the JS SDK (section 25).
 - Programs: [`example/`](../../firebase_database/firebase_database_dart/example/README.md) (one per topic, against the
   emulator) and the apps `examples/rtdb_cli`, `examples/rtdb_server_shelf`, `examples/rtdb_presence_worker`,
   `examples/rtdb_web_app` and `examples/rtdb_playground`.

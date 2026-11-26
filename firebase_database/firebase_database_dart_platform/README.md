@@ -28,7 +28,8 @@ opt-in through `FirebaseDatabaseDart.use()`. It is not affiliated with or endors
 > - On Linux x64 (a Debian 13 container) the Linux example app builds and passes its 4 integration tests under a
 >   virtual display.
 > - An independent review of the adapter found 2 high, 4 medium and 6 low findings; all were fixed with a test each.
-> - Not run: a release build of a desktop app, a real display, a production project.
+> - Not run: a release build of a desktop app, a real display, a production project through this adapter (the client
+>   underneath ran its verification kit against production once; see its README).
 
 ## How to enable it
 
