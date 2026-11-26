@@ -20,7 +20,8 @@
 // entry first, then every priority entry, parents first, each landing only on a node that at
 // that moment has a value or holds hidden state (Q1, Q6, Q10, F1 to F9 of run 8; three separate
 // writes keep it, Q4); a node holding only emptied children takes a priority (Q2); a priority on
-// a node that does not exist refuses the write (check 27); the hash counts kept priorities;
+// a node that does not exist refuses the write (check 27), a null one is answered ok and changes
+// nothing (check 40); the hash counts kept priorities;
 // listen and get answers carry `{".priority": p}` for an emptied node, also inside its parent;
 // the compound hash counts a kept priority as a `.priority` leaf (Q5).
 //
@@ -109,7 +110,7 @@ const Map<String, List<int>> _knownFailures = <String, List<int>>{
   'group R: limit view server cache short after a default listen took over': <int>[
     6892, 12944, 15580, 17434, 22925, 24768, 28802, 53038, 60676, 61383, 81628, 95040, 95959,
     108626, 118921, 130468, 131009, 137624, 152480, 153895, 155494, 156387, 165358, 167845,
-    168570, 174285, 177344, 178722, 210298, 215182, 227643, 250134, 251256, 251431, 252308,
+    168570, 174285, 177344, 178722, 210298, 215182, 250134, 251256, 251431, 252308,
     255287, 256221, 256506, 288075,
   ],
   // Group S of that report (a server merge refilling a full window from the complete cache as
@@ -401,10 +402,15 @@ final class _Server {
   /// Applies [w] as the server does ([JsonServerModel.write]); false when the server refuses it.
   bool apply(_Write w) {
     final _M? before = data?.copy();
+    // A set of a null priority that changes nothing is answered ok and sent to no listen
+    // (production run 13, check 40).
+    final bool silent = model.changesNothing(w.path, w.data, merge: w.merge);
     if (!model.write(w.path, w.data, merge: w.merge)) {
       return false;
     }
-    _publish(w, before);
+    if (!silent) {
+      _publish(w, before);
+    }
     return true;
   }
 

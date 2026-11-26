@@ -477,7 +477,13 @@ final class FakeServerActions implements ServerActions {
           ).toJson(exportFormat: true),
       };
     }
-    if (!_storeUpdate(writePath, resolved, isMerge: call.action == 'merge')) {
+    final bool isMerge = call.action == 'merge';
+    final bool silent = _model.changesNothing(
+      writePath,
+      resolved,
+      merge: isMerge,
+    );
+    if (!_storeUpdate(writePath, resolved, isMerge: isMerge)) {
       respond(
         call,
         status: 'invalid_parameters',
@@ -485,7 +491,9 @@ final class FakeServerActions implements ServerActions {
       );
       return;
     }
-    _pushWrite(writePath, resolved, isMerge: call.action == 'merge');
+    if (!silent) {
+      _pushWrite(writePath, resolved, isMerge: isMerge);
+    }
     respond(call);
   }
 
@@ -517,7 +525,7 @@ final class FakeServerActions implements ServerActions {
   }
 
   /// Applies a write to the stored data as the server does ([JsonServerModel.write]); false when
-  /// the server refuses it (a priority on a node that does not exist).
+  /// the server refuses it (a non-null priority on a node that does not exist).
   bool _storeUpdate(String path, Object? data, {required bool isMerge}) =>
       _model.write(path, data, merge: isMerge);
 
@@ -555,13 +563,16 @@ final class FakeServerActions implements ServerActions {
 
   /// Another client writes [data] at [path] (either form; a map of children when [isMerge]):
   /// the data is stored, and pushed once to each overlapping listen while [isConnected]. A write
-  /// the server refuses (a priority on a node that does not exist) changes and pushes nothing.
+  /// the server refuses (a non-null priority on a node that does not exist) changes and pushes
+  /// nothing; a set of a null priority that changes nothing is pushed to no listen either
+  /// ([JsonServerModel.changesNothing]).
   void writeByOtherClient(String path, Object? data, {bool isMerge = false}) {
     final String writePath = normalizePath(path);
+    final bool silent = _model.changesNothing(writePath, data, merge: isMerge);
     if (!_storeUpdate(writePath, data, isMerge: isMerge)) {
       return;
     }
-    if (isConnected) {
+    if (isConnected && !silent) {
       _pushWrite(writePath, data, isMerge: isMerge);
     }
   }

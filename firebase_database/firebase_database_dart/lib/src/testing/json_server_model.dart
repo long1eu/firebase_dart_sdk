@@ -10,7 +10,10 @@
 /// - a priority written on a node that does not exist refuses the whole write
 ///   (`invalid_parameters: could not set priority on non-existent node`), except a null one in
 ///   an update, which is answered ok and changes nothing (production run 10 and the emulator,
-///   2026-11-26, check 39 Q14; a set of a null priority there is not measured and stays refused);
+///   2026-11-26, check 39 Q14), and a set of a null priority there, which is answered ok too
+///   (production run 13, 2026-11-26, check 40); a set of a null priority that changes nothing,
+///   on a missing node or on one without a priority, is pushed to no listener ([JsonServerModel.changesNothing];
+///   production run 13: the emulator pushes a null at the `.priority` path, production nothing);
 ///   a node that keeps a priority, or holds only emptied children, takes one (check 38 (b),
 ///   check 39 Q2); the check is made on the data before the update, so an update that writes a
 ///   priority and creates its node in the same message is refused whole, in either key order
@@ -242,9 +245,21 @@ final class JsonServerModel {
   /// The hash of the node at [path] (`''` for none).
   String hash(String path) => at(path)?.hash() ?? '';
 
+  /// Whether a set of [data] at [path] is a null priority that changes nothing: the node is
+  /// missing or has no priority. The server answers it ok and pushes it to no listener
+  /// (production run 13, 2026-11-26, check 40).
+  bool changesNothing(String path, Object? data, {bool merge = false}) {
+    final List<String> at = keysOf(path);
+    if (merge || data != null || at.isEmpty || at.last != '.priority') {
+      return false;
+    }
+    return _get(root, at.sublist(0, at.length - 1))?.priority == null;
+  }
+
   /// Applies a set (or with [merge] an update of the children in the map [data]) at [path];
   /// false, and nothing changed, when the server refuses it: a priority on a node that does not
-  /// exist before the write (check 39 Q12), except a null one in an update (Q14).
+  /// exist before the write (check 39 Q12), except a null one, in an update (Q14) or as a set
+  /// (check 40).
   bool write(String path, Object? data, {bool merge = false}) {
     final List<String> at = keysOf(path);
     final Map<String, Object?> entries = merge
@@ -261,7 +276,7 @@ final class JsonServerModel {
       final List<String> full = <String>[...at, ...keysOf(e.key)];
       if (full.isNotEmpty && full.last == '.priority') {
         final List<String> owner = full.sublist(0, full.length - 1);
-        if ((e.value != null || !merge) && _get(root, owner) == null) {
+        if (e.value != null && _get(root, owner) == null) {
           return false;
         }
         priorities.add((owner, e.value));
