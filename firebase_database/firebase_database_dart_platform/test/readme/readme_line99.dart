@@ -12,8 +12,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_database_dart_platform/firebase_database_dart_platform.dart';
 
-// README.md:98
-Future<void> readmeLine98() async {
+// README.md:99
+Future<void> readmeLine99() async {
   FirebaseDatabaseDart.use(
     appCheckProviderFor: (FirebaseApp app) {
       final FirebaseAppCheck appCheck = FirebaseAppCheck.instanceFor(app: app);

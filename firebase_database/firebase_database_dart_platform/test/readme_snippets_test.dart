@@ -39,7 +39,7 @@ const Set<String> _needsOtherPackages = <String>{};
 /// Blocks of route B (the client's own Dart API) without an import line: they use the client, and
 /// the `database` of the block before them.
 const Set<String> _clientBlocks = <String>{
-  '../../docs/guides/database_flutter.md:220',
+  '../../docs/guides/database_flutter.md:222',
 };
 
 /// What a snippet may assume to exist.
@@ -61,14 +61,14 @@ const List<String> _clientImports = <String>[
 
 /// Imports added to the defaults of a block that names other packages.
 const Map<String, List<String>> _extraImports = <String, List<String>>{
-  'README.md:65': <String>[
+  'README.md:66': <String>[
     "import 'package:firebase_auth_dart_platform/firebase_auth_dart_platform.dart';",
   ],
-  'README.md:98': <String>[
+  'README.md:99': <String>[
     "import 'package:firebase_app_check/firebase_app_check.dart';",
     "import 'package:cloud_firestore_dart_flutterfire/cloud_firestore_dart_flutterfire.dart';",
   ],
-  'README.md:73': <String>[
+  'README.md:74': <String>[
     "import 'package:firebase_auth/firebase_auth.dart';",
     "import 'package:cloud_firestore_dart_flutterfire/cloud_firestore_dart_flutterfire.dart';",
   ],
