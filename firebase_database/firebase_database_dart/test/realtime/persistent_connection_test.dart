@@ -163,6 +163,136 @@ void main() {
       },
     );
 
+    test(
+      'B-4.1e an ok no_index answer for a listen removed after its data push warns once, '
+      'without onComplete (past the JS SDK)',
+      () async {
+        rig = PRig(hold: true);
+        await rig.start();
+        final List<String> statuses = <String>[];
+        rig.connection.listen(
+          taggedListen('/users'),
+          hashProvider: CountingHash(''),
+          tag: 1,
+          onComplete: (String s, _) => statuses.add(s),
+        );
+        await rig.settle();
+        final int r = rig.sent('q').single.r!;
+        rig.server.connector.last.serverPush('d', <String, Object?>{
+          'p': 'users',
+          'd': <String, Object?>{'ada': 1},
+          't': 1,
+        });
+        await until(() => rig.delegate.callsOf('dataUpdate').isNotEmpty);
+        rig.connection.unlisten(taggedListen('/users'), tag: 1);
+        await rig.settle();
+        rig.server.connector.last.serverResponse(
+          r,
+          data: <String, Object?>{
+            'w': <Object?>['no_index'],
+          },
+        );
+        await rig.settle();
+        expect(
+          rig.logs.where((String l) => l.contains('.indexOn": "age"')),
+          hasLength(1),
+        );
+        expect(statuses, isEmpty);
+      },
+    );
+
+    test(
+      'B-4.1f a failed answer for a listen removed after its data push warns nothing and leaves '
+      'the listen that replaced it',
+      () async {
+        rig = PRig(hold: true);
+        await rig.start();
+        final List<String> statuses = <String>[];
+        rig.connection.listen(
+          taggedListen('/users'),
+          hashProvider: CountingHash(''),
+          tag: 1,
+          onComplete: (String s, _) => statuses.add('old $s'),
+        );
+        await rig.settle();
+        final int r = rig.sent('q').single.r!;
+        rig.server.connector.last.serverPush('d', <String, Object?>{
+          'p': 'users',
+          'd': <String, Object?>{'ada': 1},
+          't': 1,
+        });
+        await until(() => rig.delegate.callsOf('dataUpdate').isNotEmpty);
+        rig.connection.unlisten(taggedListen('/users'), tag: 1);
+        rig.connection.listen(
+          taggedListen('/users'),
+          hashProvider: CountingHash(''),
+          tag: 2,
+          onComplete: (String s, _) => statuses.add('new $s'),
+        );
+        await rig.settle();
+        rig.server.connector.last.serverResponse(
+          r,
+          status: 'permission_denied',
+          data: <String, Object?>{
+            'w': <Object?>['no_index'],
+          },
+        );
+        await rig.settle();
+        expect(rig.logs.where((String l) => l.contains('.indexOn')), isEmpty);
+        expect(statuses, isEmpty);
+        // The old answer removed nothing: the replacing listen is sent again after a reconnect.
+        await rig.drop();
+        await until(() => rig.connects == 2);
+        expect(
+          rig.sent('q', onConnection: 2).map((ServerSeen s) => s.body['t']),
+          <Object?>[2],
+        );
+      },
+    );
+
+    test(
+      'B-4.1g each no_index answer warns once when a listen was replaced before its answer',
+      () async {
+        rig = PRig(hold: true);
+        await rig.start();
+        final List<String> statuses = <String>[];
+        rig.connection.listen(
+          taggedListen('/users'),
+          hashProvider: CountingHash(''),
+          tag: 1,
+          onComplete: (String s, _) => statuses.add('old $s'),
+        );
+        await rig.settle();
+        rig.connection.unlisten(taggedListen('/users'), tag: 1);
+        rig.connection.listen(
+          taggedListen('/users'),
+          hashProvider: CountingHash(''),
+          tag: 2,
+          onComplete: (String s, _) => statuses.add('new $s'),
+        );
+        await rig.settle();
+        final List<ServerSeen> listens = rig.sent('q');
+        expect(listens, hasLength(2));
+        final Map<String, Object?> warning = <String, Object?>{
+          'w': <Object?>['no_index'],
+        };
+        rig.server.connector.last.serverResponse(listens[0].r!, data: warning);
+        await rig.settle();
+        expect(
+          rig.logs.where((String l) => l.contains('.indexOn": "age"')),
+          hasLength(1),
+        );
+        expect(statuses, isEmpty);
+        rig.server.connector.last.serverResponse(listens[1].r!, data: warning);
+        await rig.settle();
+        expect(
+          rig.logs.where((String l) => l.contains('.indexOn": "age"')),
+          hasLength(2),
+        );
+        expect(statuses, <String>['new ok']);
+      },
+    );
+
     test('B-4.1d listening twice to the same path and query is an error', () {
       rig = PRig();
       rig.connection.listen(
