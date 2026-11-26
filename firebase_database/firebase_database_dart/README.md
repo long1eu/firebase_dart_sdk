@@ -552,7 +552,7 @@ query, and snapshot data appears at the debug level only; it is your users' data
 
 ## How it differs from the JS SDK
 
-The 17 you notice are below. The full table, 28 rows with the test that pins each, is section 25 of
+The 19 you notice are below. The full table, 35 rows with the test that pins each, is section 25 of
 [docs/database_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_decisions.md).
 
 | Topic | JS SDK | This client |

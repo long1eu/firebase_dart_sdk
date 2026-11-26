@@ -231,6 +231,45 @@ void main() {
       });
     });
 
+    test(
+      'once() on an ordered query whose data comes before the no_index answer warns once',
+      () {
+        fakeTime((FakeTime time) {
+          final _Ws ws = _Ws(time);
+          final List<DatabaseEvent> events = <DatabaseEvent>[];
+          unawaited(
+            ws.db
+                .ref('l')
+                .orderByChild('n')
+                .limitToFirst(1)
+                .once()
+                .then(events.add),
+          );
+          time.elapse(const Duration(seconds: 1));
+          final Map<String, Object?> listen = ws.channel
+              .sentRequests('q')
+              .single;
+          final Map<String, Object?> body =
+              listen['b']! as Map<String, Object?>;
+          ws.channel.serverPush('d', <String, Object?>{
+            'p': 'l',
+            'd': <String, Object?>{
+              'a': <String, Object?>{'n': 1},
+            },
+            't': body['t'],
+          });
+          time.elapse(Duration.zero);
+          expect(events, hasLength(1));
+          // once() has cancelled: the unlisten went out before the listen's answer.
+          expect(ws.channel.sentRequests('n'), hasLength(1));
+          ws.answerListens(<String, Object?>{
+            'w': <Object?>['no_index'],
+          });
+          expect(ws.indexWarnings, hasLength(1));
+        });
+      },
+    );
+
     test('an answer without the warning logs nothing', () {
       fakeTime((FakeTime time) {
         final _Ws ws = _Ws(time);
