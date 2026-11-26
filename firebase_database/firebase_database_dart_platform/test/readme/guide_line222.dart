@@ -9,9 +9,9 @@
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_database_dart/firebase_database_dart.dart';
 
-// ../../docs/guides/database_flutter.md:220
+// ../../docs/guides/database_flutter.md:222
 late FirebaseDatabase database;
-Future<void> guideLine220() async {
+Future<void> guideLine222() async {
   final DataSnapshot top = await database.ref('players').orderByChild('score').limitToLast(3).get();
   for (final DataSnapshot child in top.children.toList().reversed) {
     print('${child.key}: ${child.value}');
