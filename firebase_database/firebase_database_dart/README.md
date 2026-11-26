@@ -13,11 +13,12 @@ Dart streams. It is not affiliated with or supported by Google or Firebase.
 > [docs/database_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_decisions.md),
 > section 23):
 >
-> - The client: 2,371 tests on the Dart VM; the whole test tree in Chrome, 2,328 with dart2js and 2,332 with dart2wasm.
+> - The client, on 2026-11-27: 2,456 tests on the Dart VM; the whole test tree in Chrome, 2,411 with dart2js and 2,415
+>   with dart2wasm.
 > - The emulator tests (tag `emulator`) against the Firebase Database emulator (v4.11.2): 29 pass, 2 slow
 >   ones skip themselves.
-> - The SQLite cache package: 247 tests, on Dart 3.11.5 and on Dart 3.8.0.
-> - The adapter: 136 tests with 5 skipped without the emulator (another session's run). FlutterFire's
+> - The SQLite cache package: 249 tests on Dart 3.12.2 (2026-11-27); 247 on Dart 3.11.5 and 3.8.0 at an earlier commit.
+> - The adapter: 136 tests with 5 skipped without the emulator (another session's run, 2026-11-27). FlutterFire's
 >   `firebase_database` integration suite through the adapter: 76 pass, 1 skips itself (macOS host test runner,
 >   emulator).
 > - Windows 11 x64: the client's VM suite passed at an earlier commit (2,126 tests); the Windows example app passes its
@@ -634,15 +635,16 @@ The 19 you notice are below. The full table, 33 rows with the test that pins eac
 
 | Platform | Client | What ran |
 |---|---|---|
-| macOS | Dart VM | 2,371 tests; 29 emulator tests; FlutterFire's suite through the adapter (76 pass, 1 skips) |
+| macOS | Dart VM | 2,456 tests (2026-11-27); 29 emulator tests; FlutterFire's suite through the adapter (76 pass, 1 skips) |
 | Linux x64 | Dart VM | 2,058 tests, at an earlier commit; the Linux example app with the adapter passes its 4 integration tests |
 | Windows 11 x64 | Dart VM | 2,126 tests at an earlier commit; the Windows example app with the adapter passes its 4 integration tests |
-| Web, dart2js | Chrome on macOS | 2,328 tests (whole test tree); 1,125 on Linux x64 at an earlier commit |
-| Web, dart2wasm | Chrome on macOS | 2,332 tests (whole test tree); 1,128 on Linux x64 at an earlier commit |
+| Web, dart2js | Chrome on macOS | 2,411 tests (whole test tree, 2026-11-27); 1,125 on Linux x64 at an earlier commit |
+| Web, dart2wasm | Chrome on macOS | 2,415 tests (whole test tree, 2026-11-27); 1,128 on Linux x64 at an earlier commit |
 
 No release build of a desktop app has run, and Safari and Firefox are untested. The main library imports no `dart:io`
-and no native code. The SQLite cache needs `package:sqlite3` and is not available on the web; it ran 247 tests, on Dart
-3.11.5 and on Dart 3.8.0. It declares Android, iOS, macOS, Windows and Linux; no run is recorded on Android or iOS.
+and no native code. The SQLite cache needs `package:sqlite3` and is not available on the web; it ran 249 tests on Dart
+3.12.2 (247 on Dart 3.11.5 and on Dart 3.8.0 at an earlier commit). It declares Android, iOS, macOS, Windows and Linux;
+no run is recorded on Android or iOS.
 
 ## Flutter apps that keep `package:firebase_database`
 

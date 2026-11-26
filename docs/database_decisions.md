@@ -708,7 +708,7 @@ increments are at-least-once here too (section 11). Web persistence is not in 0.
 **Pinned by.** In `firebase_database_dart_sqlite/test/`: `sqlite_storage_engine_test.dart` and
 `sqlite_storage_engine_contract_test.dart` (the engine, including Android's engine tests as ported),
 `node_codec_test.dart`, `sqlite_persistence_test.dart`; `android_oracles_test.dart` runs Android's tree-level
-suites on the SQLite engine (the package has 247 tests). In the client, `test/oracle/persistence_test.dart`,
+suites on the SQLite engine (the package has 249 tests). In the client, `test/oracle/persistence_test.dart`,
 `pruning_test.dart`, `keep_synced_test.dart` and `random_persistence_test.dart` (ports of Android's
 `PersistenceTest`, `PruningTest`, `KeepSyncedTest` and `RandomPersistenceTest`, run on the in-memory engine),
 and `test/contract/persistence_*_contract_test.dart`.
@@ -1053,10 +1053,10 @@ earlier commit.
 
 | Where | Result | Whose run |
 |---|---|---|
-| Dart VM | 2,371 tests of the client | the other session |
-| Chrome, the whole test tree | dart2js 2,328 tests, dart2wasm 2,332 tests | the other session |
-| SQLite package | 247 tests on Dart 3.11.5 and on Dart 3.8.0 | lead |
-| Adapter | 136 tests, 5 skipped without the emulator; 141 with it | the other session |
+| Dart VM | 2,456 tests of the client (2026-11-27, Dart 3.12.2) | the other session |
+| Chrome, the whole test tree | dart2js 2,411 tests, dart2wasm 2,415 tests (2026-11-27) | the other session |
+| SQLite package | 249 tests on Dart 3.12.2 (2026-11-27, the other session); 247 on Dart 3.11.5 and on Dart 3.8.0 at an earlier commit | lead |
+| Adapter | 136 tests, 5 skipped without the emulator (2026-11-27, Flutter 3.44.9); 141 with it, at an earlier commit | the other session |
 | FlutterFire's own `firebase_database` integration suite through the adapter | 76 pass, 1 skips itself (macOS host test runner, emulator) | lead |
 | Database emulator (v4.11.2, macOS) | the tests tagged `emulator`: 29 pass, 2 skip themselves | the other session |
 | Windows 11 x64 | the client's VM suite passed at an earlier commit (2,126); the Windows example app passes its 4 integration tests through the adapter (Flutter 3.47.8, debug); its disk cache test passed with an earlier version of the app | lead |
@@ -1078,15 +1078,15 @@ CI runs on GitHub Actions (`.github/workflows/ci.yml`) and passes. Not run: a re
 and Firefox, and a real display.
 
 **What was run against production.** A dedicated database instance in europe-west1 of one Firebase project, on
-2026-11-25 and 26. The verification kit (39 checks) ran on the trunk client at `0f41b078`, and all 39 passed. Checks
-22 and 38 (c), (e) and (f) are informational on that client and record what it does: it drops the priority of an
-emptied node, as the JS SDK does (checks 22, 38 (c) and (f); section 25, rows 2 and 8). The kit signs up a throwaway
-user, writes about 1.1 MB below a path of its own and removes it. It covers the connection and its TLS, the server's
-host, every value type, server values, listeners, queries, transactions, `onDisconnect`, offline writes, rules with
-and without a user, a token refresh on a live connection, a sign-out, timings, a 1 MB value, pipelined writes, and
-raw frames for the server's answers about priorities and limit queries. Earlier runs of the kit, or of its check 39
-alone, are named where a section cites them. The JS SDK 13.4.0 ran against the same database for the forms compared
-in section 25. One run each unless stated.
+2026-11-25 and 26. The verification kit (39 checks) ran on the trunk client at `0f41b078`, and all 39 passed. Checks 22
+and 38 (c), (e) and (f) are informational on that client and record what it does: it drops the priority of an emptied
+node, as the JS SDK does (checks 22, 38 (c) and (f); section 25, rows 2 and 8 of the table "Behaviours shared with the
+JS SDK that are kept"). The kit signs up a throwaway user, writes about 1.1 MB below a path of its own and removes it.
+It covers the connection and its TLS, the server's host, every value type, server values, listeners, queries,
+transactions, `onDisconnect`, offline writes, rules with and without a user, a token refresh on a live connection, a
+sign-out, timings, a 1 MB value, pipelined writes, and raw frames for the server's answers about priorities and limit
+queries. Earlier runs of the kit, or of its check 39 alone, are named where a section cites them. The JS SDK 13.4.0 ran
+against the same database for the forms compared in section 25. One run each unless stated.
 
 **Never run against production:**
 
