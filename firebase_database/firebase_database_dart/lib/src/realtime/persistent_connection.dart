@@ -269,16 +269,21 @@ final class PersistentConnection implements ServerActions {
   );
 
   void _onListenResponse(ListenRecord record, Map<String, Object?> response) {
-    // A response for a listen removed (or replaced) meanwhile is ignored
+    final String status = _statusOf(response);
+    final Object? data = response['d'];
+    // The index warning is logged even for a listen removed meanwhile, which goes past the JS SDK
+    // (PersistentConnection.ts:296-300 drops it): `once()` cancels its listen on the first data
+    // push, which comes before this answer, and a one-shot read of an unindexed query is the
+    // commonest way a developer meets a missing index. The warning uses only the record's spec.
+    if (status == statusOk) {
+      _warnOnMissingIndex(record.spec, data);
+    }
+    // The rest of a response for a listen removed (or replaced) meanwhile is ignored
     // (PersistentConnection.ts:296-300).
     if (!_queues.hasListen(record)) {
       return;
     }
-    final String status = _statusOf(response);
-    final Object? data = response['d'];
-    if (status == statusOk) {
-      _warnOnMissingIndex(record.spec, data);
-    } else {
+    if (status != statusOk) {
       _queues.removeListen(record.spec.path, record.spec.queryIdentifier);
     }
     _emit(() => record.onComplete(status, data));
