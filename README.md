@@ -33,9 +33,10 @@ endorsed by Google or Firebase.
    SDK tab was run beside a tab of this client, and multi-tab is a preview since 0.3.2.
 7. **You build a Flutter app for Linux desktop that needs the Realtime Database.** The official
    `firebase_database` plugin has no Linux implementation. Add `firebase_database_dart_platform` and keep the
-   official API (on Windows it can replace the native plugin). Caveat: 0.0.1, not published; on Linux only the
-   Dart VM suites ran, no Linux app; on Windows one debug app did a write, a read and a transaction against the
-   emulator; against production only the client's verification kit, once
+   official API (on Windows it can replace the native plugin). Caveat: 0.0.1, not published; on Linux x64 the
+   Dart suites ran and a debug build of the example app ran under a virtual display (no real display, no release
+   build; section 23 of [the decisions](docs/database_decisions.md)); on Windows one debug app did a write, a read
+   and a transaction against the emulator; against production only the client's verification kit, once
    ([status](firebase_database/firebase_database_dart/README.md)).
 
 **Do not use it when**
