@@ -1,8 +1,40 @@
-## 0.0.1
+## 0.1.0
 
-Work in progress, not published. A client of the Firebase Realtime Database in Dart for the VM and the web, tested
-against the Database emulator.
-
+- First version. A client of the Firebase Realtime Database in Dart, for the Dart VM and the web. It speaks the
+  WebSocket protocol of the Firebase JS SDK, with Dart names (`DatabaseReference`, `onValue`, `runTransaction`) and
+  Dart streams. It is not affiliated with or supported by Google or Firebase.
+- It covers reads and writes, listeners, queries, transactions, `onDisconnect`, server values and the connection
+  state. An optional disk cache is in `firebase_database_dart_sqlite`.
+- Where it ran. Dart VM: macOS (2,456 tests of the client; 29 tests against the Database emulator v4.11.2), Linux x64
+  in a Debian 13 container and Windows 11 x64 (both at an earlier commit). Web: Chrome on macOS, the whole test tree,
+  2,411 tests with dart2js and 2,415 with dart2wasm. Not run: a release build of a desktop app, Safari, Firefox and a
+  real display.
+- Verified against production. The verification kit (39 checks) ran once against a dedicated database instance of one
+  Firebase project, on 2026-11-25 and 26, on the client at an earlier commit, and all 39 passed. "Run" here means one
+  run of the kit, not repeated runs. Some checks are informational and record what the client does. The kit signs up
+  a throwaway user, writes about 1.1 MB below a path of its own and removes it. It covers the connection and its TLS,
+  the server's host, every value type, server values, listeners, queries, transactions, `onDisconnect`, offline
+  writes, rules with and without a user, a token refresh on a live connection, a sign-out, timings, a 1 MB value,
+  pipelined writes, and raw frames for the server's answers about priorities and limit queries.
+- Never run against production: token expiry after an hour, a rules change during a connection, a 10 MiB string leaf
+  and a 16 MB write, App Check with a real provider, the legacy `firebaseio.com` host and a custom domain, and the
+  re-send of an `increment` whose answer was lost.
+- Known limits:
+  - Writes are delivered at least once. A re-sent `ServerValue.increment` can apply twice; use a transaction to count.
+  - A hung TLS handshake cannot be closed on the Dart VM. The client gives up after its 30 s connect timeout and
+    tries again.
+  - A dead socket after a wake is noticed after about 46 s, and after about 75 s at worst, plus the connect (computed
+    from the timing constants, not measured).
+  - A `ServerValue.increment` whose sum leaves the range of a double is a local infinity until the server's value
+    replaces it.
+  - One process or isolate owns a cache file; a second one runs memory-only with one logged warning.
+  - Transactions and `onDisconnect` registrations are not persisted.
+  - Priorities and pending writes. As in the JS SDK, a node that is emptied and refilled loses its priority locally
+    while the server keeps it, and a transaction on a node that holds only a priority fails with `max-retries`.
+  - Not in this version: long polling, web disk persistence, a REST client, an instance cache, typed converters, the
+    compat API and a proxy option in the API. On the Dart VM a secure connection honours `HTTPS_PROXY` and `NO_PROXY`.
+- Differences from the JS SDK are in the README, "How it differs from the JS SDK", and in section 25 of
+  `docs/database_decisions.md` (33 rows, each with the test that pins it).
 - `FirebaseDatabase(app, databaseUrl:, emulatorHost:, mockUserToken:, persistence:, logger:)`: one instance is one
   connection; configuration is constructor-only and there is no instance cache. A new instance opens no connection:
   the first operation that needs the server (a read, a listener, a write, a transaction, an `onDisconnect` call,
@@ -50,7 +82,6 @@ against the Database emulator.
 - `package:firebase_database_dart/testing.dart`: a fake server for tests of your own code.
 - The event dispatcher yields to the event loop after 1,000 events with an unthrottled task in the browser, so a burst
   of events in a hidden tab is delivered in bounded time.
-- Writes are delivered at least once: a re-sent `ServerValue.increment` can apply twice.
 - A limit query under a listener at or above its path keeps the right window when one update by another client
   moves a child out of it: the child that enters holds the update's earlier changes, and the window ends as the
   server's. The JS SDK showed a stale or removed child there until every listener at the path was removed.
@@ -60,5 +91,3 @@ against the Database emulator.
   with an error that names no request, so its Future would never complete. `update({'.priority': p})`, a
   `'n/.priority'` key, `{'.value': v, '.priority': p}` and empty objects (removals) are accepted as before; `set` and
   transactions are unchanged and leave such an object out.
-- Not included: long polling, typed converters, a REST client or fallback, web disk persistence, an instance cache,
-  the compat API, a proxy option in the API.
