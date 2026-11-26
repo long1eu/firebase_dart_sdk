@@ -35,7 +35,8 @@ endorsed by Google or Firebase.
    `firebase_database` plugin has no Linux implementation. Add `firebase_database_dart_platform` and keep the
    official API (on Windows it can replace the native plugin). Caveat: 0.0.1, not published; on Linux only the
    Dart VM suites ran, no Linux app; on Windows one debug app did a write, a read and a transaction against the
-   emulator; never against production ([status](firebase_database/firebase_database_dart/README.md)).
+   emulator; against production only the client's verification kit, once
+   ([status](firebase_database/firebase_database_dart/README.md)).
 
 **Do not use it when**
 
@@ -53,8 +54,8 @@ endorsed by Google or Firebase.
   second factor proven by a real SMS (phone sign-in was run against a real project with a test phone number
   only), Messaging or the other Firebase services this repository does not port, or admin jobs such as bulk
   writes and recursive deletes (use `firebase_admin_sdk`).
-- You need the Realtime Database in production today: that client is not published and nothing was run against a
-  production project; the report of its large-snapshot benchmark is not written yet.
+- You need the Realtime Database in production today: that client is not published, against production only its
+  verification kit ran, once, and the report of its large-snapshot benchmark is not written yet.
 - You need a vendor to call: one person maintains it, with no SLA.
 
 **Start** with the emulator (`firebase emulators:start --only firestore --project demo-my-app`):
@@ -257,9 +258,9 @@ the protocol of the JS SDK; `firebase_database_dart_sqlite` keeps its cache on d
 `firebase_database_dart_platform` runs the official `firebase_database` API on top of it. Version 0.0.1, not
 published. What has run: its test suites on macOS, Windows 11 and Linux (Dart VM and Chrome), 33 tests against the
 Database emulator, FlutterFire's own `firebase_database` integration suite through the adapter, and one Flutter
-Windows debug app against the emulator. What has not: any production project, a release build of a desktop app,
-Safari and Firefox; the report of its large-snapshot benchmark is not written yet. See its
-[README](firebase_database/firebase_database_dart/README.md), the [guide](docs/guides/database.md) and the
+Windows debug app against the emulator; against production, its verification kit (39 checks), once. What has not: a
+release build of a desktop app, Safari and Firefox; the report of its large-snapshot benchmark is not written yet.
+See its [README](firebase_database/firebase_database_dart/README.md), the [guide](docs/guides/database.md) and the
 [decisions](docs/database_decisions.md). The other directories
 under `firebase_auth`, and `google_sign_in_dart`, are older code from
 the original project and are not part of the migrated, tested set.

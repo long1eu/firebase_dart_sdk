@@ -29,8 +29,11 @@ Dart streams. It is not affiliated with or supported by Google or Firebase.
 > - Independent reviews, all findings fixed with a test each: connection (3 high, 8 medium, 7 low), SQLite engine (1, 5,
 >   10), adapter (2, 4, 6), API and core (1, 4, 4).
 >
-> What has **not** run: a production project (nothing here was measured against one), a release build of a desktop
-> app, Safari and Firefox, a real display, and CI on a runner. One person maintains it.
+> - Production: the verification kit (39 checks) passed once on this client (commit `0f41b078`) against a dedicated
+>   database; what it covers and what never ran there is in section 23 of the decisions document.
+> - CI on GitHub Actions passes (`.github/workflows/ci.yml`).
+>
+> What has **not** run: a release build of a desktop app, Safari, Firefox and a real display. One person maintains it.
 
 ## Use it when
 
@@ -137,7 +140,7 @@ also refuses, with an `ArgumentError` before any connection, a URL with a path, 
 other than 443 on a host that is not loopback, and an invalid project id; a start that fails fails every pending and
 later call instead of hanging. `close()` is idempotent; afterwards every asynchronous call fails with the code
 `database-closed`, and `ref()` still works because it makes no request. A new instance opens no connection; see
-[Connection state](#connection-state). Nothing was run against a production project yet (see Status).
+[Connection state](#connection-state). What ran against a production database is under Status.
 
 ## Read and write
 
@@ -612,9 +615,9 @@ The 17 you notice are below. The full table, 28 rows with the test that pins eac
   SDK that are kept" in
   [docs/database_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_decisions.md).
 - **Transactions and `onDisconnect` registrations are not persisted.** After a restart, register them again.
-- **The server's behaviour was measured on the emulator only.** Token refresh, revocation, ping answers and the
-  size limits of a production server are not measured; the three connection timeouts (30 s, 15 s, 60 s) are chosen,
-  not measured.
+- **Production was measured by one run of the verification kit.** Token expiry, a rules change during a connection,
+  ping answers and the size limits beyond a 1 MB value and a depth of 32 are not measured there; the three connection
+  timeouts (30 s, 15 s, 60 s) are chosen, not measured.
 - **Not in this version:**
   - long polling: networks that block the WebSocket upgrade cannot use the client;
   - web disk persistence: the web build is memory only;

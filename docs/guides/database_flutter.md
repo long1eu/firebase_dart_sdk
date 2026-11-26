@@ -141,7 +141,7 @@ event, `onDisconnect` and transaction classes is implemented (`remove()` of `onD
 - A Flutter Windows debug app written against `package:firebase_database` was built with the adapter on Windows 11
   x64 with Flutter 3.47.8, and did a write, a read and a transaction against the emulator.
 - Not run: a release build, a Linux desktop app, anything on Android, iOS or the web, and any production
-  project.
+  project through the adapter (the client underneath ran its verification kit against production once).
 
 Treat 0.0.1 as a first version: test your own app on the target platform before you ship it.
 
