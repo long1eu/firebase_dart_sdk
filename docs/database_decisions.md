@@ -9,10 +9,11 @@ ends with a status line:
 - **built**: the code does this and tests pin it, on the VM, in the browser, or both (section 23 says what has
   run where);
 - **measured on the emulator (v4.11.2)**: observed on the Firebase Database emulator
-  (`firebase-database-emulator-v4.11.2.jar`, firebase-tools 15.18.0); production was not measured;
+  (`firebase-database-emulator-v4.11.2.jar`, firebase-tools 15.18.0); production only where the line says so;
 - **not measured**: a number or a behaviour that no run has settled yet.
 
-Nothing here was run against a production project. [storage_decisions.md](storage_decisions.md) is the model
+What ran against a production database is in section 23, "What was run against production", with the list of what
+never ran there. [storage_decisions.md](storage_decisions.md) is the model
 of this document; [contributing_a_product.md](contributing_a_product.md) has the rules every product client
 follows. "Pinned by" names the test files that pin each decision. Test paths are relative to
 `firebase_database/firebase_database_dart` unless they start with `docs/`, `tool/`, `.github/` or a package
@@ -124,8 +125,9 @@ control message; it ignores the app id and App Check token in both forms; and a 
 reads and writes normally.
 
 **What we gave up.** If a server does not accept our compound hash, a large cache is re-sent in full after each
-reconnect, as in JS. Production was not measured for the `unappeck` spelling, for the compound hash or for
-pipelining.
+reconnect, as in JS. Production was not measured for the `unappeck` spelling or for pipelining. The compound hash
+ran there only as raw frames of the verification kit (section 23): the server answered with range merges for the
+ranges whose hash differed, and with nothing when the simple hash matched.
 
 **Pinned by.** `test/realtime/reconnect_backoff_test.dart` (delay sequence with injected random and clock);
 `test/realtime/replay_test.dart` and `test/realtime/persistent_connection_test.dart` (replay order, request
@@ -133,7 +135,7 @@ bodies including `ch`); `test/realtime/auth_session_test.dart` (the App Check re
 `test/integration/connection_emulator_test.dart` (pipelined auth).
 
 Status: built; measured on the emulator (v4.11.2) for the accepted spellings, ordering and ignored headers;
-production not measured.
+on production only the compound hash, by raw frames.
 
 ## 4. Tokens from the app, and where they may go
 
@@ -236,7 +238,9 @@ proxy from the environment"); `test/api/api_behaviour_test.dart` (the cache key 
 two namespaces on one host).
 
 Status: built. The emulator sends the Host header as `h` and never redirects (measured on the emulator,
-v4.11.2); real hosts for `firebaseio.com`, a regional database and a custom domain are not measured.
+v4.11.2). On production a regional database (europe-west1) named another host of its region in the hello, and the
+next connection went there (the verification kit, section 23); a `firebaseio.com` host and a custom domain are not
+measured.
 
 ## 6. Everything from the server is bounded and validated
 
@@ -523,7 +527,9 @@ separate priority key);
 answered is sent again on the next connection); `test/integration/chaos_emulator_test.dart`.
 
 Status: built. The double-applied increment and the emulator's size limits (768 bytes, depth 32, 10 MiB
-string) are measured on the emulator (v4.11.2).
+string) are measured on the emulator (v4.11.2). On production (section 23) a 768-byte path and 32 levels were
+accepted and a depth of 33 was refused over REST with HTTP 400; the 10 MiB string and the re-sent increment were not
+run there.
 
 ## 12. Transactions
 
@@ -555,7 +561,10 @@ and not the priority, which Android's `MutableData` and iOS's `FIRMutableData` e
 lost connection fails with `disconnected`, D40; `applyLocally: false`); `test/api/scenarios_test.dart`;
 `test/integration/public_api_emulator_test.dart`.
 
-Status: built. The compare-and-set behaviour is measured on the emulator (v4.11.2).
+Status: built. The compare-and-set behaviour is measured on the emulator (v4.11.2). On production (section 23) a
+transaction against another client's write committed on the second run of its handler, one whose path a second
+client rewrote between every attempt ended with `max-retries` after 25 runs, and of 100 transactions that two
+clients ran against one counter 99 committed and one ended with `max-retries` (the counter ended at 99).
 
 ## 13. `onDisconnect`
 
@@ -584,7 +593,8 @@ drops completes once and is not replayed); `test/realtime/replay_test.dart`;
 `test/contract/server_actions_reconnect_contract.dart`; `test/integration/public_api_emulator_test.dart` (an
 `onDisconnect` write applied when the client goes offline).
 
-Status: built. The server side is measured on the emulator (v4.11.2); whether the server runs an operation
+Status: built. The server side is measured on the emulator (v4.11.2), and on production (section 23) the registered
+writes ran 52 ms after a close and 49 ms after a socket dropped without a close; whether the server runs an operation
 with the identity of the registration after a re-`auth` is not measured.
 
 ## 14. Connection state on a desktop
@@ -858,17 +868,20 @@ port of its own, with its own hub and logging ports, and signal only the process
   that moves one child out and another in is pushed as one merge (`m`) at the query's path, carrying the entering
   and the leaving child whole. A write below a child outside the window is not pushed. No frame says that a child
   left the window; the client works that out from its limit. So the client never receives a deep write below a child
-  it does not hold. Not measured: `limitToFirst`, `startAt` or `endAt` without a limit, an `update` by the writer, and
-  production.
+  it does not hold. Not measured on the emulator: `limitToFirst`, `startAt` or `endAt` without a limit, and an `update`
+  by the writer. On production (the verification kit, raw frames, a tagged `limitToFirst(2)` and `limitToLast(2)` by
+  key) a write below a window child came at its deep path, an entering child came whole at its path, a write that
+  moved one child out and one in came as one merge at the query's path with the entering child whole and the leaving
+  one as `null`, and a write below a child outside the window sent no frame.
 - The emulator honours `sin` and `ein` (`startAfter` and `endBefore`) when the start or end name is present,
   and implements `ch` and `rm`: one range matches and gets an empty range merge, but a two-range hash did not
   match in four tries, and the cause is not known. The client sends `ch` above 1,024 bytes of cached data
   (section 3); whether the emulator accepts our two-range hash is not measured.
 - `put` with a right hash returns the new value in `d`.
 
-**What we gave up.** Everything about production that the emulator hides: token refresh, revocation, the real
-`h`, ping behaviour, size limits. There is no production kit for the Database yet; it would run against a test
-project with a throwaway user.
+**What we gave up.** What the emulator hides is checked on production only as far as the verification kit goes
+(section 23): it ran a token refresh on a live connection, a sign-out that cancels a listener, the real `h` and a
+depth limit there, but not token expiry, ping behaviour or the larger size limits.
 
 **Pinned by.** `test/integration/connection_emulator_test.dart` (listen pushes, hashes, server values, numbers, rules
 cancel, `onDisconnect`, auth), `idle_close_emulator_test.dart` (the idle close), `chaos_emulator_test.dart` and
@@ -876,7 +889,7 @@ cancel, `onDisconnect`, auth), `idle_close_emulator_test.dart` (the idle close),
 replays the limit-query frames above; `tool/start_database_emulator.sh` and
 `tool/stop_database_emulator.sh`.
 
-Status: built; measured on the emulator (v4.11.2); production not measured.
+Status: built; measured on the emulator (v4.11.2); the pushes to a limit query also on production (above).
 
 ## 20. REST is not in this version
 
@@ -1050,7 +1063,7 @@ earlier commit.
 | Linux x64 (Debian 13 container) | the client's VM suite and both browser legs passed at an earlier commit (2,058; 1,125; 1,128); the Linux example app builds and passes its 4 integration tests under a virtual display | lead |
 | Web gallery | a smoke script passes 66 steps on both compilers | the other session |
 | Both engines | Android's persistence suites pass on the in-memory and the SQLite engine (inside the counts above) | lead |
-| GitHub Actions (run 45086670535) | all 25 jobs pass: the emulator tests (29 pass, 2 skip), Chrome dart2js (2,328) and dart2wasm (2,332), the adapter with the emulator (141), FlutterFire's suite through the adapter (76 pass, 1 skips), the gallery smoke script (66 steps) | CI |
+| GitHub Actions (`.github/workflows/ci.yml`) | all 25 jobs pass: the emulator tests (29 pass, 2 skip), Chrome dart2js (2,328) and dart2wasm (2,332), the adapter with the emulator (141), FlutterFire's suite through the adapter (76 pass, 1 skips; that job is marked allowed to fail in the workflow), the gallery smoke script (66 steps) | CI |
 
 Mutation testing: 45 mutations were tried; 39 of them survived the suites as they were before the last pass, and all
 45 are caught now. Independent reviews: the connection (3 high, 8 medium and 7 low findings), the SQLite engine (1
@@ -1061,8 +1074,32 @@ The connection's own unit tests first ran in a browser late, and found one web-o
 JavaScript an infinity passes `is int`, so `1e999` from the server passed the number checks. Every number from the
 server is now asked for finiteness (`server_message_test`, `c_limits_test`, `k_server_input_test`).
 
-Not run: a production project, a release build of a desktop app, Safari and Firefox, a real display, and CI on a
-runner.
+CI runs on GitHub Actions (`.github/workflows/ci.yml`) and passes. Not run: a release build of a desktop app, Safari
+and Firefox, and a real display.
+
+**What was run against production.** A dedicated database instance in europe-west1 of one Firebase project, on
+2026-11-25 and 26. The verification kit (39 checks) ran on the trunk client at `0f41b078`, and all 39 passed. Checks
+22 and 38 (c), (e) and (f) are informational on that client and record what it does: it drops the priority of an
+emptied node, as the JS SDK does (checks 22, 38 (c) and (f); section 25, rows 2 and 8). The kit signs up a throwaway
+user, writes about 1.1 MB below a path of its own and removes it. It covers the connection and its TLS, the server's
+host, every value type, server values, listeners, queries, transactions, `onDisconnect`, offline writes, rules with
+and without a user, a token refresh on a live connection, a sign-out, timings, a 1 MB value, pipelined writes, and
+raw frames for the server's answers about priorities and limit queries. Earlier runs of the kit, or of its check 39
+alone, are named where a section cites them. The JS SDK 13.4.0 ran against the same database for the forms compared
+in section 25. One run each unless stated.
+
+**Never run against production:**
+
+- token expiry after an hour;
+- a rules change during a connection;
+- a 10 MiB string leaf and a 16 MB write;
+- App Check with a real provider;
+- the limit-view race of section 25, row 7;
+- a plain `set` of a null priority on a missing node (only the `update` form ran);
+- the legacy `firebaseio.com` host and a custom domain;
+- the re-send of an `increment` whose answer was lost;
+- three limits with no measurement anywhere: a hung TLS handshake, an increment past the range of a double, and the
+  lease of the disk cache.
 
 **Pinned by.** `test/realtime/`, `test/integration/`, `test/security/`, `test/contract/` and the tags in
 `dart_test.yaml` (`browser`, `emulator`, `emulator-slow`).
@@ -1209,19 +1246,20 @@ where the last two columns say so, run. Rows 2 and 7 are shared with the JS SDK 
 row 5 in its simplified form. Row 1 is better here than in JS: the JS SDK showed a wrong value that lasted, this client
 does not. Rows 3, 5 (in the table's form) and 6 were seen only in the differential check; they are not reachable
 through the public API in the forms run on either SDK. Row 4 is a server fact. Rows 29 to 32 above are places where
-this client departs from JS. "Emulator" means the local Firebase emulator (v4.11.2); production was run for rows 4 and
-8 only (2026-11-25), and for no other row. The JS column says what a run of the JS SDK 13.4.0 showed; "Measured on" says what was run with our client.
+this client departs from JS. "Emulator" means the local Firebase emulator (v4.11.2); production (section 23) was run
+for rows 1, 2, 4 and 8 and for the refusal of row 3, and for no other row. The JS column says what a run of the JS
+SDK 13.4.0 showed; "Measured on" says what was run with our client.
 
 | # | Behaviour | Minimal sequence | What is seen, and for how long | JS SDK 13.4.0 | Measured on (our client) |
 |---|---|---|---|---|---|
-| 1 | A child written below a leaf and then changed again could show a wrong value. The write tree treats a write below a leaf as confined to its path, but on a leaf it replaces the leaf. This client is correct in the offline form and wrong for a few ms in the refused form, by two helpers in `view_processor_server.dart` that the JS SDK has no counterpart for (rows 25 and 26 of the table above, commit `a5e448fd`); `test/core/leaf_write_test.dart` pins both forms. The first helper skips filtered views, so a limit query's listener is not covered by it. The differential check reported a lasting wrong value there (listen limit `/a`, `set a/x/u 2`, `set a/x/u null` over a leaf `x`; seeds 44988 and 79304 of 0 to 99999). That was a fault of the check's model server, not of a client: the model sent the limit listener the second write as written, where the emulator sends a put of null at the emptied child `a/x`. On the emulator the limit listener ended right on both SDKs (one run each). | Server `r = 1`. `goOffline`, listen `r`, `set r/c {v:1}`, `set r/c null`, `goOnline`. A second form: `set r/b 1`, `set r/b null` on a leaf, the first refused by a rule | Offline form: the listener was never wrong (its `null` came in the same ms as a second client's). Refused form: `null` shown until the acknowledgement of the second write, which follows the refusal in the same ms, then `1`, wrong for about 4 ms (4, 4, 4 in three runs). The server and a second client held `null` and `1` | Wrong and lasting in both forms, 3 runs each. Offline: the writer's listener and `get()` stayed at `1` (server `null`) from about 18 to 21 ms, and still at +30 s; only a detach and re-attach gave `null`. Refused: `null` (server `1`) from 1 to 2 ms, still at +30 s, repaired only by a re-attach | Emulator, both forms, 3 runs each, public API, same harness as the JS runs. Three versions of the client (`ebd757c4`, `38e6d8a3`, `9ddd3fda`) behaved the same: correct in the offline form, wrong for 2 to 4 ms in the refused form. No commit among them changed the outcome; older ones were not run |
-| 2 | A node that is emptied and refilled loses its priority in the client; the server keeps it. This holds for one update that does both, and for two separate messages. A fix for the one-update form was written and reviewed five times; every version either left a listener disagreeing with the client's own server data when nothing was pending, or was wrong where the unchanged code is right, so none is in this version. | Server `{a:1, .priority:1}`, listen. `update {a:null, b:1}`. The two-message form: `set a null`, then `set b 1` | The writer's listener and `get()`, and a second client's listener, show `{b:1}` without the priority; the server holds `{b:1, .priority:1}` (REST export, and a new connection's `get()`). Nothing repaired it in the 2 s watched | Same, in both forms: the priority was lost on the writer and the observer, kept by the server, unchanged 2 s later. For the one-update form the observer got it back after its listener was detached and attached again; the writer still lacked it 4.7 s later, after another client wrote below the node | Emulator, both forms, 3 runs each, public API. A later run of the two-message form on one child (`{x:1, .priority:5}`, listen `/`, `set x null`, `set x 1`), 3 runs on each SDK: online, the writer's listener and `get()` lacked the priority on both SDKs, still at +10 s, repaired by attaching the listener again; offline, wrong for 7 to 9 ms on both, until the server's data came after `goOnline` |
-| 3 | A priority written on a node that does not exist is shown locally, though the server refuses it (`could not set priority on non-existent node`). A pending write that creates the node later makes the priority show too, because the writes are applied together and priorities go after children. A fix that hid such a priority when complete server data shows the node missing was tried and dropped: it is wrong whenever another client creates the node before our write is answered, and the client cannot know which the server handled first. One update with separate keys (`update r {'x/v': 1, 'x/.priority': 3}`, `x` missing) has the same two local views, depending on timing: with the listens answered before the write the listeners show `{v: 1}` without the priority, and when the write is sent while the listen answers are still in flight they sometimes show one more event with the priority 3 before the refusal reverts both (emulator, 2026-11-26; nothing was built for it). | Node `b` missing. `setPriority(b, 0)`, then `set b/x/y 2`. The race: our `setPriority(b, 0)` and another client's `set b/x 1`, arriving in either order | Seen only in the differential check; not reachable through the public API in the form run on either SDK. Public API form run (`setPriority(b, 0)`, then `set b/x/y 2`): the writer's listener showed `{x:{y:2}}` with no priority, never priority 0, in 3 of 3 runs, and the server refused the priority write | Same: the writer's listener never showed priority 0; the server refused with `invalid_parameters` | Refusal on the emulator, by our client, 3 runs. Showing the priority, and the race: differential check only |
-| 4 | The emulator keeps the priority of a node emptied by one write and refilled by the next. The client's node model cannot represent an empty node with a priority, so it never agrees with this. Measured on the emulator by REST: after `DELETE r/a` the export of `r` is `{".priority":0.0}`, an empty node that still has its priority; only deleting `r` itself drops it. A production server does the same (2026-11-25): a listen and a `get` on the emptied node are answered with `{".priority":5.0}`, its parent's data holds it as `{"n":{".priority":5.0}}`, the hash the server computes counts the priority, and `set(n, null)` drops it for good. Row 8 is what follows for a transaction. | Server `{d:1, .priority:1}`. `set d null`, then `set b 1`, then a read | The server holds `{b:1, .priority:1}`; the client has no priority (as in row 2). A server fact | Not run on JS (a fact about the server) | Emulator by REST; production by raw frames and REST export, one run |
+| 1 | A child written below a leaf and then changed again could show a wrong value. The write tree treats a write below a leaf as confined to its path, but on a leaf it replaces the leaf. This client is correct in the offline form and wrong for a few ms in the refused form, by two helpers in `view_processor_server.dart` that the JS SDK has no counterpart for (rows 25 and 26 of the table above, commit `a5e448fd`); `test/core/leaf_write_test.dart` pins both forms. The first helper skips filtered views, so a limit query's listener is not covered by it. The differential check reported a lasting wrong value there (listen limit `/a`, `set a/x/u 2`, `set a/x/u null` over a leaf `x`; seeds 44988 and 79304 of 0 to 99999). That was a fault of the check's model server, not of a client: the model sent the limit listener the second write as written, where the emulator sends a put of null at the emptied child `a/x`. On the emulator the limit listener ended right on both SDKs (one run each). | Server `r = 1`. `goOffline`, listen `r`, `set r/c {v:1}`, `set r/c null`, `goOnline`. A second form: `set r/b 1`, `set r/b null` on a leaf, the first refused by a rule | Offline form: the listener was never wrong (its `null` came in the same ms as a second client's). Refused form: `null` shown until the acknowledgement of the second write, which follows the refusal in the same ms, then `1`, wrong for about 4 ms (4, 4, 4 in three runs). The server and a second client held `null` and `1` | Wrong and lasting in both forms, 3 runs each. Offline: the writer's listener and `get()` stayed at `1` (server `null`) from about 18 to 21 ms, and still at +30 s; only a detach and re-attach gave `null`. Refused: `null` (server `1`) from 1 to 2 ms, still at +30 s, repaired only by a re-attach. On production, one run each: the same in both forms, still at +30 s, repaired by a re-attach | Emulator, both forms, 3 runs each, public API, same harness as the JS runs. Three versions of the client (`ebd757c4`, `38e6d8a3`, `9ddd3fda`) behaved the same: correct in the offline form, wrong for 2 to 4 ms in the refused form. No commit among them changed the outcome; older ones were not run. Production, the kit's two forms on the trunk client, one run each: both ended at the server's value. Offline form, with the listener attached before going offline: the listener saw `1`, `{c:{v:1}}`, `null`, `1`, `null`, so it passed through `1` once more after the first `null` before ending at `null` (not timed): a wrong value for a moment, which the emulator's "correct in the offline form" does not cover, since that sequence attached the listener while offline. It, `get()` and a fresh client held `null` 1 s after both acknowledgements. Refused form: the listener saw `1`, `{a:1}`, `null`, `1`, and it, `get()` and a fresh client held `1` at +0 s and +5 s. How long each value showed was not timed |
+| 2 | A node that is emptied and refilled loses its priority in the client; the server keeps it. This holds for one update that does both, and for two separate messages. A fix for the one-update form was written and reviewed five times; every version either left a listener disagreeing with the client's own server data when nothing was pending, or was wrong where the unchanged code is right, so none is in this version. | Server `{a:1, .priority:1}`, listen. `update {a:null, b:1}`. The two-message form: `set a null`, then `set b 1` | The writer's listener and `get()`, and a second client's listener, show `{b:1}` without the priority; the server holds `{b:1, .priority:1}` (REST export, and a new connection's `get()`). Nothing repaired it in the 2 s watched | Same, in both forms: the priority was lost on the writer and the observer, kept by the server, unchanged 2 s later. For the one-update form the observer got it back after its listener was detached and attached again; the writer still lacked it 4.7 s later, after another client wrote below the node. On production, one run each (no observer): in both forms the writer's listener and `get()` lacked the priority the server kept, still at +30 s; a listener attached again got it | Emulator, both forms, 3 runs each, public API. A later run of the two-message form on one child (`{x:1, .priority:5}`, listen `/`, `set x null`, `set x 1`), 3 runs on each SDK: online, the writer's listener and `get()` lacked the priority on both SDKs, still at +10 s, repaired by attaching the listener again; offline, wrong for 7 to 9 ms on both, until the server's data came after `goOnline`. Production, both forms on the trunk client, one run (check 22 of the kit, informational on that client, so it records the trunk's behaviour): the writer's listener showed no priority after either form, and its `get()` none after the one update at +0 s and +5 s, while a fresh client read the priority 0 |
+| 3 | A priority written on a node that does not exist is shown locally, though the server refuses it (`could not set priority on non-existent node`). A pending write that creates the node later makes the priority show too, because the writes are applied together and priorities go after children. A fix that hid such a priority when complete server data shows the node missing was tried and dropped: it is wrong whenever another client creates the node before our write is answered, and the client cannot know which the server handled first. One update with separate keys (`update r {'x/v': 1, 'x/.priority': 3}`, `x` missing) has the same two local views, depending on timing: with the listens answered before the write the listeners show `{v: 1}` without the priority, and when the write is sent while the listen answers are still in flight they sometimes show one more event with the priority 3 before the refusal reverts both (emulator, 2026-11-26; nothing was built for it). | Node `b` missing. `setPriority(b, 0)`, then `set b/x/y 2`. The race: our `setPriority(b, 0)` and another client's `set b/x 1`, arriving in either order | Seen only in the differential check; not reachable through the public API in the form run on either SDK. Public API form run (`setPriority(b, 0)`, then `set b/x/y 2`): the writer's listener showed `{x:{y:2}}` with no priority, never priority 0, in 3 of 3 runs, and the server refused the priority write | Same: the writer's listener never showed priority 0; the server refused with `invalid_parameters` | Refusal on the emulator, by our client, 3 runs. Refusal on production, one run each: `setPriority` on a missing path by the trunk client, and the one update with separate keys by raw frames (the verification kit). Showing the priority, and the race: differential check only |
+| 4 | The emulator keeps the priority of a node emptied by one write and refilled by the next. The client's node model cannot represent an empty node with a priority, so it never agrees with this. Measured on the emulator by REST: after `DELETE r/a` the export of `r` is `{".priority":0.0}`, an empty node that still has its priority; only deleting `r` itself drops it. A production server does the same (2026-11-25): a listen and a `get` on the emptied node are answered with `{".priority":5.0}`, its parent's data holds it as `{"n":{".priority":5.0}}`, the hash the server computes counts the priority, and `set(n, null)` drops it for good. Row 8 is what follows for a transaction. | Server `{d:1, .priority:1}`. `set d null`, then `set b 1`, then a read | The server holds `{b:1, .priority:1}`; the client has no priority (as in row 2). A server fact | Not run on JS (a fact about the server) | Emulator by REST; production by REST export and by raw frames (the verification kit) |
 | 5 | A limit query's window is not refilled after a local removal. The client does not know the next child that would enter the window, so the window is short, or holds a child that moved out of order, until the server sends it again. A listener can receive a value while part of the window is unknown. | Table form: `listen r orderByValue limitToLast(2)`, `update r {b:null}`, `set /` (a whole-tree value), `set r/b/v 0`, the listen answered, then the last two writes reverted locally, as a transaction abort does (minimised seed 100653). Simplified form run: server `r = {a:1,b:2,c:3,d:4}` with `.indexOn: .value`, listen `orderByValue limitToLast(2)`, `goOffline`, `remove r/d`, `goOnline` | Table form: seen only in the differential check, not reachable through the public API (seed 100653: `{d}` instead of `{a, d}`; no duration measured). Simplified form: `{c:3}`, one child where 2 are due, while offline (about 510 ms, all of it offline), refilled by a server merge push 2 to 12 ms after `goOnline` (`{b:2,c:3}`). Without an index the server sends the whole node and the window is never short | Same in the simplified form: `{c:3}` while offline, refilled 6 ms after the removal was sent. Without an index the window was never short. The table form was not run | Simplified form: emulator, 3 runs, public API. Table form: differential check only |
 | 6 | A listener can receive the same null value twice in a row. A revert that finds an incomplete server cache marks the view incomplete, and the next complete answer raises `null` again. | Listen `r/b/x`, `set /`, the server refuses the set, `set /r {...}`. A second form: `set /r null`, listen `r/b`, the set refused, the listen answered | Seen only in the differential check; not reachable through the public API in the forms run on either SDK. Two forms run (a refused `set /` then `set r {b:{x:null}}`; the same two writes queued offline): the events were `null`, `1`, `null`, never two identical nulls in a row, in 6 of 6 runs | Same events `null`, `1`, `null`, no repeated null, in both forms | Differential check only; the two forms above on the emulator, 3 runs each |
 | 7 | A root listen added over a tagged limit query leaves the limit listener with a stale window when another client's write at the query's path is processed by the server between the client's listen frame and its unlisten frame. The tagged put sets the limit view's server cache to the filtered window, and a later push below a child outside it is dropped. The root listener is right. | Data `{a:{x:1, y:{u:2,.priority:2}, .priority:1}}`. Listen `/a` ordered by priority with `limitToFirst(2)`, then listen `/`, the limit listen answered. The client's frames after its `q /` are held by a proxy; another client sets `/a {y}`; the frames are released (seed 18113 of the property test has the same shape) | The limit listener shows `{y}` where the server holds `{x:{u:1}, y}`, at +100 ms, +2 s and +10 s; nothing in the protocol sends `x` to the limit view again, so it lasts until another write touches `x` or the listener is removed (the last part inferred). Other writes by the second client that remove or replace a window child while an own pending write keeps it (`set /a/x null`, `set /a/y`, `update /a {x:null}`, `update / {a/x:null}`, `update /a {.priority, y}`; the plain listen at `/` or at `/a`; 11 seeds of 0 to 99999) leave the listener right and only the limit view's server cache short of that child. The short cache lasts. A refused write below the missing child then rebuilds the listener's value from it, and the listener is wrong: seed 18113 shows `{y}` where the server window is `{x:{u:1}, y}`; seed 65343 shows `{y:3, z:3}`, with `z` from outside the window, where it is `{x:{u:2}, y:3}`. That was still so at +1 s, +10 s and +30 s after the refusal, after an unrelated write by the other client, and after its write below the missing child (`set /a/x/w 7`: the client gets only an untagged push below a child the filtered cache does not hold); a new listener on the same query got the same wrong value. Not run, inferred: a put of the whole child, or removing every listener at `/a` and listening again, repairs it. Without the held uplink the server handles the other client's write after the client's frames and the listener is right. A second form of the same state: the limit view's own server cache is filtered while a complete view covers it, and a deep merge below a child outside the window is skipped, so the child that enters later is stale. `/a` ordered by key with `limitToFirst(1)`, tagged put `{k1}`, default listen `/a`, put `{k1:{v:1}, k2:{v:2}}`, one more tagged frame, merge `/a {k1:null, k2/v:5}`, merge `/a/k2 {v:6}`: expected `{k2:{v:6}}`, shown `{k2:{v:2}}` (unit run, with and without the change of row 32; the JS code path was read, JS was not run) | Same: `{y}` at +100 ms, +2 s and +10 s, server `{x:{u:1}, y}`; the write at `/a/x` gave a right listener and a short cache in JS too. The refused-write form: the same values as our client at every point watched, for seeds 18113 and 65343 | Emulator, our client and JS, one run each for every form, uplink held by a proxy that releases the client's frames one step at a time. No form was found that produces it through the public API without the proxy (reasoned, not tried: the client sends its listen and its unlisten in one tick). Rare without a stalled uplink. Not a general failure |
-| 8 | A transaction on a node that holds only a priority fails with `max-retries`. The node was emptied by a write below it and the server kept its priority (row 4). The client holds it as an empty node and sends the hash of an empty node with the transaction; the server's hash counts the priority, so it answers that the data is stale and sends `{".priority":5}` again, which the client reads as empty again. The handler sees `null` on each of its 25 runs. The JS SDK does the same, for the same reason. A fix that keeps the priority of an emptied node in the client's node model is in work and is not in this version. | Server `n = {a:1}` with priority 5. `remove n/a`. A client runs a transaction on `n` that returns `{b:1}` | The transaction's Future fails with `max-retries` after 25 runs of the handler, each given `null`; the server still holds `{".priority":5}`, and `get()` on the client gives `null`. It lasts as long as the node holds only its priority. Removing the node itself drops the priority (run); a write of a child gives the node a value again and should end it too (inferred, not run) | Same: failed with `maxretry` after 25 runs of the handler in 1902 ms, each given `null`; server `{".priority":5}` and `get()` `null` at +0 s and +5 s | Production and emulator, our client and JS 13.4.0, by a client with nothing cached; production one run each |
+| 8 | A transaction on a node that holds only a priority fails with `max-retries`. The node was emptied by a write below it and the server kept its priority (row 4). The client holds it as an empty node and sends the hash of an empty node with the transaction; the server's hash counts the priority, so it answers that the data is stale and sends `{".priority":5}` again, which the client reads as empty again. The handler sees `null` on each of its 25 runs. The JS SDK does the same, for the same reason. A fix that keeps the priority of an emptied node in the client's node model is in work and is not in this version. | Server `n = {a:1}` with priority 5. `remove n/a`. A client runs a transaction on `n` that returns `{b:1}` | The transaction's Future fails with `max-retries` after 25 runs of the handler, each given `null`; the server still holds `{".priority":5}`, and `get()` on the client gives `null`. It lasts as long as the node holds only its priority. Removing the node itself drops the priority (run); a write of a child gives the node a value again and should end it too (inferred, not run) | Same: failed with `maxretry` after 25 runs of the handler in 1902 ms, each given `null`; server `{".priority":5}` and `get()` `null` at +0 s and +5 s | Production and emulator, our client and JS 13.4.0, by a client with nothing cached; production one run each. On production the trunk client did the same (the kit's check 38, informational on that client): with nothing cached, and again after its SQLite cache was closed and reopened |
 
 The code spots are `CompoundWrite.addWrite` and `WriteTree.removeWrite` (row 1), `ChildrenNode.updateImmediateChild`
 (rows 2, 4 and 8), `CompoundWrite` applying priorities after children (row 3), `ViewProcessor.revertUserWrite` (rows 5
