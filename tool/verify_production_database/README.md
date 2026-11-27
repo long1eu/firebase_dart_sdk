@@ -12,7 +12,7 @@ from the right directory. It is modelled on the Storage kit (`tool/verify_produc
 **Status of the kit itself:** it runs against the Database emulator (v4.11.2) and the Auth emulator, where every
 check passes (`test/production/verify_production_test.dart` pins the results below). Run 15 on 2026-11-27 ran the
 whole kit in one run on the final client of this version: 41 of 41 PASS on the emulator and 41 of 41 PASS against a
-dedicated production database. Check 42 was added after run 15 and has not run on either backend yet.
+dedicated production database. Check 42 was added after run 15; run 16 on 2026-11-28 ran it alone: PASS on both.
 
 ## Before you run it against production
 
@@ -461,7 +461,12 @@ emulator, a line "N on production" follows the check; without one, production ga
   and export of up unchanged (`{"loc":{"j":2,"k":1},"sib":5}`); the writer's next put is answered ok
 - **41 on production** (2026-11-27, alone and in run 15): every answer, frame, `g` and export as on the emulator; the
   answers came within 161 ms alone and within 178 ms in run 15
-- **42**: not run yet on either backend
+- **42**: `h` is stored as `{".priority":2.0}` and its hash is the emptied-node form. `limitToFirst(3)`: a listen
+  without a hash gets data with `h` as `{".priority":2.0}`; the hash of a, h, c (h counted) is accepted, no data;
+  the hash of a, c and the hash of a, c, d (the window refilled) each get data. `startAt(1).endAt(3)`: the hash with
+  `h` counted is accepted; the hash without it gets data. So the server counts an emptied node in a query window's
+  hash and toward a limit
+- **42 on production** (2026-11-28, run 16, alone): every answer as on the emulator
 
 ## Questions the kit does not answer
 

@@ -408,10 +408,10 @@ Future<void> main() async {
         }, reason: e.key);
       }
       expect(emptyKey['after'], ok);
-      // Check 42, the hash of a query window that holds an emptied node. The server's answers are
-      // not pinned (not measured yet). Pinned: h is stored as an emptied node keeping priority 2
-      // (as checks 38 and 39 measured on the emulator), every listen was recorded, and the
-      // candidate hashes differ, so that the run can tell which one the server accepts.
+      // Check 42, the hash of a query window that holds an emptied node: h is stored as an emptied
+      // node keeping priority 2, the candidate hashes differ, and for both queries the server
+      // accepts only the hash that counts h (no data sent); every other listen gets data
+      // (emulator and production, run 16, 2026-11-28).
       final Map<String, Object?> window = observed('42');
       expect(
         window['hHash'],
@@ -430,7 +430,14 @@ Future<void> main() async {
             (listens[c]! as Map<String, Object?>)['hash'],
         ];
         expect(hashes.toSet(), hasLength(candidates.length), reason: id);
-        expect((listens['none']! as Map<String, Object?>)['data'], isTrue);
+        expect(listens['accepted'], <String>['withH'], reason: id);
+        for (final String c in <String>['none', ...candidates]) {
+          expect(
+            (listens[c]! as Map<String, Object?>)['data'],
+            c != 'withH',
+            reason: '$id $c',
+          );
+        }
       }
 
       final String runId = run.runPath!.split('/').last;
