@@ -2,7 +2,7 @@ name: firebase_database_dart
 description: >-
   Unofficial pure-Dart client of the Firebase Realtime Database. Work in
   progress: tested against the emulator only.
-version: 0.0.1
+version: 0.1.0
 publish_to: none
 homepage: https://github.com/long1eu/firebase_dart_sdk
 repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_database/firebase_database_dart
@@ -44,7 +44,7 @@ dev_dependencies:
   # The production verification kit restarts a client on the SQLite cache (check 38). Resolved
   # from ../firebase_database_dart_sqlite through pubspec_overrides.yaml; it depends on this
   # package, which pub allows for a dev dependency.
-  firebase_database_dart_sqlite: ^0.0.1
+  firebase_database_dart_sqlite: ^0.1.0
   # The emulator tests' owner writes and reads over REST (test/integration/emulator_rig.dart);
   # 1.5.0 is the version firebase_storage_dart uses.
   http: ^1.5.0

@@ -8,12 +8,13 @@ app is offline. It is not affiliated with or endorsed by Google or Firebase.
 > **Status: 0.0.1, work in progress, not published.** What has run (the counts are from the maintainer's runs on the
 > merged trunk):
 >
-> - The package has 247 tests, which pass on Dart 3.11.5 and on Dart 3.8.0, including Android's own persistence suites
->   run on the SQLite engine.
+> - The package has 287 tests, which pass on Dart 3.12.2 (2026-11-27; 247 passed on Dart 3.11.5 and on Dart 3.8.0 at
+>   an earlier commit), including Android's own persistence suites run on the SQLite engine.
 > - On Windows 11 x64 the disk cache test of the Windows example app passed with an earlier version of the app.
 > - The SQLite engine had an independent review (1 high, 5 medium and 10 low findings), all fixed with a test each.
 > - Nothing ran on Android or iOS or in a release build of a desktop app. Against production one check of the
->   client's verification kit used this cache: it closed and reopened a cache file and listened again (one run).
+>   client's verification kit used this cache: it closed and reopened a cache file and listened again (check 38, in the
+>   run of all 41 checks on 2026-11-27, and in an earlier run).
 > - Cost of the cache, measured on one Mac mini (macOS, AOT, medians of 5, rows of about 100 bytes; see Limits). Not
 >   measured: JSON against a binary codec, `synchronous = FULL` against `NORMAL`, and any write cost on Linux or
 >   Windows.
@@ -149,7 +150,7 @@ and the tracked queries, restores the writes, and then connects. The layout is A
 
 | Platform | What ran |
 |---|---|
-| Dart VM | 247 tests on Dart 3.11.5 and on Dart 3.8.0, including Android's persistence suites on the SQLite engine |
+| Dart VM | 287 tests on Dart 3.12.2 (2026-11-27; 247 on Dart 3.11.5 and on Dart 3.8.0 at an earlier commit), including Android's persistence suites on the SQLite engine |
 | Windows 11 x64 | the disk cache test of the Windows example app, with an earlier version of the app |
 | Linux x64 | no run of this package is recorded; the client's own suites ran there (see its README) |
 | Android, iOS | declared in `pubspec.yaml`; no run is recorded |
