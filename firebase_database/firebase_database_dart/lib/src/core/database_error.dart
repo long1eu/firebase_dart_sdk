@@ -46,7 +46,8 @@ enum DatabaseErrorCode {
   indexNotDefined('index-not-defined', 'no_index'),
 
   /// The database instance was closed (or its app deleted); every later asynchronous call fails with
-  /// this code. Local only: the server never sends it.
+  /// this code. Local only: made by [DatabaseError.closed], never read from the wire (a server
+  /// status `database_closed` maps to [unknown]).
   databaseClosed('database-closed', 'database_closed'),
 
   /// An unknown error occurred.
@@ -62,7 +63,8 @@ enum DatabaseErrorCode {
 
   /// The code for a wire [status]; JS-only local statuses map as follows: `disconnect` to
   /// [disconnected], `maxretry` to [maxRetries], `set` to [overriddenBySet], anything else to
-  /// [unknown].
+  /// [unknown]. The status of a local-only code ([databaseClosed]) also maps to [unknown], so a
+  /// server cannot imitate a close.
   ///
   /// Matching ignores case, as Android `DatabaseError.fromStatus` lower-cases the status, so
   /// Android's local `overriddenBySet` also maps to [overriddenBySet]. JS: `errorForServerCode`;
@@ -78,7 +80,7 @@ enum DatabaseErrorCode {
         return overriddenBySet;
     }
     for (final DatabaseErrorCode code in values) {
-      if (code.wireStatus == lower) {
+      if (code.wireStatus == lower && code != databaseClosed) {
         return code;
       }
     }
@@ -106,6 +108,12 @@ final class DatabaseError {
   }) : details = null,
        rawStatus = null,
        isLocal = true;
+
+  /// The error of a closed database or a deleted app: local, code [DatabaseErrorCode.databaseClosed].
+  factory DatabaseError.closed() => DatabaseError.local(
+    DatabaseErrorCode.databaseClosed,
+    _messageFor(DatabaseErrorCode.databaseClosed),
+  );
 
   /// Creates the error for a wire [status] with the server's optional [reason], as Repo does for
   /// a failed request.

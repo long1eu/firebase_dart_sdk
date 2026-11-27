@@ -298,16 +298,17 @@ void main() {
       },
     );
 
-    test('a clear whose deletion failed leaves a tombstone: opens are memory-only and a second '
-        'clear is refused until it expires', () async {
-      // Fails without the live-tombstone refusal of SqlitePersistence._tombstone
-      // (sqlite_persistence.dart:183-185), or if a tombstone never expires there; and without
-      // the side-files-first rule of SqliteFiles.deleteAll (sqlite_files.dart:75).
+    test('a clear whose deletion failed leaves a tombstone that keeps other isolates out; this '
+        'isolate retries at once', () async {
+      // Fails without the live-tombstone refusal of SqliteLease.tryAcquire, without the side-files-
+      // first rule of SqliteFiles.deleteAll, or if a retry in this isolate does not take the
+      // tombstone its failed clear left as its own (SqlitePersistence._failedClearTombstones).
       final String path = persistence.pathOf(key);
       (await persistence.open(key)).close();
       writeLease(path, '17:crashed');
       // While clear watches the row, something makes the journal path undeletable (a directory
-      // stands in for it on every platform).
+      // stands in for it on every platform). It also makes the file unreadable, so the clear can
+      // not remove its tombstone then.
       final Directory blocker = Directory('$path-journal');
       fixture.clock.onAdvance = () {
         if (!blocker.existsSync()) {
@@ -325,19 +326,20 @@ void main() {
 
       expect(File(path).existsSync(), isTrue);
       expect(readLease(path)?.ownerId, SqliteLease.clearingOwnerId);
-      final PersistenceStorageEngine racing = await persistence.open(key);
+      // An open that does not go through SqlitePersistence of this isolate, as another isolate's.
+      final SqliteConnection racing = await openSqliteStore(
+        directory: fixture.directory,
+        fileName: File(path).uri.pathSegments.last,
+        options: fixture.options(),
+      );
       expect(racing.isDurable, isFalse);
       expect(fixture.log.last, contains('being deleted'));
       racing.close();
-      await expectLater(persistence.clear(key), throwsStateError);
-      expect(fixture.clock.delays, <Duration>[SqliteLease.observation]);
 
-      fixture.clock.advance(
-        SqliteLease.tombstoneDuration + const Duration(milliseconds: 1),
-      );
       await persistence.clear(key);
 
       expect(File(path).existsSync(), isFalse);
+      expect(fixture.clock.delays, <Duration>[SqliteLease.observation]);
     });
 
     test('of a database that never existed does nothing', () async {
