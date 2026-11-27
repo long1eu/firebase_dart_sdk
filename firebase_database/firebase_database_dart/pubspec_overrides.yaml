@@ -3,3 +3,10 @@
 dependency_overrides:
   firebase_app_dart:
     path: ../../firebase_core/firebase_app_dart
+  # Dev dependencies of the production verification kit (test/production).
+  firebase_auth_providers_dart:
+    path: ../../firebase_auth/firebase_auth_providers_dart
+  secure_flow:
+    path: ../../secure_flow/secure_flow
+  firebase_database_dart_sqlite:
+    path: ../firebase_database_dart_sqlite

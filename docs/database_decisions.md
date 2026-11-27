@@ -205,7 +205,8 @@ Status: built. Emulator behaviour for credentials measured on the emulator (v4.1
   production host. The namespace is `ns`, else the first label of a `firebaseio.com` or `firebasedatabase.app` host, and
   must match `^[a-z0-9-]{1,63}$`. Every query value is percent-encoded. `refFromUrl` puts the URL without its path
   through the same parser, so it refuses user info, plain `http://`, other ports and extra query keys, and it refuses
-  a host other than the database's own.
+  a host or a namespace other than the database's own. On the emulator the host and port are not compared; a
+  namespace the URL names must be the database's (section 25, row 36).
 - The disk cache is keyed by the app name and the normalised database URL: every spelling of one URL shares one cache,
   two `?ns=` values on one host are two caches, and one emulator named by two hosts (`localhost` and `127.0.0.1`) has
   two.
@@ -516,7 +517,10 @@ emulator, 2026-11-26).
 **What we gave up.** Nothing makes an increment exact after a lost answer; the README and a test say so. A
 write under `.info` that JS accepts through `update` and `onDisconnect().cancel` is refused
 (`J:api/Reference_impl.ts:798-808`, `J:api/OnDisconnect.ts:72-80`): `set`, `update`, `remove` and
-`OnDisconnect.cancel()` are refused. `update({'': v})` with the empty key alone is accepted, as in the JS SDK.
+`OnDisconnect.cancel()` are refused. An `update` or `OnDisconnect.update` key that names the location itself
+(`''`, `'/'` or only slashes) throws an `ArgumentError` naming the key, where JS and Android accept it (section 25,
+row 34): the server refuses such a merge with `invalid_parameters` "Empty strings are not valid keys", alone or
+beside another key, and writes and pushes nothing (measured on the emulator and on production, 2026-11-27).
 Such an object in a merge is refused, where JS sends it and hangs (measured) and Android sends it too (read,
 `A:core/Repo.java:633-635`); the same object nested in a `set` value is dropped without an error, as in JS.
 
@@ -1194,6 +1198,10 @@ the number; the section each reason cites has the upstream lines.
 | 31 | A write reverted while an earlier pending write lies above it (with a real server: a transaction aborted below an ancestor transaction still in flight) | only writes at or below the removed one count as overlapping it, so nothing is rebuilt, and the view returns unchanged when a write shadows the reverted path: an open listener, `get()` and a new listener below keep the reverted data until the upper write is answered (reproduced on the JS SDK 13.4.0 against the emulator with the answers reordered by a proxy; with a real server's order it lasts milliseconds) | a visible write above counts too and the tree is rebuilt; the view takes what the write tree holds, so no listener keeps the reverted data | `revert_under_pending_write_test`, `revert_under_shadow_test` |
 | 32 | A server merge that moves a child out of a limit window while a complete view covers the query | every child of the merge is applied with the complete server cache from before it, so the child pulled into the window can hold values the same merge changed or removed; it lasts until every listener at the path is removed (read: `J:core/view/ViewProcessor.ts:583-660`; measured: JS 13.4.0 on the emulator, seeds 245589, 4614, 11541 and 174519, one run each) | each child of a merge the server sent gets that cache with the merge's earlier children applied, so the window takes the child that sorts next after them. This holds for server merges only; acknowledgements are as in JS (measured: the same four sequences on the emulator, three runs each, right at every check) | `limit_window_merge_test` |
 | 33 | Index warning for a listen removed before its answer | the answer of a listen already removed is dropped, with its `no_index` warning (`J:realtime/PersistentConnection.ts:296-300`), so a `once()` on an unindexed query, which unlistens on the first data push, logs nothing when that push comes before the answer | the warning is logged for that answer too, once per answer: a query listened again before the first answer came logs it for each of the two answers, and so does a query listen stopped because a wider listen covers it; the rest of the answer is still ignored (no completion, nothing removed) | `persistent_connection_test` (`test/realtime/`) B-4.1e and B-4.1g (B-4.1f guards the error answer and passes without the change); `parity_gaps_test` ("once() on an ordered query whose data comes before the no_index answer warns once") |
+| 34 | Update key naming the location itself | `update({'': v})`, `{'/': v}`, `{'//': v}` accepted at the call (`J:core/util/validation.ts:253-289`, `new Path(key)` with no empty-path check; Android the same, `A:core/utilities/Validation.java:134-168`): the location is replaced locally until the server refuses the merge with `invalid_parameters` "Empty strings are not valid keys" and the write reverts (measured on the emulator and on production, 2026-11-27) | `update` and `OnDisconnect.update` throw an `ArgumentError` that names the key; nothing is sent | `empty_merge_key_test`; `validation_test` (`test/core/util/`, group "merges") |
+| 35 | Failed `get` and unreadable data in the log | `'get for query ' + stringify(query) + ' failed: ' + err`, the query with its bound values, when logging is on (`J:core/Repo.ts:533`) | the path, the query's shape (index, which bounds are set and inclusive, limit and side) and the server status; no bound value or key; data the client cannot parse is logged by error type and path | `logging_and_urls_test` |
+| 36 | `refFromUrl` of another database | host compared, namespace not; no check at all for a custom host, the emulator included; a bad percent escape kept raw (`J:api/Reference_impl.ts:516-529`, `J:core/util/libs/parser.ts:28-30`, read) | host and namespace compared (a database `https://a.firebaseio.com?ns=b` refuses `https://a.firebaseio.com/x`); on the emulator host and port are not compared, but a namespace the URL names must be this one, and the URL must be http(s) or ws(s) with a valid host, no user info, no fragment and no query key other than `ns`; a bad percent escape in the path throws; no message quotes the whole URL, its user info or its query | `logging_and_urls_test`; `api_behaviour_test` (m10) |
+| 37 | `databaseUrl` with an emulator | namespace from `ns`, else the first label of a host with three or more labels, else empty (allowed for `localhost` only; no `ns` is sent and the emulator reads its Host header) | namespace from `ns`, else the emulator's own Host rule applied to the URL's `host:port` (first label when valid and not numeric, else `fake-server`); host, port and scheme are not checked; one warning to the logger when the namespace came from the host and is not `<projectId>-default-rtdb` | `emulator_url_test`; `emulator_namespace_warning_test` |
 
 Test file names are given without their directory: `scenarios_test`, `snapshot_test`, `public_surface_test`,
 `validation_test`, `api_behaviour_test` and `revert_under_pending_write_test` are in `test/api/`; `repo_get_test`,
@@ -1242,6 +1250,19 @@ Test file names are given without their directory: `scenarios_test`, `snapshot_t
     plain-text frames of the emulator, and a setting in the API would be a second place to configure it (section 5).
 28. Code that no caller reaches is a second surface with its own contract (section 20). JS uses REST for crawlers
     and tests only.
+34. Such a key replaced the whole location in the local view, while the doc of `update` says other children are
+    left alone, and the server refuses the merge on the emulator and on production (2026-11-27), so the write can
+    only fail. `set` replaces a location and `remove` deletes it. `empty_merge_key_test` is in `test/api/`.
+35. A bound value or a key in a log line is user data in a place nobody expects it; the shape of the query is
+    enough to find the call. A message the server sends is still logged as sent.
+    `logging_and_urls_test` is in `test/api/`.
+36. A reference made from another database's URL reads and writes this database at that path, and an error that
+    quotes the URL can print a password. On the emulator the host names no database, so only the namespace can
+    be compared.
+37. The emulator ignores the URL's host, so only the namespace matters. Mirroring the emulator's rule gives the
+    database the emulator would pick for that URL, and refuses no address a developer uses (Android's
+    `10.0.2.2`, a LAN address, a `.local` name). `fake-server` is not the project's default database and has
+    open rules, which the warning and the constructor doc say. Both tests are in `test/api/`.
 
 Status: built.
 

@@ -146,7 +146,7 @@ void main() {
           isA<FormatException>().having(
             (FormatException e) => e.message,
             'message',
-            contains('useEmulator'),
+            contains('emulatorHost'),
           ),
         ),
       );

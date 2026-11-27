@@ -16,6 +16,8 @@ import 'package:firebase_database_dart/src/api/environment_stub.dart'
 import 'package:firebase_database_dart/src/api/firebase_database_exception.dart';
 import 'package:firebase_database_dart/src/api/query.dart';
 import 'package:firebase_database_dart/src/core/callback_event_registration.dart';
+import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
+import 'package:firebase_database_dart/src/core/connection/wire_range_merge.dart';
 import 'package:firebase_database_dart/src/core/database_error.dart';
 import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:firebase_database_dart/src/core/persistence/database_persistence.dart';
@@ -58,14 +60,43 @@ final class FirebaseDatabase {
   ///
   /// [databaseUrl] defaults to the app's `databaseURL`, then to
   /// `https://<projectId>-default-rtdb.firebaseio.com`; with neither and no project id it throws an
-  /// [ArgumentError]. The URL must be the root of a database over TLS (`https://` or `wss://`): a
-  /// plain `http://` URL, a path, user info, a port other than 443 on a host that is not loopback,
-  /// a custom domain without `?ns=` and an invalid namespace each throw an [ArgumentError] here,
-  /// with or without [persistence]. The message does not quote the URL.
+  /// [ArgumentError]. Without [emulatorHost], the URL must be the root of a database over TLS
+  /// (`https://` or `wss://`): a plain `http://` URL (the message points to [emulatorHost]), a
+  /// path, user info, a port other than 443 on a host that is not loopback, a custom domain
+  /// without `?ns=` and an invalid namespace each throw an [ArgumentError] here, with or without
+  /// [persistence]. The message does not quote the URL.
   ///
   /// [emulatorHost] (`'host:port'` or `'[ipv6]:port'`) connects to the Database emulator over plain
-  /// WebSocket (over TLS for a `*.cloudworkstations.dev` host), with the database URL's namespace
-  /// (by default `<projectId>-default-rtdb`); the URL's scheme and host are not used then. See
+  /// WebSocket (over TLS for a `*.cloudworkstations.dev` host). The database URL (the argument,
+  /// else the app's `databaseURL`) then gives only the namespace: its scheme (`http`, `https`,
+  /// `ws` or `wss`), host and port are not used to connect, and the client always sends the
+  /// namespace as `ns`. `http://10.0.2.2:9000?ns=demo` and `http://my-mac.local:9000?ns=demo` both
+  /// mean namespace `demo`.
+  ///
+  /// Without `?ns=`, the scheme, host and port choose the namespace by the rule the emulator
+  /// applies to a Host header that names none: take the URL's `host:port`, without the port when
+  /// it is the scheme's default (80 for `http` and `ws`, 443 for `https` and `wss`), split it on
+  /// `.`, and use the first part when it is a valid namespace (lowercase letters, digits, `-`)
+  /// and, with four or more parts, not a 32-bit integer; else use `fake-server`. So
+  /// `http://my-mac.local:9000` gives `my-mac`, `https://db.example.com` gives `db`,
+  /// `http://localhost` gives `localhost`, and `http://localhost:9000`, `http://my-mac:9000` (a
+  /// one-label name with a port) and any IP address give `fake-server`. With no URL at all
+  /// (neither the argument nor the app's `databaseURL`, or an empty argument) the namespace is the
+  /// project's default database `<projectId>-default-rtdb`; a production URL of that database or
+  /// `?ns=` with that name reach it too. The emulator applies the rules of `firebase.json` only
+  /// to the databases `firebase.json` names, by default `<projectId>-default-rtdb`; every other
+  /// namespace has open rules. Measured (our emulator probe, one rules file): only the default
+  /// namespace got the rules. Read in firebase-tools' code (`getRulesConfig`), not run: the array
+  /// form of `"database"` gives rules to each named instance.
+  ///
+  /// When the namespace came from the host (no `?ns=`) and is not `<projectId>-default-rtdb`, or
+  /// the app has no project id, [logger] receives one warning at the first connection of this
+  /// instance (not again on a reconnect). It names the namespace and the emulator host and says
+  /// to give `?ns=` when `firebase.json` does not name that namespace; the client cannot read
+  /// `firebase.json`, so it also warns when it does. A logger that throws does not stop the
+  /// connection. A URL with `?ns=`, or no URL, logs nothing. User info, a
+  /// path, a fragment, a query key other than `ns` and an invalid namespace still throw an
+  /// [ArgumentError] whose message does not quote the URL. See
   /// [emulatorHostFromEnvironment]. [mockUserToken] is sent to the emulator as it is: build a
   /// user's token with `mockUserTokenFor`. A string that is not such a token (the literal `'owner'`
   /// included) is an admin credential for the emulator and bypasses the rules. Passing it without
@@ -118,13 +149,19 @@ final class FirebaseDatabase {
   FirebaseDatabase._withConnection(
     this.app, {
     required ServerActionsFactory connectionFactory,
+    String? databaseUrl,
+    String? emulatorHost,
     DatabasePersistence? persistence,
     DatabaseLogger? logger,
     DateTime Function()? clock,
     double Function()? random,
   }) {
     _setUp(
-      _Target.resolve(app),
+      _Target.resolve(
+        app,
+        databaseUrl: databaseUrl,
+        emulatorHost: emulatorHost,
+      ),
       connectionFactory: connectionFactory,
       persistence: persistence,
       logger: logger,
@@ -180,7 +217,10 @@ final class FirebaseDatabase {
     double Function()? random,
   }) {
     _target = target;
-    _connectionFactory = connectionFactory;
+    final String? warning = target.namespaceWarning;
+    _connectionFactory = warning == null
+        ? connectionFactory
+        : _warnAtFirstConnect(connectionFactory, warning);
     _persistence = persistence;
     _logger = logger;
     _clock = clock;
@@ -415,9 +455,11 @@ final class FirebaseDatabase {
   /// The URL of the database, normalised: `https://<host>` with the host in lowercase and without
   /// the default port, followed by `?ns=<namespace>` when the host does not name the namespace (a
   /// custom domain, or a `?ns=` that differs from the first host label). With an emulator it is
-  /// `http://<emulatorHost>?ns=<namespace>` (`https` for `*.cloudworkstations.dev`). Every spelling
-  /// of one database gives the same value, two databases never share one, and it keys the persisted
-  /// cache (pass it to `clearSqlitePersistence`).
+  /// `http://<emulatorHost>?ns=<namespace>` (`https` for `*.cloudworkstations.dev`), whatever host
+  /// the constructor's `databaseUrl` argument names: with `emulatorHost: '10.0.2.2:9000'`,
+  /// `databaseUrl: 'http://localhost:9000?ns=demo'` gives `http://10.0.2.2:9000?ns=demo`. Every
+  /// spelling of one database gives the same value, two databases never share one, and it keys the
+  /// persisted cache (pass it to `clearSqlitePersistence`).
   Uri get databaseUrl => _target.databaseUrl;
 
   /// The reference at [path]. `''`, `'a/b'` and `'/a/b'` are accepted and empty segments are
@@ -432,23 +474,45 @@ final class FirebaseDatabase {
   }
 
   /// The reference for a full [url] of this database (for example
-  /// `https://my-project-default-rtdb.firebaseio.com/a/b`). Outside an emulator the URL without its
-  /// path must be accepted by the constructor's `databaseUrl` rules and name this database's host,
-  /// else an [ArgumentError] is thrown. With an emulator the host is not compared and only the path
-  /// is used. Path segments are percent-decoded.
+  /// `https://my-project-default-rtdb.firebaseio.com/a/b`). Path segments are percent-decoded.
+  ///
+  /// Outside an emulator the URL without its path must be accepted by the constructor's
+  /// `databaseUrl` rules and name this database: its host, and its namespace (`?ns=` or the first
+  /// label of a `firebaseio.com` / `firebasedatabase.app` host). With an emulator the host and
+  /// port are not compared, but the URL must still be `http`, `https`, `ws` or `wss` with a valid
+  /// host, no user info and no query key but `ns`, and a namespace it names (the same two ways)
+  /// must be this database's. Anything else throws an [ArgumentError], as does a path that is not
+  /// valid percent-encoded UTF-8 or that [ref] refuses.
+  ///
+  /// No message quotes the whole URL, its user info or its query. A message may name the URL's
+  /// host (another host) and, as [ref] does, a decoded path it refuses.
   DatabaseReference refFromUrl(String url) {
     final ({String root, String path}) parts = _splitPath(url);
-    if (!_target.info.isUsingEmulator) {
+    final RepoInfo here = _target.info;
+    final String? namespace;
+    if (here.isUsingEmulator) {
+      namespace = _Target._argument('url', () => namespaceOfUrl(parts.root));
+    } else {
       final RepoInfo info = _Target._argument(
         'url',
         () => parseDatabaseUrl(parts.root),
       );
-      if (info.host != _target.info.host) {
+      if (info.host != here.host) {
         throw ArgumentError(
-          'refFromURL: Host name does not match the current database: '
-          '(found ${info.host} but expected ${_target.info.host})',
+          'refFromUrl: Host name does not match the current database: '
+              '(found ${info.host} but expected ${here.host})',
+          'url',
         );
       }
+      namespace = info.namespace;
+    }
+    if (namespace != null && namespace != here.namespace) {
+      // The URL's ns is not quoted: it is a query value.
+      throw ArgumentError(
+        'refFromUrl: The URL names another database than this one '
+            '(this namespace is ${here.namespace})',
+        'url',
+      );
     }
     return ref(parts.path);
   }
@@ -582,14 +646,20 @@ extension FirebaseDatabaseInternal on FirebaseDatabase {
 
   /// The URL of [path] in this database.
   Uri urlFor(Path path) => _urlFor(path);
+
+  /// Where the connection goes: the host and namespace the WebSocket URL is built from.
+  RepoInfo get repoInfo => _target.info;
 }
 
 /// A [FirebaseDatabase] of [app] whose connection is built by [connectionFactory] (the testing
-/// factories pass a fake server). The database URL comes from the app's options.
+/// factories pass a fake server). [databaseUrl] and [emulatorHost] are resolved as by the
+/// constructor; by default the database URL comes from the app's options.
 @internal
 FirebaseDatabase firebaseDatabaseWithConnection(
   FirebaseApp app, {
   required ServerActionsFactory connectionFactory,
+  String? databaseUrl,
+  String? emulatorHost,
   DatabasePersistence? persistence,
   DatabaseLogger? logger,
   DateTime Function()? clock,
@@ -597,11 +667,83 @@ FirebaseDatabase firebaseDatabaseWithConnection(
 }) => FirebaseDatabase._withConnection(
   app,
   connectionFactory: connectionFactory,
+  databaseUrl: databaseUrl,
+  emulatorHost: emulatorHost,
   persistence: persistence,
   logger: logger,
   clock: clock,
   random: random,
 );
+
+/// [factory] with [message] logged as a warning when its first connection is up; reconnects and
+/// later connections of the same database log nothing. An error thrown by the logger is dropped,
+/// so the connect still reaches the Repo.
+ServerActionsFactory _warnAtFirstConnect(
+  ServerActionsFactory factory,
+  String message,
+) {
+  bool warned = false;
+  return (ServerActionsDelegate delegate, DatabaseLogger? logger) => factory(
+    _OnConnectDelegate(delegate, () {
+      if (!warned) {
+        warned = true;
+        try {
+          logger?.call(DatabaseLogLevel.warning, message);
+        } on Object {
+          // A throwing logger must not stop the connect that follows.
+        }
+      }
+    }),
+    logger,
+  );
+}
+
+/// A [ServerActionsDelegate] that runs [_onConnect] before passing each connect to [_inner].
+final class _OnConnectDelegate implements ServerActionsDelegate {
+  _OnConnectDelegate(this._inner, this._onConnect);
+
+  final ServerActionsDelegate _inner;
+  final void Function() _onConnect;
+
+  @override
+  void onConnect() {
+    _onConnect();
+    _inner.onConnect();
+  }
+
+  @override
+  void onDataUpdate(
+    String path,
+    Object? data, {
+    required bool isMerge,
+    int? tag,
+  }) => _inner.onDataUpdate(path, data, isMerge: isMerge, tag: tag);
+
+  @override
+  void onRangeMergeUpdate(
+    String path,
+    List<WireRangeMerge> merges, {
+    int? tag,
+  }) => _inner.onRangeMergeUpdate(path, merges, tag: tag);
+
+  @override
+  void onDisconnect() => _inner.onDisconnect();
+
+  @override
+  void onAuthStatus(String status, {String? explanation}) =>
+      _inner.onAuthStatus(status, explanation: explanation);
+
+  @override
+  void onAppCheckStatus(String status, {String? explanation}) =>
+      _inner.onAppCheckStatus(status, explanation: explanation);
+
+  @override
+  void onServerShutdown(String reason) => _inner.onServerShutdown(reason);
+
+  @override
+  void onServerInfoUpdate(Map<String, Object?> updates) =>
+      _inner.onServerInfoUpdate(updates);
+}
 
 ServerActionsFactory _realtimeConnectionFactory(
   FirebaseApp app,
@@ -734,10 +876,10 @@ final class _FunctionRandom implements Random {
     try {
       segments.add(Uri.decodeComponent(segment));
     } on ArgumentError {
-      throw ArgumentError.value(
-        url,
-        'url',
+      // Not quoted: the URL can hold user info, and the path user data.
+      throw ArgumentError(
         'The path is not valid percent-encoded UTF-8.',
+        'url',
       );
     }
   }
@@ -749,7 +891,7 @@ final class _FunctionRandom implements Random {
 
 /// Where an instance connects: its [RepoInfo] and public [databaseUrl].
 final class _Target {
-  _Target(this.info, this.databaseUrl);
+  _Target(this.info, this.databaseUrl, {this.namespaceWarning});
 
   /// The target for [app] and the constructor arguments (contract C27). JS: `api/Database.ts`
   /// (`repoManagerDatabaseFromApp`, `connectDatabaseEmulator`).
@@ -784,10 +926,10 @@ final class _Target {
     return _Target(info, persistenceUrlOf(info));
   }
 
-  /// The target of the emulator at [emulatorHost], with the namespace of [url] or of the project's
-  /// default database. [url] follows the rules of a production URL (`parseDatabaseUrl`), except that
-  /// `http://` and `ws://` are accepted too, so an emulator URL such as
-  /// `http://127.0.0.1:9000?ns=<name>` works.
+  /// The target of the emulator at [emulatorHost], with the namespace of [url]
+  /// (`emulatorUrlNamespace`: its `?ns=`, else the emulator's own rule for its host) or, without
+  /// [url], of the project's default database. The scheme, host and port of [url] are not used to
+  /// connect; without `?ns=` they choose the namespace.
   factory _Target._emulator(FirebaseApp app, String? url, String emulatorHost) {
     if (emulatorHost.isEmpty) {
       throw ArgumentError.value(
@@ -797,24 +939,46 @@ final class _Target {
       );
     }
     final String namespace;
+    bool fromHost = false;
     if (url == null || url.isEmpty) {
       namespace = _defaultDatabase(app).namespace;
     } else {
-      final String secureUrl = url.replaceFirstMapped(
-        RegExp('^(http|ws)://', caseSensitive: false),
-        (Match m) => 'https://',
-      );
-      namespace = _argument(
-        'databaseUrl',
-        () => parseDatabaseUrl(secureUrl),
-      ).namespace;
+      try {
+        namespace = emulatorUrlNamespace(url);
+      } on FormatException catch (e) {
+        throw ArgumentError(e.message, 'databaseUrl');
+      }
+      // The URL is valid here, so it parses; without a scheme it was read as https.
+      final Uri parsed = Uri.parse(url.contains('://') ? url : 'https://$url');
+      // Without a project id the default database is unknown: any namespace from the host warns.
+      final String? projectId = app.options.projectId;
+      fromHost =
+          !parsed.queryParameters.containsKey('ns') &&
+          (projectId == null ||
+              namespace != '${projectId.toLowerCase()}-default-rtdb');
     }
     final RepoInfo info = _argument('emulatorHost', () {
       final ({String host, int port}) address = parseEmulatorHost(emulatorHost);
       return emulatorDatabase(address.host, address.port, namespace: namespace);
     });
-    return _Target(info, persistenceUrlOf(info));
+    return _Target(
+      info,
+      persistenceUrlOf(info),
+      namespaceWarning: fromHost
+          ? 'Database emulator at ${info.host}: the database URL has no ?ns=, so the '
+                'namespace is "${info.namespace}", chosen from the URL host by the emulator\'s '
+                'rule (fake-server when the host names none). The emulator applies the rules '
+                'of firebase.json only to the databases firebase.json names (by default '
+                '<projectId>-default-rtdb); any other namespace has open rules. If '
+                '"${info.namespace}" is not named there, give the database with ?ns=<name>.'
+          : null,
+    );
   }
+
+  /// The warning to log once at the first connection, or null: set when the emulator namespace
+  /// came from the URL host (no `?ns=`) and is not the project's default database, or the app
+  /// has no project id.
+  final String? namespaceWarning;
 
   /// The default database of the app's project id; throws an [ArgumentError] without one.
   static RepoInfo _defaultDatabase(FirebaseApp app) {
@@ -830,7 +994,7 @@ final class _Target {
 
   /// The value of [parse], with a [FormatException] turned into an [ArgumentError] on [name]. The
   /// message never quotes the URL, which can hold a credential by mistake.
-  static RepoInfo _argument(String name, RepoInfo Function() parse) {
+  static T _argument<T>(String name, T Function() parse) {
     try {
       return parse();
     } on FormatException catch (e) {
