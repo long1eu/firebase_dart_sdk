@@ -5,9 +5,9 @@
   Dart streams. It is not affiliated with or supported by Google or Firebase.
 - It covers reads and writes, listeners, queries, transactions, `onDisconnect`, server values and the connection
   state. An optional disk cache is in `firebase_database_dart_sqlite`.
-- Where it ran. Dart VM: macOS (2,639 tests of the client, 60 of them skipped; 29 tests against the Database emulator
+- Where it ran. Dart VM: macOS (2,645 tests of the client, 60 of them skipped; 29 tests against the Database emulator
   v4.11.2), Linux x64 in a Debian 13 container and Windows 11 x64 (both at an earlier commit). Web: Chrome on macOS, the
-  whole test tree, 2,578 tests with dart2js and 2,582 with dart2wasm. Not run: a release build of a desktop app, Safari,
+  whole test tree, 2,584 tests with dart2js and 2,588 with dart2wasm. Not run: a release build of a desktop app, Safari,
   Firefox and a real display.
 - Verified against production. The verification kit has 41 checks. Checks 1 to 39 ran once as one run against a
   dedicated database instance of one Firebase project, on 2026-11-25 and 26, on the client at an earlier commit, and all

@@ -1066,8 +1066,8 @@ earlier commit.
 
 | Where | Result | Whose run |
 |---|---|---|
-| Dart VM | 2,639 tests of the client, 60 skipped (2026-11-27, Dart 3.12.2) | the other session |
-| Chrome, the whole test tree | dart2js 2,578 tests, dart2wasm 2,582 tests (2026-11-27) | the other session |
+| Dart VM | 2,645 tests of the client, 60 skipped (2026-11-27, Dart 3.12.2) | the other session |
+| Chrome, the whole test tree | dart2js 2,584 tests, dart2wasm 2,588 tests (2026-11-27) | the other session |
 | SQLite package | 287 tests on Dart 3.12.2 (2026-11-27, the other session); 247 on Dart 3.11.5 and on Dart 3.8.0 at an earlier commit | lead |
 | Adapter | 328 tests, 5 skipped without the emulator (2026-11-27, Flutter 3.44.9); 141 with it, at an earlier commit | the other session |
 | FlutterFire's own `firebase_database` integration suite through the adapter | 76 pass, 1 skips itself (macOS host test runner, emulator) | lead |

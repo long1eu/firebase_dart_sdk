@@ -15,7 +15,7 @@ opt-in through `FirebaseDatabaseDart.use()`. It is not affiliated with or endors
 
 > **Status: 0.0.1, not published, work in progress.** What is and is not verified:
 >
-> - The client underneath, `firebase_database_dart`, passes its own suites (2,639 tests on the Dart VM) and its tests
+> - The client underneath, `firebase_database_dart`, passes its own suites (2,645 tests on the Dart VM) and its tests
 >   against the Database emulator.
 > - This package has 328 tests, 5 of them skipped without the emulator (another session's run, 2026-11-27). The unit
 >   tests run against the client's fake server (`package:firebase_database_dart/testing.dart`).
