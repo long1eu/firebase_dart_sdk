@@ -572,6 +572,7 @@ Future<(HarnessRun, CleanupLedger, _Codes)> _newRun(
   List<String> codes, {
   bool githubAccountExists = false,
   bool phone = true,
+  bool askForCode = false,
 }) async {
   final FirebaseApp app = await Firebase.initializeApp(
     name: 'harness${_apps++}',
@@ -594,7 +595,11 @@ Future<(HarnessRun, CleanupLedger, _Codes)> _newRun(
     log: (_) {},
     githubAccountExists: githubAccountExists,
     phoneNumber: phone ? _testPhone : null,
-    phoneCode: phone ? smsCode : null,
+    phoneCode: !phone
+        ? null
+        : askForCode
+        ? askForPhoneCode
+        : smsCode,
     proof: _proof,
   );
   return (run, ledger, source);
@@ -799,6 +804,19 @@ void _phoneTests() {
     final StepResult result = await run.runStep(HarnessStep.phone);
     expect(result.status, StepStatus.skip);
     expect(_backend.phones[_Project.uid], '+15555550199');
+  });
+
+  test('with the code "ask", every SMS code is asked for', () async {
+    final (HarnessRun run, CleanupLedger ledger, _Codes codes) = await _newRun(
+      <String>[smsCode, smsCode, smsCode],
+      askForCode: true,
+    );
+    final StepResult result = await run.runStep(HarnessStep.phone);
+    expect(result.status, StepStatus.pass, reason: result.line());
+    expect(codes.prompts, hasLength(3));
+    expect(codes.prompts.first, contains('the link'));
+    expect(codes.prompts.last, contains('the reauthentication'));
+    expect(ledger.pending, isEmpty);
   });
 
   test('sms enrols, signs in through the resolver and unenrols', () async {

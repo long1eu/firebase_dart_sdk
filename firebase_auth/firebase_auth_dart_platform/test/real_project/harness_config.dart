@@ -57,9 +57,13 @@ const String googleLoginHintVariable = 'AUTH_HARNESS_GOOGLE_LOGIN_HINT';
 /// steps. Never printed in full.
 const String phoneNumberVariable = 'AUTH_HARNESS_PHONE_NUMBER';
 
-/// The verification code the console set for [phoneNumberVariable]. Never
-/// printed.
+/// The verification code the console set for [phoneNumberVariable], or
+/// [askForPhoneCode]. Never printed.
 const String phoneCodeVariable = 'AUTH_HARNESS_PHONE_CODE';
+
+/// The value of [phoneCodeVariable] for a real phone number: every SMS is
+/// really sent, and its code is typed into the code page.
+const String askForPhoneCode = 'ask';
 
 const List<String> _firebaseVariables = <String>[
   'FIREBASE_API_KEY',
