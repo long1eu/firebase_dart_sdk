@@ -205,7 +205,8 @@ void validateFirebaseMergePaths(String errorPrefix, List<Path> mergePaths) {
   }
 }
 
-/// Validates the argument of `update` at [path].
+/// Validates the argument of `update` at [path]. A key that parses to the empty path (`''`, or only
+/// slashes such as `'/'` and `'//'`) is refused: it would name [path] itself.
 void validateFirebaseMergeDataArg(
   String fnName,
   Object? data,
@@ -233,6 +234,12 @@ void validateFirebaseMergeDataArg(
       );
     }
     final Path curPath = Path(key);
+    if (curPath.isEmpty) {
+      throw ArgumentError(
+        '${errorPrefix}contains the key "$key", which names the location itself, not a child '
+        'below it. Use set() to replace the location, or name the children to write.',
+      );
+    }
     validateFirebaseData(
       errorPrefix,
       entry.value,

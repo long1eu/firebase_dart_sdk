@@ -63,7 +63,9 @@ final class OnDisconnect {
   }
 
   /// On disconnect, writes each entry of [values] below the location, leaving other children alone. Keys
-  /// may be multi-segment paths (`'a/b'`).
+  /// may be multi-segment paths (`'a/b'`). A key that names the location itself (`''`, `'/'` or any
+  /// string of only slashes) throws an [ArgumentError] that names the key, and nothing is
+  /// registered; use [set] to replace the location on disconnect.
   ///
   /// An empty [values] map registers nothing and completes the Future in a microtask, with no
   /// request.
