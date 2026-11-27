@@ -92,17 +92,38 @@ RepoInfo parseDatabaseUrl(String url) {
 
 /// The namespace [url] names, read as for an emulator instance: the `ns` parameter (lowercased
 /// and checked as in [parseDatabaseUrl]), else the first label of a `firebaseio.com` /
-/// `firebasedatabase.app` host, else null. Scheme, host and port are not checked. Throws
-/// [FormatException] for text that is not a URL and for a bad query; the message never quotes
-/// the URL.
+/// `firebasedatabase.app` host, else null. A text without a scheme is read as `https`.
+///
+/// Throws [FormatException] for text that `Uri` cannot parse, a scheme other than `http`,
+/// `https`, `ws` and `wss`, user info, a fragment, a missing or invalid host (a DNS name or an IP
+/// literal), and a query that [parseDatabaseUrl] refuses. The port is not checked. The message
+/// never quotes the URL.
 String? namespaceOfUrl(String url) {
   final String text = _schemePrefix.hasMatch(url) ? url : 'https://$url';
   final Uri? uri = Uri.tryParse(text);
   if (uri == null) {
     throw const FormatException('Not a valid database URL');
   }
-  return _namespaceParameter(uri) ?? _namespaceOfHost(uri.host.toLowerCase());
+  if (!_emulatorSchemes.contains(uri.scheme.toLowerCase())) {
+    throw const FormatException(
+      'Database URL scheme must be http, https, ws or wss',
+    );
+  }
+  if (uri.userInfo.isNotEmpty) {
+    throw const FormatException('Database URL must not have user info');
+  }
+  if (uri.hasFragment) {
+    throw const FormatException('Database URL must not have a fragment');
+  }
+  final String host = _unbracket(uri.host).toLowerCase();
+  final String? problem = _hostProblem(host, anyIp: true);
+  if (problem != null) {
+    throw FormatException('Database URL: $problem');
+  }
+  return _namespaceParameter(uri) ?? _namespaceOfHost(host);
 }
+
+const Set<String> _emulatorSchemes = <String>{'http', 'https', 'ws', 'wss'};
 
 /// The [RepoInfo] of the default database of [projectId]:
 /// `<projectId>-default-rtdb.firebaseio.com`, namespace `<projectId>-default-rtdb` (1.1,

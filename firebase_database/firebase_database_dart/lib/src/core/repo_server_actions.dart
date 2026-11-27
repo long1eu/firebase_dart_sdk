@@ -18,33 +18,38 @@ extension _RepoServerActions on Repo {
     final Path path = Path(wirePath);
     _log(DatabaseLogLevel.debug, 'onDataUpdate: $path');
     _dataUpdateCount++;
-    final List<Event> events;
+    // Read first, then apply, so the log line can say which failed. Each logs the error's type
+    // and a fixed reason only: the error's text can quote the data (Android logs both as an
+    // internal error).
+    final Map<Path, Node>? children;
+    final Node? node;
     try {
-      if (tag != null) {
-        if (isMerge) {
-          events = _serverSyncTree.applyTaggedQueryMerge(
-            path,
-            _changedChildren(data),
-            Tag(tag),
-          );
-        } else {
-          events = _serverSyncTree.applyTaggedQueryOverwrite(
-            path,
-            nodeFromJson(data),
-            Tag(tag),
-          );
-        }
-      } else if (isMerge) {
-        events = _serverSyncTree.applyServerMerge(path, _changedChildren(data));
-      } else {
-        events = _serverSyncTree.applyServerOverwrite(path, nodeFromJson(data));
-      }
+      children = isMerge ? _changedChildren(data) : null;
+      node = isMerge ? null : nodeFromJson(data);
     } on Object catch (e) {
-      // The server sent data the client cannot read; Android logs it as an internal error. The
-      // error's text can quote that data, so only its type is logged.
       _log(
         DatabaseLogLevel.error,
-        'FIREBASE INTERNAL ERROR at $path: ${e.runtimeType}',
+        'FIREBASE INTERNAL ERROR at $path: the server sent data the client cannot read '
+        '(${e.runtimeType})',
+      );
+      return;
+    }
+    final List<Event> events;
+    try {
+      if (children != null) {
+        events = tag == null
+            ? _serverSyncTree.applyServerMerge(path, children)
+            : _serverSyncTree.applyTaggedQueryMerge(path, children, Tag(tag));
+      } else {
+        events = tag == null
+            ? _serverSyncTree.applyServerOverwrite(path, node!)
+            : _serverSyncTree.applyTaggedQueryOverwrite(path, node!, Tag(tag));
+      }
+    } on Object catch (e) {
+      _log(
+        DatabaseLogLevel.error,
+        'FIREBASE INTERNAL ERROR at $path: applying server data failed, in the local cache '
+        'or the client (${e.runtimeType})',
       );
       return;
     }
@@ -154,7 +159,11 @@ extension _RepoServerActions on Repo {
       _infoData.updateSnapshot(path, node);
       _post(_infoSyncTree.applyServerOverwrite(path, node));
     } on Object catch (e) {
-      _log(DatabaseLogLevel.error, 'Failed to parse info update: $e');
+      // The type only, as every other parse failure (the values are the client's own).
+      _log(
+        DatabaseLogLevel.error,
+        'Failed to parse info update for $key: ${e.runtimeType}',
+      );
     }
   }
 }

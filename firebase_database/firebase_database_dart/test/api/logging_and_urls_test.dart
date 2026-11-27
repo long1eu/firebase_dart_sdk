@@ -128,14 +128,24 @@ void main() {
     });
   });
 
-  // Mutation D: in core/repo_server_actions.dart `onDataUpdate`, log `$e` in place of
-  // `${e.runtimeType}`.
+  // Mutation D: in core/repo_server_actions.dart `onDataUpdate`, log `($e)` in place of
+  // `(${e.runtimeType})` after "cannot read".
   group('data the client cannot read is logged by error type', () {
-    // A bool priority is invalid: nodeFromJson throws an ArgumentError that quotes it.
+    // A bool priority is invalid: nodeFromJson throws an ArgumentError whose text is
+    // "Invalid argument (priority): Invalid priority type found: bool: true". The old lines
+    // printed that text; the checks below look for it.
     const Map<String, Object?> unreadable = <String, Object?>{
       '.value': 'secret-value',
       '.priority': true,
     };
+
+    void expectNoErrorText(List<String> messages) {
+      for (final String message in messages) {
+        expect(message, isNot(contains('Invalid priority')), reason: message);
+        expect(message, isNot(contains('bool: true')), reason: message);
+        expect(message, isNot(contains('secret-value')), reason: message);
+      }
+    }
 
     timed('in a get answer', (FakeTime time) {
       final _Wire w = _Wire(time);
@@ -147,9 +157,7 @@ void main() {
           'ArgumentError',
         ),
       );
-      for (final String message in w.messages) {
-        expect(message, isNot(contains('secret-value')), reason: message);
-      }
+      expectNoErrorText(w.messages);
     });
 
     timed('in a data push', (FakeTime time) {
@@ -159,11 +167,12 @@ void main() {
       time.elapse(Duration.zero);
       expect(
         w.messages,
-        contains('error: FIREBASE INTERNAL ERROR at /a: ArgumentError'),
+        contains(
+          'error: FIREBASE INTERNAL ERROR at /a: the server sent data the '
+          'client cannot read (ArgumentError)',
+        ),
       );
-      for (final String message in w.messages) {
-        expect(message, isNot(contains('secret-value')), reason: message);
-      }
+      expectNoErrorText(w.messages);
     });
   });
 
@@ -275,7 +284,66 @@ void main() {
       );
     });
 
-    test('no error quotes user info, the URL or its path', () {
+    test('a path ref() refuses is quoted as ref() quotes it, nothing else', () {
+      final FirebaseDatabase db = FirebaseDatabase(newTestApp());
+      final FirebaseDatabase emulator = FirebaseDatabase(
+        newTestApp(),
+        emulatorHost: '127.0.0.1:9000',
+      );
+      final Matcher pathOnly = throwsA(
+        isA<ArgumentError>().having(
+          (ArgumentError e) => e.toString(),
+          'text',
+          allOf(<Matcher>[
+            contains('"private-path/a\$b"'),
+            isNot(contains('://')),
+            isNot(contains('firebaseio.com')),
+            isNot(contains('127.0.0.1')),
+            isNot(contains('ns=')),
+          ]),
+        ),
+      );
+      expect(
+        () => db.refFromUrl(
+          'https://test-project-default-rtdb.firebaseio.com/private-path/a%24b'
+          '?ns=test-project-default-rtdb',
+        ),
+        pathOnly,
+      );
+      expect(
+        () => emulator.refFromUrl(
+          'http://127.0.0.1:9000/private-path/a%24b?ns=test-project-default-rtdb',
+        ),
+        pathOnly,
+      );
+    });
+
+    test('on the emulator, a URL that is not a database URL is refused', () {
+      final FirebaseDatabase db = FirebaseDatabase(
+        newTestApp(),
+        emulatorHost: '127.0.0.1:9000',
+      );
+      for (final String url in <String>[
+        'http://user:secret@localhost:9000/c',
+        'ftp://evil.example/c',
+        'not a url/c',
+        '',
+        'http://loc%ZZalhost:9000/c',
+        'https://Bad_Label.firebaseio.com/c',
+        'javascript:alert(1)/c',
+        'http://localhost:9000/c?ns=',
+        'http://localhost:9000/c?ns=test-project-default-rtdb&v=5',
+        'http://localhost:9000/c#top',
+      ]) {
+        expect(
+          () => db.refFromUrl(url),
+          argumentErrorWithout(<String>['secret', 'evil', 'top']),
+          reason: url,
+        );
+      }
+    });
+
+    test('no error quotes user info, the query or the whole URL', () {
       final FirebaseDatabase db = FirebaseDatabase(newTestApp());
       final FirebaseDatabase emulator = FirebaseDatabase(
         newTestApp(),

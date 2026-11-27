@@ -437,10 +437,14 @@ final class FirebaseDatabase {
   ///
   /// Outside an emulator the URL without its path must be accepted by the constructor's
   /// `databaseUrl` rules and name this database: its host, and its namespace (`?ns=` or the first
-  /// label of a `firebaseio.com` / `firebasedatabase.app` host). With an emulator the host is not
-  /// compared; a namespace the URL names (the same two ways) must be this database's. Anything
-  /// else throws an [ArgumentError], as does a path that is not valid percent-encoded UTF-8. No
-  /// message quotes the URL, its user info or its path.
+  /// label of a `firebaseio.com` / `firebasedatabase.app` host). With an emulator the host and
+  /// port are not compared, but the URL must still be `http`, `https`, `ws` or `wss` with a valid
+  /// host, no user info and no query key but `ns`, and a namespace it names (the same two ways)
+  /// must be this database's. Anything else throws an [ArgumentError], as does a path that is not
+  /// valid percent-encoded UTF-8 or that [ref] refuses.
+  ///
+  /// No message quotes the whole URL, its user info or its query. A message may name the URL's
+  /// host (another host) and, as [ref] does, a decoded path it refuses.
   DatabaseReference refFromUrl(String url) {
     final ({String root, String path}) parts = _splitPath(url);
     final RepoInfo here = _target.info;
@@ -454,16 +458,18 @@ final class FirebaseDatabase {
       );
       if (info.host != here.host) {
         throw ArgumentError(
-          'refFromURL: Host name does not match the current database: '
-          '(found ${info.host} but expected ${here.host})',
+          'refFromUrl: Host name does not match the current database: '
+              '(found ${info.host} but expected ${here.host})',
+          'url',
         );
       }
       namespace = info.namespace;
     }
     if (namespace != null && namespace != here.namespace) {
+      // The URL's ns is not quoted: it is a query value.
       throw ArgumentError(
-        'refFromURL: the URL names another database (its ns) than this one, '
-            '${here.namespace}.',
+        'refFromUrl: The URL names another database than this one '
+            '(this namespace is ${here.namespace})',
         'url',
       );
     }

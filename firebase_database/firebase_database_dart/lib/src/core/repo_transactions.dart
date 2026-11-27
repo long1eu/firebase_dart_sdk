@@ -172,22 +172,25 @@ extension _RepoTransactions on Repo {
   }
 
   /// Runs the update function on a fresh mutable copy of [current] (without priority, JS
-  /// `val()`); a throw aborts with `user_code_exception` (Android `DatabaseError.fromException`).
+  /// `val()`); a throw aborts with `user_code_exception` (Android `DatabaseError.fromException`),
+  /// the thrown object and its stack trace as the error's cause.
   (TransactionOutcome, DatabaseError?) _runUpdate(
     TransactionData transaction,
     Node current,
   ) {
     try {
       return (transaction.update(current.toJson()), null);
-    } on Object catch (e) {
-      // The type only, as in the error's details: the text may quote the value it was given.
+    } on Object catch (e, stackTrace) {
+      // The log line has the type only: the text may quote the value the handler was given. The
+      // exception and its stack trace stay on the error, for the caller.
       _log(DatabaseLogLevel.error, 'Caught Throwable. ${e.runtimeType}');
       return (
         TransactionOutcome.abort,
-        DatabaseError(
+        DatabaseError.local(
           DatabaseErrorCode.userCodeException,
           'The transaction update function threw an exception.',
-          details: e.runtimeType.toString(),
+          cause: e,
+          causeStackTrace: stackTrace,
         ),
       );
     }
