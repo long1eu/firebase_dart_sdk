@@ -58,14 +58,21 @@ final class FirebaseDatabase {
   ///
   /// [databaseUrl] defaults to the app's `databaseURL`, then to
   /// `https://<projectId>-default-rtdb.firebaseio.com`; with neither and no project id it throws an
-  /// [ArgumentError]. The URL must be the root of a database over TLS (`https://` or `wss://`): a
-  /// plain `http://` URL, a path, user info, a port other than 443 on a host that is not loopback,
-  /// a custom domain without `?ns=` and an invalid namespace each throw an [ArgumentError] here,
-  /// with or without [persistence]. The message does not quote the URL.
+  /// [ArgumentError]. Without [emulatorHost], the URL must be the root of a database over TLS
+  /// (`https://` or `wss://`): a plain `http://` URL, a path, user info, a port other than 443 on a
+  /// host that is not loopback, a custom domain without `?ns=` and an invalid namespace each throw
+  /// an [ArgumentError] here, with or without [persistence]. The message does not quote the URL.
   ///
   /// [emulatorHost] (`'host:port'` or `'[ipv6]:port'`) connects to the Database emulator over plain
-  /// WebSocket (over TLS for a `*.cloudworkstations.dev` host), with the database URL's namespace
-  /// (by default `<projectId>-default-rtdb`); the URL's scheme and host are not used then. See
+  /// WebSocket (over TLS for a `*.cloudworkstations.dev` host). The database URL then gives only
+  /// the namespace, and its scheme (`http`, `https`, `ws` or `wss`), host and port are not used:
+  /// `http://10.0.2.2:9000?ns=demo` and `http://my-mac.local:9000?ns=demo` both mean namespace
+  /// `demo`. Without `?ns=` the namespace is the one the emulator picks for that host: the first
+  /// label of a name (`http://my-mac.local:9000` gives `my-mac`), and `fake-server` for
+  /// `localhost:9000` or an IP address. `fake-server` is not the project's default database
+  /// `<projectId>-default-rtdb`, the only one where the emulator applies the rules file; give
+  /// `?ns=`, or no URL at all, to use that one. User info, a path, a fragment, a query key other
+  /// than `ns` and an invalid namespace still throw an [ArgumentError]. See
   /// [emulatorHostFromEnvironment]. [mockUserToken] is sent to the emulator as it is: build a
   /// user's token with `mockUserTokenFor`. A string that is not such a token (the literal `'owner'`
   /// included) is an admin credential for the emulator and bypasses the rules. Passing it without
@@ -415,9 +422,11 @@ final class FirebaseDatabase {
   /// The URL of the database, normalised: `https://<host>` with the host in lowercase and without
   /// the default port, followed by `?ns=<namespace>` when the host does not name the namespace (a
   /// custom domain, or a `?ns=` that differs from the first host label). With an emulator it is
-  /// `http://<emulatorHost>?ns=<namespace>` (`https` for `*.cloudworkstations.dev`). Every spelling
-  /// of one database gives the same value, two databases never share one, and it keys the persisted
-  /// cache (pass it to `clearSqlitePersistence`).
+  /// `http://<emulatorHost>?ns=<namespace>` (`https` for `*.cloudworkstations.dev`), whatever host
+  /// the constructor's `databaseUrl` argument names: with `emulatorHost: '10.0.2.2:9000'`,
+  /// `databaseUrl: 'http://localhost:9000?ns=demo'` gives `http://10.0.2.2:9000?ns=demo`. Every
+  /// spelling of one database gives the same value, two databases never share one, and it keys the
+  /// persisted cache (pass it to `clearSqlitePersistence`).
   Uri get databaseUrl => _target.databaseUrl;
 
   /// The reference at [path]. `''`, `'a/b'` and `'/a/b'` are accepted and empty segments are
@@ -792,10 +801,9 @@ final class _Target {
     );
   }
 
-  /// The target of the emulator at [emulatorHost], with the namespace of [url] or of the project's
-  /// default database. [url] follows the rules of a production URL (`parseDatabaseUrl`), except that
-  /// `http://` and `ws://` are accepted too, so an emulator URL such as
-  /// `http://127.0.0.1:9000?ns=<name>` works.
+  /// The target of the emulator at [emulatorHost], with the namespace of [url]
+  /// (`emulatorUrlNamespace`: its `?ns=`, else the emulator's own rule for its host) or, without
+  /// [url], of the project's default database. The host and port of [url] are not used.
   factory _Target._emulator(FirebaseApp app, String? url, String emulatorHost) {
     if (emulatorHost.isEmpty) {
       throw ArgumentError.value(
@@ -808,14 +816,11 @@ final class _Target {
     if (url == null || url.isEmpty) {
       namespace = _defaultDatabase(app).namespace;
     } else {
-      final String secureUrl = url.replaceFirstMapped(
-        RegExp('^(http|ws)://', caseSensitive: false),
-        (Match m) => 'https://',
-      );
-      namespace = _argument(
-        'databaseUrl',
-        () => parseDatabaseUrl(secureUrl),
-      ).namespace;
+      try {
+        namespace = emulatorUrlNamespace(url);
+      } on FormatException catch (e) {
+        throw ArgumentError(e.message, 'databaseUrl');
+      }
     }
     final RepoInfo info = _argument('emulatorHost', () {
       final ({String host, int port}) address = parseEmulatorHost(emulatorHost);

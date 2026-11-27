@@ -37,6 +37,9 @@ const String _cloudWorkstationSuffix = '.cloudworkstations.dev';
 const String _defaultNamespaceSuffix = '-default-rtdb';
 const int _httpsPort = 443;
 
+/// The namespace the Database emulator uses when a request names none it can read.
+const String _emulatorFallbackNamespace = 'fake-server';
+
 /// Parses [url] as a production database URL (2.1, threat model T6) into a [RepoInfo] with
 /// `secure` true and `isUsingEmulator` false.
 ///
@@ -86,6 +89,49 @@ RepoInfo parseDatabaseUrl(String url) {
     namespace: namespace,
     secure: true,
   );
+}
+
+/// The namespace a database URL names when the client talks to an emulator (2.4); the URL's
+/// host and port are not used to connect.
+///
+/// Accepts `http`, `https`, `ws` and `wss` (and a bare host), any valid host name or IP address
+/// and any port. The namespace is the `ns` parameter, lowercased; without one it is what the
+/// Database emulator picks from a request's Host header (`EmulatorDecoder.parseSubdomain`,
+/// emulator 4.11.2): the first dot-separated label of `host[:port]` when it is a valid
+/// namespace name and, for four or more labels, not a number; else `fake-server`. So
+/// `my-mac.local:9000` gives `my-mac`, and `localhost:9000` and any IP address give
+/// `fake-server`. Throws [FormatException] for user info, a fragment, a non-root path, any query
+/// key but `ns`, an invalid `ns`, another scheme, or an invalid host or port.
+String emulatorUrlNamespace(String url) {
+  final Uri uri = _parseUrl(url);
+  const List<String> schemes = <String>['http', 'https', 'ws', 'wss'];
+  if (!schemes.contains(uri.scheme)) {
+    throw const FormatException(
+      'Database URL scheme must be http, https, ws or wss',
+    );
+  }
+  if (uri.hasFragment) {
+    throw const FormatException('Database URL must not have a fragment');
+  }
+  final String? namespaceParameter = _namespaceParameter(uri);
+  final String host = uri.host.toLowerCase();
+  final String? problem = _hostProblem(host, anyIp: true);
+  if (problem != null) {
+    throw FormatException('Database URL: $problem');
+  }
+  final int? port = uri.hasPort ? uri.port : null;
+  if (port != null) {
+    _checkPort(port);
+  }
+  if (namespaceParameter != null) {
+    return namespaceParameter;
+  }
+  final List<String> labels = joinHostPort(host, port).split('.');
+  final String first = labels.first;
+  final bool numeric = RegExp(r'^[0-9]+$').hasMatch(first);
+  return _namespacePattern.hasMatch(first) && (labels.length < 4 || !numeric)
+      ? first
+      : _emulatorFallbackNamespace;
 }
 
 /// The [RepoInfo] of the default database of [projectId]:
