@@ -347,12 +347,8 @@ final class FirebaseDatabase {
     }
   }
 
-  FirebaseDatabaseException _closedError() => exceptionFromDatabaseError(
-    const DatabaseError(
-      DatabaseErrorCode.databaseClosed,
-      'The FirebaseDatabase instance was closed.',
-    ),
-  );
+  FirebaseDatabaseException _closedError() =>
+      exceptionFromDatabaseError(DatabaseError.closed());
 
   Future<T> _request<T>(void Function(Repo repo, _Pending<T> pending) start) {
     if (_closed) {
