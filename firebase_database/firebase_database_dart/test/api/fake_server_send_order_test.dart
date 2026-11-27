@@ -1,6 +1,9 @@
-// The fakes answer writes in send order, as a server answers one connection's requests (emulator
-// probe item 4): answering a put, merge or onDisconnect request while one sent before it is
-// unanswered throws, unless the test passes `outOfOrder: true`. Listens and gets are not ordered.
+// The fakes make a test answer writes in the order they left: answering a put, merge or
+// onDisconnect request while one sent before it is unanswered throws, unless the test passes
+// `outOfOrder: true`. After a reconnect puts and merges leave before the onDisconnect requests
+// made offline, as `PersistentConnection._replay` sends them. That the server answers writes in
+// send order is inferred from `rtdb_emulator_probe.md` addendum 2 item 4 (listens and gets
+// answered in order; no write measured). The fakes do not check the order of listens and gets.
 
 import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
 import 'package:firebase_database_dart/src/testing/fake_server_actions.dart';
@@ -74,7 +77,9 @@ void main() {
       expect(h.log, <String>['O:ok', 'W:ok']);
     });
 
-    scenario('a listen may be answered after a later write', (Harness h) {
+    scenario('the order of a listen against a later write is not checked', (
+      Harness h,
+    ) {
       h.listen('S', h.ref('a').onValue);
       h.settle();
       h.track('W', h.ref('b').set(2));
@@ -85,6 +90,43 @@ void main() {
       h.settle();
       expect(h.log, <String>['W:ok', 'S:V(1)']);
     });
+
+    scenario(
+      'after a reconnect a set made offline leaves before an onDisconnect made offline',
+      (Harness h) {
+        h.goDown();
+        h.track('O', h.ref('a').onDisconnect.set(0));
+        h.track('W', h.ref('b').set(2));
+        h.reconnect();
+        final List<String> writes = <String>[
+          for (final String r in h.server.requests)
+            if (r.startsWith('p') || r.startsWith('o')) r,
+        ];
+        expect(writes, <String>['p /b', 'o /a']);
+        expect(h.server.ackNextOnDisconnect, outOfOrderError('o /a', 'p /b'));
+        h.server.ackNextWrite();
+        h.server.ackNextOnDisconnect();
+        h.settle();
+        expect(h.log, <String>['W:ok', 'O:ok']);
+      },
+    );
+
+    scenario(
+      'a write resent after a drop is answered before the writes made offline',
+      (Harness h) {
+        h.track('X', h.ref('x').set(1));
+        h.settle();
+        h.goDown();
+        h.track('O', h.ref('a').onDisconnect.set(0));
+        h.track('Y', h.ref('y').set(2));
+        h.reconnect();
+        h.server.ackNextWrite();
+        h.server.ackNextWrite();
+        h.server.ackNextOnDisconnect();
+        h.settle();
+        expect(h.log, <String>['X:ok', 'Y:ok', 'O:ok']);
+      },
+    );
   });
 
   group('FakeServerActions', () {
@@ -125,6 +167,65 @@ void main() {
         ..put('/b', 2, onComplete: (String s, Object? _) => done.add('b:$s'))
         ..failLastWrite('permission_denied', outOfOrder: true);
       expect(done, <String>['b:permission_denied']);
+    });
+
+    test('connect replays puts before onDisconnect requests made offline', () {
+      final List<String> done = <String>[];
+      server
+        ..disconnect()
+        ..onDisconnectPut(
+          '/a',
+          0,
+          onComplete: (String s, Object? _) => done.add('a:$s'),
+        )
+        ..put('/b', 2, onComplete: (String s, Object? _) => done.add('b:$s'));
+      expect(
+        server.ackNextOnDisconnect,
+        throwsA(
+          isA<StateError>().having(
+            (StateError e) => e.message,
+            'message',
+            contains('No sent, unanswered request'),
+          ),
+        ),
+      );
+      server.connect();
+      expect(
+        server.ackNextOnDisconnect,
+        throwsA(
+          isA<StateError>().having(
+            (StateError e) => e.message,
+            'message',
+            allOf(
+              contains('ackNextOnDisconnect answers'),
+              contains('onDisconnectPut /a'),
+              contains('put /b'),
+            ),
+          ),
+        ),
+      );
+      server
+        ..ackNextWrite()
+        ..ackNextOnDisconnect();
+      expect(done, <String>['b:ok', 'a:ok']);
+    });
+
+    test('a write made offline cannot be answered before connect', () {
+      server
+        ..disconnect()
+        ..put('/a', 1);
+      expect(
+        () => server.respond(server.callsOf('put').single),
+        throwsA(
+          isA<StateError>().having(
+            (StateError e) => e.message,
+            'message',
+            contains(
+              'respond answers ServerCall(put /a) (call 0), which was not sent',
+            ),
+          ),
+        ),
+      );
     });
 
     test('disconnect answers a sent transaction put behind a plain put', () {

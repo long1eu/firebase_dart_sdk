@@ -27,12 +27,19 @@ import 'package:meta/meta.dart';
 /// after the listens are sent again; a dropped connection is retried after the database's reconnect delay
 /// for as long as [acceptConnections] is false.
 ///
-/// Writes are answered in the order they were sent, as a server answers one connection's
-/// requests: a put, merge or onDisconnect request answered while one sent before it is still
-/// unanswered throws a [StateError] naming both. [ackNextWrite], [failNextWrite] and
-/// [ackNextOnDisconnect] answer the oldest one; the `*Last*` helpers answer the newest and take
-/// `outOfOrder: true` for a test that models something a server does not do. Listens and gets
-/// may be answered in any order.
+/// The test must answer writes in the order they left: answering a put, merge or onDisconnect
+/// request while one sent before it on the same connection is unanswered throws a [StateError]
+/// naming both. A request made while connected leaves at once; after a reconnect the unanswered
+/// puts and merges leave first, then the onDisconnect requests made while offline, as the real
+/// connection replays them. [ackNextWrite], [failNextWrite] and [ackNextOnDisconnect] answer the
+/// oldest request of their kind, and throw when an older request of the other kind is
+/// unanswered; the `*Last*` helpers answer the newest of their kind and take `outOfOrder: true`
+/// for a test that models something a server does not do.
+///
+/// That the server answers writes in send order is inferred from the emulator probe
+/// (`rtdb_emulator_probe.md`, addendum 2 item 4): a pipelined `auth`, listen, get, `unauth`, get
+/// was answered in order; no write was in that burst. Listens and gets were answered in order
+/// there too; this fake does not check their order.
 ///
 /// ```dart
 /// fakeAsync((FakeAsync async) {
@@ -201,16 +208,18 @@ final class FakeDatabaseServer {
   /// A transaction put whose hash does not match the server's current data at its path is answered
   /// `datastale` instead, with nothing pushed.
   ///
-  /// Throws a [StateError] when a write or onDisconnect request sent before it is unanswered: a
-  /// server answers in send order (use [ackNextWrite]). [outOfOrder] true skips that check, for a
-  /// test that models something else; give the reason next to it.
+  /// Throws a [StateError] when a write or onDisconnect request sent before it is unanswered (use
+  /// [ackNextWrite]). [outOfOrder] true skips that check, for a test that models something a
+  /// server does not do; give the reason next to it.
   void ackLastWrite({bool outOfOrder = false}) => _ackWrite(
     _lastSentWrite(onDisconnect: false),
     'ackLastWrite',
     outOfOrder: outOfOrder,
   );
 
-  /// Acknowledges the oldest unanswered write (put or merge), as [ackLastWrite] does.
+  /// Acknowledges the oldest sent unanswered write (put or merge), as [ackLastWrite] does. Throws a
+  /// [StateError] when an onDisconnect request sent before it is unanswered, or when no write is
+  /// sent and unanswered.
   void ackNextWrite() =>
       _ackWrite(_nextSentWrite(onDisconnect: false), 'ackNextWrite');
 
@@ -268,7 +277,8 @@ final class FakeDatabaseServer {
     outOfOrder: outOfOrder,
   );
 
-  /// Refuses the oldest unanswered write with the wire [status], as [failLastWrite] does.
+  /// Refuses the oldest sent unanswered write with the wire [status], as [failLastWrite] does.
+  /// Throws as [ackNextWrite] does.
   void failNextWrite(String status) =>
       _failWrite(_nextSentWrite(onDisconnect: false), status, 'failNextWrite');
 
@@ -297,7 +307,8 @@ final class FakeDatabaseServer {
     outOfOrder: outOfOrder,
   );
 
-  /// Acknowledges the oldest unanswered onDisconnect request.
+  /// Acknowledges the oldest sent unanswered onDisconnect request. Throws a [StateError] when a
+  /// write sent before it is unanswered, or when no onDisconnect request is sent and unanswered.
   void ackNextOnDisconnect() => _ackOnDisconnect(
     _nextSentWrite(onDisconnect: true),
     'ackNextOnDisconnect',
@@ -374,8 +385,8 @@ final class FakeDatabaseServer {
 
   List<_Write> _sentWrites({required bool onDisconnect}) {
     final List<_Write> sent = <_Write>[
-      for (final _Write write in _conn._writes)
-        if (write.wire != null && write.isOnDisconnect == onDisconnect) write,
+      for (final _Write write in _conn._sentPending)
+        if (write.isOnDisconnect == onDisconnect) write,
     ];
     if (sent.isEmpty) {
       throw StateError(
@@ -390,19 +401,16 @@ final class FakeDatabaseServer {
   /// Throws when a write or onDisconnect request sent before [write] on this connection is
   /// unanswered.
   void _checkSendOrder(_Write write, String helper) {
-    for (final _Write earlier in _conn._writes) {
-      if (identical(earlier, write)) {
-        return;
-      }
-      if (earlier.wire != null) {
-        throw StateError(
-          '$helper answers ${_describeWrite(write)} while ${_describeWrite(earlier)}, sent '
-          'before it, is unanswered. A server answers writes in send order: answer the earlier '
-          'one first (ackNextWrite, failNextWrite, ackNextOnDisconnect), or pass '
-          'outOfOrder: true with a reason.',
-        );
-      }
+    final _Write earlier = _conn._sentPending.first;
+    if (identical(earlier, write)) {
+      return;
     }
+    throw StateError(
+      '$helper answers ${_describeWrite(write)} while ${_describeWrite(earlier)}, sent '
+      'before it, is unanswered. Writes are answered in the order they left: answer the '
+      'earlier one first (ackNextWrite, failNextWrite, ackNextOnDisconnect), or pass '
+      'outOfOrder: true with a reason.',
+    );
   }
 
   static String _describeWrite(_Write write) =>
@@ -594,6 +602,16 @@ final class _FakeConnection implements ServerActions {
 
   final Map<ListenSpec, _Listen> _listens = <ListenSpec, _Listen>{};
   final List<_Write> _writes = <_Write>[];
+
+  /// The writes in the order they left on the current connection; answered, purged and dropped
+  /// ones have no `wire` and are skipped by [_sentPending].
+  final List<_Write> _sendLog = <_Write>[];
+
+  /// The unanswered writes sent on the current connection, in the order they left.
+  List<_Write> get _sentPending => <_Write>[
+    for (final _Write write in _sendLog)
+      if (write.wire != null) write,
+  ];
   final List<_Get> _gets = <_Get>[];
   final Set<String> _interrupts = <String>{};
 
@@ -658,8 +676,17 @@ final class _FakeConnection implements ServerActions {
       for (final _Listen listen in _listens.values.toList()) {
         _sendListen(listen);
       }
+      // As PersistentConnection._replay: puts and merges, then onDisconnect requests.
+      _sendLog.clear();
       for (final _Write write in _writes.toList()) {
-        _sendWrite(write);
+        if (!write.isOnDisconnect) {
+          _sendWrite(write);
+        }
+      }
+      for (final _Write write in _writes.toList()) {
+        if (write.isOnDisconnect) {
+          _sendWrite(write);
+        }
       }
       for (final _Get get in _gets.toList()) {
         _sendGet(get);
@@ -811,6 +838,7 @@ final class _FakeConnection implements ServerActions {
     }
     call = _wire.calls.last;
     write.wire = call;
+    _sendLog.add(write);
   }
 
   void _sendGet(_Get get) {

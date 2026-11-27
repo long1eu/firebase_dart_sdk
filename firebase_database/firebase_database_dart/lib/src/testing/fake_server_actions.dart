@@ -85,9 +85,15 @@ final class ServerCall {
 /// requests with [respond], push data with [deliverDataUpdate] and [deliverRangeMerge], and drop
 /// or restore the connection with [disconnect] and [connect].
 ///
-/// Writes are answered in send order, as a server answers one connection's requests: answering a
-/// put, merge or onDisconnect request while one of those sent before it is still unanswered throws
-/// a [StateError] naming both, unless the call passes `outOfOrder: true` (see [respond]).
+/// Writes must be answered in the order they left: answering a put, merge or onDisconnect request
+/// while one sent before it is unanswered, or one that was never sent on the current connection,
+/// throws a [StateError], unless the call passes `outOfOrder: true` (see [respond]). The order is
+/// the one the real connection sends in: a request made while connected leaves at once, and
+/// [connect] replays the unanswered puts and merges first, then the onDisconnect requests, as
+/// `PersistentConnection._replay` does. That the server answers writes in that order is inferred
+/// from the emulator probe (`rtdb_emulator_probe.md`, addendum 2 item 4), which measured a
+/// pipelined `auth`, listen, get, `unauth`, get answered in order; it sent no write. Listens and
+/// gets were answered in order there too; this fake does not check their order.
 ///
 /// It follows the reconnect contract of [ServerActions]: on [disconnect], sent transaction puts
 /// (puts with a hash) are answered with [statusDisconnect] before the delegate hears of it; other
@@ -138,9 +144,15 @@ final class FakeServerActions implements ServerActions {
     'onDisconnectCancel',
   };
 
+  /// The writes in the order they left on the current connection; answered ones stay in it.
+  final List<ServerCall> _sendLog = <ServerCall>[];
+
   ServerCall _record(ServerCall call) {
     call._sent = isConnected;
     calls.add(call);
+    if (isConnected && _writeActions.contains(call.action)) {
+      _sendLog.add(call);
+    }
     return call;
   }
 
@@ -328,19 +340,33 @@ final class FakeServerActions implements ServerActions {
   /// Throws a [StateError] for a second answer to one call, except the one revoke of a listen
   /// answered `ok`.
   ///
-  /// Writes (put, merge, onDisconnectPut, onDisconnectMerge, onDisconnectCancel) are answered in
-  /// send order: a write answered while an earlier one is unanswered throws a [StateError] naming
-  /// both, because the server answers one connection's requests in the order they arrive (emulator
-  /// probe, `rtdb_emulator_probe.md` item 4). Pass [outOfOrder] true only for a test that models
-  /// something a server does not do, and say why next to it. Listens and gets are not ordered.
+  /// A write (put, merge, onDisconnectPut, onDisconnectMerge, onDisconnectCancel) must be the
+  /// oldest unanswered one sent on the current connection (see the class doc); otherwise this
+  /// throws a [StateError] naming both, or saying the write was never sent. Pass [outOfOrder] true
+  /// only for a test that models something a server does not do, and say why next to it. The
+  /// order of listens and gets is not checked.
   void respond(
     ServerCall call, {
     String status = statusOk,
     Object? data,
     bool outOfOrder = false,
+  }) => _respond(
+    call,
+    'respond',
+    status: status,
+    data: data,
+    outOfOrder: outOfOrder,
+  );
+
+  void _respond(
+    ServerCall call,
+    String helper, {
+    String status = statusOk,
+    Object? data,
+    bool outOfOrder = false,
   }) {
     if (!outOfOrder) {
-      _checkSendOrder(call, 'respond');
+      _checkSendOrder(call, helper);
     }
     final bool revoke =
         call._answered &&
@@ -454,15 +480,19 @@ final class FakeServerActions implements ServerActions {
   Object? dataAt(String path) =>
       _store.getChild(Path(path)).toJson(exportFormat: true);
 
-  /// Acknowledges the most recent unanswered put or merge (see [ackWrite]). With more than one
-  /// write unanswered this is out of order and throws, unless [outOfOrder] is true.
-  void ackLastWrite({bool outOfOrder = false}) => ackWrite(
-    _lastPending(const <String>{'put', 'merge'}),
+  /// Acknowledges the most recently sent unanswered put or merge (see [ackWrite]). With another
+  /// write or onDisconnect request sent before it unanswered this is out of order and throws,
+  /// unless [outOfOrder] is true.
+  void ackLastWrite({bool outOfOrder = false}) => _ackWrite(
+    _lastPending(_putOrMerge),
+    'ackLastWrite',
     outOfOrder: outOfOrder,
   );
 
-  /// Acknowledges the oldest unanswered put or merge (see [ackWrite]).
-  void ackNextWrite() => ackWrite(_nextPending(const <String>{'put', 'merge'}));
+  /// Acknowledges the oldest sent unanswered put or merge (see [ackWrite]). Throws a [StateError]
+  /// when an onDisconnect request sent before it is unanswered, or when no put or merge is sent
+  /// and unanswered.
+  void ackNextWrite() => _ackWrite(_nextPending(_putOrMerge), 'ackNextWrite');
 
   /// Acknowledges the put or merge [call] as the measured server does.
   ///
@@ -472,7 +502,10 @@ final class FakeServerActions implements ServerActions {
   /// stored and pushed once to each overlapping listen (a tagged listen gets the path data with
   /// its tag, unfiltered), and then the write is answered `ok`: the push comes before the ack.
   /// Ordered as in [respond].
-  void ackWrite(ServerCall call, {bool outOfOrder = false}) {
+  void ackWrite(ServerCall call, {bool outOfOrder = false}) =>
+      _ackWrite(call, 'ackWrite', outOfOrder: outOfOrder);
+
+  void _ackWrite(ServerCall call, String helper, {bool outOfOrder = false}) {
     if (call.action != 'put' && call.action != 'merge') {
       throw ArgumentError.value(call, 'call', 'Not a put or merge.');
     }
@@ -480,7 +513,7 @@ final class FakeServerActions implements ServerActions {
       throw StateError('$call was already answered.');
     }
     if (!outOfOrder) {
-      _checkSendOrder(call, 'ackWrite');
+      _checkSendOrder(call, helper);
     }
     final String writePath = normalizePath(call.path!);
     final String? hash = call.hash;
@@ -519,34 +552,45 @@ final class FakeServerActions implements ServerActions {
     respond(call, outOfOrder: true);
   }
 
-  /// Refuses the most recent unanswered put or merge with [status] (`permission_denied`,
-  /// `datastale`, ...) and the optional [reason]; pushes and stores nothing. With more than one
-  /// write unanswered this is out of order and throws, unless [outOfOrder] is true.
+  /// Refuses the most recently sent unanswered put or merge with [status] (`permission_denied`,
+  /// `datastale`, ...) and the optional [reason]; pushes and stores nothing. Ordered as
+  /// [ackLastWrite], with the same [outOfOrder].
   void failLastWrite(
     String status, {
     String? reason,
     bool outOfOrder = false,
-  }) => respond(
-    _lastPending(const <String>{'put', 'merge'}),
+  }) => _respond(
+    _lastPending(_putOrMerge),
+    'failLastWrite',
     status: status,
     data: reason,
     outOfOrder: outOfOrder,
   );
 
-  /// Refuses the oldest unanswered put or merge with [status] and the optional [reason], as
-  /// [failLastWrite] does.
-  void failNextWrite(String status, {String? reason}) => respond(
-    _nextPending(const <String>{'put', 'merge'}),
+  /// Refuses the oldest sent unanswered put or merge with [status] and the optional [reason].
+  /// Throws as [ackNextWrite] does.
+  void failNextWrite(String status, {String? reason}) => _respond(
+    _nextPending(_putOrMerge),
+    'failNextWrite',
     status: status,
     data: reason,
   );
 
-  /// Acknowledges the most recent unanswered onDisconnect request; ordered as in [respond].
-  void ackLastOnDisconnect({bool outOfOrder = false}) =>
-      respond(_lastPending(_onDisconnectActions), outOfOrder: outOfOrder);
+  /// Acknowledges the most recently sent unanswered onDisconnect request. Ordered as
+  /// [ackLastWrite], with the same [outOfOrder].
+  void ackLastOnDisconnect({bool outOfOrder = false}) => _respond(
+    _lastPending(_onDisconnectActions),
+    'ackLastOnDisconnect',
+    outOfOrder: outOfOrder,
+  );
 
-  /// Acknowledges the oldest unanswered onDisconnect request.
-  void ackNextOnDisconnect() => respond(_nextPending(_onDisconnectActions));
+  /// Acknowledges the oldest sent unanswered onDisconnect request. Throws a [StateError] when a
+  /// put or merge sent before it is unanswered, or when no onDisconnect request is sent and
+  /// unanswered.
+  void ackNextOnDisconnect() =>
+      _respond(_nextPending(_onDisconnectActions), 'ackNextOnDisconnect');
+
+  static const Set<String> _putOrMerge = <String>{'put', 'merge'};
 
   static const Set<String> _onDisconnectActions = <String>{
     'onDisconnectPut',
@@ -554,12 +598,19 @@ final class FakeServerActions implements ServerActions {
     'onDisconnectCancel',
   };
 
+  /// The unanswered writes sent on the current connection, in the order they left.
+  List<ServerCall> get _sentPending => <ServerCall>[
+    for (final ServerCall call in _sendLog)
+      if (!call._answered) call,
+  ];
+
   List<ServerCall> _pendingOf(Set<String> actions) {
-    final List<ServerCall> pending = pendingWrites
-        .where((ServerCall call) => actions.contains(call.action))
-        .toList();
+    final List<ServerCall> pending = <ServerCall>[
+      for (final ServerCall call in _sentPending)
+        if (actions.contains(call.action)) call,
+    ];
     if (pending.isEmpty) {
-      throw StateError('No unanswered request of $actions.');
+      throw StateError('No sent, unanswered request of $actions.');
     }
     return pending;
   }
@@ -568,20 +619,29 @@ final class FakeServerActions implements ServerActions {
 
   ServerCall _nextPending(Set<String> actions) => _pendingOf(actions).first;
 
-  /// Throws when [call] is a write and a write recorded before it is still unanswered.
+  /// Throws when [call] is a write that was not sent on the current connection, or a write sent
+  /// before it is still unanswered.
   void _checkSendOrder(ServerCall call, String helper) {
     if (!_writeActions.contains(call.action) || call._answered) {
       return;
     }
-    final ServerCall oldest = pendingWrites.first;
+    final List<ServerCall> sent = _sentPending;
+    if (!sent.contains(call)) {
+      throw StateError(
+        '$helper answers $call (call ${calls.indexOf(call)}), which was not sent on the '
+        'current connection: it was made while offline and connect() has not replayed it. '
+        'Call connect() first, or pass outOfOrder: true with a reason.',
+      );
+    }
+    final ServerCall oldest = sent.first;
     if (identical(oldest, call)) {
       return;
     }
     throw StateError(
       '$helper answers $call (call ${calls.indexOf(call)}) while $oldest '
-      '(call ${calls.indexOf(oldest)}), sent before it, is unanswered. A server '
-      'answers writes in send order: answer the earlier one first (ackNextWrite, '
-      'failNextWrite, ackNextOnDisconnect), or pass outOfOrder: true with a reason.',
+      '(call ${calls.indexOf(oldest)}), sent before it, is unanswered. Writes are answered '
+      'in the order they left: answer the earlier one first (ackNextWrite, failNextWrite, '
+      'ackNextOnDisconnect), or pass outOfOrder: true with a reason.',
     );
   }
 
@@ -647,13 +707,28 @@ final class FakeServerActions implements ServerActions {
       outer == '/' || inner == outer || inner.startsWith('$outer/');
 
   /// Reports the connection up (after the replay): every unanswered request counts as
-  /// [ServerCall.sent] from now on.
+  /// [ServerCall.sent] from now on. The unanswered puts and merges leave first, then the
+  /// onDisconnect requests, each in call order, as `PersistentConnection._replay` sends them.
   void connect() {
+    final bool wasConnected = isConnected;
     isConnected = true;
     for (final ServerCall call in calls) {
       if (!call._answered) {
         call._sent = true;
       }
+    }
+    if (!wasConnected) {
+      final List<ServerCall> pending = pendingWrites;
+      _sendLog
+        ..clear()
+        ..addAll(
+          pending.where((ServerCall c) => _putOrMerge.contains(c.action)),
+        )
+        ..addAll(
+          pending.where(
+            (ServerCall c) => _onDisconnectActions.contains(c.action),
+          ),
+        );
     }
     _delegate.onConnect();
   }
@@ -663,13 +738,14 @@ final class FakeServerActions implements ServerActions {
   /// handler that purges) is not answered again.
   void disconnect() {
     isConnected = false;
+    _sendLog.clear();
     for (final ServerCall call in pendingWrites) {
       if (call.answered) {
         continue;
       }
       if (call.action == 'put' && call.hash != null ||
           call.action.startsWith('onDisconnect') && call.sent) {
-        // A plain put sent earlier stays pending across the drop, so this is not in send order.
+        // The connection is gone, so the send order no longer applies.
         respond(call, status: statusDisconnect, outOfOrder: true);
       }
     }

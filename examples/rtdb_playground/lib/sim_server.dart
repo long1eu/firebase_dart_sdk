@@ -86,7 +86,9 @@ final class SimServer {
     }
     final List<String> fresh = requests.sublist(_seen);
     _seen = requests.length;
-    final List<_Intent> writes = <_Intent>[];
+    bool changed = false;
+    // The requests are in the order they left, so answering each write as it comes answers the
+    // oldest one, the order the fake requires.
     for (final String request in fresh) {
       final List<String> parts = request.split(' ');
       final String code = parts[0];
@@ -101,15 +103,9 @@ final class SimServer {
             fake.answerGet(path, _valueAt(path));
             log('answered get /$path');
           case 'p' || 'm':
-            final _Intent? intent = _take(code, path);
-            if (intent == null) {
-              fake.ackLastWrite();
-              log('acknowledged $code /$path (the page did not say its data)');
-            } else {
-              writes.add(intent);
-            }
+            changed = _answerWrite(code, path) || changed;
           case 'o' || 'om' || 'oc':
-            fake.ackLastOnDisconnect();
+            fake.ackNextOnDisconnect();
           case 'n':
             log('unlisten /$path');
           default:
@@ -119,7 +115,36 @@ final class SimServer {
         // The request was withdrawn before the answer, for example an unlisten.
       }
     }
-    _answerWrites(writes);
+    if (changed) {
+      onChange?.call();
+    }
+  }
+
+  /// Answers the oldest unanswered write, which is the [code] request at [path], and applies it to
+  /// [data] when the page said its data. Returns whether [data] changed.
+  bool _answerWrite(String code, String path) {
+    final _Intent? intent = _take(code, path);
+    if (rejectNext) {
+      rejectNext = false;
+      fake.failNextWrite('permission_denied');
+      log('refused $code /$path: permission_denied');
+      onReject?.call();
+      return false;
+    }
+    fake.ackNextWrite();
+    if (intent == null) {
+      log('acknowledged $code /$path (the page did not say its data)');
+      return false;
+    }
+    if (intent.action == 'set') {
+      _setAt(intent.path, intent.value);
+    } else {
+      (intent.value! as Map<String, Object?>).forEach((String key, Object? v) {
+        _setAt('${intent.path}/$key', v);
+      });
+    }
+    log('applied ${intent.action} /${intent.path}');
+    return true;
   }
 
   _Intent? _take(String code, String path) {
@@ -130,43 +155,6 @@ final class SimServer {
       }
     }
     return null;
-  }
-
-  /// The fake can only answer the most recent unanswered write, so a batch (the writes that waited
-  /// offline) is answered newest first, then the server's data is rebuilt in the order of the writes and
-  /// pushed, so listeners end on the right value.
-  void _answerWrites(List<_Intent> writes) {
-    if (writes.isEmpty) {
-      return;
-    }
-    final List<_Intent> accepted = <_Intent>[];
-    for (final _Intent write in writes.reversed) {
-      if (rejectNext) {
-        rejectNext = false;
-        fake.failLastWrite('permission_denied');
-        log('refused ${write.action} /${write.path}: permission_denied');
-        onReject?.call();
-      } else {
-        fake.ackLastWrite();
-        accepted.insert(0, write);
-      }
-    }
-    for (final _Intent write in accepted) {
-      if (write.action == 'set') {
-        _setAt(write.path, write.value);
-      } else {
-        (write.value! as Map<String, Object?>).forEach((String key, Object? v) {
-          _setAt('${write.path}/$key', v);
-        });
-      }
-      log('applied ${write.action} /${write.path}');
-    }
-    if (accepted.length > 1) {
-      for (final _Intent write in accepted) {
-        fake.push(write.path, _valueAt(write.path));
-      }
-    }
-    onChange?.call();
   }
 
   Object? _valueAt(String path) {
