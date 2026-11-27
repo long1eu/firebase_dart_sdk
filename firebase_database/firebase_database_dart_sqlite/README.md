@@ -1,12 +1,12 @@
 # firebase_database_dart_sqlite
 
-The SQLite offline cache of [`firebase_database_dart`](../firebase_database_dart/README.md), the unofficial Dart client
+The SQLite offline cache of [`firebase_database_dart`](https://pub.dev/packages/firebase_database_dart), the unofficial Dart client
 of the Firebase Realtime Database. It is for the Dart VM and Flutter (Android, iOS, macOS, Windows, Linux), on top of
 `package:sqlite3`. It keeps your pending writes across a restart and serves listeners and `get()` from disk while the
 app is offline. It is not affiliated with or endorsed by Google or Firebase.
 
-> **Status: 0.0.1, work in progress, not published.** What has run (the counts are from the maintainer's runs on the
-> merged trunk):
+> **Status: 0.1.0, first version.** The known limits are under [Limits](#limits). What has run (the counts are from
+> the maintainer's runs on the merged trunk):
 >
 > - The package has 287 tests, which pass on Dart 3.12.2 (2026-11-27; 247 passed on Dart 3.11.5 and on Dart 3.8.0 at
 >   an earlier commit), including Android's own persistence suites run on the SQLite engine.
@@ -41,8 +41,7 @@ dart pub add firebase_database_dart firebase_database_dart_sqlite
 ```
 
 Dart 3.8 or later. SQLite is loaded by `package:sqlite3` as in `cloud_firestore_dart_sqlite` (see "Which `sqlite3`" in
-its README); this package does not override the lookup. The `pubspec.yaml` of 0.0.1 still says `publish_to: none`:
-publishing is the maintainer's step, so until then depend on the packages from the repository.
+its README); this package does not override the lookup. The command writes the constraint `^0.1.0` for both packages.
 
 ## Use
 
@@ -156,7 +155,7 @@ and the tracked queries, restores the writes, and then connects. The layout is A
 | Android, iOS | declared in `pubspec.yaml`; no run is recorded |
 | Web | not supported |
 
-More: [the client's README](../firebase_database_dart/README.md), which has the sections on the database itself, and
+More: [the client's README](https://pub.dev/packages/firebase_database_dart), which has the sections on the database itself, and
 [docs/database_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_decisions.md),
 sections 15 and 16, for why the cache is built this way.
 

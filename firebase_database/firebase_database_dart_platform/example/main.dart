@@ -3,9 +3,9 @@
 //
 // On Linux the FirebaseDatabaseDart.use() call is optional: Flutter registers
 // the package before main() runs. On the other platforms it replaces the
-// official implementation. Run it against an emulator started with
-// `tool/start_database_emulator.sh 9100` from the repository root (open
-// rules for this namespace).
+// official implementation. Run it against a Database emulator on
+// 127.0.0.1:9100 with open rules for this namespace (in a checkout of the
+// repository: `tool/start_database_emulator.sh 9100` from its root).
 
 import 'dart:async';
 

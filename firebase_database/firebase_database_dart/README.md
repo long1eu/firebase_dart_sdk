@@ -8,8 +8,8 @@ no native SDK in the build; for servers and command line tools in Dart there is 
 the WebSocket protocol of the Firebase JS SDK, with Dart names (`DatabaseReference`, `onValue`, `runTransaction`) and
 Dart streams. It is not affiliated with or supported by Google or Firebase.
 
-> **Status: 0.0.1, work in progress, not published.** What has run (the maintainer's runs on the merged trunk, with
-> the connection tests; the record is in
+> **Status: 0.1.0, first version.** The known limits are under [Limits](#limits). What has run (the maintainer's
+> runs on the merged trunk, with the connection tests; the record is in
 > [docs/database_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_decisions.md),
 > section 23):
 >
@@ -65,13 +65,15 @@ dart pub add firebase_database_dart_sqlite   # only for the offline cache
 dart pub add firebase_auth_providers_dart    # only when the rules look at auth
 ```
 
-Dart 3.8 or later; no Flutter dependency. The `pubspec.yaml` of 0.0.1 still says `publish_to: none`: publishing is
-the maintainer's step, so until then depend on the packages from the repository.
+Dart 3.8 or later; no Flutter dependency. The commands write the constraint `^0.1.0` for this package and for the
+SQLite cache.
 
 ## Quick start with the emulator
 
-In the repository, start a private emulator (it needs Java and the Firebase CLI, see
-[tool/README.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/tool/README.md)):
+Any Database emulator on `127.0.0.1:9100` will do (`firebase emulators:start --only database --project demo-test`,
+with the port in `firebase.json`). In a checkout of the
+[repository](https://github.com/long1eu/firebase_dart_sdk) two scripts start and stop a private one (they need Java
+and the Firebase CLI, see [tool/README.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/tool/README.md)):
 
 ```shell
 tool/start_database_emulator.sh          # 127.0.0.1:9100, project demo-test, in the background
@@ -112,7 +114,7 @@ to the databases `firebase.json` names; every other namespace has open rules). A
 given with an emulator only names the namespace (`?ns=`, else by the host); its host and port are not used to connect.
 An open `FirebaseDatabase` keeps a command line program alive: call `close()`.
 
-The programs in [example/](example/README.md) run against the same emulator.
+The programs in [example/](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_database/firebase_database_dart/example/README.md) run against the same emulator.
 
 ## Against a real project
 
@@ -196,9 +198,9 @@ runs (measured on production and the emulator). Write the node as one object,
 a full URL of this database (it throws for another one), `FirebaseDatabase.app` is the app and `databaseUrl` the URL in
 use. A `DataSnapshot` also has `priority`, `child`, `hasChild`, `hasChildren`, `childrenCount`, `ref` and `toJson`.
 
-More: [read_write.dart](example/read_write.dart), [push_and_keys.dart](example/push_and_keys.dart),
-[multi_path_update.dart](example/multi_path_update.dart),
-[priority_and_ordering.dart](example/priority_and_ordering.dart).
+More: [read_write.dart](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_database/firebase_database_dart/example/read_write.dart), [push_and_keys.dart](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_database/firebase_database_dart/example/push_and_keys.dart),
+[multi_path_update.dart](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_database/firebase_database_dart/example/multi_path_update.dart),
+[priority_and_ordering.dart](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_database/firebase_database_dart/example/priority_and_ordering.dart).
 
 ## Listening
 
@@ -235,7 +237,7 @@ whose order survives that. A server refusal (a rule) ends a stream with an error
 and a listener simply gets its data again after the reconnect. Closing the database or deleting its app
 ends streams with done and no error; pending Futures fail with `database-closed`.
 
-More: [listeners.dart](example/listeners.dart).
+More: [listeners.dart](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_database/firebase_database_dart/example/listeners.dart).
 
 ## Queries
 
@@ -284,7 +286,7 @@ when the cache holds the complete value for that query (its limit applied; a cac
 fails with `unavailable`; after `goOffline()` there is no wait and the cache answers at once. A refusal by the rules
 is `permission-denied`, never a cached answer.
 
-More: [queries.dart](example/queries.dart).
+More: [queries.dart](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_database/firebase_database_dart/example/queries.dart).
 
 ## Transactions
 
@@ -313,7 +315,7 @@ the app quits is lost. `Transaction.success(value, priority:)` can also set the 
 `runTransaction(applyLocally: false)` raises no local event for the intermediate runs; the handler's type is
 `TransactionHandler`.
 
-More: [transactions.dart](example/transactions.dart), [cookbook/counter.dart](example/cookbook/counter.dart).
+More: [transactions.dart](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_database/firebase_database_dart/example/transactions.dart), [cookbook/counter.dart](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_database/firebase_database_dart/example/cookbook/counter.dart).
 
 ## onDisconnect and presence
 
@@ -340,7 +342,7 @@ it, not when it ran. Register the offline write first and write "online" second,
 user stuck online. A request that was sent and whose connection drops before the answer completes with `disconnected`
 and is not replayed; the app registers again when `onConnected` says it is connected.
 
-More: [on_disconnect.dart](example/on_disconnect.dart), [cookbook/presence.dart](example/cookbook/presence.dart).
+More: [on_disconnect.dart](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_database/firebase_database_dart/example/on_disconnect.dart), [cookbook/presence.dart](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_database/firebase_database_dart/example/cookbook/presence.dart).
 
 ## Server values
 
@@ -361,7 +363,7 @@ Until the server answers, local events show an estimate from the device clock co
 value follows as another event. `ServerValue.increment` adds on the server without a transaction round trip.
 **Writes are delivered at least once** (see [Limits](#limits)): for an exact count use a transaction.
 
-More: [server_values.dart](example/server_values.dart), [cookbook/counter.dart](example/cookbook/counter.dart).
+More: [server_values.dart](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_database/firebase_database_dart/example/server_values.dart), [cookbook/counter.dart](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_database/firebase_database_dart/example/cookbook/counter.dart).
 
 ## Connection state
 
@@ -398,7 +400,7 @@ the next 15 s after the ping it closes the connection and reconnects. It resets 
 at once on a hint from the app's network source (`app.onNetworkConnected`). It never closes an idle connection by
 itself.
 
-More: [connection_state.dart](example/connection_state.dart), [lifecycle.dart](example/lifecycle.dart).
+More: [connection_state.dart](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_database/firebase_database_dart/example/connection_state.dart), [lifecycle.dart](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_database/firebase_database_dart/example/lifecycle.dart).
 
 ## Authentication and App Check
 
@@ -447,12 +449,12 @@ that user. **Do not pass a plain string as `mockUserToken`.** The emulator treat
 literal `'owner'` included, as an admin credential, and the rules are then bypassed. `mockUserToken` without an
 emulator is refused.
 
-More: [auth_and_rules.dart](example/auth_and_rules.dart), which needs the rules in its header.
+More: [auth_and_rules.dart](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_database/firebase_database_dart/example/auth_and_rules.dart), which needs the rules in its header.
 
 ## Offline persistence
 
 By default nothing is written to disk. The package
-[`firebase_database_dart_sqlite`](../firebase_database_dart_sqlite/README.md) adds a SQLite cache for the Dart VM and
+[`firebase_database_dart_sqlite`](https://pub.dev/packages/firebase_database_dart_sqlite) adds a SQLite cache for the Dart VM and
 Flutter.
 
 ```dart
@@ -530,7 +532,7 @@ and reason in `serverStatus` and in `toString()`. For example, `setPriority` on 
 the server with the status `invalid_parameters`, and the exception has code `unknown`, message `could not set priority
 on non-existent node` and `serverStatus` `invalid_parameters: could not set priority on non-existent node`.
 
-More: [error_handling.dart](example/error_handling.dart).
+More: [error_handling.dart](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_database/firebase_database_dart/example/error_handling.dart).
 
 ## Logging
 
@@ -657,12 +659,12 @@ no run is recorded on Android or iOS.
 ## Flutter apps that keep `package:firebase_database`
 
 An app can keep the official API and let this client do the work underneath, by adding
-[`firebase_database_dart_platform`](../firebase_database_dart_platform/README.md) next to `firebase_database`:
+[`firebase_database_dart_platform`](https://pub.dev/packages/firebase_database_dart_platform) next to `firebase_database`:
 
 ```yaml
 dependencies:
   firebase_database: ^13.1.0
-  firebase_database_dart_platform: ^0.0.1
+  firebase_database_dart_platform: ^0.1.0
 ```
 
 On Linux it registers itself; on Windows when it is a direct dependency; elsewhere with
@@ -690,11 +692,11 @@ to see the rest. On the VM the turn is `Timer.run`, which a fake clock does driv
 
 - Decisions, what was measured and what was not:
   [docs/database_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_decisions.md).
-- [17 programs in example/](example/README.md), one per topic, and the complete apps `examples/rtdb_cli`,
+- [17 programs in example/](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_database/firebase_database_dart/example/README.md), one per topic, and the complete apps `examples/rtdb_cli`,
   `examples/rtdb_server_shelf`, `examples/rtdb_presence_worker`, `examples/rtdb_web_app` and
-  `examples/rtdb_playground` in the repository.
+  `examples/rtdb_playground` in the [repository](https://github.com/long1eu/firebase_dart_sdk/tree/main/examples).
 - The Storage client, laid out the same way:
-  [firebase_storage_dart](../../firebase_storage/firebase_storage_dart/README.md).
+  [firebase_storage_dart](https://pub.dev/packages/firebase_storage_dart).
 
 ## License
 
