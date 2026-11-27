@@ -17,9 +17,9 @@ Maintained, tested and published (`cloud_firestore_dart` 0.3.2, Dart `^3.8.0`):
 | `cloud_firestore_dart_flutterfire` (0.1.2, Flutter) | `cloud_firestore/cloud_firestore_dart_flutterfire` |
 | `cloud_firestore_dart_platform` (0.1.2, Flutter) | `cloud_firestore/cloud_firestore_dart_platform` |
 | `firebase_auth_dart_platform` (0.2.0, Flutter) | `firebase_auth/firebase_auth_dart_platform` |
-| `firebase_storage_dart` (0.1.0) | `firebase_storage/firebase_storage_dart` |
-| `firebase_storage_dart_platform` (0.1.0, Flutter) | `firebase_storage/firebase_storage_dart_platform` |
-| `firebase_admin_dart` (0.1.0; trusted code only, never ship a service account key) | `firebase_admin/firebase_admin_dart` |
+| `firebase_storage_dart` (0.2.0) | `firebase_storage/firebase_storage_dart` |
+| `firebase_storage_dart_platform` (0.2.0, Flutter) | `firebase_storage/firebase_storage_dart_platform` |
+| `firebase_admin_dart` (0.1.2; trusted code only, never ship a service account key) | `firebase_admin/firebase_admin_dart` |
 | `firebase_database_dart` (0.1.1) | `firebase_database/firebase_database_dart` |
 | `firebase_database_dart_sqlite` (0.1.1) | `firebase_database/firebase_database_dart_sqlite` |
 | `firebase_database_dart_platform` (0.1.0, Flutter) | `firebase_database/firebase_database_dart_platform` |

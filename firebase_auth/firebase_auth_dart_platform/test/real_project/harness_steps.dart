@@ -299,7 +299,7 @@ class HarnessRun {
     MultiFactorResolver resolver, {
     String? factorUid,
   }) async {
-    final (_, String code) = _testPhone();
+    _testPhone();
     final PhoneMultiFactorInfo hint =
         resolver.hints
             .whereType<PhoneMultiFactorInfo>()
@@ -316,7 +316,7 @@ class HarnessRun {
       PhoneMultiFactorGenerator.getAssertion(
         PhoneAuthProvider.credential(
           verificationId: verificationId,
-          smsCode: code,
+          smsCode: await _smsCode('the second-factor sign-in'),
         ),
       ),
     );
@@ -561,6 +561,15 @@ class HarnessRun {
     return (number, code);
   }
 
+  /// The code of the SMS just sent for [purpose]: the one of the test phone
+  /// number, or, with [askForPhoneCode], the one the person types.
+  Future<String> _smsCode(String purpose) async {
+    final String code = _testPhone().$2;
+    return code == askForPhoneCode
+        ? codes.ask('The code of the SMS just sent for $purpose')
+        : code;
+  }
+
   /// The verification id of an SMS sent by `verifyPhoneNumber`, or the error
   /// of `verificationFailed`.
   Future<String> _sendCode({
@@ -597,6 +606,7 @@ class HarnessRun {
       } on FirebaseAuthException catch (e) {
         final bool refused = const <String>{
           'missing-app-credential',
+          'missing-client-identifier',
           'invalid-app-credential',
           'captcha-check-failed',
         }.contains(e.code);
@@ -614,7 +624,7 @@ class HarnessRun {
   }
 
   Future<String?> _phone() async {
-    final (String number, String code) = _testPhone();
+    final (String number, _) = _testPhone();
     final User user = await ensurePrimary();
     if (user.providerData.any((UserInfo info) => info.providerId == 'phone')) {
       throw StepSkipped(
@@ -624,7 +634,7 @@ class HarnessRun {
     final ConfirmationResult link = await _withProof(
       () => user.linkWithPhoneNumber(number),
     );
-    _expectPrimary((await link.confirm(code)).user);
+    _expectPrimary((await link.confirm(await _smsCode('the link'))).user);
     final CleanupToken unlink = ledger.register(
       'unlink phone',
       () => _unlink('phone'),
@@ -634,7 +644,7 @@ class HarnessRun {
     final ConfirmationResult signIn = await _withProof(
       () => auth.signInWithPhoneNumber(number),
     );
-    _expectPrimary((await signIn.confirm(code)).user);
+    _expectPrimary((await signIn.confirm(await _smsCode('the sign-in'))).user);
     final String verificationId = await _withProof(
       () => _sendCode(phoneNumber: number),
     );
@@ -642,7 +652,7 @@ class HarnessRun {
       (await auth.currentUser!.reauthenticateWithCredential(
         PhoneAuthProvider.credential(
           verificationId: verificationId,
-          smsCode: code,
+          smsCode: await _smsCode('the reauthentication'),
         ),
       )).user,
     );
@@ -652,7 +662,7 @@ class HarnessRun {
   }
 
   Future<String?> _sms() async {
-    final (String number, String code) = _testPhone();
+    final (String number, _) = _testPhone();
     final User user = await ensurePrimary();
     await _withRecentLogin(() async {
       final String verificationId = await _withProof(
@@ -665,7 +675,7 @@ class HarnessRun {
         PhoneMultiFactorGenerator.getAssertion(
           PhoneAuthProvider.credential(
             verificationId: verificationId,
-            smsCode: code,
+            smsCode: await _smsCode('the second-factor enrolment'),
           ),
         ),
         displayName: smsDisplayName,

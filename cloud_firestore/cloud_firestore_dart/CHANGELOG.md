@@ -1,3 +1,9 @@
+## (unreleased)
+
+- A client that cannot reach the backend at all logs the warning "Could not reach Cloud Firestore backend" once,
+  as the JS and Android SDKs do. Before, the message was only written at debug level, so it was not shown by
+  default.
+
 ## 0.3.2
 
 - Several tabs can share one IndexedDB cache: `indexedDbCacheSettings(multiTab: true)` (a **preview**, off by
