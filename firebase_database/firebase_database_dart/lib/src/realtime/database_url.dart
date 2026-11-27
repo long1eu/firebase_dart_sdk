@@ -95,13 +95,17 @@ RepoInfo parseDatabaseUrl(String url) {
 /// host and port are not used to connect.
 ///
 /// Accepts `http`, `https`, `ws` and `wss` (and a bare host), any valid host name or IP address
-/// and any port. The namespace is the `ns` parameter, lowercased; without one it is what the
-/// Database emulator picks from a request's Host header (`EmulatorDecoder.parseSubdomain`,
-/// emulator 4.11.2): the first dot-separated label of `host[:port]` when it is a valid
-/// namespace name and, for four or more labels, not a number; else `fake-server`. So
-/// `my-mac.local:9000` gives `my-mac`, and `localhost:9000` and any IP address give
-/// `fake-server`. Throws [FormatException] for user info, a fragment, a non-root path, any query
-/// key but `ns`, an invalid `ns`, another scheme, or an invalid host or port.
+/// and any port. The namespace is the `ns` parameter, lowercased; without one, the emulator's
+/// Host header rule (`EmulatorDecoder.parseSubdomain`, emulator 4.11.2) is applied to the
+/// lowercased `host[:port]` of the URL, the port left out when it is the scheme's default (80
+/// for `http` and `ws`, 443 for `https` and `wss`): split on `.`, the first part is the
+/// namespace when it is a valid namespace name and, for four or more parts, not a 32-bit int;
+/// else `fake-server`. A port stays attached to the last part, so a one-label host with a port
+/// never matches. Examples: `my-mac.local:9000` gives `my-mac`, `db.example.com` gives `db`,
+/// `localhost` and `localhost:80` give `localhost`, `localhost:9000`, `my-mac:9000` and any IP
+/// address give `fake-server`. Throws [FormatException] for user info, a fragment, a non-root
+/// path, any query key but `ns`, `ns` given twice, an invalid `ns` or query, another scheme, or
+/// an invalid host or port.
 String emulatorUrlNamespace(String url) {
   final Uri uri = _parseUrl(url);
   const List<String> schemes = <String>['http', 'https', 'ws', 'wss'];
@@ -126,9 +130,20 @@ String emulatorUrlNamespace(String url) {
   if (namespaceParameter != null) {
     return namespaceParameter;
   }
-  final List<String> labels = joinHostPort(host, port).split('.');
+  // A client leaves the scheme's default port out of the Host header; ws is http, wss is https.
+  final int defaultPort = uri.scheme == 'http' || uri.scheme == 'ws'
+      ? 80
+      : _httpsPort;
+  final String hostHeader = joinHostPort(
+    host,
+    port == defaultPort ? null : port,
+  );
+  final List<String> labels = hostHeader.split('.');
   final String first = labels.first;
-  final bool numeric = RegExp(r'^[0-9]+$').hasMatch(first);
+  // The emulator's number test accepts a valid 32-bit int only.
+  final bool numeric =
+      RegExp(r'^[0-9]{1,10}$').hasMatch(first) &&
+      int.parse(first) <= 0x7fffffff;
   return _namespacePattern.hasMatch(first) && (labels.length < 4 || !numeric)
       ? first
       : _emulatorFallbackNamespace;

@@ -66,18 +66,30 @@ final class FirebaseDatabase {
   /// an [ArgumentError] here, with or without [persistence]. The message does not quote the URL.
   ///
   /// [emulatorHost] (`'host:port'` or `'[ipv6]:port'`) connects to the Database emulator over plain
-  /// WebSocket (over TLS for a `*.cloudworkstations.dev` host). The database URL then gives only
-  /// the namespace, and its scheme (`http`, `https`, `ws` or `wss`), host and port are not used:
-  /// `http://10.0.2.2:9000?ns=demo` and `http://my-mac.local:9000?ns=demo` both mean namespace
-  /// `demo`. Without `?ns=` the namespace is the one the emulator picks for that host: the first
-  /// label of a name (`http://my-mac.local:9000` gives `my-mac`), and `fake-server` for
-  /// `localhost:9000` or an IP address. `fake-server` is not the project's default database
-  /// `<projectId>-default-rtdb`, the only one where the emulator applies the rules file; give
-  /// `?ns=`, or no URL at all, to use that one. When the namespace came from the host this way and
-  /// is not `<projectId>-default-rtdb`, [logger] receives one warning at the first connection
-  /// (not again on a reconnect) that names the namespace and the emulator host. A URL with `?ns=`,
-  /// or no URL (the project's default database), logs nothing. User info, a path, a fragment, a
-  /// query key other than `ns` and an invalid namespace still throw an [ArgumentError]. See
+  /// WebSocket (over TLS for a `*.cloudworkstations.dev` host). The database URL (the argument,
+  /// else the app's `databaseURL`) then gives only the namespace: its scheme (`http`, `https`,
+  /// `ws` or `wss`), host and port are not used to connect, and the client always sends the
+  /// namespace as `ns`. `http://10.0.2.2:9000?ns=demo` and `http://my-mac.local:9000?ns=demo` both
+  /// mean namespace `demo`.
+  ///
+  /// Without `?ns=`, the scheme, host and port choose the namespace by the rule the emulator
+  /// applies to a Host header that names none: take the URL's `host:port`, without the port when
+  /// it is the scheme's default (80 for `http` and `ws`, 443 for `https` and `wss`), split it on
+  /// `.`, and use the first part when it is a valid namespace (lowercase letters, digits, `-`)
+  /// and, with four or more parts, not a 32-bit integer; else use `fake-server`. So
+  /// `http://my-mac.local:9000` gives `my-mac`, `https://db.example.com` gives `db`,
+  /// `http://localhost` gives `localhost`, and `http://localhost:9000`, `http://my-mac:9000` (a
+  /// one-label name with a port) and any IP address give `fake-server`. With no URL at all
+  /// (neither the argument nor the app's `databaseURL`, or an empty argument) the namespace is the
+  /// project's default database `<projectId>-default-rtdb`, the only one where the emulator
+  /// applies the `firebase.json` rules file; a production URL of that database or `?ns=` with
+  /// that name reach it too.
+  ///
+  /// When the namespace came from the host and is not `<projectId>-default-rtdb`, [logger]
+  /// receives one warning at the first connection (not again on a reconnect) that names the
+  /// namespace and the emulator host. A URL with `?ns=`, or no URL, logs nothing. User info, a
+  /// path, a fragment, a query key other than `ns` and an invalid namespace still throw an
+  /// [ArgumentError] whose message does not quote the URL. See
   /// [emulatorHostFromEnvironment]. [mockUserToken] is sent to the emulator as it is: build a
   /// user's token with `mockUserTokenFor`. A string that is not such a token (the literal `'owner'`
   /// included) is an admin credential for the emulator and bypasses the rules. Passing it without
@@ -605,6 +617,9 @@ extension FirebaseDatabaseInternal on FirebaseDatabase {
 
   /// The URL of [path] in this database.
   Uri urlFor(Path path) => _urlFor(path);
+
+  /// Where the connection goes: the host and namespace the WebSocket URL is built from.
+  RepoInfo get repoInfo => _target.info;
 }
 
 /// A [FirebaseDatabase] of [app] whose connection is built by [connectionFactory] (the testing
@@ -887,7 +902,8 @@ final class _Target {
 
   /// The target of the emulator at [emulatorHost], with the namespace of [url]
   /// (`emulatorUrlNamespace`: its `?ns=`, else the emulator's own rule for its host) or, without
-  /// [url], of the project's default database. The host and port of [url] are not used.
+  /// [url], of the project's default database. The scheme, host and port of [url] are not used to
+  /// connect; without `?ns=` they choose the namespace.
   factory _Target._emulator(FirebaseApp app, String? url, String emulatorHost) {
     if (emulatorHost.isEmpty) {
       throw ArgumentError.value(

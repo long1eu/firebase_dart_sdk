@@ -90,6 +90,37 @@ void main() {
     });
   });
 
+  test('a custom domain without ns warns once, without quoting the URL', () {
+    fakeTime((FakeTime time) {
+      final List<String> warnings = warningsOverTwoConnections(
+        time,
+        FakeDatabaseServer(),
+        databaseUrl: 'https://db.example.com',
+        emulatorHost: '127.0.0.1:9000',
+      );
+      expect(warnings, hasLength(1));
+      expect(warnings.single, contains('"db"'));
+      expect(warnings.single, isNot(contains('example')));
+    });
+  });
+
+  test('ws on its default port warns for the same namespace as http', () {
+    fakeTime((FakeTime time) {
+      for (final String url in <String>[
+        'http://localhost:80',
+        'ws://localhost:80',
+      ]) {
+        final List<String> warnings = warningsOverTwoConnections(
+          time,
+          FakeDatabaseServer(),
+          databaseUrl: url,
+          emulatorHost: '127.0.0.1:9000',
+        );
+        expect(warnings.single, contains('"localhost"'), reason: url);
+      }
+    });
+  });
+
   test('a URL with ?ns= logs no warning', () {
     fakeTime((FakeTime time) {
       expect(
