@@ -1,19 +1,20 @@
-// Checks 27 to 41 of the production verification kit: 27 to 36 are the questions of the core side
+// Checks 27 to 42 of the production verification kit: 27 to 36 are the questions of the core side
 // (rtdb/from_helper/reports/production_questions.md); 37 to 40 ask about priorities, 41 about a
-// merge key that names the merge's own location. Each runs as an informational sequence. PASS
+// merge key that names the merge's own location, 42 about the hash of a query window that holds
+// an emptied node keeping a priority. Each runs as an informational sequence. PASS
 // means the sequence ran; the finding is the printed observation, which says whether it matched
 // the expectation measured on the emulator. Exceptions: leaf B of check 30 (a refused write below
 // a leaf, then its removal) is FAIL when the client does not end at the server's value, as check
 // 23; with --expect-emptied-node-fix the transactions of check 38 are FAIL when one does not commit
 // within two runs of its handler.
 //
-// Checks 28, 29, 33, 37, 38, 39 and 40 open a raw protocol connection of their own
+// Checks 28, 29, 33, 37, 38, 39, 40 and 42 open a raw protocol connection of their own
 // (RawConnection) with the throwaway user's ID token, to see frames the public API does not show;
 // check 41 opens three (a writer and two listeners).
-// It listens (in checks 38 and 39 also with a hash, in 39 with a compound hash), unlistens, gets
-// (38 to 41), puts (39, some with a hash, 40 and 41) and merges (39, 41) and registers one
+// It listens (in checks 38, 39 and 42 also with a hash, in 39 with a compound hash), unlistens,
+// gets (38 to 42), puts (39, some with a hash, 40 to 42) and merges (39, 41) and registers one
 // onDisconnect write (check 33), all below the run's path. The auth request and its answer are
-// never printed (an auth answer holds the token's claims); checks 38 to 41 print the answers of
+// never printed (an auth answer holds the token's claims); checks 38 to 42 print the answers of
 // their other requests, which hold only the kit's own data.
 
 import 'dart:async';
@@ -239,16 +240,20 @@ class RawConnection {
     return '${answer['s']}';
   }
 
-  /// Listens to [relative] below the run's path with the default query, no tag, [hash] and, when
-  /// given, the compound hash [compound] (`ch`: `ps` and `hs`), and returns the whole answer (`s`
-  /// and `d`; a listen answer holds only the kit's own data).
+  /// Listens to [relative] below the run's path with [query] (empty: the default) and [tag] (none
+  /// by default), [hash] and, when given, the compound hash [compound] (`ch`: `ps` and `hs`), and
+  /// returns the whole answer (`s` and `d`; a listen answer holds only the kit's own data).
   Future<Map<String, Object?>> listenAnswer(
     String relative, {
     String hash = '',
     Map<String, Object?>? compound,
+    Map<String, Object?> query = const <String, Object?>{},
+    int? tag,
   }) => request('q', <String, Object?>{
     'p': '/$_runPath/$relative',
     'h': hash,
+    'q': ?(query.isEmpty ? null : query),
+    't': ?tag,
     'ch': ?compound,
   });
 
@@ -3517,7 +3522,245 @@ Future<CheckResult> _emptyMergeKey(Kit kit) async {
   );
 }
 
-/// Checks 27 to 41, appended to the kit's list.
+// -----------------------------------------------------------------------------------------------
+// Check 42: the hash of a query window that holds an emptied node keeping a priority.
+
+/// The node of check 42 below the run's path.
+const String _windowNode = 'emptied_window';
+
+/// The children check 42 puts, by priority a 1, h 2, c 3, d 4. Removing `h/v` afterwards empties
+/// `h`, which the server then holds as `{".priority": 2}` (checks 38 and 39 measured that).
+Map<String, Object?> _windowChildren() => <String, Object?>{
+  'a': <String, Object?>{'n': 1, '.priority': 1},
+  'h': <String, Object?>{'v': 1, '.priority': 2},
+  'c': <String, Object?>{'n': 3, '.priority': 3},
+  'd': <String, Object?>{'n': 4, '.priority': 4},
+};
+
+/// One tagged query of check 42: its wire object, its first tag, and the candidate windows whose
+/// hashes it offers (id, label, the keys of the window).
+typedef WindowQuery = ({
+  String id,
+  String label,
+  Map<String, Object?> query,
+  int tag,
+  List<(String, String, List<String>)> candidates,
+});
+
+/// The queries of check 42. Both windows hold a, h and c when the server counts h; without h the
+/// limit query's window may take d instead, so it offers that window as a third candidate.
+List<WindowQuery> _windowQueries() => <WindowQuery>[
+  (
+    id: 'limit',
+    label: 'orderByPriority().limitToFirst(3)',
+    query: const <String, Object?>{'l': 3, 'vf': 'l'},
+    tag: 70,
+    candidates: <(String, String, List<String>)>[
+      ('withH', 'with h as {.priority: 2}', <String>['a', 'h', 'c']),
+      (
+        'withoutH',
+        'without h (what the trunk client holds)',
+        <String>['a', 'c'],
+      ),
+      (
+        'refilled',
+        'without h, d moved into the limit',
+        <String>['a', 'c', 'd'],
+      ),
+    ],
+  ),
+  (
+    id: 'range',
+    label: 'orderByPriority().startAt(1).endAt(3)',
+    query: const <String, Object?>{'sp': 1, 'sin': true, 'ep': 3, 'ein': true},
+    tag: 80,
+    candidates: <(String, String, List<String>)>[
+      ('withH', 'with h as {.priority: 2}', <String>['a', 'h', 'c']),
+      (
+        'withoutH',
+        'without h (what the trunk client holds)',
+        <String>['a', 'c'],
+      ),
+    ],
+  ),
+];
+
+/// The simple hash of the children [keys] of [stored] (the data a raw `g` answered; a key it
+/// does not hold is left out), formed as `ChildrenNode.hash` forms it.
+String _windowHash(Object? stored, List<String> keys) {
+  final Map<String, Object?> data = stored is Map<String, Object?>
+      ? stored
+      : const <String, Object?>{};
+  return simpleHash(
+    JsonNode.parse(<String, Object?>{
+      for (final String k in keys)
+        if (data.containsKey(k)) k: data[k],
+    }),
+  );
+}
+
+/// What [frames] say about `h`: its JSON in each frame at the node (or `absent`) and in each
+/// frame at `node/h`, or `no frame`.
+String _shapeOfH(List<Push> frames) {
+  final List<String> shapes = <String>[
+    for (final Push p in frames)
+      if (p.path == _windowNode)
+        p.data is Map<String, Object?> &&
+                (p.data! as Map<String, Object?>).containsKey('h')
+            ? jsonEncode((p.data! as Map<String, Object?>)['h'])
+            : 'absent'
+      else if (p.path == '$_windowNode/h')
+        jsonEncode(p.data),
+  ];
+  return shapes.isEmpty ? 'no frame' : shapes.join(' then ');
+}
+
+/// One tagged listen of check 42 with [hash] (`''`: no hash), its answer (or `NO ANSWER` after the
+/// step wait) and the frames within the listen settle, then the unlisten.
+Future<Map<String, Object?>> _windowListen(
+  RawConnection raw,
+  Map<String, Object?> query,
+  int tag,
+  String hash,
+) async {
+  final int before = raw.pushes.length;
+  Map<String, Object?> answer;
+  try {
+    answer = await raw.listenAnswer(
+      _windowNode,
+      hash: hash,
+      query: query,
+      tag: tag,
+    );
+  } on KitTimeout {
+    answer = <String, Object?>{
+      's': 'NO ANSWER',
+      'd': 'none within ${stepWait.inSeconds} s',
+    };
+  }
+  await Future<void>.delayed(_listenSettle);
+  final List<Push> frames = raw.pushes.skip(before).toList();
+  await raw.unlisten(_windowNode, query, tag);
+  return <String, Object?>{
+    'hash': hash,
+    'status': '${answer['s']}',
+    'answer': jsonEncode(answer),
+    'data': frames.isNotEmpty,
+    'h': _shapeOfH(frames),
+    'frames': frames.map(_verbatim).toList(),
+  };
+}
+
+/// One query of check 42: a listen without a hash, then one with each candidate's hash.
+Future<List<String>> _windowQueryRun(
+  RawConnection raw,
+  WindowQuery q,
+  Object? stored,
+  Map<String, Object?> observed,
+) async {
+  final Map<String, Object?> seen = <String, Object?>{};
+  final List<String> lines = <String>[
+    '${q.id}: ${q.label}, wire query ${jsonEncode(q.query)}',
+  ];
+  final List<(String, String, String)> listens = <(String, String, String)>[
+    ('none', 'no hash', ''),
+    for (final (String id, String label, List<String> keys) in q.candidates)
+      (id, '$label, window ${keys.join(', ')}', _windowHash(stored, keys)),
+  ];
+  int tag = q.tag;
+  for (final (String id, String label, String hash) in listens) {
+    final Map<String, Object?> one = await _windowListen(
+      raw,
+      q.query,
+      tag++,
+      hash,
+    );
+    seen[id] = one;
+    final List<String> frames = one['frames']! as List<String>;
+    lines.addAll(<String>[
+      '  ${q.id} $label: h ${hash.isEmpty ? "''" : hash}',
+      '    answered ${one['answer']}; '
+          '${one['data']! as bool ? 'DATA SENT (hash not accepted)' : 'no data (hash accepted)'}'
+          '; h in the data: ${one['h']}',
+      '    frames: ${frames.isEmpty ? 'NO FRAME' : frames.join(' | ')}',
+    ]);
+  }
+  final List<String> accepted = <String>[
+    for (final (String id, _, _) in listens.skip(1))
+      if (!((seen[id]! as Map<String, Object?>)['data']! as bool)) id,
+  ];
+  lines.add(
+    '${q.id} observation: hash accepted (no data) for '
+    '${accepted.isEmpty ? 'NONE of the candidates' : accepted.join(', ')}',
+  );
+  seen['accepted'] = accepted;
+  observed[q.id] = seen;
+  return lines;
+}
+
+/// Check 42: a tagged limit query and a tagged range query (by priority) over children where `h`
+/// is an emptied node keeping priority 2, each listened with no hash and with the hash of its
+/// window counting h as `{".priority": 2}` and without h. Raw frames on one connection, each
+/// listen with a tag of its own and ended before the next. Printed as observations; the check
+/// passes whatever the server answers.
+Future<CheckResult> _emptiedWindowHash(Kit kit) async {
+  final RawConnection raw = await RawConnection.open(kit);
+  final List<String> details = <String>[];
+  for (final RuleOp op in <RuleOp>[
+    _put('', _windowChildren()),
+    _put('h/v', null),
+  ]) {
+    final Map<String, Object?> answer = await _sendRule(
+      kit,
+      raw,
+      _windowNode,
+      op,
+    );
+    details.add('setup: ${raw.sent.last}  -> ${jsonEncode(answer)}');
+    if (answer['s'] != 'ok') {
+      throw StateError(
+        'the setup "${_describeOp(op)}" of check 42 answered ${answer['s']}',
+      );
+    }
+  }
+  final Map<String, Object?> got = await raw.get(_windowNode);
+  final String export = await _export(kit, _windowNode);
+  final Object? stored = got['d'];
+  final Object? storedH = stored is Map<String, Object?> ? stored['h'] : null;
+  final String hHash = simpleHash(JsonNode.parse(storedH));
+  final Map<String, Object?> observed = <String, Object?>{
+    'get': jsonEncode(got),
+    'export': export,
+    'hHash': hHash,
+  };
+  details.addAll(<String>[
+    'g answered ${jsonEncode(got)}; export $export',
+    'h as stored ${jsonEncode(storedH)}, its hash $hHash (emptied-node form, SHA-1 of '
+        '"priority:number:${ieee754Hex(2)}:": ${emptiedNodeHash(2)}; equal: '
+        '${_yes(hHash == emptiedNodeHash(2))})',
+  ]);
+  for (final WindowQuery q in _windowQueries()) {
+    details.addAll(await _windowQueryRun(raw, q, stored, observed));
+  }
+  String line(String id) {
+    final Map<String, Object?> seen = observed[id]! as Map<String, Object?>;
+    final List<Object?> accepted = seen['accepted']! as List<Object?>;
+    final Map<String, Object?> none = seen['none']! as Map<String, Object?>;
+    return 'accepted ${accepted.isEmpty ? 'NONE' : accepted.join(', ')}; h without a hash: '
+        '${none['h']}';
+  }
+
+  return CheckResult(
+    Status.pass,
+    'A query window holding h = {".priority":2} (emptied, stored as ${jsonEncode(storedH)}): '
+    'limitToFirst(3) ${line('limit')}; startAt(1).endAt(3) ${line('range')}. withH counts h, '
+    'withoutH leaves it out. Details below.',
+    details: details,
+    observed: observed,
+  );
+}
+
+/// Checks 27 to 42, appended to the kit's list.
 const List<Check> questionChecks = <Check>[
   Check(
     '27',
@@ -3611,5 +3854,11 @@ const List<Check> questionChecks = <Check>[
     Scope.production,
     _emptyMergeKey,
     wait: Duration(minutes: 8),
+  ),
+  Check(
+    '42',
+    'Hash of a query window that holds an emptied node, raw frames',
+    Scope.production,
+    _emptiedWindowHash,
   ),
 ];
