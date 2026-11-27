@@ -1358,7 +1358,12 @@ of the query's own node, and an acknowledgement applies again values copied from
 run. (e) A second case of (a): `update {"x/a": null, "x/.priority": 7}` and then `update {"x/b": 1}`, both pending on
 `x = {a: 1}`, show `x = {b: 1}` with priority 7 until they are answered; the server never holds it (the first update
 removes `x`, so its priority lands on nothing, and the second writes `b` with no priority). The client before the
-change shows the same (a reviewer's script on both trees, 2026-11-27).
+change shows the same (a reviewer's script on both trees, 2026-11-27). (f) A filtered view (a limit or a range) can
+hold an emptied child with a stale kept priority: a change to a hidden child that is empty before and after is dropped
+by the filter. The server counts an emptied node in a query window's hash and toward a limit (check 42, emulator and
+production, 2026-11-28), so the hash of such a view is not accepted and its window is sent again at the next listen.
+No wrong data is shown. (g) When the SQLite engine is used, an acknowledged update that sets a priority on a node
+loads that node from the cache once (15 ms for 10,000 rows, measured once); see the SQLite package's README.
 
 ## 26. What is not in 0.1
 

@@ -7,6 +7,8 @@
 - Fixes a known limit of 0.1.0: when the server patched only part of a cached node and the patched part contained none
   of that node's children, the client dropped the node's priority even though the server still held it, so listeners
   saw the priority as null until the data was loaded again.
+- A known limit of 0.1.0: a query window that holds an emptied node is sent again at each listen, because that client
+  holds no emptied node and the server counts it in the window's hash.
 
 ## 0.1.0
 
