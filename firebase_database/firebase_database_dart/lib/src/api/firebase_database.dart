@@ -478,12 +478,16 @@ final class FirebaseDatabase {
 
   /// Whether the client is connected to the server (`.info/connected`). The first event is the current
   /// state.
+  ///
+  /// [close] (also run when the app is deleted) ends the stream with the error `database-closed`;
+  /// no final `false` event comes before it.
   Stream<bool> get onConnected => ref(
     '.info/connected',
   ).onValue.map((DatabaseEvent event) => event.snapshot.value == true);
 
-  /// The current value of [onConnected], synchronously.
-  bool get isConnected => _infoValue('connected') == true;
+  /// The current value of [onConnected], synchronously. Always false once [close] has been called
+  /// (also when the app is deleted), whatever it was before.
+  bool get isConnected => !_closed && _infoValue('connected') == true;
 
   /// The server's clock minus this device's (`.info/serverTimeOffset`); zero until the first connection.
   Duration get serverTimeOffset {
