@@ -105,8 +105,10 @@ Future<void> main() async {
 
 `emulatorHost` is `host:port`, reached over plain WebSocket. `emulatorHostFromEnvironment` reads
 `FIREBASE_DATABASE_EMULATOR_HOST` and is `null` on the web; nothing reads that variable unless you ask for it. With an
-emulator and no `databaseUrl`, the database is `<projectId>-default-rtdb`; the rules file given to the emulator applies
-to that namespace only. An open `FirebaseDatabase` keeps a command line program alive: call `close()`.
+emulator, a `databaseUrl` is not needed when neither the argument nor the app's `databaseURL` is set: the database is
+`<projectId>-default-rtdb`, and the rules file given to the emulator applies to that namespace only. A `databaseUrl`
+given with an emulator only names the namespace (`?ns=`, else by the host); its host and port are not used to connect.
+An open `FirebaseDatabase` keeps a command line program alive: call `close()`.
 
 The programs in [example/](example/README.md) run against the same emulator.
 
@@ -549,8 +551,10 @@ await logged.close();
 `DatabaseLogger` is the type of the callback, `void Function(DatabaseLogLevel level, String message)`. The levels are
 `debug`, `info`, `warning` and `error`. Warnings include the missing-index one ("Using an unspecified index": a query
 filtered on the client because the rules have no `.indexOn`), a memory-only cache and failed persisted writes. Requests
-with credentials are logged as `<action> (contents hidden)`. The client never logs values it holds or sends; a message
-from the server is logged as the server sent it and, with rules debug output on (emulator), may quote data.
+with credentials are logged as `<action> (contents hidden)`. Log lines can contain database paths, index names, the
+host and counters (request numbers, write ids, close codes, cache sizes, timeouts), never a token, a value you read or
+write or a query's bound values. Text from the server is logged as the server sent it, with control characters escaped
+and cut at 1 KiB, and, with rules debug output on (emulator), may quote data.
 
 ## How it differs from the JS SDK
 
@@ -611,8 +615,9 @@ The 19 you notice are below. The full table, 38 rows with the test that pins eac
   that names the proxy and the status.
 - **Priorities and pending writes.** As in the JS SDK, the local view can differ from the server until the server
   answers. A node that is emptied and refilled, by one update or by two writes, loses its priority locally (the server
-  keeps it). A transaction on a node that holds only a priority, because its last child was removed by a write below
-  it, fails with `max-retries`; removing the node itself first drops the priority. A limit query's window is short
+  keeps it; the JS SDK does the same, [issue 10688](https://github.com/firebase/firebase-js-sdk/issues/10688)). A
+  transaction on a node that holds only a priority, because its last child was removed by a write below it, fails with
+  `max-retries` in the JS SDK too; removing the node itself first drops the priority. A limit query's window is short
   while the client is offline after a local removal, until the server sends it. See "Behaviours shared with the JS
   SDK that are kept" in
   [docs/database_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_decisions.md).

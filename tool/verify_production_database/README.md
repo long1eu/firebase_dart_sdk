@@ -353,9 +353,10 @@ Auth emulator of firebase-tools 15.18.0. Production: the whole kit ran once (che
 - **3 on production** (2026-11-26): the whole value in **one** `set` is accepted; the 768-byte refusal is the
   emulator's only
 - **4 to 8**: PASS
-- **9**: PASS: the `no_index` warning is sent; a filtered `get()` answers `index-not-defined`
-- **9 on production** (2026-11-26): as above, the `no_index` warning sent (one emulator run of the same kit did not
-  see the warning)
+- **9**: PASS: the `no_index` warning is sent in two of three runs and not in the third (on the emulator, 3 runs); a
+  filtered `get()` answers `index-not-defined` in all three
+- **9 on production** (2026-11-26): the `no_index` warning sent, as in two of the three emulator runs; a filtered
+  `get()` answers `index-not-defined`
 - **10**: PASS: two runs of the handler (null, then 10)
 - **11 to 13**: PASS
 - **14**: PASS: answered at once (0 ms) from the view `keepSynced` holds
@@ -366,14 +367,15 @@ Auth emulator of firebase-tools 15.18.0. Production: the whole kit ran once (che
 - **19**: PASS: cancelled with `permission_denied`; the write is refused
 - **20**: PASS
 - **21**: PASS, priority KEPT: `{".priority":0.0,"a":1}`, then `{".priority":0.0}`, then `{".priority":0.0,"b":1}`
-- **22**: PASS: a fresh client reads priority 0 after both forms; the writer's own listener shows 0 too; in the
-  `update` form the writer's listener and its `get()` show 0 at 0 s and at 5 s (listener values: null, `{a:1}` with
-  priority 0, `{b:1}` with priority 0)
-- **22 on production** (2026-11-26): run with the client before the emptied-node fix: after the `update` form the
-  writer's listener shows priority null where a fresh client reads 0, as that client does on the emulator
+- **22**: PASS: a fresh client reads priority 0 after both forms; the writer's own listener shows priority null after
+  both; in the `update` form the writer's listener and its `get()` show null at 0 s and at 5 s (listener values: null,
+  `{a:1}` with priority 0, `{b:1}` with priority null). The client of the repository has no emptied-node fix. With
+  `--expect-emptied-node-fix` this part decides: a client with the fix shows priority 0 in the writer's listener and
+  its `get()` at 0 s and at 5 s
 - **23**: PASS
 - **24 to 26**: PASS, a few ms each on loopback
-- **4** (question 25): the writer saw the local estimate, then the server's value 38 ms later (two events, one run)
+- **4** (question 25): the writer saw the local estimate, then the server's value 1 ms later (two events) in two runs,
+  and a single event in the third (on the emulator, 3 runs)
 - **27**: line 1: null with no priority from a fresh client, but the REST export of the emptied node is
   `{".priority":5.0}`; line 2: refused, `unknown: invalid_parameters: could not set priority on non-existent node`;
   line 3: `{".value":"leaf",".priority":3.0}`
@@ -386,31 +388,34 @@ Auth emulator of firebase-tools 15.18.0. Production: the whole kit ran once (che
 - **30**: line 12 `{a:1}` on both; line 13 the client ends at `leaf` (events null, leaf, `{a:1}`, leaf); line 14
   client and server `{b:2}`; leaf B: the first write refused with `permission_denied`, the removal accepted; the
   listener (events 1, `{a:1}`, null, 1), `get()` and a fresh client at 1, the server's value, at 0 s and 5 s
-- **31**: line 15 **98 of 100 committed, 2 failed with `max-retries`** (seen in two runs; final 98, no value went
-  back); line 16 one put frame, `permission-denied`; line 17 the transaction **committed** and the `set` won (99):
-  the transaction had been sent, and a sent transaction the server accepts completes as committed, as in the JS SDK;
-  line 18 two runs (null, then 5), committed 6; line 19 `max-retries` after 25 runs
+- **31**: line 15 **98 or 99 of 100 committed, the rest failed with `max-retries`** (final 98 or 99, no value went
+  back; on the emulator, 3 runs); line 16 one put frame, `permission-denied`; line 17 the transaction **committed**
+  and the `set` won (99): the transaction had been sent, and a sent transaction the server accepts completes as
+  committed, as in the JS SDK; line 18 two runs (null, then 5), committed 6; line 19 `max-retries` after 25 runs in
+  two of three runs, and in the third it committed after 15 runs (the rival's writes race the transaction)
 - **31 on production** (2026-11-26): line 15 99 of 100 committed, 1 failed with `max-retries` (final 99, no value
-  went back); lines 16 to 19 as on the emulator
-- **32**: on loopback the 1 MB `get()` took about 8 ms and the small event came after it
-- **32 on production** (2026-11-26): the small event came **before** the 1 MB `get()` finished (51 ms against
-  290 ms), not after it as on loopback
+  went back); line 19 `max-retries` after 25 runs; lines 16 to 18 as on the emulator
+- **32**: on loopback the 1 MB `get()` took 4 to 6 ms and the small event came after it (on the emulator, 3 runs)
+- **32 on production** (2026-11-26): the small event came **before** the 1 MB `get()` finished, not after it as on
+  loopback
 - **33**: the onDisconnect write ran about 12 ms after the dropped socket
 - **34**: 200; **35**: REST 400 "Invalid path: Path specified exceeds the maximum depth that can be written (32).",
-  the client refuses before sending; **36**: acknowledgements in order, final 999, no value went back, about 3,000
-  operations per second on loopback
+  the client refuses before sending; **36**: acknowledgements in order, final 999, no value went back, 4,975 to
+  8,403 operations per second on loopback (on the emulator, 3 runs)
 - **37**: into the window, one tagged put of `c4` alone (`{".priority":0,"n":4}`); out of it, one tagged merge at the
   query path with c2 (re-entering) and **c4 whole with priority 9, not null**
 - **38**: (a) the listen of the emptied node answers `{"s":"ok","d":{}}` and pushes `{".priority":5.0}`, the get
   answers the same data; the parent pushes and gets `{"n":{".priority":5.0}}`. (b) the update is accepted, export
-  `{".priority":7}`; `setPriority(9)` is accepted, export `{".priority":9}`. (c) the transaction commits after 2 runs
-  (null, null), export `{"t":2}`; the listens with the kit's hashes get no data for either the
-  emptied node or the control (the hash matched), the one with a wrong hash gets `{"b":1}`. (d) export
+  `{".priority":7}`; `setPriority(9)` is accepted, export `{".priority":9}`. (c) the transaction fails with
+  `max-retries` after 25 runs of the handler (null each time), export `{".priority":5.0}`; the listens with the
+  kit's hashes get no data for either the emptied node or the control (the hash matched), the one with a wrong hash
+  gets `{"b":1}`. (d) export
   `{".priority":5.0}`, then `null` after `set(n, null)`, then `{"b":1}` after `set(n/b, 1)`: the priority does not
   come back. (e) export `null` after the update (the node is removed), the transaction commits after 1 run.
-  (f) both SQLite clients own the file; the transaction commits after 2 runs (null, null)
-- **38 on production** (2026-11-26): run with the client before the emptied-node fix: (c) and (f) fail with
-  `max-retries` after 25 runs, as that client does on the emulator
+  (f) the SQLite cache is durable before and after the reopen; the transaction fails with `max-retries` after 25
+  runs of the handler (null each time), export `{".priority":5.0}`. The client of the repository has no emptied-node
+  fix. With `--expect-emptied-node-fix` (c) and (f) decide: a client with the fix commits (c) after 2 runs (null,
+  null, export `{"t":2}`) and (f) after 1 run (null) (on the emulator, one run)
 - **39**: Q1 without priority: the merge is accepted and the node is **removed** (`null`, both forms); control: kept
   as `{".priority":7}`. Q2: n holds `{"c":{".priority":3.0}}` after the removal, the put of `.priority` 9 is
   accepted: `{".priority":9,"c":{".priority":3.0}}`. Q3: a raw put of `{".priority":5}` gets **no answer**, on a

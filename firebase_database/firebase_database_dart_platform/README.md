@@ -114,12 +114,19 @@ Without it, or when it returns null, the connection sends no App Check token.
 
 | Argument | Default | What it does |
 | --- | --- | --- |
-| `tokenProviderFor` | none: no user | Returns the token provider of a FlutterFire app; called once per app. |
-| `appCheckProviderFor` | none: no App Check token | Returns the App Check token provider of a FlutterFire app; called once per app. |
+| `tokenProviderFor` | none: no user | Returns the token provider of a FlutterFire app; called when a client is created and the app has no token provider yet (below). |
+| `appCheckProviderFor` | none: no App Check token | Returns the App Check token provider of a FlutterFire app; called as `tokenProviderFor` is. |
 | `persistenceFor` | none: memory only | A `DatabasePersistenceFactory`: returns the client's `DatabasePersistence` for the cache size the app set (below). |
 | `useDartCore` | Linux only | Installs a small pure-Dart `firebase_core` in place of its method-channel implementation; a core another package installed is kept. Pass `true` for any platform (tests), `false` to never do it. |
 
 `use()` throws a `StateError` once an instance has created its client, because the configuration is read then.
+Called again before that, it replaces the whole configuration: `tokenProviderFor`, `appCheckProviderFor` and
+`persistenceFor` left out of the later call are unset, not kept from the earlier one (a Dart core already installed
+stays). The provider factories are called when a client is created and the `firebase_app_dart` app of the FlutterFire
+app has no provider of that kind yet: while a factory returns null, for every client created (each database, each new
+client after a delete); once it returned a provider, not again for that app. The Dart core of Linux deletes the
+`firebase_app_dart` app with the FlutterFire app, so a delete and create calls the factories again; the native and web
+cores keep that app and its providers.
 `FirebaseDatabaseDart.clientFor(app)` returns the client behind an instance, for what the official API does not
 have: `onConnected`, `isConnected`, `serverTimeOffset`, `onChildEvents`, `close`.
 
@@ -127,9 +134,9 @@ have: `onConnected`, `isConnected`, `serverTimeOffset`, `onChildEvents`, `close`
 
 The clients keep their data in memory unless `use` was given `persistenceFor`, a function from the cache size to a
 `DatabasePersistence`. The disk one comes from `firebase_database_dart_sqlite` (this package does not depend on it).
-The function is called once per instance (app and database URL), when the instance creates its client, with the size
-of `FirebaseDatabase.setPersistenceCacheSizeBytes`, 10 MiB when the app set none. The client keys the cache by app
-name and database URL, so one directory serves every app.
+The function is called each time an instance (app and database URL) creates a client, at the first use and again
+after the app was deleted, with the size of `FirebaseDatabase.setPersistenceCacheSizeBytes`, 10 MiB when the app set
+none. The client keys the cache by app name and database URL, so one directory serves every app.
 
 - `setPersistenceEnabled(false)` turns it off for an instance; `setPersistenceEnabled(true)` without
   `persistenceFor` prints a warning and stays in memory.
@@ -222,8 +229,9 @@ that same object. With `applyLocally: false`, listeners see no local event befor
   listen of an event stream, `push`, `goOnline`...). `push()` makes no request, but it needs the client for the
   server time offset of the key, so call `useDatabaseEmulator` before it. After the client is created,
   `useDatabaseEmulator` with the same host does nothing and with another one throws a `StateError` (ignoring it would
-  send the traffic to production); `setPersistenceEnabled` and `setPersistenceCacheSizeBytes` are ignored with a
-  debug message, as on Android; `setLoggingEnabled` takes effect at once.
+  send the traffic to production); `setPersistenceEnabled` that does not match the client (on disk only with
+  `persistenceFor`) and `setPersistenceCacheSizeBytes` with another size than the stored one are ignored with a debug
+  message, as on Android; `setLoggingEnabled` takes effect at once.
 - **An app deleted and created again under the same name with other options gets no client** while an instance of
   the earlier app is kept: each call that needs one throws a `StateError` (see "Emulator, logging, deleting an app").
   The instances and their settings stay with the earlier app, are not replaced and are never released, so the name
@@ -241,8 +249,9 @@ that same object. With `applyLocally: false`, listeners see no local event befor
 - **A stream ends after the server cancels its listen** (`permission-denied`, then done), as the client's streams do;
   on Android the stream reports the error and stays open, so an `await for` loop ends here and waits there.
 - **Closing the client or deleting the app is not an error**: every stream ends with done and no error event, as the
-  client's streams do. FlutterFire's `once()` is `onValue.first`, so a `once()` pending then fails with `StateError`
-  "No element" instead of `database-closed`; `get()` and the other Futures fail with `database-closed`.
+  client's streams do. FlutterFire's `once(eventType)` is the `first` of the stream of that event type (`onValue` by
+  default), so a `once()` pending then fails with `StateError` "No element" instead of `database-closed`; `get()` and
+  the other Futures fail with `database-closed`.
 - **A child snapshot keeps its priority** (`snapshot.child('a').priority`, `children`); the native plugins give null.
 - **A whole-number priority is an `int`** (`1`, not `1.0`), as values are; on Android FlutterFire returns every
   numeric priority as a `double`, so `priority as double` must become `(priority as num).toDouble()`.

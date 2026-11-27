@@ -870,6 +870,15 @@ jobs:
         run: ./tool/build_gallery.sh
       - name: Check the built files
         run: ./tool/check_gallery.sh
+      - name: Test the examples whose tests need no emulator
+        # The tests of the two playgrounds run on the VM with no backend; no other job runs an
+        # example's tests (tool/test_all.sh only analyzes the examples).
+        run: |
+          for example in playground rtdb_playground; do
+            echo "::group::examples/$example"
+            (cd "examples/$example" && dart pub get && dart test)
+            echo "::endgroup::"
+          done
       - name: Download the Database emulator
         # Does nothing when the cache restored the JAR of this CLI version.
         run: firebase setup:emulators:database
