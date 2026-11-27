@@ -587,12 +587,8 @@ void main() {
 
       h.db.close().then((_) => h.log.add('closed'));
       h.settle();
-      expect(h.log, <String>[
-        'S1:E(database-closed)',
-        'S1:done',
-        'F:E(database-closed)',
-        'closed',
-      ]);
+      // A close is not a failure: the stream ends with done only; the write's Future fails.
+      expect(h.log, <String>['S1:done', 'F:E(database-closed)', 'closed']);
       h.log.clear();
 
       h.listen('S2', h.ref('a').onValue);
@@ -602,14 +598,9 @@ void main() {
       // The streams and Futures made after close are independent: only their entries are pinned.
       expect(
         h.log,
-        unorderedEquals(<String>[
-          'S2:E(database-closed)',
-          'S2:done',
-          'G:E(database-closed)',
-          'closed2',
-        ]),
+        unorderedEquals(<String>['S2:done', 'G:E(database-closed)', 'closed2']),
       );
-      expect(h.named('S2'), <String>['S2:E(database-closed)', 'S2:done']);
+      expect(h.named('S2'), <String>['S2:done']);
     });
 
     scenario('D32 close() fails an outstanding get', (Harness h) {
@@ -628,7 +619,7 @@ void main() {
 
       h.app.delete();
       h.settle();
-      expect(h.log, <String>['S1:E(database-closed)', 'S1:done']);
+      expect(h.log, <String>['S1:done']);
     });
   });
 

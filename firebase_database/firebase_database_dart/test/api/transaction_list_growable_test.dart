@@ -117,6 +117,36 @@ void main() {
     },
   );
 
+  _withCached(
+    'a handler that changes its list and aborts leaves the cache unchanged',
+    <String, Object?>{
+      'l': <Object?>[1, 2],
+    },
+    (Harness h) {
+      h.trackTransaction(
+        'T',
+        h.ref('a').runTransaction((Object? value) {
+          final Map<String, Object?> root = value! as Map<String, Object?>;
+          (root['l']! as List<Object?>)
+            ..add(3)
+            ..removeAt(0);
+          root['m'] = 1;
+          return Transaction.abort();
+        }),
+      );
+      h.settle();
+      expect(h.named('T'), <String>['T:aborted({l:[1,2]})']);
+      expect(h.named('S'), isEmpty, reason: 'no local event');
+      expect(
+        h.server.requests.where((String r) => r.startsWith('p ')),
+        isEmpty,
+      );
+      h.trackEvent('O', h.ref('a').once());
+      h.settle();
+      expect(h.named('O'), <String>['O:V({l:[1,2]})']);
+    },
+  );
+
   _withCached('DataSnapshot.value lists stay unmodifiable', <Object?>[1, 2], (
     Harness h,
   ) {

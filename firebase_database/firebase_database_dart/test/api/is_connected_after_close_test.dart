@@ -1,6 +1,5 @@
-// isConnected after close and after the app is deleted: always false, whatever it was before.
-// onConnected listeners get the database-closed error and the stream ends, with no final false
-// event before it.
+// isConnected after close and after the app is deleted: always false, whatever it was before,
+// from the call on. onConnected listeners get done, with no error and no final false event.
 
 import 'dart:async';
 
@@ -38,7 +37,7 @@ void main() {
       expect(h.db.isConnected, isFalse);
       h.elapse(const Duration(minutes: 5));
       expect(h.db.isConnected, isFalse);
-      expect(h.log, <String>['C:true', 'C:E(database-closed)', 'C:done']);
+      expect(h.log, <String>['C:true', 'C:done']);
     },
   );
 
@@ -46,10 +45,12 @@ void main() {
     _listenConnected(h);
     expect(h.db.isConnected, isTrue);
 
-    h.app.delete();
+    unawaited(h.app.delete());
+    // The close that the deletion starts runs one event later; isConnected is false already.
+    expect(h.db.isConnected, isFalse);
     h.settle();
     expect(h.db.isConnected, isFalse);
-    expect(h.log, <String>['C:true', 'C:E(database-closed)', 'C:done']);
+    expect(h.log, <String>['C:true', 'C:done']);
   });
 
   _connected('close while offline: isConnected stays false', (Harness h) {

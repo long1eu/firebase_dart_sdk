@@ -42,12 +42,13 @@ import 'package:meta/meta.dart';
 /// also a second `listen` on the same stream object, is its own registration that gets its own initial
 /// events. Equal queries share one listen on the server. Cancelling a subscription removes it at once,
 /// without waiting for the server; the last one on a query removes the server listen. A stream ends only
-/// when the database closes (error `database-closed`, then done) or when the server cancels the listen
-/// (error, for example `permission-denied`, then done). A lost connection is never a stream error.
+/// when the database closes or its app is deleted (done, with no error event) or when the server cancels
+/// the listen (error, for example `permission-denied`, then done). A lost connection is never a stream
+/// error.
 ///
-/// Delivery. No listener runs inside the call that caused it, except in [FirebaseDatabase.close],
-/// which delivers the `database-closed` error to every open stream before it returns: events go
-/// through one queue per database, drained in a microtask. Inside one change, events come child
+/// Delivery. No listener runs inside the call that caused it: events go through one queue per
+/// database, drained in a microtask. [FirebaseDatabase.close] drops the events still queued for
+/// open streams, then each gets done in a microtask. Inside one change, events come child
 /// removed, added, moved, changed, then value; deeper locations before shallower ones. Changes are
 /// delivered in the order they were applied. Pausing a subscription buffers its events without
 /// bound; nothing is dropped. Order across subscriptions holds only for `listen` callbacks that are
@@ -338,8 +339,8 @@ base class Query {
   /// writes included), else it waits for the server with no timeout, also while offline; [get]
   /// fails with `unavailable` after 3 seconds instead. With a child type it completes with the
   /// first child event, so it waits until a child exists or changes. It fails with the error of the
-  /// stream (`permission-denied` when the rules refuse the listen, `database-closed` after
-  /// [FirebaseDatabase.close]).
+  /// stream (`permission-denied` when the rules refuse the listen), and with `database-closed`
+  /// when [FirebaseDatabase.close] ends the stream first.
   ///
   /// ```dart
   /// final DatabaseEvent e = await db.ref('config').once();
@@ -365,8 +366,11 @@ base class Query {
       },
       onDone: () {
         if (!completer.isCompleted) {
+          // The stream ends with done only at close; the Future still fails.
           completer.completeError(
-            StateError('The stream ended before an event of type $type.'),
+            database.isClosed
+                ? database.closedError()
+                : StateError('The stream ended before an event of type $type.'),
           );
         }
       },
