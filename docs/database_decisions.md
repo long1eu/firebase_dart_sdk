@@ -1187,7 +1187,7 @@ the number; the section each reason cites has the upstream lines.
 | 7 | Event delivery | listeners can run inside `set()` | queue, microtask, never inside | `scenarios_test` D1 |
 | 8 | Child events | four callbacks | four getters, `onChildEvents`, `once()` | `scenarios_test` D12 |
 | 9 | Error codes | upper-case status string | kebab-case, no token codes | `database_error_test` |
-| 10 | Configuration | cached instance, setters | constructor only, no cache | `public_surface_test`; no cache test |
+| 10 | Configuration | cached instance, setters | constructor only, no cache | `public_surface_test`; the adapter's cache: `instance_test`, `recreated_app_*_test` (platform package) |
 | 11 | Plain text | `http://h:443`, emulator on `ws://` | `ArgumentError`, no token | `realtime_target_test` |
 | 12 | Server hosts | stored unchecked | validated, resets capped | `hosts_test` |
 | 13 | Frame split | by UTF-16 unit | by code point | `framing_test` |
@@ -1390,8 +1390,8 @@ the typed read); a REST client of any kind (section 20); web disk persistence; a
 25 row 10); a typed `.info/authenticated` member (the path is readable) and a hook that goes offline when the app is
 backgrounded; a proxy option in the API (on the VM a secure connection honours `HTTPS_PROXY` and `NO_PROXY`, see
 the README); a configurable `get()` wait; the compat (namespaced) API;
-admin-only authentication paths; the idle disconnect. No parity page for the Database exists yet; this list and
-section 3 are the record of what differs.
+admin-only authentication paths; the idle disconnect. [The parity page](database_parity.md) compares every feature
+with the four official SDKs and lists these as "won't do or not needed".
 
 Follow-ups to the emptied-node priority fix (section 25, the two passes): the SQLite engine's restart replay keeps its
 current merge order, and a stored-format change would be needed to record emptied nodes; the SQLite cache does not

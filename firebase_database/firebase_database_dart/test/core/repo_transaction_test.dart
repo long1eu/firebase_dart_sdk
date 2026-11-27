@@ -1,7 +1,9 @@
 // Repo transactions: rows D24 and D34 to D41 of 14_api_contract.md section 4.4, retries, the
 // abort on an overlapping set, and the queue tree. Driven through FakeServerActions.
 import 'package:firebase_database_dart/src/core/transaction_data.dart';
+import 'package:firebase_database_dart/src/core/user_write_record.dart';
 import 'package:firebase_database_dart/src/testing/fake_server_actions.dart';
+import 'package:firebase_database_dart/src/testing/in_memory_persistence_storage_engine.dart';
 import 'package:test/test.dart';
 
 import 'repo_harness.dart';
@@ -279,4 +281,41 @@ void main() {
     await settle();
     expect(h.callsAt('unlisten', '/w'), hasLength(1));
   });
+
+  test(
+    'with persistence on, a transaction write is not stored and one info line says so',
+    () async {
+      final InMemoryPersistenceStorageEngine engine =
+          InMemoryPersistenceStorageEngine();
+      final RepoHarness h = RepoHarness(persistence: managerOver(engine));
+      h.listen('S1', 'c');
+      h.answer('c', 0);
+      await settle();
+
+      h.transaction('c', increment);
+      await settle();
+      expect(h.server.callsOf('put').single.path, '/c');
+      expect(engine.loadUserWrites(), isEmpty);
+
+      // A plain set on the same Repo is stored: the engine records user writes.
+      h.set('d', 1);
+      expect(
+        engine.loadUserWrites().map((UserWriteRecord w) => w.path.toString()),
+        <String>['/d'],
+      );
+
+      // A second transaction logs nothing more; the line is written when the call is made.
+      h.transaction('c', increment);
+      await settle();
+      expect(
+        h.logs.where(
+          (String l) => l.contains('runTransaction() usage detected'),
+        ),
+        <String>[
+          'info: runTransaction() usage detected while persistence is enabled. Please be aware that '
+              'transactions *will not* be persisted across database restarts.',
+        ],
+      );
+    },
+  );
 }
