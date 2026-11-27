@@ -140,9 +140,7 @@ and the tracked queries, restores the writes, and then connects. The layout is A
   rows of about 100 bytes): a point read takes 0.1 to 0.2 ms and one pending write 0.1 ms, whatever the size of the
   cache. Loading a whole subtree takes 56.2 ms for 1 MB, 615.2 ms for 10 MB and 2,968.3 ms for 50 MB; writing it takes
   51.9, 483.8 and 2,123.7 ms; reopening the file takes 3.4, 12.7 and 55.5 ms. A listener loads the subtree below its
-  path, so listen below the root of a large cache. An update that sets a priority on a node loads that node from the
-  cache once when it is acknowledged: 15 ms for a node of 10,000 rows of about 200 bytes and 155 ms for 100,000
-  (measured once on an Apple M5, JIT, medians of 7).
+  path, so listen below the root of a large cache.
 - **On macOS `fsync` does not flush the drive cache** and `fullfsync` is not set, so those write costs are not the
   cost on Linux or Windows; nothing was measured there.
 - **No web persistence.**

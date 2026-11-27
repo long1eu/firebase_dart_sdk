@@ -89,24 +89,10 @@ final class DefaultPersistenceManager implements PersistenceManager {
   }
 
   /// Android: `DefaultPersistenceManager.applyUserWriteToServerCache(Path, CompoundWrite)`.
-  /// Difference: the entries go in the server's order ([writesInServerOrder]: values, then
-  /// priorities, parents first), so a priority written next to a value that empties its node
-  /// is stored as the server holds it. A priority entry whose node takes no priority after the
-  /// values ([ChildrenNode.takesPriority], as [CompoundWrite.apply]) is skipped; that check loads
-  /// the node from the cache once per priority entry. On the SQLite engine, with the node stored
-  /// as 10,000 rows, an acked `{a: null, .priority: 7}` took a median of 15 ms (0.2 ms without the
-  /// check; measured once, Apple M5, 2026-11-27).
   @override
   void applyUserMergeToServerCache(Path path, CompoundWrite merge) {
-    for (final MapEntry<Path, Node> write in writesInServerOrder(merge)) {
-      final Path target = path.childPath(write.key);
-      if ((write.key.back?.isPriorityKey ?? false) &&
-          !ChildrenNode.takesPriority(
-            _storageLayer.serverCache(target.parent!),
-          )) {
-        continue;
-      }
-      applyUserWriteToServerCache(target, write.value);
+    for (final MapEntry<Path, Node> write in merge.entries) {
+      applyUserWriteToServerCache(path.childPath(write.key), write.value);
     }
   }
 

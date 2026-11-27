@@ -1362,8 +1362,16 @@ change shows the same (a reviewer's script on both trees, 2026-11-27). (f) A fil
 hold an emptied child with a stale kept priority: a change to a hidden child that is empty before and after is dropped
 by the filter. The server counts an emptied node in a query window's hash and toward a limit (check 42, emulator and
 production, 2026-11-28), so the hash of such a view is not accepted and its window is sent again at the next listen.
-No wrong data is shown. (g) When the SQLite engine is used, an acknowledged update that sets a priority on a node
-loads that node from the cache once (15 ms for 10,000 rows, measured once); see the SQLite package's README.
+No wrong data is shown. A limit view whose window holds emptied children only drops them (it stores the empty node),
+with the same effect. (g) An acknowledged update is written into the persisted server cache entry by entry in tree
+order (`.priority` first, as Android), not in the server's two passes, when no default listen is active at its path.
+With the in-memory engine, `update(x, {a: null, ".priority": 7})` on a cached `x = {a: 1}` stores `x` as an emptied
+node keeping 7, where the server holds nothing; a restarted client that writes `x/b` offline shows `x = {b: 1}` with
+priority 7 until it is online again (pinned by `test/core/persistence/emptied_node_priority_persistence_test.dart`).
+The SQLite engine clears an emptied node, so it does not show this; for the same reason it shows no priority after a
+refill where the server keeps the priority of an emptied node. Two attempts to store the update in the server's order
+each moved the fault to another case (the SQLite engine kept a priority under an empty node; a value entry skipped for
+an active listen made the priority's node read empty), so the order stays as it was in 0.1.0 (2026-11-28).
 
 ## 26. What is not in 0.1
 
