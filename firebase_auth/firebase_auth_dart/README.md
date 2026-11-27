@@ -43,7 +43,7 @@ If you already have a Firebase project for you mobile/web apps you can skip this
    if (isDesktop) {
      FirebaseAuthDart.register(
        options: const FirebaseOptions(
-         apiKey: 'AIzaSyBQgB5s3n8WvyCOxhCws-RVf3C-6VnGg0A',
+         apiKey: 'AIzaSyCbP8E_BUgahI04T_JOaJTnMBo1en0Q8RE',
          projectID: 'flutter-sdk',
          gcmSenderID: '233259864964',
          databaseURL: 'https://flutter-sdk.firebaseio.com',
@@ -111,7 +111,7 @@ Since desktop is not an officially supported platform, we need to create `applic
           final FirebaseApp app = await FirebaseApp.configure(
             name: 'foo',
             options: const FirebaseOptions(
-              apiKey: 'AIzaSyBQgB5s3n8WvyCOxhCws-RVf3C-6VnGg0A',
+              apiKey: 'AIzaSyCbP8E_BUgahI04T_JOaJTnMBo1en0Q8RE',
               databaseURL: 'https://flutter-sdk.firebaseio.com',
               projectID: 'flutter-sdk',
               storageBucket: 'flutter-sdk.appspot.com',

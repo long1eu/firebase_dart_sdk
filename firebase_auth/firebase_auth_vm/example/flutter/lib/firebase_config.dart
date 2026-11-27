@@ -27,7 +27,7 @@ FirebaseOptions get firebaseOptions {
     );
   } else {
     return FirebaseOptions(
-      apiKey: 'AIzaSyBQgB5s3n8WvyCOxhCws-RVf3C-6VnGg0A',
+      apiKey: 'AIzaSyCbP8E_BUgahI04T_JOaJTnMBo1en0Q8RE',
       projectId: 'flutter-sdk',
       gcmSenderId: '233259864964',
       databaseUrl: 'https://flutter-sdk.firebaseio.com',
