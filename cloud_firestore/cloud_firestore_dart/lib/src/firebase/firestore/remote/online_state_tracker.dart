@@ -32,7 +32,7 @@ class OnlineStateTracker {
   }) : _runOnQueue = runOnQueue ?? _runNow,
        _state = OnlineState.unknown,
        _watchStreamFailures = 0,
-       _shouldWarnClientIsOffline = false;
+       _shouldWarnClientIsOffline = true;
 
   /// The current OnlineState.
   OnlineState _state;
