@@ -74,6 +74,12 @@ READMEs are short landing pages; the API reference is on pub.dev.
     SQLite cache.
 29. [Cloud Storage](storage.md): `firebase_storage_dart`: the token and App Check headers, rules and
     errors, retries, resumable uploads with progress, metadata, and tests against the Storage emulator.
+30. [Realtime Database](database.md): the three `firebase_database_dart*` packages: which to add, the connection and
+    its tokens, rules and errors, what differs from the JS SDK, the SQLite cache, the connection on a desktop or a
+    server, and tests against the emulator.
+31. [Realtime Database in a FlutterFire app](database_flutter.md): moving a FlutterFire `firebase_database` app to
+    Linux, Windows or pure Dart: keep `package:firebase_database` with the `firebase_database_dart_platform` adapter,
+    or move to the `firebase_database_dart` API, with the differences, what has run and troubleshooting.
 
 Every Dart snippet in these guides is compiled against the current API by
 `cloud_firestore/cloud_firestore_dart/test/unit/api/readme_snippets_test.dart`, except the blocks

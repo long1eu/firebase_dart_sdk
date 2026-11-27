@@ -1,0 +1,23 @@
+name: rtdb_playground
+description: >-
+  A browser playground for firebase_database_dart that needs no backend: the
+  real client runs against a small simulated server inside the page.
+publish_to: none
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  firebase_app_dart: ^0.2.0
+  firebase_database_dart:
+    path: ../../firebase_database/firebase_database_dart
+  web: ^1.1.0
+
+dev_dependencies:
+  lints: ^6.0.0
+
+# firebase_app_dart is not on pub.dev yet: it comes from this repository.
+# Outside the repository, remove this section.
+dependency_overrides:
+  firebase_app_dart:
+    path: ../../firebase_core/firebase_app_dart

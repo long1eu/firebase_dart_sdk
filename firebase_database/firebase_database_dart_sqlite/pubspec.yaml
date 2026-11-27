@@ -1,0 +1,45 @@
+name: firebase_database_dart_sqlite
+description: >-
+  The SQLite offline cache of firebase_database_dart on the Dart VM and in
+  Flutter, on top of package:sqlite3. Work in progress.
+version: 0.0.1
+publish_to: none
+homepage: https://github.com/long1eu/firebase_dart_sdk
+repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_database/firebase_database_dart_sqlite
+issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
+topics:
+  - firebase
+  - database
+  - sqlite
+  - offline
+
+platforms:
+  android:
+  ios:
+  linux:
+  macos:
+  windows:
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  # SHA-256 of (app name, database URL): the name of the cache file.
+  crypto: ^3.0.3
+  # Already a dependency of sqlite3: C strings for chmod(2) through dart:ffi.
+  ffi: ^2.1.0
+  # The PersistenceStorageEngine interface (not committed yet; see
+  # lib/src/engine_contract_placeholder.dart). Local development resolves it
+  # from ../firebase_database_dart through pubspec_overrides.yaml.
+  firebase_database_dart: ^0.0.1
+  meta: ^1.11.0
+  # The constraint of cloud_firestore_dart_sqlite: 3.x loads SQLite through a
+  # build hook (Dart 3.10 or later); pub picks 2.x on older SDKs, which loads
+  # the system library (see the README of cloud_firestore_dart_sqlite).
+  sqlite3: '>=2.7.3 <4.0.0'
+
+dev_dependencies:
+  # Only for test/readme: a README snippet signs a user in before it opens the database.
+  firebase_auth_providers_dart: ^0.4.0
+  lints: ^6.1.0
+  test: ^1.25.0

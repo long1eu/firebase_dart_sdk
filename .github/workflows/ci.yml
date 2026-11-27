@@ -52,6 +52,10 @@ jobs:
       indexeddb: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.indexeddb == 'true' }}
       # Whether the change touches firebase_auth_secure_storage_dart or what runs its tests on the real stores.
       securestorage: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.securestorage == 'true' }}
+      # Whether the change touches the Realtime Database packages or their scripts.
+      database: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.database == 'true' }}
+      # Whether the change touches the examples or the gallery scripts.
+      gallery: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.gallery == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -74,7 +78,8 @@ jobs:
           # `browser` is true when any changed file is one of these: the library, the SQLite
           # opener package (the web opener and OPFS worker the tests use), the browser tests, and
           # what runs them.
-          # `indexeddb` and `securestorage` work the same way for their own jobs.
+          # `indexeddb`, `securestorage`, `database` and `gallery` work the same way for their own
+          # jobs.
           filters: |
             browser:
               - 'cloud_firestore/cloud_firestore_dart/lib/**'
@@ -110,6 +115,30 @@ jobs:
               - 'firebase_auth/firebase_auth_secure_storage_dart/**'
               - '.github/workflows/ci.yml'
               - '.github/actions/**'
+            database:
+              - 'firebase_database/**'
+              - 'firebase_core/firebase_app_dart/lib/**'
+              - 'firebase_core/firebase_app_dart/pubspec.yaml'
+              - 'tool/start_database_emulator.sh'
+              - 'tool/stop_database_emulator.sh'
+              - 'tool/database_emulator/**'
+              - 'tool/test_flutterfire_database_gate.sh'
+              - '.github/workflows/ci.yml'
+              - '.github/actions/**'
+            gallery:
+              - 'examples/**'
+              - 'tool/build_gallery.sh'
+              - 'tool/check_gallery.sh'
+              - 'tool/smoke_gallery.mjs'
+              # What examples/web_app resolves by path (the rtdb examples are covered by `database`).
+              - 'cloud_firestore/cloud_firestore_dart/lib/**'
+              - 'cloud_firestore/cloud_firestore_dart/pubspec.yaml'
+              - 'cloud_firestore/cloud_firestore_dart_sqlite/lib/**'
+              - 'cloud_firestore/cloud_firestore_dart_sqlite/pubspec.yaml'
+              - 'firebase_storage/firebase_storage_dart/lib/**'
+              - 'firebase_storage/firebase_storage_dart/pubspec.yaml'
+              - 'firebase_core/firebase_app_dart/lib/**'
+              - 'firebase_core/firebase_app_dart/pubspec.yaml'
 
   # The unit suite (tool/test_all.sh) runs in two parallel legs per SDK: cloud_firestore_dart
   # alone (its tests take about 9 of the 11 minutes) and every other package with the examples.
@@ -134,7 +163,8 @@ jobs:
           - leg: others
             packages: >-
               secure_flow firebase_app_dart firebase_auth_providers_dart cloud_firestore_dart_sqlite
-              firebase_admin_dart firebase_storage_dart firebase_auth_secure_storage_dart examples
+              firebase_admin_dart firebase_storage_dart firebase_auth_secure_storage_dart
+              firebase_database_dart firebase_database_dart_sqlite examples
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/dart
@@ -191,6 +221,18 @@ jobs:
         if: ${{ !cancelled() && matrix.leg == 'others' }}
         working-directory: firebase_auth/firebase_auth_secure_storage_dart
         run: dart format --output=none --set-exit-if-changed lib test
+      - name: Check formatting (firebase_database_dart)
+        if: ${{ !cancelled() && matrix.leg == 'others' }}
+        working-directory: firebase_database/firebase_database_dart
+        run: dart format --output=none --set-exit-if-changed lib test example
+      - name: Check formatting (firebase_database_dart_sqlite)
+        if: ${{ !cancelled() && matrix.leg == 'others' }}
+        working-directory: firebase_database/firebase_database_dart_sqlite
+        # Without test/readme: readme_snippets_test.dart generates it and the formatter does not
+        # leave it unchanged.
+        run: |
+          find lib test tool -name '*.dart' -not -path 'test/readme/*' -print0 \
+            | xargs -0 dart format --output=none --set-exit-if-changed
       - name: Lowest versions of the dependencies (firebase_auth_providers_dart)
         # The package claims `googleapis_auth: ^2.0.0`, `http: ^1.2.0` and `crypto: ^3.0.3`: run its
         # tests with the lowest versions this SDK resolves (only the runtime dependencies are
@@ -217,7 +259,8 @@ jobs:
           - leg: others
             packages: >-
               secure_flow firebase_app_dart firebase_auth_providers_dart cloud_firestore_dart_sqlite
-              firebase_admin_dart firebase_storage_dart firebase_auth_secure_storage_dart examples
+              firebase_admin_dart firebase_storage_dart firebase_auth_secure_storage_dart
+              firebase_database_dart firebase_database_dart_sqlite examples
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/dart
@@ -647,6 +690,220 @@ jobs:
           name: storage-log
           path: ${{ runner.temp }}/emulator/*.log
 
+  # firebase_database_dart against the Realtime Database emulator (test/integration, tag
+  # `emulator`), which tool/start_database_emulator.sh starts on 9100 with open rules. The
+  # emulator JAR is fetched by `firebase setup:emulators:database`, as the Storage job fetches its
+  # rules runtime. The two tests tagged `emulator-slow` (minutes each) are skipped by
+  # dart_test.yaml; any other skip means FIREBASE_DATABASE_EMULATOR_HOST did not reach the tests,
+  # and the step fails then. Starts at once, in parallel with the other emulator suites.
+  database:
+    name: Realtime Database emulator integration tests
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set the emulator work directory
+        # The `runner` context is not available in job-level `env`.
+        run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/dart
+        with:
+          sdk: stable
+      - uses: ./.github/actions/emulators
+      - name: Download the Database emulator
+        # Does nothing when the cache restored the JAR of this CLI version.
+        run: firebase setup:emulators:database
+      - name: Start the Database emulator
+        run: ./tool/start_database_emulator.sh 9100
+      - name: Run the emulator tests of firebase_database_dart
+        working-directory: firebase_database/firebase_database_dart
+        env:
+          FIREBASE_DATABASE_EMULATOR_HOST: 127.0.0.1:9100
+          # The tests tagged `emulator-slow`, which dart_test.yaml skips.
+          EXPECTED_SKIPS: '2'
+        # One test file at a time, the run dart_test.yaml of the package documents.
+        run: |
+          set -o pipefail
+          dart pub get
+          dart test -t emulator -j 1 --reporter expanded --no-color test/integration 2>&1 \
+            | tee "$EMULATOR_DIR/database_integration.log"
+          if ! grep -Eq "^[0-9:]+ \+[1-9][0-9]* ~$EXPECTED_SKIPS: All tests passed!\$" \
+            "$EMULATOR_DIR/database_integration.log"; then
+            echo "::error::The Database emulator tests did not all run: a skip count other than" \
+              "$EXPECTED_SKIPS means FIREBASE_DATABASE_EMULATOR_HOST did not reach them."
+            exit 1
+          fi
+      - name: Stop the Database emulator
+        if: always()
+        run: ./tool/stop_database_emulator.sh 9100
+      - name: Upload the logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: database-log
+          path: ${{ runner.temp }}/emulator/*.log
+
+  # The tests of firebase_database_dart in headless Chrome, on both compilers (`dart test -p chrome`
+  # over the whole test tree; the files marked @TestOn('vm') drop out by themselves). No emulator.
+  # Only when the change touches the Database packages, firebase_app_dart, their scripts, ci.yml
+  # or .github/actions/. Required: no other job runs the client on the web.
+  database-browser:
+    name: Realtime Database tests in Chrome (${{ matrix.compiler }})
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' && needs.changes.outputs.database == 'true' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [dart2js, dart2wasm]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/dart
+        with:
+          sdk: stable
+      - name: Run the tests in Chrome
+        working-directory: firebase_database/firebase_database_dart
+        env:
+          COMPILER: ${{ matrix.compiler }}
+        run: |
+          set -o pipefail
+          dart pub get
+          dart test -p chrome -c "$COMPILER" --reporter expanded --no-color 2>&1 \
+            | tee "$RUNNER_TEMP/database_browser.log"
+      - name: Upload the logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: database-browser-log-${{ matrix.compiler }}
+          path: ${{ runner.temp }}/database_browser.log
+
+  # The acceptance gate of firebase_database_dart_platform: FlutterFire's own firebase_database
+  # example integration tests (77) against the shim and a Database emulator on 9100
+  # (tool/test_flutterfire_database_gate.sh, which starts and stops the emulator itself). It needs
+  # FlutterFire at the commit the script pins, checked out sparsely next to this repository, and a
+  # Flutter whose Dart is at least 3.13 (FlutterFire's example does not resolve on 3.44.9). Only
+  # when the change touches the Database packages or their scripts. Allowed to fail until it has
+  # passed on a runner: it passed on macOS (76 passed, 1 skipped), not yet on Linux.
+  database-flutterfire-gate:
+    name: FlutterFire firebase_database tests on the shim (Flutter 3.47.8, allowed to fail)
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' && needs.changes.outputs.database == 'true' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 40
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The commit pinned as PINNED_COMMIT in tool/test_flutterfire_database_gate.sh; move both
+      # together.
+      - name: Check out FlutterFire at the pinned commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: firebase/flutterfire
+          ref: 6a80b1b5eea1ea86ba8c7e7bf2a8525cabb77126
+          path: flutterfire
+          persist-credentials: false
+          filter: blob:none
+          sparse-checkout: |
+            packages/firebase_database
+            .github
+      - name: Set the emulator work directory
+        # The `runner` context is not available in job-level `env`.
+        run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: 3.47.8
+          cache: true
+      - uses: ./.github/actions/emulators
+      - name: Download the Database emulator
+        # Does nothing when the cache restored the JAR of this CLI version.
+        run: firebase setup:emulators:database
+      - name: Run the gate
+        env:
+          GATE_DATABASE_PORT: '9100'
+        run: |
+          flutter --version
+          FLUTTERFIRE_DIR="$GITHUB_WORKSPACE/flutterfire" ./tool/test_flutterfire_database_gate.sh
+      - name: Upload the logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: database-flutterfire-gate-log
+          path: ${{ runner.temp }}/emulator/*.log
+
+  # The web gallery: tool/build_gallery.sh compiles each web example with dart2wasm and dart2js
+  # into build/gallery, tool/check_gallery.sh checks the built entry files and every file each
+  # index.html references, and tool/smoke_gallery.mjs clicks through rtdb_web_app and
+  # rtdb_playground in headless Chrome on both builds (Node's own WebSocket, no npm package),
+  # with the pages served from 127.0.0.1:8080 and a Database emulator on 9100, the script's
+  # defaults. The script writes no screenshots: its output is the log. Only when the change
+  # touches what the `database` filter covers, the examples or the three gallery scripts.
+  # Required: no other job compiles the examples to the web or runs them in a browser.
+  gallery:
+    name: Web gallery build and smoke test (Chrome)
+    needs: changes
+    if: >-
+      ${{ needs.changes.outputs.code == 'true' && (needs.changes.outputs.database == 'true' ||
+      needs.changes.outputs.gallery == 'true') }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set the emulator work directory
+        # The `runner` context is not available in job-level `env`.
+        run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/dart
+        with:
+          sdk: stable
+      - uses: ./.github/actions/emulators
+      - name: Build the gallery
+        run: ./tool/build_gallery.sh
+      - name: Check the built files
+        run: ./tool/check_gallery.sh
+      - name: Download the Database emulator
+        # Does nothing when the cache restored the JAR of this CLI version.
+        run: firebase setup:emulators:database
+      - name: Start the Database emulator
+        run: ./tool/start_database_emulator.sh 9100
+      - name: Smoke test the Realtime Database examples (dart2js and dart2wasm)
+        env:
+          CHROME: google-chrome
+        run: |
+          set -o pipefail
+          python3 -m http.server 8080 --bind 127.0.0.1 --directory build/gallery \
+            > "$EMULATOR_DIR/http_server.log" 2>&1 &
+          server=$!
+          trap 'kill "$server"' EXIT
+          for _ in $(seq 1 30); do
+            if curl -sf -o /dev/null http://127.0.0.1:8080/; then break; fi
+            sleep 1
+          done
+          if ! curl -sf -o /dev/null http://127.0.0.1:8080/; then
+            echo "::error::The HTTP server of build/gallery did not answer on 127.0.0.1:8080."
+            cat "$EMULATOR_DIR/http_server.log"
+            exit 1
+          fi
+          node tool/smoke_gallery.mjs 2>&1 | tee "$EMULATOR_DIR/smoke_gallery.log"
+      - name: Stop the Database emulator
+        if: always()
+        run: ./tool/stop_database_emulator.sh 9100
+      - name: Upload the logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gallery-log
+          path: ${{ runner.temp }}/emulator/*.log
+
   # firebase_auth_secure_storage_dart against the real secret store of each system
   # (test/integration, skipped without FIREBASE_AUTH_SECURE_STORAGE_INTEGRATION=1; the unit legs run
   # the rest of its tests). Only when a change touches the package, ci.yml or .github/actions/. Each
@@ -768,10 +1025,16 @@ jobs:
 
   # The Flutter packages, which the unit jobs skip (they install Dart only): flutter analyze and
   # flutter test of cloud_firestore_dart_flutterfire, cloud_firestore_dart_platform,
-  # firebase_auth_dart_platform, firebase_storage_dart_platform and firebase_auth_secure_storage_flutter
-  # (unit tests only, against a fake of the plugin's channel), the emulator tests of the two platform packages included
+  # firebase_auth_dart_platform, firebase_storage_dart_platform, firebase_database_dart_platform and
+  # firebase_auth_secure_storage_flutter (unit tests only, against a fake of the plugin's
+  # channel), the emulator tests of the three platform packages included
   # (FIRESTORE_EMULATOR_HOST: 15 of the Firestore package's 29 tests skip without it;
-  # FIREBASE_AUTH_EMULATOR_HOST, from tool/start_auth_emulators.sh, for the Auth package), flutter analyze of examples/flutter_notes, and flutter analyze and the web builds
+  # FIREBASE_AUTH_EMULATOR_HOST, from tool/start_auth_emulators.sh, for the Auth package;
+  # FIREBASE_DATABASE_EMULATOR_HOST, from tool/start_database_emulator.sh on 9100, for the Database
+  # package: 5 of its tests skip without it), flutter analyze of examples/flutter_notes and of the
+  # desktop examples (flutterfire_on_linux, flutterfire_on_windows, flutterfire_storage_on_linux,
+  # flutterfire_database_on_linux, flutterfire_database_on_windows; analyze only, no build), and
+  # flutter analyze and the web builds
   # (`flutter build web` and `flutter build web --wasm`) of examples/flutter_web_two_users. Through tool/test_all.sh, with
   # TEST_ALL_REQUIRE_FLUTTER=1 so that a missing Flutter fails the job instead of skipping. The
   # emulator is a private one on 8090 (tool/start_private_emulator.sh), as in the web transport
@@ -801,10 +1064,16 @@ jobs:
       - name: Start the Auth emulator
         # Also starts a Firestore emulator on 8197, which nothing here uses.
         run: ./tool/start_auth_emulators.sh 9197 8197
+      - name: Download the Database emulator
+        # Does nothing when the cache restored the JAR of this CLI version.
+        run: firebase setup:emulators:database
+      - name: Start the Database emulator
+        run: ./tool/start_database_emulator.sh 9100
       - name: Analyze and test the Flutter packages, analyze and build the Flutter examples
         env:
           FIRESTORE_EMULATOR_HOST: 127.0.0.1:8090
           FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9197
+          FIREBASE_DATABASE_EMULATOR_HOST: 127.0.0.1:9100
           TEST_ALL_REQUIRE_FLUTTER: '1'
           TEST_LOG_DIR: ${{ runner.temp }}/emulator/flutter
         # A skipped test of a platform package means the emulator did not reach it: the step
@@ -814,8 +1083,13 @@ jobs:
           flutter --version
           ./tool/test_all.sh cloud_firestore_dart_flutterfire cloud_firestore_dart_platform \
             firebase_auth_dart_platform firebase_storage_dart_platform \
-            firebase_auth_secure_storage_flutter \
-            examples/flutter_notes examples/flutter_web_two_users 2>&1 \
+            firebase_database_dart_platform firebase_auth_secure_storage_flutter \
+            examples/flutter_notes examples/flutter_web_two_users \
+            examples/flutterfire_on_linux \
+            examples/flutterfire_on_windows \
+            examples/flutterfire_storage_on_linux \
+            examples/flutterfire_database_on_linux \
+            examples/flutterfire_database_on_windows 2>&1 \
             | tee "$RUNNER_TEMP/flutter_summary.txt"
           if ! grep -Eq '^cloud_firestore_dart_platform: .*test PASS \([0-9]+ passed, 0 skipped' \
             "$RUNNER_TEMP/flutter_summary.txt"; then
@@ -832,12 +1106,20 @@ jobs:
             echo "::error::Tests of firebase_auth_secure_storage_flutter were skipped."
             exit 1
           fi
+          if ! grep -Eq '^firebase_database_dart_platform: .*test PASS \([0-9]+ passed, 0 skipped' \
+            "$RUNNER_TEMP/flutter_summary.txt"; then
+            echo "::error::Tests of firebase_database_dart_platform were skipped: FIREBASE_DATABASE_EMULATOR_HOST did not reach them."
+            exit 1
+          fi
       - name: Stop the private Firestore emulator
         if: always()
         run: ./tool/stop_private_emulator.sh 8090
       - name: Stop the Auth emulator
         if: always()
         run: ./tool/stop_auth_emulators.sh 9197 8197
+      - name: Stop the Database emulator
+        if: always()
+        run: ./tool/stop_database_emulator.sh 9100
       - name: Upload test output
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

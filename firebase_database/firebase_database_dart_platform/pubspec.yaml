@@ -1,0 +1,67 @@
+name: firebase_database_dart_platform
+description: >-
+  Unofficial pure-Dart implementation of the FlutterFire Realtime Database
+  platform interface: the official firebase_database API on Linux, or on any
+  platform you choose.
+version: 0.0.1
+publish_to: none
+homepage: https://github.com/long1eu/firebase_dart_sdk
+repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_database/firebase_database_dart_platform
+issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
+topics:
+  - firebase
+  - database
+  - flutterfire
+  - linux
+
+# firebase_database_platform_interface 0.4.3+10 requires both.
+environment:
+  sdk: ^3.12.0
+  flutter: '>=3.44.0'
+
+# Flutter registers the plugin class before main() only on the platforms listed
+# here. On Linux neither firebase_database nor firebase_core has an
+# implementation of its own. On Windows, an app that lists this package as a
+# direct dependency gets it in place of the native (C++ SDK) firebase_database
+# plugin, which then leaves the build (run on Windows 11 x64, Flutter 3.47.8,
+# debug). Elsewhere the app calls FirebaseDatabaseDart.use() (see the README).
+flutter:
+  plugin:
+    implements: firebase_database
+    platforms:
+      linux:
+        dartPluginClass: FirebaseDatabaseDart
+      windows:
+        dartPluginClass: FirebaseDatabaseDart
+
+dependencies:
+  # Local development resolves firebase_database_dart and firebase_app_dart
+  # from the sibling packages through pubspec_overrides.yaml (not published).
+  firebase_app_dart: ^0.2.0
+  firebase_core: ^5.1.0
+  firebase_core_platform_interface: ^8.1.1
+  firebase_database_dart: ^0.0.1
+  # The version firebase_database 13.1.0 resolves to at FlutterFire 6a80b1b5.
+  firebase_database_platform_interface: ^0.4.3+10
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  # Parses lib in test/public_api_lister.dart (dart:mirrors is not available
+  # under flutter test).
+  analyzer: ^13.0.0
+  # The packages that the snippets of the README and of the Flutter guide name
+  # (test/readme_snippets_test.dart).
+  cloud_firestore_dart_flutterfire:
+    path: ../../cloud_firestore/cloud_firestore_dart_flutterfire
+  firebase_app_check: ^0.5.2
+  firebase_auth: ^7.0.1
+  firebase_auth_dart_platform:
+    path: ../../firebase_auth/firebase_auth_dart_platform
+  # The app-facing package the tests drive, as an app would.
+  firebase_database: ^13.1.0
+  firebase_database_dart_sqlite:
+    path: ../firebase_database_dart_sqlite
+  flutter_test:
+    sdk: flutter
+  lints: ^6.1.0

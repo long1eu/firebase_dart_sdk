@@ -17,7 +17,7 @@ import 'package:rxdart/rxdart.dart';
 ///
 /// | Member | Default | Who reads it |
 /// | --- | --- | --- |
-/// | [onNetworkConnected] | always connected | Firestore: `true` restarts failed streams at once |
+/// | [onNetworkConnected] | always connected | Firestore and Realtime Database: `true` retries at once |
 /// | [onBackgroundChanged] | never in the background | nobody in this repository |
 /// | [storage] | this object, in memory | `FirebaseApp.setAutomaticDataCollectionEnabled` |
 /// | [authProvider] | none: requests carry no token | Firestore |

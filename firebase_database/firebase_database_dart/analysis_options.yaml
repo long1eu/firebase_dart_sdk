@@ -1,0 +1,12 @@
+# The options of the repository, plus the documentation lints (this package
+# passes both). Not published (see .pubignore): it includes a file outside the
+# package.
+include: ../../analysis_options.yaml
+
+linter:
+  rules:
+    comment_references: true
+    public_member_api_docs: true
+    # Skeleton phase only: signature-only factories throw before using their
+    # parameters. Remove this line when the data layer freezes.
+    avoid_unused_constructor_parameters: false

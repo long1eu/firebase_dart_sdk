@@ -1,0 +1,21 @@
+class FakeDatabaseServer
+  acceptConnections: bool
+  ackLastOnDisconnect(): void
+  ackLastWrite(): void
+  answerGet(String path, Object value): void
+  answerListen(String path, Object value, {Map<String, Object> query}): void
+  cancelListen(String path, String status, {Map<String, Object> query}): void
+  dropConnection(): void
+  failGet(String path, String status): void
+  failLastWrite(String status): void
+  failListen(String path, String status, {Map<String, Object> query}): void
+  get connectionAttempts: int
+  get receivedAuthTokens: List<String>
+  get requests: List<String>
+  kill(String reason): void
+  new FakeDatabaseServer()
+  push(String path, Object value): void
+  revokeAuth(): void
+  serverTime: DateTime
+databaseWithFakeServer(FirebaseApp app, FakeDatabaseServer server, {DatabasePersistence persistence, (.DatabaseLogLevel, dart.core.String) -> void logger, Duration reconnectDelay}): FirebaseDatabase
+fakePersistence({Map<String, Object> serverCache}): DatabasePersistence
