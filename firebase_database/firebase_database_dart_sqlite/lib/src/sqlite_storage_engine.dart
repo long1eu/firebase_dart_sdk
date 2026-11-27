@@ -42,6 +42,21 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
   bool _successful = false;
   int _sizeAtBegin = 0;
 
+  /// The write removals of the open transaction: ids, or all writes.
+  final Set<int> _removedNow = <int>{};
+  bool _removedAllNow = false;
+
+  /// Write removals of transactions that were meant to commit but did not reach the file (a busy
+  /// file, or a storage error that degraded the store). Left in the file, those writes would be
+  /// loaded and sent again at the next start although the server already answered them. They are
+  /// applied again in the next transaction that reaches the file, or at [close] after a storage
+  /// error ([SqliteConnection.removeUserWritesAfterDegraded]).
+  final Set<int> _unsavedRemovals = <int>{};
+  bool _unsavedRemoveAll = false;
+
+  /// Whether the open transaction applies [_unsavedRemovals] again.
+  bool _retryingRemovals = false;
+
   void _requireTransaction() {
     if (!_open) {
       throw StateError('Transaction expected to already be in progress.');
@@ -59,7 +74,16 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
   bool get isDurable => _connection.isDurable;
 
   @override
-  void close() => _connection.close();
+  void close() {
+    if (_connection.state == StoreState.degraded &&
+        (_unsavedRemoveAll || _unsavedRemovals.isNotEmpty)) {
+      _connection.removeUserWritesAfterDegraded(
+        _unsavedRemovals,
+        all: _unsavedRemoveAll,
+      );
+    }
+    _connection.close();
+  }
 
   @override
   void beginTransaction() {
@@ -68,10 +92,21 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
         'beginTransaction called while a storage transaction is already in progress.',
       );
     }
-    _connection.begin();
+    final bool reachesFile = _connection.begin();
     _open = true;
     _successful = false;
     _sizeAtBegin = _serverCache.size;
+    _removedNow.clear();
+    _removedAllNow = false;
+    _retryingRemovals =
+        reachesFile && (_unsavedRemoveAll || _unsavedRemovals.isNotEmpty);
+    if (_retryingRemovals) {
+      if (_unsavedRemoveAll) {
+        _userWrites.removeAll();
+      } else {
+        _unsavedRemovals.forEach(_userWrites.remove);
+      }
+    }
   }
 
   @override
@@ -83,11 +118,13 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
   @override
   void endTransaction() {
     _requireTransaction();
+    bool committed = false;
     // A close inside the transaction already rolled it back; ending it is then a no-op.
     if (_connection.inTransaction) {
       if (_successful) {
         // A transaction the file refused (busy) or that failed did not change the rows.
-        if (!_connection.commit()) {
+        committed = _connection.commit();
+        if (!committed) {
           _serverCache.size = _sizeAtBegin;
         }
       } else {
@@ -95,8 +132,30 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
         _serverCache.size = _sizeAtBegin;
       }
     }
+    if (committed && _retryingRemovals) {
+      _unsavedRemovals.clear();
+      _unsavedRemoveAll = false;
+    }
+    if (!committed && _successful) {
+      _keepUnsavedRemovals();
+    }
     _open = false;
     _successful = false;
+  }
+
+  /// Keeps the removals of a transaction that was meant to commit and did not, while the file is
+  /// still this store's (durable or degraded; a fenced file belongs to another owner).
+  void _keepUnsavedRemovals() {
+    final StoreState state = _connection.state;
+    if (state != StoreState.durable && state != StoreState.degraded) {
+      return;
+    }
+    if (_removedAllNow) {
+      _unsavedRemovals.clear();
+      _unsavedRemoveAll = true;
+    } else if (!_unsavedRemoveAll) {
+      _unsavedRemovals.addAll(_removedNow);
+    }
   }
 
   @override
@@ -120,6 +179,7 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
     if (!_canMutate()) {
       return;
     }
+    _removedNow.add(writeId);
     _userWrites.remove(writeId);
   }
 
@@ -131,6 +191,8 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
     if (!_canMutate()) {
       return;
     }
+    _removedNow.clear();
+    _removedAllNow = true;
     _userWrites.removeAll();
   }
 

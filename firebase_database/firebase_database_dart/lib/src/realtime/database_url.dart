@@ -88,6 +88,61 @@ RepoInfo parseDatabaseUrl(String url) {
   );
 }
 
+/// The URL that keys the persisted cache of [info] (`PersistenceKey.databaseUrl`): `https://<host>`
+/// for a production database, followed by `?ns=<namespace>` when the first label of the host is not
+/// the namespace; `http://<host>:<port>?ns=<namespace>` for the emulator (`https` for
+/// `*.cloudworkstations.dev`, and the default port left out).
+Uri persistenceUrlOf(RepoInfo info) {
+  final Uri root = Uri.parse(
+    '${info.secure ? 'https' : 'http'}://${info.host}',
+  );
+  if (!info.isUsingEmulator && info.namespace == info.host.split('.').first) {
+    return root;
+  }
+  return root.replace(queryParameters: <String, String>{'ns': info.namespace});
+}
+
+/// The URL under which a `FirebaseDatabase` keys the persisted cache of the database at [url]
+/// (`PersistenceKey.databaseUrl`, `FirebaseDatabase.databaseUrl`): every spelling of one database
+/// gives the same value, and the result of this function gives itself.
+///
+/// An `https://` or `wss://` URL (or a bare host) is read as a production database URL by the
+/// rules of the `FirebaseDatabase` constructor: scheme, case of the host, port 443, a trailing `/`
+/// and a `?ns=` equal to the first label of the host make no difference. An `http://` or `ws://`
+/// URL, or one on a `*.cloudworkstations.dev` host, is read as the emulator key
+/// `<scheme>://<host>:<port>?ns=<namespace>`, and must name its namespace with `?ns=`.
+///
+/// Throws a [FormatException] for a URL that the constructor would refuse, or an emulator URL
+/// without `?ns=`. The message does not quote the URL.
+Uri persistenceDatabaseUrl(Uri url) {
+  final String text = url.toString();
+  final String scheme = url.scheme.toLowerCase();
+  final bool emulator =
+      scheme == 'http' ||
+      scheme == 'ws' ||
+      url.host.toLowerCase().endsWith(_cloudWorkstationSuffix);
+  if (!emulator) {
+    return persistenceUrlOf(parseDatabaseUrl(text));
+  }
+  final Uri uri = _parseUrl(text);
+  if (uri.hasFragment) {
+    throw const FormatException('Database URL must not have a fragment');
+  }
+  final String? namespace = _namespaceParameter(uri);
+  if (namespace == null) {
+    throw const FormatException(
+      'An emulator database URL needs the database name as ?ns=<name>',
+    );
+  }
+  final RepoInfo info;
+  try {
+    info = emulatorDatabase(uri.host, uri.port, namespace: namespace);
+  } on ArgumentError catch (e) {
+    throw FormatException('Emulator database URL: ${e.message}');
+  }
+  return persistenceUrlOf(info);
+}
+
 /// The [RepoInfo] of the default database of [projectId]:
 /// `<projectId>-default-rtdb.firebaseio.com`, namespace `<projectId>-default-rtdb` (1.1,
 /// api/Database.ts:135). Throws [ArgumentError] when [projectId] is not a valid label.

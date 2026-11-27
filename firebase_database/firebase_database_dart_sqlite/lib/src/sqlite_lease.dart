@@ -326,6 +326,23 @@ final class SqliteLease {
     }
   }
 
+  /// Deletes the lease row when it is still [tombstone] (written by [writeTombstone]), in a
+  /// transaction of its own. Throws the [sqlite.SqliteException] of a failed statement after
+  /// rolling back.
+  static void removeTombstone(sqlite.Database db, LeaseRow tombstone) {
+    db.execute('BEGIN IMMEDIATE');
+    try {
+      db.execute(
+        'DELETE FROM lease WHERE id = 0 AND owner_id = ? AND epoch = ? AND expires_at_ms = ?',
+        <Object?>[tombstone.ownerId, tombstone.epoch, tombstone.expiresAtMs],
+      );
+      db.execute('COMMIT');
+    } catch (_) {
+      _rollbackQuietly(db);
+      rethrow;
+    }
+  }
+
   static bool _isLiveTombstone(LeaseRow row, int nowMs) =>
       row.ownerId == clearingOwnerId && row.expiresAtMs >= nowMs;
 

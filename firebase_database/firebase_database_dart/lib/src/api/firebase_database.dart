@@ -780,16 +780,8 @@ final class _Target {
     final RepoInfo info = url == null || url.isEmpty
         ? _defaultDatabase(app)
         : _argument('databaseUrl', () => parseDatabaseUrl(url));
-    final Uri root = Uri.parse('https://${info.host}');
     // The namespace is in the URL when the host does not name it (a custom domain or `?ns=`).
-    return _Target(
-      info,
-      info.namespace == info.host.split('.').first
-          ? root
-          : root.replace(
-              queryParameters: <String, String>{'ns': info.namespace},
-            ),
-    );
+    return _Target(info, persistenceUrlOf(info));
   }
 
   /// The target of the emulator at [emulatorHost], with the namespace of [url] or of the project's
@@ -821,12 +813,7 @@ final class _Target {
       final ({String host, int port}) address = parseEmulatorHost(emulatorHost);
       return emulatorDatabase(address.host, address.port, namespace: namespace);
     });
-    return _Target(
-      info,
-      Uri.parse(
-        '${info.secure ? 'https' : 'http'}://${info.host}',
-      ).replace(queryParameters: <String, String>{'ns': info.namespace}),
-    );
+    return _Target(info, persistenceUrlOf(info));
   }
 
   /// The default database of the app's project id; throws an [ArgumentError] without one.

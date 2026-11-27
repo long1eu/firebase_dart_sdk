@@ -82,10 +82,11 @@ await clearSqlitePersistence(
 
 `clearSqlitePersistence` deletes a cache while no instance holds it: it waits about 7.5 s to see whether an owner is
 alive, throws a `StateError` while one is, and throws a `ClearPersistenceException` that lists the files it could not
-delete. `SqlitePersistence.pathOf(key)` gives the path of the file of an app and database URL. There is one SQLite file
-per app and normalised database URL in the directory you give (every spelling of one URL shares a file, two `?ns=`
-values on one host get two); its name is a hash, never the URL or the user. On macOS and Linux
-the directory is created with mode 0700 and the file gets mode 0600; elsewhere the platform's default permissions
+delete; a retry in the same isolate can start at once. It normalises the URL as the client does, so any spelling of the
+database URL works. `SqlitePersistence.pathOf(key)` gives the path of the file of an app and database URL. There is
+one SQLite file per app and normalised database URL in the directory you give (every spelling of one URL shares a
+file, two `?ns=` values on one host get two); its name is a hash, never the URL or the user. On macOS and Linux the
+directory is created with mode 0700 and the file gets mode 0600; elsewhere the platform's default permissions
 apply. Tokens, the server host and session ids are never written.
 
 ## How it works
@@ -106,8 +107,9 @@ and the tracked queries, restores the writes, and then connects. The layout is A
   can apply twice; a transaction is the exact way to count. Transactions and `onDisconnect` registrations are not
   stored.
 - **A storage error makes the instance memory-only for the session.** Nothing is deleted: the writes committed before
-  the error stay in the file and are sent at the next start. A write made after the error is not durable. The app never
-  receives a `SqliteException`; a row that does not decode is skipped and logged once.
+  the error stay in the file and are sent at the next start, except those the server answered before the instance
+  closed, which are removed at close when the file can be written again. A write made after the error is not durable.
+  The app never receives a `SqliteException`; a row that does not decode is skipped and logged once.
 - **One moved-aside copy.** A file that cannot be used (damaged, of another program, or written by a newer major
   version of this package) is renamed to `<file>.bad-<time>` and the cache starts empty. Only the newest such copy is
   kept: the next quarantine deletes the previous one, also the file of a newer version after a downgrade and a second

@@ -10,7 +10,8 @@
 /// needs to read, walk and size stored data. An engine stores a query as its path and
 /// `QuerySpec.toWireObject()`, and rebuilds it with `QuerySpec.fromPathAndWireObject`.
 /// [InMemoryPersistenceStorageEngine] is the reference engine that every engine's behaviour is checked
-/// against.
+/// against. [persistenceDatabaseUrl] turns any spelling of a database URL into the one the client
+/// puts in [PersistenceKey.databaseUrl], for an engine function that deletes a cache by URL.
 ///
 /// ```dart
 /// final FirebaseDatabase db = FirebaseDatabase(
@@ -36,6 +37,7 @@ import 'src/core/snap/indexes/key_index.dart';
 import 'src/core/snap/named_node.dart';
 import 'src/core/snap/node.dart';
 import 'src/core/view/query_spec.dart';
+import 'src/realtime/database_url.dart';
 import 'src/testing/in_memory_persistence_storage_engine.dart';
 
 export 'src/core/persistence/database_persistence.dart'
@@ -55,6 +57,7 @@ export 'src/core/snap/named_node.dart' show NamedNode;
 export 'src/core/snap/node.dart' show Node;
 export 'src/core/snap/node_from_json.dart' show nodeFromJson;
 export 'src/core/user_write_record.dart' show UserWriteRecord;
+export 'src/realtime/database_url.dart' show persistenceDatabaseUrl;
 export 'src/core/util/immutable_tree.dart' show ImmutableTree;
 export 'src/core/util/node_size_estimator.dart' show estimateSerializedNodeSize;
 export 'src/core/view/query_spec.dart' show QuerySpec;
