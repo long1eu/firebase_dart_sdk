@@ -34,8 +34,17 @@ dependencies:
   web: ^1.1.0
 
 dev_dependencies:
+  # The production verification kit (test/production) parses its command line.
+  args: ^2.5.0
   # Controlled time in unit tests, as cloud_firestore_dart.
   fake_async: ^1.3.0
+  # The production verification kit signs a throwaway user in. Resolved from
+  # ../../firebase_auth/firebase_auth_providers_dart through pubspec_overrides.yaml.
+  firebase_auth_providers_dart: ^0.4.0
+  # The production verification kit restarts a client on the SQLite cache (check 38). Resolved
+  # from ../firebase_database_dart_sqlite through pubspec_overrides.yaml; it depends on this
+  # package, which pub allows for a dev dependency.
+  firebase_database_dart_sqlite: ^0.0.1
   # The emulator tests' owner writes and reads over REST (test/integration/emulator_rig.dart);
   # 1.5.0 is the version firebase_storage_dart uses.
   http: ^1.5.0

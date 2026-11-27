@@ -1,0 +1,26 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "verify_database_kit": {
+      "$run": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        "indexed": {".indexOn": ["score"]},
+        "values": {".indexOn": ".value"},
+        "validated": {
+          "$k": {".validate": "newData.isNumber()"}
+        },
+        "leaf_rule": {
+          "a": {".validate": "false"}
+        }
+      }
+    },
+    "verify_database_kit_owner": {
+      "$uid": {
+        ".read": "auth.uid === $uid",
+        ".write": "auth.uid === $uid"
+      }
+    }
+  }
+}

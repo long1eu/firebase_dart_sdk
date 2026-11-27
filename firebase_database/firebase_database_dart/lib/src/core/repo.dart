@@ -55,6 +55,7 @@ import 'package:firebase_database_dart/src/core/util/tree.dart';
 import 'package:firebase_database_dart/src/core/view/change.dart';
 import 'package:firebase_database_dart/src/core/view/event.dart';
 import 'package:firebase_database_dart/src/core/view/event_dispatcher.dart';
+import 'package:firebase_database_dart/src/core/view/query_params.dart';
 import 'package:firebase_database_dart/src/core/view/query_spec.dart';
 import 'package:firebase_database_dart/src/core/write_id.dart';
 import 'package:meta/meta.dart';

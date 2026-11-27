@@ -154,9 +154,11 @@ final class SyncTree implements SyncTreeApi {
     });
   }
 
-  /// Android `SyncTree.applyUserMerge`. A merge that writes [path] itself (`update({'': v})`) is
-  /// kept and applied as an overwrite of [path], which it is: the write tree's shadowing and the
-  /// view processor take a merge to write below its path only. It is persisted as given.
+  /// Android `SyncTree.applyUserMerge`. A merge that writes [path] itself (a root write, key `''`)
+  /// is kept and applied as an overwrite of [path], which it is: the write tree's shadowing and the
+  /// view processor take a merge to write below its path only. It is persisted as given. The
+  /// public API refuses such a key (`validateFirebaseMergeDataArg`); a root merge still comes from
+  /// a stored merge replayed from disk and from core tests that call the repo directly.
   @override
   List<Event> applyUserMerge(
     Path path,
