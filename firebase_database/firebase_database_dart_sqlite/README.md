@@ -5,16 +5,16 @@ of the Firebase Realtime Database. It is for the Dart VM and Flutter (Android, i
 `package:sqlite3`. It keeps your pending writes across a restart and serves listeners and `get()` from disk while the
 app is offline. It is not affiliated with or endorsed by Google or Firebase.
 
-> **Status: 0.1.0, first version.** The known limits are under [Limits](#limits). What has run (the counts are from
-> the maintainer's runs on the merged trunk):
+> **Status: 0.1.1.** The first version was 0.1.0; this one adds an example and no code change. The known limits are
+> under [Limits](#limits). What has run (the counts are from the maintainer's runs on the merged trunk):
 >
-> - The package has 287 tests, which pass on Dart 3.12.2 (2026-11-27; 247 passed on Dart 3.11.5 and on Dart 3.8.0 at
+> - The package has 288 tests, which pass on Dart 3.12.2 (2026-11-28; 247 passed on Dart 3.11.5 and on Dart 3.8.0 at
 >   an earlier commit), including Android's own persistence suites run on the SQLite engine.
 > - On Windows 11 x64 the disk cache test of the Windows example app passed with an earlier version of the app.
 > - The SQLite engine had an independent review (1 high, 5 medium and 10 low findings), all fixed with a test each.
 > - Nothing ran on Android or iOS or in a release build of a desktop app. Against production one check of the
 >   client's verification kit used this cache: it closed and reopened a cache file and listened again (check 38, in the
->   run of all 41 checks on 2026-11-27, and in an earlier run).
+>   run of all 42 checks on 2026-11-28, and in earlier runs).
 > - Cost of the cache, measured on one Mac mini (macOS, AOT, medians of 5, rows of about 100 bytes; see Limits). Not
 >   measured: JSON against a binary codec, `synchronous = FULL` against `NORMAL`, and any write cost on Linux or
 >   Windows.
@@ -41,7 +41,7 @@ dart pub add firebase_database_dart firebase_database_dart_sqlite
 ```
 
 Dart 3.8 or later. SQLite is loaded by `package:sqlite3` as in `cloud_firestore_dart_sqlite` (see "Which `sqlite3`" in
-its README); this package does not override the lookup. The command writes the constraint `^0.1.0` for both packages.
+its README); this package does not override the lookup. The command writes the constraint `^0.1.1` for both packages.
 
 ## Use
 
@@ -146,13 +146,18 @@ and the tracked queries, restores the writes, and then connects. The layout is A
   path, so listen below the root of a large cache.
 - **On macOS `fsync` does not flush the drive cache** and `fullfsync` is not set, so those write costs are not the
   cost on Linux or Windows; nothing was measured there.
+- **Priorities of emptied nodes are not kept on disk.** The cache stores no node that has a priority and no children.
+  A node emptied by a removal and refilled shows no priority from the cache, where the server keeps it, until the node
+  is loaded again. An acknowledged update that removes a child, adds another and sets the node's priority
+  (`update(x, {a: null, b: 5, '.priority': 7})` on `x = {a: 1}`), while a listen on the added child waits for its
+  data, stores the node without the priority, until the node is loaded from the server again (also in 0.1.0).
 - **No web persistence.**
 
 ## Platforms
 
 | Platform | What ran |
 |---|---|
-| Dart VM | 287 tests on Dart 3.12.2 (2026-11-27; 247 on Dart 3.11.5 and on Dart 3.8.0 at an earlier commit), including Android's persistence suites on the SQLite engine |
+| Dart VM | 288 tests on Dart 3.12.2 (2026-11-28; 247 on Dart 3.11.5 and on Dart 3.8.0 at an earlier commit), including Android's persistence suites on the SQLite engine |
 | Windows 11 x64 | the disk cache test of the Windows example app, with an earlier version of the app |
 | Linux x64 | no run of this package is recorded; the client's own suites ran there (see its README) |
 | Android, iOS | declared in `pubspec.yaml`; no run is recorded |

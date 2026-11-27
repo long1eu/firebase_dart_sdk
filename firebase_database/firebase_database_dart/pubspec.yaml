@@ -2,7 +2,7 @@ name: firebase_database_dart
 description: >-
   Unofficial pure-Dart client of the Firebase Realtime Database for the Dart
   VM and the web: listeners, queries, transactions, onDisconnect.
-version: 0.1.0
+version: 0.1.1
 homepage: https://github.com/long1eu/firebase_dart_sdk
 repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_database/firebase_database_dart
 issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues

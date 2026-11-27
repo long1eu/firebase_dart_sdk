@@ -1,4 +1,4 @@
-## Unreleased
+## 0.1.1
 
 - One update is applied in two passes, independent of key order, as production does: every value entry first, then
   every priority entry, parents before children. A node whose last child goes keeps its priority as an emptied node,
