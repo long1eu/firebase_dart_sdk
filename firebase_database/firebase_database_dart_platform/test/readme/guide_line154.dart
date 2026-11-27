@@ -9,8 +9,8 @@
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_database_dart/firebase_database_dart.dart';
 
-// ../../docs/guides/database_flutter.md:155
-Future<void> guideLine155() async {
+// ../../docs/guides/database_flutter.md:154
+Future<void> guideLine154() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: '<the apiKey of your options>',

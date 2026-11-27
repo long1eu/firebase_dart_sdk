@@ -10,8 +10,7 @@ It does not cover Firestore or Storage (see [The official cloud_firestore API on
 cloud_firestore_dart](flutterfire_platform.md) and
 [Coming from FlutterFire's cloud_firestore](migrating_from_flutterfire.md)),
 the web (the adapter does not support it: keep the official plugin there), or a server or command line
-program (use the client directly, see its README). Both packages are at 0.0.1 and not published; until they
-are, depend on them from the repository.
+program (use the client directly, see its README). Both packages are at 0.1.0 and published on pub.dev.
 
 ## Which route
 
@@ -34,7 +33,7 @@ code, for apps that already leave FlutterFire, and for the web.
 dependencies:
   firebase_core: ^5.1.0
   firebase_database: ^13.1.0
-  firebase_database_dart_platform: ^0.0.1
+  firebase_database_dart_platform: ^0.1.0
 ```
 
 The adapter lists `implements: firebase_database` with the plugin class `FirebaseDatabaseDart` for `linux` and
@@ -145,7 +144,7 @@ event, `onDisconnect` and transaction classes is implemented (`remove()` of `onD
 - Not run: a release build, a Linux app on a real display, anything on Android, iOS or the web, and any production
   project through the adapter (the client underneath ran its verification kit against production once).
 
-Treat 0.0.1 as a first version: test your own app on the target platform before you ship it.
+Treat 0.1.0 as a first version: test your own app on the target platform before you ship it.
 
 ## Route B: the client's own Dart API
 

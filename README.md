@@ -33,8 +33,8 @@ endorsed by Google or Firebase.
    SDK tab was run beside a tab of this client, and multi-tab is a preview since 0.3.2.
 7. **You build a Flutter app for Linux desktop that needs the Realtime Database.** The official
    `firebase_database` plugin has no Linux implementation. Add `firebase_database_dart_platform` and keep the
-   official API (on Windows it can replace the native plugin). Caveat: 0.0.1, not published; on Linux x64 the
-   Dart suites ran and a debug build of the example app ran under a virtual display (no real display, no release
+   official API (on Windows it can replace the native plugin). Caveat: version 0.1.0 is a first release; on Linux
+   x64 the Dart suites ran and a debug build of the example app ran under a virtual display (no real display, no release
    build; section 23 of [the decisions](docs/database_decisions.md)); on Windows one debug app did a write, a read
    and a transaction against the emulator; against production only the client's verification kit, once
    ([status](firebase_database/firebase_database_dart/README.md)).
@@ -55,7 +55,7 @@ endorsed by Google or Firebase.
   second factor proven by a real SMS (phone sign-in was run against a real project with a test phone number
   only), Messaging or the other Firebase services this repository does not port, or admin jobs such as bulk
   writes and recursive deletes (use `firebase_admin_sdk`).
-- You need the Realtime Database in production today: that client is not published, against production only its
+- You need the Realtime Database in production today: that client is at version 0.1.0, and against production only its
   verification kit ran, once, and the report of its large-snapshot benchmark is not written yet.
 - You need a vendor to call: one person maintains it, with no SLA.
 
@@ -102,9 +102,9 @@ from 0.1? The 0.2 API took FlutterFire's names: [what changed](docs/api_migratio
 | [`firebase_auth_secure_storage_dart`](firebase_auth/firebase_auth_secure_storage_dart/) | 0.1.0 | Command line tools and servers that keep the signed-in session in the system's secret store (macOS Keychain; Linux and Windows untested) instead of a file |
 | [`firebase_storage_dart`](firebase_storage/firebase_storage_dart/) | 0.2.0 | Apps and servers that upload, download and list Cloud Storage for Firebase objects ([guide](docs/guides/storage.md), [parity](docs/storage_parity.md)) |
 | [`firebase_admin_dart`](firebase_admin/firebase_admin_dart/) | 0.1.2 | Servers, tools and integration tests that mint custom tokens, manage users or verify ID tokens |
-| [`firebase_database_dart`](firebase_database/firebase_database_dart/) | 0.0.1, not published | Dart programs, servers and web apps that use the Realtime Database through this client ([guide](docs/guides/database.md)) |
-| [`firebase_database_dart_sqlite`](firebase_database/firebase_database_dart_sqlite/) | 0.0.1, not published | Anyone who wants the Realtime Database cache on disk on the VM or in Flutter |
-| [`firebase_database_dart_platform`](firebase_database/firebase_database_dart_platform/) | 0.0.1, not published | Flutter apps written against the official `firebase_database` API, on desktop |
+| [`firebase_database_dart`](firebase_database/firebase_database_dart/) | 0.1.0 | Dart programs, servers and web apps that use the Realtime Database through this client ([guide](docs/guides/database.md)) |
+| [`firebase_database_dart_sqlite`](firebase_database/firebase_database_dart_sqlite/) | 0.1.0 | Anyone who wants the Realtime Database cache on disk on the VM or in Flutter |
+| [`firebase_database_dart_platform`](firebase_database/firebase_database_dart_platform/) | 0.1.0 | Flutter apps written against the official `firebase_database` API, on desktop |
 
 ## How it fits together
 
@@ -256,8 +256,8 @@ with a real SMS.
 ([docs/storage_parity.md](docs/storage_parity.md)).
 `firebase_database/firebase_database_dart` is a Realtime Database client for the Dart VM and the web, ported from
 the protocol of the JS SDK; `firebase_database_dart_sqlite` keeps its cache on disk and
-`firebase_database_dart_platform` runs the official `firebase_database` API on top of it. Version 0.0.1, not
-published. What has run: its test suites on macOS, Windows 11 and Linux (Dart VM and Chrome), 33 tests against the
+`firebase_database_dart_platform` runs the official `firebase_database` API on top of it. Version 0.1.0 is published on
+pub.dev. What has run: its test suites on macOS, Windows 11 and Linux (Dart VM and Chrome), 33 tests against the
 Database emulator, FlutterFire's own `firebase_database` integration suite through the adapter, and one Flutter
 Windows debug app against the emulator; against production, its verification kit (41 checks), once. What has not: a
 release build of a desktop app, Safari and Firefox; the report of its large-snapshot benchmark is not written yet.

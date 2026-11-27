@@ -27,10 +27,10 @@ registers before `main()` on Linux. The app code does not import it; the only si
 dependencies:
   firebase_core: ^5.1.0
   firebase_database: ^13.1.0
-  firebase_database_dart_platform: ^0.0.1   # registers itself on Linux
+  firebase_database_dart_platform: ^0.1.0   # registers itself on Linux
 ```
 
-`firebase_database_dart_platform` is not on pub.dev yet, so `pubspec.yaml` has a `dependency_overrides` section
+`firebase_database_dart_platform` is on pub.dev; `pubspec.yaml` still has a `dependency_overrides` section
 that takes it, `firebase_database_dart` and `firebase_app_dart` from this repository. Outside the repository,
 remove that section and use the versions on pub.dev. The dependencies need Dart 3.12, so Flutter 3.44 or later.
 
