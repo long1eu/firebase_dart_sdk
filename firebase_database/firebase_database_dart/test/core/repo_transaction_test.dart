@@ -304,8 +304,7 @@ void main() {
         <String>['/d'],
       );
 
-      h.server.ackLastWrite();
-      await settle();
+      // A second transaction logs nothing more; the line is written when the call is made.
       h.transaction('c', increment);
       await settle();
       expect(

@@ -27,7 +27,7 @@ no such feature; "partly" means it has it with a missing piece or in a weaker fo
 
 | Dart | Rows |
 |---|---|
-| Built | 139, of which 3 without a test of their own |
+| Built | 139, of which 2 without a test of their own |
 | Gaps (wanted, not built) | 0 |
 | Won't do or not needed | 17 |
 | Not applicable to Dart | 6 |
@@ -225,7 +225,7 @@ The four SDKs, by row (a row that describes a restriction or an extra of one SDK
 | Feature | JS | Android | iOS | C++ | Dart | Notes |
 |---|---|---|---|---|---|---|
 | connect (`emu.connect`) | connectDatabaseEmulator(db, host, port, {mockUserToken?}) J:api/Database.ts:350-408. Must be called before any operation; calling again with the *same* arguments after ... | useEmulator(String host, int port) A:FirebaseDatabase.java:315 | -useEmulatorWithHost:port: IH:FIRDatabase.h:187; I:Api/FIRDatabase.m:179-200 | — No emulator support: no emulator API, no env var, no localhost special case (a search of C:desktop, C:common, Ci: for "emulator" found nothing). (inferred) ... | **built**: emulatorHost: 'host:port' constructor argument; any host name, IP and port. The database URL gives only the namespace: its ?ns=, else the emulator's own rule for the URL host ('fake-server' for an IP) | The emulator talks the same WebSocket protocol (ws://host:port/.ws?ns=...&v=5). Android and iOS: Sets host host:port, internalHost the same, secure=false (A:core/RepoInfo.java:66-72). Must precede first use: Android IllegalStateException (:317-319), iOS NSInternalInconsistencyException (I:Api/FIRDatabase.m:185-190); iOS also rejects an empty host (:180-184) |
-| env (`emu.env`) | FIREBASE_DATABASE_EMULATOR_HOST (Node only): when set, the URL becomes http://<host>?ns=<namespace> (J:api/Database.ts:69,143-152); also ... | — no FIREBASE_DATABASE_EMULATOR_HOST support (searched both source trees) | — | — none. | **built, no test of its own**: FirebaseDatabase.emulatorHostFromEnvironment reads FIREBASE_DATABASE_EMULATOR_HOST (null when unset or on the web); the host:port parsing is tested, the environment read is not | Namespace comes from the original URL, so the env var can redirect any database URL. Android and iOS: The JS SDK reads FIREBASE_DATABASE_EMULATOR_HOST |
+| env (`emu.env`) | FIREBASE_DATABASE_EMULATOR_HOST (Node only): when set, the URL becomes http://<host>?ns=<namespace> (J:api/Database.ts:69,143-152); also ... | — no FIREBASE_DATABASE_EMULATOR_HOST support (searched both source trees) | — | — none. | **built**: FirebaseDatabase.emulatorHostFromEnvironment reads FIREBASE_DATABASE_EMULATOR_HOST (null when unset, empty or on the web) | Namespace comes from the original URL, so the env var can redirect any database URL. Android and iOS: The JS SDK reads FIREBASE_DATABASE_EMULATOR_HOST |
 | mock token (`emu.mockToken`) | mockUserToken: string or EmulatorMockTokenOptions object, turned into an unsecured JWT with createMockUserToken(options, projectId) (J:api/Database.ts:384-388); constant ... | — no mock token API | — | — none. | **built**: mockUserToken as a String only (JS also takes an object), only with emulatorHost | Lets tests exercise security rules with a chosen uid and claims. Android and iOS: The emulator accepts the unsigned tokens of the Auth emulator through the normal token provider. |
 | cloud workstation (`emu.cloudWorkstation`) | isCloudWorkstation(host) makes the emulator use TLS and sends a pingServer first for cookies (J:api/Database.ts:96,393-396). | — | — | — none. | **built**: an emulator on *.cloudworkstations.dev is reached over TLS | Rare. |
 | any http is emulator (`emu.anyHttpIsEmulator`) | isEmulator = !repoInfo.secure for any http:// URL (J:api/Database.ts:154): the handshake host check is relaxed (Connection.ts:348-350). | — | — | — n/a | **won't do**: the emulator is chosen explicitly | A plain-http production URL is treated as an emulator. |
@@ -340,10 +340,9 @@ The four SDKs, by row (a row that describes a restriction or an extra of one SDK
 
 ## Built without a test of their own
 
-3 rows.
+2 rows.
 
 | Feature | What is built | Code |
 |---|---|---|
 | not persisted (`txn.notPersisted`) | transactions stay in memory, also with persistence on | firebase_database/firebase_database_dart/lib/src/core/repo_transactions.dart:159,271,398,429 (persist: false); :63-70 (one info log when persistence is on) |
-| env (`emu.env`) | FirebaseDatabase.emulatorHostFromEnvironment reads FIREBASE_DATABASE_EMULATOR_HOST (null when unset or on the web); the host:port parsing is tested, the environment read is not | firebase_database/firebase_database_dart/lib/src/api/firebase_database.dart:193 emulatorHostFromEnvironment; firebase_database/firebase_database_dart/lib/src/api/environment_io.dart:8 environmentVariable |
 | model (`thread.model`) | Design property; no test of its own. | single isolate by construction; decisions section 8 |
