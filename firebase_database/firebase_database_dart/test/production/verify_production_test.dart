@@ -20,6 +20,7 @@ import 'package:firebase_auth_providers_dart/firebase_auth_providers_dart.dart';
 import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
 
+import 'production_hashes.dart';
 import 'verify_production.dart';
 
 /// Why the emulator tests are skipped, or null when both emulators answer.
@@ -407,6 +408,30 @@ Future<void> main() async {
         }, reason: e.key);
       }
       expect(emptyKey['after'], ok);
+      // Check 42, the hash of a query window that holds an emptied node. The server's answers are
+      // not pinned (not measured yet). Pinned: h is stored as an emptied node keeping priority 2
+      // (as checks 38 and 39 measured on the emulator), every listen was recorded, and the
+      // candidate hashes differ, so that the run can tell which one the server accepts.
+      final Map<String, Object?> window = observed('42');
+      expect(
+        window['hHash'],
+        sha1Base64Of('priority:number:${ieee754Hex(2)}:'),
+      );
+      for (final (String id, List<String> candidates)
+          in <(String, List<String>)>[
+            ('limit', <String>['withH', 'withoutH', 'refilled']),
+            ('range', <String>['withH', 'withoutH']),
+          ]) {
+        final Map<String, Object?> listens =
+            window[id]! as Map<String, Object?>;
+        expect(listens.keys, <String>['none', ...candidates, 'accepted']);
+        final List<Object?> hashes = <Object?>[
+          for (final String c in candidates)
+            (listens[c]! as Map<String, Object?>)['hash'],
+        ];
+        expect(hashes.toSet(), hasLength(candidates.length), reason: id);
+        expect((listens['none']! as Map<String, Object?>)['data'], isTrue);
+      }
 
       final String runId = run.runPath!.split('/').last;
       expect(run.removed, hasLength(2));
