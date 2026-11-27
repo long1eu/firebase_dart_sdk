@@ -145,8 +145,36 @@ name and database URL, so one directory serves every app.
 - The client's warnings and errors (for example that persistence could not be opened and the client runs in memory)
   are printed with `debugPrint` always; its debug and info lines only after `setLoggingEnabled(true)`.
 - `FirebaseApp.delete()` closes the clients of that app on every platform (through `firebase_core`'s
-  `registerService`). The `FirebaseDatabase` objects of the app keep working once an app of the same name is created
-  again: the next call creates a new client with the settings the object had.
+  `registerService`), except a client created while a delete ran (below).
+- Created again under the same name with the same options, the app's `FirebaseDatabase` objects keep working: the next
+  call creates a new client with the settings the object had, also after a second delete and create.
+  `useDatabaseEmulator` called after the delete and before that call takes effect (after a use while the delete ran it
+  throws, as after any first use). `instanceFor(app: newApp)` returns
+  the same object, and `clientFor` with the new or the old app object returns the client that object uses.
+- A use while `FirebaseApp.delete()` runs (after `firebase_core` disposed the services, before the core removed the app)
+  creates a client with the object's settings that the delete does not close on the native and web cores (shown on test
+  cores that behave like them): the object keeps using it after the app is created again, and a later delete
+  does not close it either. On the Dart core of Linux the delete closes it, and the next call creates a new one with the
+  same settings.
+- When the `firebase_app_dart` app of the name is deleted directly and the FlutterFire app is kept, the next call
+  creates a new client with the object's settings.
+- Created again under the same name with other options (any field that `FirebaseOptions ==` compares; `recaptchaSiteKey`
+  is not one) while an instance of the earlier app is kept, a call that needs a new client throws a `StateError` ("The
+  Firebase app ... was deleted and created again with other options"), for the database the earlier app used and for any
+  other: `instanceFor(app: newApp, databaseURL: anyUrl)`, `clientFor` with the new or the old app object, with or
+  without a URL, and the old object's `get`, `set`, `goOnline`, `goOffline` and `purgeOutstandingWrites` (a listen of
+  `onValue` gets it as an error event). An old object used while the delete ran is the exception on the native and web
+  cores: it keeps the client made then, with the earlier app's options and its settings, and its calls work. No client
+  without the settings made before the delete is created. `ref`, `useDatabaseEmulator` and `setPersistenceEnabled` need
+  no client and do not throw. The tests show this on the Dart core and on test cores that behave like the native ones
+  and like the web one.
+- Instances are never released, so after such a recreate the name throws for the rest of the process; creating the app
+  again with the earlier options makes it work again. To use other options, give the app another name, or restart the
+  app. A test suite that, in one process, uses a database of an app name and later creates that name again with other
+  options meets this throw; give each test its own app name.
+- An app that never had a `FirebaseDatabase` instance before its delete has nothing kept: created again with other
+  options, it works as a new app. With the same options, a database the earlier app did not use gets a new client of its
+  own, without the settings of the first database.
 
 ## What is implemented
 
@@ -157,7 +185,7 @@ name and database URL, so one directory serves every app.
 | `goOnline`, `goOffline`, `purgeOutstandingWrites` | the same client calls | pending writes fail with `write-cancelled` |
 | `ref`, `refFromURL`, `child`, `parent`, `root`, `key`, `path` | the location's keys | no client, no I/O |
 | `set`, `setWithPriority`, `update`, `setPriority`, `remove`, `push` | `set`, `update`, `setPriority`, `push` | map keys are stringified (as FlutterFire does) |
-| `onValue`, `onChildAdded`, `onChildChanged`, `onChildRemoved`, `onChildMoved`, `once`, `get` | the client's streams and `get` | |
+| `onValue`, `onChildAdded`, `onChildChanged`, `onChildRemoved`, `onChildMoved`, `once`, `get` | the client's streams and `get` | a `once()` pending at close or app deletion fails with `StateError` "No element"; `get()` fails with `database-closed` |
 | `orderBy*`, `startAt`, `startAfter`, `endAt`, `endBefore`, `equalTo`, `limitToFirst`, `limitToLast`, `keepSynced` | the client's `Query` | |
 | `runTransaction(handler, applyLocally:)` | `runTransaction` | the handler gets a fresh mutable copy on each run; it may run several times |
 | `onDisconnect()`: `set`, `setWithPriority`, `update`, `remove`, `cancel` | `onDisconnect` | |
@@ -196,6 +224,11 @@ that same object. With `applyLocally: false`, listeners see no local event befor
   `useDatabaseEmulator` with the same host does nothing and with another one throws a `StateError` (ignoring it would
   send the traffic to production); `setPersistenceEnabled` and `setPersistenceCacheSizeBytes` are ignored with a
   debug message, as on Android; `setLoggingEnabled` takes effect at once.
+- **An app deleted and created again under the same name with other options gets no client** while an instance of
+  the earlier app is kept: each call that needs one throws a `StateError` (see "Emulator, logging, deleting an app").
+  The instances and their settings stay with the earlier app, are not replaced and are never released, so the name
+  throws for the rest of the process unless it is created again with the earlier options; use another app name or
+  restart.
 - **Persistence is injected** as a factory from the cache size (`persistenceFor`), not switched on by the native SDK.
 - **References are made without the client**: `ref`, `child`, `parent`, `root`, `key`, `path` and `onDisconnect()`
   only build a location. So an invalid key, `ref('a.b')`, is reported at the first read or write of it (an
@@ -207,6 +240,9 @@ that same object. With `applyLocally: false`, listeners see no local event befor
   children from the parent's `value` map, so there they see it.
 - **A stream ends after the server cancels its listen** (`permission-denied`, then done), as the client's streams do;
   on Android the stream reports the error and stays open, so an `await for` loop ends here and waits there.
+- **Closing the client or deleting the app is not an error**: every stream ends with done and no error event, as the
+  client's streams do. FlutterFire's `once()` is `onValue.first`, so a `once()` pending then fails with `StateError`
+  "No element" instead of `database-closed`; `get()` and the other Futures fail with `database-closed`.
 - **A child snapshot keeps its priority** (`snapshot.child('a').priority`, `children`); the native plugins give null.
 - **A whole-number priority is an `int`** (`1`, not `1.0`), as values are; on Android FlutterFire returns every
   numeric priority as a `double`, so `priority as double` must become `(priority as num).toDouble()`.
@@ -219,7 +255,7 @@ that same object. With `applyLocally: false`, listeners see no local event befor
 - **Modifiers are applied in one order** (orderBy, start, end, limit) whatever the call order, so
   `startAt(1).orderByChild('x')` works; an invalid combination is an error of the stream or of `get`, not of the call.
 - **Error codes**: the client's `write-canceled` is reported as `write-cancelled` and `operation-failed` as `failure`,
-  FlutterFire's spellings; `database-closed` (the instance was closed or its app deleted) is not in FlutterFire.
+  FlutterFire's spellings; `database-closed` (a Future of a closed client or deleted app) is not in FlutterFire.
 - **Programmer errors stay Dart errors**: a bad path, key, value or query is an `ArgumentError` or a `StateError`,
   and a transaction handler's exception is rethrown as itself, where the native plugins report
   `FirebaseException('unknown')`.

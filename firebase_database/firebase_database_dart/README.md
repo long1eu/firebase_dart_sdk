@@ -227,8 +227,8 @@ database, in a microtask, never inside the call that caused them.
 Inside one change the order is: removed, added, moved, changed, then value. Four separate streams keep that order only
 while none of them is paused, and `await for` pauses its subscription after every event. `onChildEvents` is the form
 whose order survives that. A server refusal (a rule) ends a stream with an error; losing the connection never does,
-and a listener simply gets its data again after the reconnect. Closing the database ends streams with
-`database-closed`.
+and a listener simply gets its data again after the reconnect. Closing the database or deleting its app
+ends streams with done and no error; pending Futures fail with `database-closed`.
 
 More: [listeners.dart](example/listeners.dart).
 
@@ -553,7 +553,7 @@ from the server is logged as the server sent it and, with rules debug output on 
 
 ## How it differs from the JS SDK
 
-The 19 you notice are below. The full table, 37 rows with the test that pins each, is section 25 of
+The 19 you notice are below. The full table, 38 rows with the test that pins each, is section 25 of
 [docs/database_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_decisions.md).
 
 | Topic | JS SDK | This client |
@@ -664,8 +664,13 @@ On Linux it registers itself; on Windows when it is a direct dependency; elsewhe
 `package:firebase_database_dart/testing.dart` has a scripted in-memory server (`FakeDatabaseServer`), a database
 connected to it (`databaseWithFakeServer`) and in-memory persistence (`fakePersistence`). It has no stability promise
 beyond the package's contract tests. A test steers the server with `acceptConnections` (set it to false and call
-`dropConnection` to keep the client offline), `serverTime`, `ackLastWrite`, `failLastWrite`, `ackLastOnDisconnect`,
-`answerGet`, `failGet`, `revokeAuth` and `kill`, and reads `connectionAttempts` and `receivedAuthTokens`.
+`dropConnection` to keep the client offline), `serverTime`, `ackNextWrite`, `failNextWrite`, `ackNextOnDisconnect`,
+`ackLastWrite`, `failLastWrite`, `ackLastOnDisconnect`, `answerGet`, `failGet`, `revokeAuth` and `kill`, and reads
+`connectionAttempts` and `receivedAuthTokens`. A test must answer writes and onDisconnect requests in the order they
+left (after a reconnect: puts and merges first, then onDisconnect requests made offline, as the client sends them):
+answering one while an earlier one is unanswered throws a `StateError`, unless the `*Last*` helper is given
+`outOfOrder: true`. That the server answers writes in that order is inferred from an emulator probe that measured
+listens and gets answered in send order. The fake does not check the order of listens and gets.
 
 Events are delivered in batches of 1000, with a turn of the event loop between batches so a long burst does not block
 the page. In a browser that turn is a message task, not a timer (a hidden tab delays timers), so a fake clock such as

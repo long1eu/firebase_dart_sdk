@@ -735,13 +735,20 @@ inside every write transaction (`BEGIN IMMEDIATE`) stops a former owner. `persis
 truth. Closing releases the lease; `clearSqlitePersistence` clears under the lease and writes a tombstone row
 before it deletes the files.
 
-**A storage error never deletes pending writes and never wipes the store.** The failed transaction rolls back,
-the engine stops writing, releases the lease and reads as empty for the rest of the session, and the file keeps
-everything committed before the error. `SQLITE_BUSY` and `SQLITE_LOCKED` roll back that transaction and leave
-the store durable; it degrades only after 3 in a row. The busy timeout is 1 s for normal work and 0 for
-clean-up. The app never receives a `SqliteException`. A bad row (a write, a cache row or a lease row that does
-not decode) is a cache miss: it is logged once and skipped, never thrown, and a lease row that does not read
-counts as not ours.
+**A storage error never deletes pending writes and never wipes the store.** The failed transaction rolls back, the
+engine stops writing and reads as empty for the rest of the session, and the file keeps everything committed before
+the error. It keeps its lease row without refreshing it, so another connection takes the file over after one
+observation period (with `PRAGMA quick_check` when the store ran in another process). At close the store opens the
+file once more, without creating it, and in one `BEGIN IMMEDIATE` deletes the writes the server answered after the
+error and its lease row, only while the row still holds its own owner id and epoch. That proves nobody else had the
+file since: an owner id is random per connection and only that connection writes it, a takeover writes its own id, a
+clear writes its tombstone and then deletes the file (or removes the tombstone, leaving no row), a quarantine
+renames the file, and a release deletes the row. Only ids the store saw committed in the file are deleted; writes
+made after the error never are. `SQLITE_BUSY` and `SQLITE_LOCKED` roll back that transaction and leave the store
+durable; it degrades only after 3 in a row. The busy timeout is 1 s for normal work and for that reopen at close,
+and 0 for other clean-up. The app never receives a `SqliteException`. A bad row (a write, a cache row or a lease row
+that does not decode) is a cache miss: it is logged once and skipped, never thrown, and a lease row that does not
+read counts as not ours.
 
 A file the engine cannot trust is handled at the next open: a foreign file, a corrupt file or a file of a
 newer major version is renamed aside together with its `-wal` file (one copy kept) and an empty cache starts;
@@ -1195,6 +1202,7 @@ the number; the section each reason cites has the upstream lines.
 | 35 | Failed `get` and unreadable data in the log | `'get for query ' + stringify(query) + ' failed: ' + err`, the query with its bound values, when logging is on (`J:core/Repo.ts:533`) | the path, the query's shape (index, which bounds are set and inclusive, limit and side) and the server status; no bound value or key; data the client cannot parse is logged by error type and path | `logging_and_urls_test` |
 | 36 | `refFromUrl` of another database | host compared, namespace not; no check at all for a custom host, the emulator included; a bad percent escape kept raw (`J:api/Reference_impl.ts:516-529`, `J:core/util/libs/parser.ts:28-30`, read) | host and namespace compared (a database `https://a.firebaseio.com?ns=b` refuses `https://a.firebaseio.com/x`); on the emulator host and port are not compared, but a namespace the URL names must be this one, and the URL must be http(s) or ws(s) with a valid host, no user info, no fragment and no query key other than `ns`; a bad percent escape in the path throws; no message quotes the whole URL, its user info or its query | `logging_and_urls_test`; `api_behaviour_test` (m10) |
 | 37 | `databaseUrl` with an emulator | namespace from `ns`, else the first label of a host with three or more labels, else empty (allowed for `localhost` only; no `ns` is sent and the emulator reads its Host header) | namespace from `ns`, else the emulator's own Host rule applied to the URL's `host:port` (first label when valid and not numeric, else `fake-server`); host, port and scheme are not checked; one warning to the logger when the namespace came from the host and is not `<projectId>-default-rtdb` | `emulator_url_test`; `emulator_namespace_warning_test` |
+| 38 | Listeners at `close()` or app delete | no cancel callback and no error; `.info/connected` listeners get a final `false`; the listeners stay registered and get nothing more; `ref()` throws after delete; no `isConnected` getter (`J:api/Database.ts:183-191, 271-284`, read) | every stream ends with done and no error, with no final `false`; a stream listened to after close ends with done; Futures (writes, get, `once`, transactions, onDisconnect) fail with `database-closed`; `isConnected` is false from the `close()` or `app.delete()` call on; a server status `database_closed` is an `unknown` error, not a close; through FlutterFire, a pending `once()` fails with `Stream.first`'s `StateError` | `streams_end_on_close_test` (client and adapter); `is_connected_after_close_test`; `shutdown_snippet_test`; `database_error_test` |
 
 Test file names are given without their directory: `scenarios_test`, `snapshot_test`, `public_surface_test`,
 `validation_test`, `api_behaviour_test` and `revert_under_pending_write_test` are in `test/api/`; `repo_get_test`,
@@ -1256,6 +1264,9 @@ Test file names are given without their directory: `scenarios_test`, `snapshot_t
     database the emulator would pick for that URL, and refuses no address a developer uses (Android's
     `10.0.2.2`, a LAN address, a `.local` name). `fake-server` is not the project's default database and has
     open rules, which the warning and the constructor doc say. Both tests are in `test/api/`.
+38. Closing is not an error of the listener, so a stream with no `onError` must not crash the program that
+    closes its database; Dart has done for the end of a stream, which JS has not. A final `false` on
+    `.info/connected` would run presence code during shutdown. The three API tests are in `test/api/`.
 
 Status: built.
 

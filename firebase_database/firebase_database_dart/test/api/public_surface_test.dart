@@ -324,9 +324,14 @@ void _testingLibrary(FirebaseApp app, FakeDatabaseServer server) {
       server.cancelListen.exact;
   final _Same<List<String?>> _ = server.receivedAuthTokens.exact;
   final _Same<DateTime?> _ = server.serverTime.exact;
-  final _Same<void Function()> _ = server.ackLastWrite.exact;
-  final _Same<void Function(String)> _ = server.failLastWrite.exact;
-  final _Same<void Function()> _ = server.ackLastOnDisconnect.exact;
+  final _Same<void Function({bool outOfOrder})> _ = server.ackLastWrite.exact;
+  final _Same<void Function(String, {bool outOfOrder})> _ =
+      server.failLastWrite.exact;
+  final _Same<void Function({bool outOfOrder})> _ =
+      server.ackLastOnDisconnect.exact;
+  final _Same<void Function()> _ = server.ackNextWrite.exact;
+  final _Same<void Function(String)> _ = server.failNextWrite.exact;
+  final _Same<void Function()> _ = server.ackNextOnDisconnect.exact;
   final _Same<void Function(String, Object?)> _ = server.answerGet.exact;
   final _Same<void Function(String, String)> _ = server.failGet.exact;
   final _Same<void Function()> _ = server.dropConnection.exact;

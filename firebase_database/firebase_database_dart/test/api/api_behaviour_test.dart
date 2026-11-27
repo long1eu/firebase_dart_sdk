@@ -346,7 +346,7 @@ void main() {
       Object? error;
       w.db.ref('a').set(1).catchError((Object e) => error = e);
       time.elapse(Duration.zero);
-      w.server.failLastWrite(status, reason);
+      w.server.failLastWrite(status, reason: reason);
       time.elapse(Duration.zero);
       return error! as FirebaseDatabaseException;
     }
