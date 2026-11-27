@@ -339,7 +339,8 @@ after check 3 ("all of it in one set").
 ## Known results
 
 On the emulator: the Database emulator v4.11.2 with the kit's rules on the namespace `verify-database-kit`, and the
-Auth emulator of firebase-tools 15.18.0. Production: run for checks 40 and 41 only (the lines marked "on production"); every other check is open there.
+Auth emulator of firebase-tools 15.18.0. Production: run for checks 40 and 41 only (the lines marked "on
+production"); every other check is open there.
 
 - **1**: PASS: plain ws to 127.0.0.1, no other host
 - **2**: PASS: offset of a few ms
