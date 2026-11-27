@@ -412,12 +412,14 @@ emulator, a line "N on production" follows the check; without one, production ga
   and the `set` won (99): the transaction had been sent, and a sent transaction the server accepts completes as
   committed, as in the JS SDK; line 18 two runs (null, then 5), committed 6; line 19 `max-retries` after 25 runs in
   two of three runs, and in the third it committed after 15 runs (the rival's writes race the transaction)
-- **31 on production** (2026-11-26 and run 15): line 15 99 of 100 committed, 1 failed with `max-retries` (final 99), and
-  98 of 100 in run 15 (2 failed with `max-retries`, final 98); no value went back in either; line 19 `max-retries`
-  after 25 runs on 2026-11-26, and committed after 18 runs in run 15; lines 16 to 18 as on the emulator
+- **31 on production** (2026-11-26, run 15 and run 17): line 15 99 of 100 committed, 1 failed with `max-retries` (final
+  99), and 98 of 100 in run 15 (2 failed with `max-retries`, final 98); no value went back in either; line 19
+  `max-retries` after 25 runs on 2026-11-26, committed after 18 runs in run 15 and after 2 runs in run 17 (line 15 in
+  run 17: 99 of 100, as on 2026-11-26); lines 16 to 18 as on the emulator
 - **32**: on loopback the 1 MB `get()` took 4 to 6 ms and the small event came after it (on the emulator, 3 runs)
-- **32 on production** (2026-11-26 and run 15): on 2026-11-26 the small event came **before** the 1 MB `get()`
-  finished; in run 15 the `get()` took 364 ms and the small event came at 377 ms, after it, as on loopback
+- **32 on production** (2026-11-26, run 15 and run 17): on 2026-11-26 the small event came **before** the 1 MB `get()`
+  finished; in run 15 the `get()` took 364 ms and the small event came at 377 ms, after it, as on loopback; in run 17
+  the `get()` took 519 ms and the small event came at 65 ms, before it
 - **33**: the onDisconnect write ran about 12 ms after the dropped socket
 - **34**: 200; **35**: REST 400 "Invalid path: Path specified exceeds the maximum depth that can be written (32).",
   the client refuses before sending; **36**: acknowledgements in order, final 999, no value went back, 4,975 to

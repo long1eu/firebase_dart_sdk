@@ -8,9 +8,10 @@ no native SDK in the build; for servers and command line tools in Dart there is 
 the WebSocket protocol of the Firebase JS SDK, with Dart names (`DatabaseReference`, `onValue`, `runTransaction`) and
 Dart streams. It is not affiliated with or supported by Google or Firebase.
 
-> **Status: 0.1.1.** The first version was 0.1.0; this one keeps the priority of an emptied node (see the
-> changelog). The known limits are under [Limits](#limits). What has run (the maintainer's runs on the merged trunk,
-> with the connection tests; the record is in
+> **Status: 0.1.1.** The first version was 0.1.0; in this one a node keeps its priority when its last child is
+> removed and another is added, and a transaction on a node that holds only a priority commits (see the changelog).
+> The known limits are under [Limits](#limits). What has run (the maintainer's runs on the merged trunk, with the
+> connection tests; the record is in
 > [docs/database_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_decisions.md),
 > section 23):
 >

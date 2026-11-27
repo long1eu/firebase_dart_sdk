@@ -1,6 +1,10 @@
 ## 0.1.1
 
-- One update is applied in two passes, independent of key order, as production does: every value entry first, then
+- A node keeps its priority when its last child is removed and another is added: the client that made the writes
+  shows the priority the server holds, where 0.1.0 showed it as null until the data was loaded again. `runTransaction`
+  on a node that holds only a priority commits, also after a restart on the SQLite cache, where 0.1.0 failed with
+  `max-retries` after 25 runs of the handler. Both were measured against production (the verification kit, 2026-11-28).
+- How: one update is applied in two passes, independent of key order, as production does: every value entry first, then
   every priority entry, parents before children. A node whose last child goes keeps its priority as an emptied node,
   so `update` with `{'.priority': 2, 'x/v': null, 'x/.priority': null}` on `{x: {v: 1, .priority: 1}}` leaves
   `{'.priority': 2}` in either key order.
