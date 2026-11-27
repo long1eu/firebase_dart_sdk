@@ -1,18 +1,20 @@
-// Checks 27 to 39 of the production verification kit: 27 to 36 are the questions of the core side
-// (rtdb/from_helper/reports/production_questions.md); 37 to 39 ask about priorities. Each runs as
-// an informational sequence. PASS means the sequence ran; the finding is the printed observation,
-// which says whether it matched the expectation measured on the emulator. Exceptions: leaf B of
-// check 30 (a refused write below a leaf, then its removal) is FAIL when the client does not end at
-// the server's value, as check 23; with --expect-emptied-node-fix the transactions of check 38 are
-// FAIL when one does not commit within two runs of its handler.
+// Checks 27 to 41 of the production verification kit: 27 to 36 are the questions of the core side
+// (rtdb/from_helper/reports/production_questions.md); 37 to 40 ask about priorities, 41 about a
+// merge key that names the merge's own location. Each runs as an informational sequence. PASS
+// means the sequence ran; the finding is the printed observation, which says whether it matched
+// the expectation measured on the emulator. Exceptions: leaf B of check 30 (a refused write below
+// a leaf, then its removal) is FAIL when the client does not end at the server's value, as check
+// 23; with --expect-emptied-node-fix the transactions of check 38 are FAIL when one does not commit
+// within two runs of its handler.
 //
-// Checks 28, 29, 33, 37, 38 and 39 open a raw protocol connection of their own (RawConnection)
-// with the throwaway user's ID token, to see frames the public API does not show. It listens (in
-// checks 38 and 39 also with a hash, in 39 with a compound hash), unlistens, gets (38, 39), puts
-// and merges (39, some puts with a hash) and registers one onDisconnect write (check 33), all
-// below the run's path. The auth request and its answer are never printed (an auth answer holds
-// the token's claims); checks 38 and 39 print the answers of their other requests, which hold
-// only the kit's own data.
+// Checks 28, 29, 33, 37, 38, 39 and 40 open a raw protocol connection of their own
+// (RawConnection) with the throwaway user's ID token, to see frames the public API does not show;
+// check 41 opens three (a writer and two listeners).
+// It listens (in checks 38 and 39 also with a hash, in 39 with a compound hash), unlistens, gets
+// (38 to 41), puts (39, some with a hash, 40 and 41) and merges (39, 41) and registers one
+// onDisconnect write (check 33), all below the run's path. The auth request and its answer are
+// never printed (an auth answer holds the token's claims); checks 38 to 41 print the answers of
+// their other requests, which hold only the kit's own data.
 
 import 'dart:async';
 import 'dart:convert';
@@ -2923,7 +2925,599 @@ Future<CheckResult> _serverRules(Kit kit) async {
   );
 }
 
-/// Checks 27 to 39, appended to the kit's list.
+// -----------------------------------------------------------------------------------------------
+// Check 40: a plain set of a null priority on a node that does not exist.
+
+/// One public API write of check 40 at its own fresh path `null_priority/api/<id>`.
+typedef NullPriorityForm = ({
+  String id,
+  String label,
+  Future<void> Function(DatabaseReference ref) write,
+});
+
+/// The writes of check 40 that the client's validation lets through: (a) `setPriority(null)` and
+/// every `set` form that holds no value, then (c) `setPriority(3)` for comparison. The client
+/// parses each `set` form here into an empty node and sends it as `p <path> null`; only
+/// `setPriority` sends `p <path>/.priority <priority>`.
+List<NullPriorityForm> _nullPriorityForms() => <NullPriorityForm>[
+  (
+    id: 'sp_null',
+    label: '(a) setPriority(null)',
+    write: (DatabaseReference r) => r.setPriority(null),
+  ),
+  (
+    id: 'set_null_p3',
+    label: '(a) set(null, priority: 3)',
+    write: (DatabaseReference r) => r.set(null, priority: 3),
+  ),
+  (
+    id: 'set_map_p3',
+    label: '(a) set({}, priority: 3)',
+    write: (DatabaseReference r) => r.set(<String, Object?>{}, priority: 3),
+  ),
+  (
+    id: 'set_list_p3',
+    label: '(a) set([], priority: 3)',
+    write: (DatabaseReference r) => r.set(<Object?>[], priority: 3),
+  ),
+  (
+    id: 'set_dot_p3',
+    label: "(a) set({'.priority': 3})",
+    write: (DatabaseReference r) => r.set(<String, Object?>{'.priority': 3}),
+  ),
+  (
+    id: 'set_value_null_p3',
+    label: "(a) set({'.value': null, '.priority': 3})",
+    write: (DatabaseReference r) =>
+        r.set(<String, Object?>{'.value': null, '.priority': 3}),
+  ),
+  (
+    id: 'set_value_map_p3',
+    label: "(a) set({'.value': {}, '.priority': 3})",
+    write: (DatabaseReference r) =>
+        r.set(<String, Object?>{'.value': <String, Object?>{}, '.priority': 3}),
+  ),
+  (
+    id: 'set_dot_null',
+    label: "(a) set({'.priority': null})",
+    write: (DatabaseReference r) => r.set(<String, Object?>{'.priority': null}),
+  ),
+  (
+    id: 'sp_3',
+    label: '(c) setPriority(3)',
+    write: (DatabaseReference r) => r.setPriority(3),
+  ),
+];
+
+/// Value-less calls of check 40 that the client refuses at the call, before anything is sent.
+List<(String, Future<void> Function(DatabaseReference ref))>
+_refusedNullPriorityForms() =>
+    <(String, Future<void> Function(DatabaseReference ref))>[
+      (
+        "child('.priority').set(null)",
+        (DatabaseReference r) => r.child('.priority').set(null),
+      ),
+      (
+        'set(null, priority: true)',
+        (DatabaseReference r) => r.set(null, priority: true),
+      ),
+      (
+        "set({'.priority': true})",
+        (DatabaseReference r) => r.set(<String, Object?>{'.priority': true}),
+      ),
+      (
+        "set({'.priority': {}})",
+        (DatabaseReference r) =>
+            r.set(<String, Object?>{'.priority': <String, Object?>{}}),
+      ),
+      (
+        "set({'.value': null, '.priority': 3, 'a': null})",
+        (DatabaseReference r) =>
+            r.set(<String, Object?>{'.value': null, '.priority': 3, 'a': null}),
+      ),
+    ];
+
+/// A snapshot as `<value> priority <priority>`.
+String _snapText(DataSnapshot s) =>
+    '${_clip(s.value)} priority ${jsonEncode(s.priority)}';
+
+/// A refusal in full: code, server status and message.
+String _refusalText(FirebaseDatabaseException e) =>
+    'code ${e.code}, serverStatus "${e.serverStatus}", message "${e.message}"';
+
+/// What `get()` of [ref] gives: the snapshot, the refusal, or `NOT COMPLETED` after the step wait.
+Future<String> _getText(DatabaseReference ref, String what) async {
+  try {
+    return _snapText(await within(ref.get(), what));
+  } on FirebaseDatabaseException catch (e) {
+    return 'failed: ${_refusalText(e)}';
+  } on KitTimeout {
+    return 'NOT COMPLETED within ${stepWait.inSeconds} s';
+  }
+}
+
+/// One write of check 40 (a) or (c) at `null_priority/api/<id>`, which does not exist: a value
+/// listener of the writer attached first, the write (how its Future ended, or `NOT COMPLETED`
+/// after the step wait), the listener's events, the writer's get() with the listener still
+/// attached, a fresh client's get() and the REST export.
+Future<List<String>> _nullPriorityApiRun(
+  Kit kit,
+  KitDb writer,
+  KitDb fresh,
+  NullPriorityForm form,
+  Map<String, Object?> seen,
+) async {
+  final String relative = 'null_priority/api/${form.id}';
+  final DatabaseReference ref = writer.ref(relative);
+  final Recorder<DatabaseEvent> events = Recorder<DatabaseEvent>(ref.onValue);
+  await until(
+    () => events.items.isNotEmpty || events.error != null,
+    'the first event at $relative',
+  );
+  final int before = events.items.length;
+  final Stopwatch watch = Stopwatch()..start();
+  String result;
+  final Future<void> write = form.write(ref);
+  handled(write);
+  try {
+    await within(write, form.label);
+    result = 'completed ok after ${watch.elapsedMilliseconds} ms';
+  } on FirebaseDatabaseException catch (e) {
+    result = 'failed after ${watch.elapsedMilliseconds} ms: ${_refusalText(e)}';
+  } on KitTimeout {
+    kit.lateWritesPossible = true;
+    result =
+        'NOT COMPLETED within ${stepWait.inSeconds} s (the kit stopped waiting)';
+  }
+  await Future<void>.delayed(_listenSettle);
+  final List<String> first = <String>[
+    for (final DatabaseEvent e in events.items.take(before))
+      _snapText(e.snapshot),
+  ];
+  final List<String> after = <String>[
+    for (final DatabaseEvent e in events.items.skip(before))
+      _snapText(e.snapshot),
+  ];
+  final Object? listenerError = events.error;
+  final String own = await _getText(ref, 'get() of $relative by the writer');
+  await events.cancel();
+  final String other = await _getText(
+    fresh.ref(relative),
+    'get() of $relative by a fresh client',
+  );
+  final String export = await _export(kit, relative);
+  seen[form.id] = <String, Object?>{
+    'write': result.replaceFirst(RegExp(r' after \d+ ms'), ''),
+    'listenerBefore': first,
+    'listenerAfter': after,
+    'listenerError': listenerError == null ? null : describe(listenerError),
+    'get': own,
+    'freshGet': other,
+    'export': export,
+  };
+  return <String>[
+    '${form.label} at $relative (missing)',
+    '  write: $result',
+    '  listener attached before: ${first.join(' | ')}; after the write: '
+        '${after.isEmpty ? 'NO EVENT' : after.join(' | ')}'
+        '${listenerError == null ? '' : '; listener error ${describe(listenerError)}'}',
+    '  get() by the writer (listener still attached): $own',
+    '  get() by a fresh client: $other',
+    '  export: $export',
+  ];
+}
+
+/// Check 40 (a): the value-less calls the client refuses at the call; each error's first line.
+Future<List<String>> _nullPriorityRefusedAtCall(
+  KitDb writer,
+  Map<String, Object?> seen,
+) async {
+  final List<String> lines = <String>[
+    '(a) refused at the call, nothing sent (each at null_priority/refused/<n>):',
+  ];
+  int n = 0;
+  for (final (String label, Future<void> Function(DatabaseReference) call)
+      in _refusedNullPriorityForms()) {
+    final DatabaseReference ref = writer.ref('null_priority/refused/${n++}');
+    String result;
+    try {
+      final Future<void> write = call(ref);
+      handled(write);
+      result =
+          'NOT REFUSED AT THE CALL: ${outcome(await refusal(write, label))}';
+    } on ArgumentError catch (e) {
+      result = 'ArgumentError: ${'$e'.split('\n').first}';
+    }
+    seen[label] = result;
+    lines.add('  $label: $result');
+  }
+  return lines;
+}
+
+/// One raw case of check 40 (b) at `null_priority/raw/<id>` (r): the setup puts relative to r, then
+/// one put of `data` at `r/<target>`.
+typedef NullPriorityFrame = ({
+  String id,
+  String label,
+  List<(String, Object?)> setup,
+  String target,
+  Object? data,
+});
+
+/// The raw cases of check 40 (b): b1 and b2 the question, b3 to b5 controls on an existing x,
+/// b6 the non-null priority on a missing x for comparison.
+List<NullPriorityFrame> _nullPriorityFrames() {
+  const Map<String, Object?> k = <String, Object?>{'k': 1};
+  return <NullPriorityFrame>[
+    (
+      id: 'b1',
+      label: '(b1) r missing (so x missing): p r/x/.priority null',
+      setup: const <(String, Object?)>[],
+      target: 'x/.priority',
+      data: null,
+    ),
+    (
+      id: 'b2',
+      label: '(b2) r={k:1}, x missing: p r/x/.priority null',
+      setup: const <(String, Object?)>[('', k)],
+      target: 'x/.priority',
+      data: null,
+    ),
+    (
+      id: 'b3',
+      label:
+          '(b3) control r={k:1, x:{v:1}} (x no priority): p r/x/.priority null',
+      setup: const <(String, Object?)>[
+        (
+          '',
+          <String, Object?>{
+            'k': 1,
+            'x': <String, Object?>{'v': 1},
+          },
+        ),
+      ],
+      target: 'x/.priority',
+      data: null,
+    ),
+    (
+      id: 'b4',
+      label: '(b4) control r={k:1, x:{v:1} priority 2}: p r/x/.priority null',
+      setup: const <(String, Object?)>[
+        (
+          '',
+          <String, Object?>{
+            'k': 1,
+            'x': <String, Object?>{'v': 1, '.priority': 2},
+          },
+        ),
+      ],
+      target: 'x/.priority',
+      data: null,
+    ),
+    (
+      id: 'b5',
+      label:
+          '(b5) control r={k:1}, x emptied keeping priority 5: p r/x/.priority null',
+      setup: const <(String, Object?)>[
+        (
+          '',
+          <String, Object?>{
+            'k': 1,
+            'x': <String, Object?>{'v': 1, '.priority': 5},
+          },
+        ),
+        ('x/v', null),
+      ],
+      target: 'x/.priority',
+      data: null,
+    ),
+    (
+      id: 'b6',
+      label: '(b6) comparison r={k:1}, x missing: p r/x/.priority 3',
+      setup: const <(String, Object?)>[('', k)],
+      target: 'x/.priority',
+      data: 3,
+    ),
+  ];
+}
+
+/// One raw case of check 40 (b): the setup puts and the start export, a listen at r, the put
+/// (sent frame verbatim, the answer or `NO ANSWER` after the step wait, every frame received
+/// within 1 s after it with `+N ms`), the unlisten, a `g` of r and the REST export of r.
+Future<List<String>> _nullPriorityFrameRun(
+  Kit kit,
+  RawConnection raw,
+  NullPriorityFrame c,
+  Map<String, Object?> seen,
+) async {
+  const String group = 'null_priority/raw';
+  final String r = '$group/${c.id}';
+  final List<String> lines = <String>[c.label];
+  for (final (String relative, Object? data) in c.setup) {
+    final Map<String, Object?> answer = await _answerOrNone(kit, raw, group, (
+      action: 'p',
+      relative: relative.isEmpty ? c.id : '${c.id}/$relative',
+      data: data,
+    ));
+    lines.add('  setup: ${raw.sent.last}  -> ${jsonEncode(answer)}');
+  }
+  lines.add('  start export of r: ${await _export(kit, r)}');
+  final Map<String, Object?> listen = await raw.listenAnswer(r);
+  await Future<void>.delayed(_listenSettle);
+  final int mark = raw.frames.length;
+  final int sentMark = raw.sent.length;
+  final int sentAt = raw.elapsedMs;
+  final Map<String, Object?> answer = await _answerOrNone(kit, raw, group, (
+    action: 'p',
+    relative: '${c.id}/${c.target}',
+    data: c.data,
+  ));
+  await Future<void>.delayed(const Duration(seconds: 1));
+  final List<String> frames = <String>[
+    for (final f in raw.frames.skip(mark)) '+${f.ms - sentAt} ms ${f.text}',
+  ];
+  final String sent = raw.sent.skip(sentMark).join(' | ');
+  String unlisten = 'ok';
+  try {
+    await raw.unlisten(r, _noQuery, null);
+  } on KitTimeout {
+    unlisten = 'NO ANSWER within ${stepWait.inSeconds} s';
+  }
+  final Map<String, Object?> got = await _answerOrNone(kit, raw, group, (
+    action: 'g',
+    relative: c.id,
+    data: null,
+  ));
+  final String export = await _export(kit, r);
+  seen[c.id] = <String, Object?>{
+    'sent': sent.replaceAll('/${kit.runPath}/', '/<run>/'),
+    'answer': jsonEncode(answer),
+    'g': jsonEncode(got),
+    'export': export,
+  };
+  return lines..addAll(<String>[
+    '  listen r answered ${jsonEncode(listen)}',
+    '  sent: $sent',
+    '  answer: ${jsonEncode(answer)}',
+    for (final String frame in frames) '  frame: $frame',
+    if (frames.isEmpty) '  frame: NO FRAME',
+    '  unlisten: $unlisten',
+    '  g of r answered ${jsonEncode(got)}',
+    '  export of r: $export',
+  ]);
+}
+
+/// The `write` field of the form [id] in [seen], or `?` when it did not run.
+String _apiWrite(Map<String, Object?> seen, String id) =>
+    '${(seen[id] as Map<String, Object?>?)?['write'] ?? '?'}';
+
+/// Check 40: a plain set of a null priority on a node that does not exist. (a) and (c) through the
+/// public API, (b) as raw frames. Printed as observations; the check passes whatever the server
+/// answers.
+Future<CheckResult> _nullPriorityOnMissing(Kit kit) async {
+  final KitDb writer = kit.open();
+  final KitDb fresh = kit.open();
+  final RawConnection raw = await RawConnection.open(kit);
+  final Map<String, Object?> api = <String, Object?>{};
+  final Map<String, Object?> refused = <String, Object?>{};
+  final Map<String, Object?> frames = <String, Object?>{};
+  final List<String> details = <String>[];
+  for (final NullPriorityForm form in _nullPriorityForms()) {
+    details.addAll(await _nullPriorityApiRun(kit, writer, fresh, form, api));
+  }
+  details.addAll(await _nullPriorityRefusedAtCall(writer, refused));
+  for (final NullPriorityFrame c in _nullPriorityFrames()) {
+    details.addAll(await _nullPriorityFrameRun(kit, raw, c, frames));
+  }
+  final Map<String, Object?> after = await _answerOrNone(
+    kit,
+    raw,
+    'null_priority/raw',
+    _put('after', 1),
+  );
+  details.add(
+    '(b) after: put null_priority/raw/after 1 on the same connection: ${jsonEncode(after)}',
+  );
+  frames['after'] = jsonEncode(after);
+  final Set<String> setForms = <String>{
+    for (final NullPriorityForm f in _nullPriorityForms())
+      if (f.id.startsWith('set_')) _apiWrite(api, f.id),
+  };
+  String rawAnswer(String id) =>
+      '${(frames[id]! as Map<String, Object?>)['answer']}';
+  return CheckResult(
+    Status.pass,
+    'A null priority on a missing node. (a) setPriority(null): ${_apiWrite(api, 'sp_null')}; '
+    'the value-less set forms (each sent as p <path> null): ${setForms.join(' / ')}. '
+    '(b) raw p x/.priority null, r and x missing: ${rawAnswer('b1')}; '
+    'r={k:1}, x missing: ${rawAnswer('b2')}; x {v:1}: ${rawAnswer('b3')}; x priority 2: '
+    '${rawAnswer('b4')}; x emptied priority 5: ${rawAnswer('b5')}; p x/.priority 3, x missing: '
+    '${rawAnswer('b6')}. (c) setPriority(3): ${_apiWrite(api, 'sp_3')}. Details below.',
+    details: details,
+    observed: <String, Object?>{'api': api, 'refused': refused, 'raw': frames},
+  );
+}
+
+// -----------------------------------------------------------------------------------------------
+// Check 41: a merge key that names the merge's own location.
+
+/// One raw case of check 41: the merge `data` sent at `<run>/empty_merge_key/<id>/loc`.
+typedef EmptyMergeKeyCase = ({
+  String id,
+  String label,
+  Map<String, Object?> data,
+});
+
+/// The cases of check 41: each key that parses to the empty path (`''`, `'/'`, `'//'`) alone and
+/// beside a normal key.
+List<EmptyMergeKeyCase> _emptyMergeKeyCases() => <EmptyMergeKeyCase>[
+  for (final (int i, String key) in <(int, String)>[
+    (1, ''),
+    (2, '/'),
+    (3, '//'),
+  ]) ...<EmptyMergeKeyCase>[
+    (
+      id: 'a$i',
+      label: '(a$i) m loc ${jsonEncode(<String, Object?>{key: 7})}',
+      data: <String, Object?>{key: 7},
+    ),
+    (
+      id: 'a${i + 3}',
+      label:
+          '(a${i + 3}) m loc ${jsonEncode(<String, Object?>{key: 7, 'n': 3})}',
+      data: <String, Object?>{key: 7, 'n': 3},
+    ),
+  ],
+];
+
+/// The frames [connection] received since [mark], each with `+N ms` after [sentAt], or
+/// `NO FRAME`.
+List<String> _framesSince(RawConnection connection, int mark, int sentAt) {
+  final List<String> frames = <String>[
+    for (final f in connection.frames.skip(mark))
+      '+${f.ms - sentAt} ms ${f.text}',
+  ];
+  return frames.isEmpty ? <String>['NO FRAME'] : frames;
+}
+
+/// One case of check 41 at `<run>/empty_merge_key/<id>` (up): the writer of [raw] puts up =
+/// `{loc: {k: 1, j: 2}, sib: 5}`, its `atLoc` listens at `up/loc` and its `above` at up, then
+/// the writer sends the merge at `up/loc`. Prints the frame sent, the answer (or `NO ANSWER` after
+/// the step wait), every frame each connection received within 1 s, a `g` of up and the REST export
+/// of up.
+Future<List<String>> _emptyMergeKeyRun(
+  Kit kit,
+  ({RawConnection writer, RawConnection atLoc, RawConnection above}) raw,
+  EmptyMergeKeyCase c,
+  Map<String, Object?> seen,
+) async {
+  const String group = 'empty_merge_key';
+  final String up = '$group/${c.id}';
+  final List<String> lines = <String>[c.label];
+  final Map<String, Object?> setup = await _answerOrNone(
+    kit,
+    raw.writer,
+    group,
+    _put(c.id, <String, Object?>{
+      'loc': <String, Object?>{'k': 1, 'j': 2},
+      'sib': 5,
+    }),
+  );
+  final String startExport = await _export(kit, up);
+  lines
+    ..add('  setup: ${raw.writer.sent.last}  -> ${jsonEncode(setup)}')
+    ..add('  start export of up: $startExport');
+  final Map<String, Object?> listenLoc = await raw.atLoc.listenAnswer(
+    '$up/loc',
+  );
+  final Map<String, Object?> listenUp = await raw.above.listenAnswer(up);
+  await Future<void>.delayed(_listenSettle);
+  final int locMark = raw.atLoc.frames.length;
+  final int upMark = raw.above.frames.length;
+  final int writerMark = raw.writer.frames.length;
+  final int sentMark = raw.writer.sent.length;
+  final int sentAt = raw.writer.elapsedMs;
+  final Map<String, Object?> answer = await _answerOrNone(
+    kit,
+    raw.writer,
+    group,
+    (action: 'm', relative: '${c.id}/loc', data: c.data),
+  );
+  await Future<void>.delayed(const Duration(seconds: 1));
+  final String sent = raw.writer.sent.skip(sentMark).join(' | ');
+  final List<String> atLoc = _framesSince(raw.atLoc, locMark, sentAt);
+  final List<String> above = _framesSince(raw.above, upMark, sentAt);
+  final List<String> writer = _framesSince(raw.writer, writerMark, sentAt);
+  final List<String> unlistened = <String>[];
+  for (final (RawConnection connection, String relative)
+      in <(RawConnection, String)>[(raw.atLoc, '$up/loc'), (raw.above, up)]) {
+    try {
+      await connection.unlisten(relative, _noQuery, null);
+      unlistened.add('ok');
+    } on KitTimeout {
+      unlistened.add('NO ANSWER within ${stepWait.inSeconds} s');
+    }
+  }
+  final Map<String, Object?> got = await _answerOrNone(kit, raw.writer, group, (
+    action: 'g',
+    relative: c.id,
+    data: null,
+  ));
+  final String export = await _export(kit, up);
+  seen[c.id] = <String, Object?>{
+    'setup': jsonEncode(setup),
+    'startExport': startExport,
+    'listen': <String>[jsonEncode(listenLoc), jsonEncode(listenUp)],
+    'sent': sent.replaceAll('/${kit.runPath}/', '/<run>/'),
+    'answer': jsonEncode(answer),
+    // The writer's frames within 1 s of the merge, without their timing.
+    'writerFrames': <String>[
+      for (final String frame in writer)
+        frame.replaceFirst(RegExp(r'^\+-?\d+ ms '), ''),
+    ],
+    'unlisten': unlistened,
+    'pushedAtLoc': atLoc.first == 'NO FRAME' ? 0 : atLoc.length,
+    'pushedAbove': above.first == 'NO FRAME' ? 0 : above.length,
+    'g': jsonEncode(got),
+    'export': export,
+  };
+  return lines..addAll(<String>[
+    '  listen up/loc answered ${jsonEncode(listenLoc)}; listen up answered ${jsonEncode(listenUp)}',
+    '  sent: $sent',
+    '  answer: ${jsonEncode(answer)}',
+    for (final String frame in writer) '  writer frame: $frame',
+    for (final String frame in atLoc) '  listener at up/loc frame: $frame',
+    for (final String frame in above) '  listener at up frame: $frame',
+    '  unlisten: ${unlistened.join(', ')}',
+    '  g of up answered ${jsonEncode(got)}',
+    '  export of up: $export',
+  ]);
+}
+
+/// Check 41: a merge (`m`) whose key parses to the empty path (`''`, `'/'`, `'//'`), alone and
+/// beside a normal key, as raw frames on three connections (writer, a listener at the merge's
+/// location, a listener above it). Printed as observations; the check passes whatever the server
+/// answers.
+Future<CheckResult> _emptyMergeKey(Kit kit) async {
+  final ({RawConnection writer, RawConnection atLoc, RawConnection above}) raw =
+      (
+        writer: await RawConnection.open(kit),
+        atLoc: await RawConnection.open(kit),
+        above: await RawConnection.open(kit),
+      );
+  final Map<String, Object?> seen = <String, Object?>{};
+  final List<String> details = <String>[];
+  for (final EmptyMergeKeyCase c in _emptyMergeKeyCases()) {
+    details.addAll(await _emptyMergeKeyRun(kit, raw, c, seen));
+  }
+  final Map<String, Object?> after = await _answerOrNone(
+    kit,
+    raw.writer,
+    'empty_merge_key',
+    _put('after', 1),
+  );
+  details.add(
+    'after: put empty_merge_key/after 1 on the writer connection: ${jsonEncode(after)}',
+  );
+  seen['after'] = jsonEncode(after);
+  String line(String id) {
+    final Map<String, Object?> s = seen[id]! as Map<String, Object?>;
+    return '${s['answer']}, pushes ${s['pushedAtLoc']}/${s['pushedAbove']}, export ${s['export']}';
+  }
+
+  return CheckResult(
+    Status.pass,
+    'A merge key that names the location itself, up = {loc:{k:1,j:2}, sib:5}, m at up/loc '
+    '(answer, pushes to the listeners at up/loc and up, export of up): '
+    '{"":7}: ${line('a1')}; {"/":7}: ${line('a2')}; {"//":7}: ${line('a3')}; '
+    '{"":7,"n":3}: ${line('a4')}; {"/":7,"n":3}: ${line('a5')}; {"//":7,"n":3}: ${line('a6')}. '
+    'Details below.',
+    details: details,
+    observed: <String, Object?>{'raw': seen},
+  );
+}
+
+/// Checks 27 to 41, appended to the kit's list.
 const List<Check> questionChecks = <Check>[
   Check(
     '27',
@@ -3002,6 +3596,20 @@ const List<Check> questionChecks = <Check>[
     'Server rules for an emptied node\'s priority, raw frames',
     Scope.production,
     _serverRules,
+    wait: Duration(minutes: 8),
+  ),
+  Check(
+    '40',
+    'A null priority set on a missing node',
+    Scope.production,
+    _nullPriorityOnMissing,
+    wait: Duration(minutes: 8),
+  ),
+  Check(
+    '41',
+    'A merge key that names the location itself, raw frames',
+    Scope.production,
+    _emptyMergeKey,
     wait: Duration(minutes: 8),
   ),
 ];
