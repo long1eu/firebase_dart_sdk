@@ -267,6 +267,107 @@ Future<void> main() async {
       );
       expect(rule('q5_withEmpty')['kind'], 'a range merge (rm)');
       expect(rule('q5_keptH')['kind'], 'ok with no data');
+      // Check 40, a null priority on a missing node. Every value pinned here was measured equal on
+      // the emulator and on production. The d pushes are not pinned: the emulator pushes data null
+      // at x/.priority to the listener at r in b1 to b5, production only in b4 and b5 (where the
+      // write changed something).
+      final Map<String, Object?> api =
+          observed('40')['api']! as Map<String, Object?>;
+      const String missingNode = 'could not set priority on non-existent node';
+      for (final String id in <String>[
+        'sp_null',
+        'set_null_p3',
+        'set_map_p3',
+        'set_list_p3',
+        'set_dot_p3',
+        'set_value_null_p3',
+        'set_value_map_p3',
+        'set_dot_null',
+        'sp_3',
+      ]) {
+        expect(api[id], <String, Object?>{
+          'write': id == 'sp_3'
+              ? 'failed: code unknown, serverStatus "invalid_parameters: $missingNode", '
+                    'message "$missingNode"'
+              : 'completed ok',
+          'listenerBefore': <String>['null priority null'],
+          'listenerAfter': <String>[],
+          'listenerError': null,
+          'get': 'null priority null',
+          'freshGet': 'null priority null',
+          'export': 'null',
+        }, reason: id);
+      }
+      final Map<String, Object?> refusedAtCall =
+          observed('40')['refused']! as Map<String, Object?>;
+      expect(refusedAtCall, hasLength(5));
+      expect(
+        refusedAtCall["child('.priority').set(null)"],
+        startsWith(
+          'ArgumentError: Invalid argument(s): child failed: path argument was an invalid path',
+        ),
+      );
+      expect(
+        refusedAtCall['set(null, priority: true)'],
+        startsWith(
+          'ArgumentError: Invalid argument(s): set failed: priority argument must be a valid',
+        ),
+      );
+      expect(
+        refusedAtCall["set({'.priority': true})"],
+        'ArgumentError: Invalid argument (priority): Invalid priority type found: bool: true',
+      );
+      expect(
+        refusedAtCall["set({'.priority': {}})"],
+        startsWith(
+          'ArgumentError: Invalid argument (priority): Invalid priority type found: _Map',
+        ),
+      );
+      expect(
+        refusedAtCall["set({'.value': null, '.priority': 3, 'a': null})"],
+        allOf(
+          startsWith(
+            'ArgumentError: Invalid argument(s): set failed: value argument',
+          ),
+          contains('contains ".value" child'),
+        ),
+      );
+      final Map<String, Object?> raw =
+          observed('40')['raw']! as Map<String, Object?>;
+      const String ok = '{"s":"ok","d":""}';
+      const String k1 = '{"k":1}';
+      const String k1x = '{"k":1,"x":{"v":1}}';
+      // Per case: the request number, the data put at r/x/.priority, the answer, the g of r, the
+      // export of r.
+      final Map<String, (int, Object?, String, String, String)> rawCases =
+          <String, (int, Object?, String, String, String)>{
+            'b1': (3, null, ok, 'null', 'null'),
+            'b2': (8, null, ok, k1, k1),
+            'b3': (13, null, ok, k1x, k1x),
+            'b4': (18, null, ok, k1x, k1x),
+            'b5': (24, null, ok, k1, k1),
+            'b6': (
+              29,
+              3,
+              '{"s":"invalid_parameters","d":"$missingNode"}',
+              k1,
+              k1,
+            ),
+          };
+      for (final MapEntry<String, (int, Object?, String, String, String)> e
+          in rawCases.entries) {
+        final (int r, Object? data, String answer, String g, String export) =
+            e.value;
+        expect(raw[e.key], <String, Object?>{
+          'sent':
+              '{"t":"d","d":{"r":$r,"a":"p","b":{"p":"/<run>/null_priority/raw/'
+              '${e.key}/x/.priority","d":${jsonEncode(data)}}}}',
+          'answer': answer,
+          'g': '{"s":"ok","d":$g}',
+          'export': export,
+        }, reason: e.key);
+      }
+      expect(raw['after'], ok);
 
       final String runId = run.runPath!.split('/').last;
       expect(run.removed, hasLength(2));

@@ -1,11 +1,11 @@
 # Realtime Database production verification kit
 
-`firebase_database_dart` was verified against the Database emulator only. This kit runs 39 named checks against a
+`firebase_database_dart` was verified against the Database emulator only. This kit runs 40 named checks against a
 **real** Realtime Database and prints, for each one, `PASS`, `FAIL`, `INCONCLUSIVE` or `SKIPPED` with a one-line
 explanation. It asks what the emulator cannot answer (TLS and the host the server names, rules with a real ID token,
 a token refresh and a sign-out on a live connection, priorities on the real server, timings), runs a base line of
 the public API on both backends, and runs the core side's production questions
-(`rtdb/from_helper/reports/production_questions.md`) as informational checks 27 to 36, plus checks 37 to 39.
+(`rtdb/from_helper/reports/production_questions.md`) as informational checks 27 to 36, plus checks 37 to 40.
 
 The code is `firebase_database/firebase_database_dart/test/production/verify_production.dart`; `run.sh` here runs it
 from the right directory. It is modelled on the Storage kit (`tool/verify_production_storage`).
@@ -50,26 +50,27 @@ real project.
   the kit exits 2 with "install the rules"; after it, a refusal in a check is a `FAIL`.
 - It prints the project, the database URL and the run's path first. Against production it does nothing more without
   `--yes`.
-- Size and load: 39 checks. The largest write is one string of 1,000,000 bytes (check 32, read back once); every
+- Size and load: 40 checks. The largest write is one string of 1,000,000 bytes (check 32, read back once); every
   other write is at most about 1.4 KB, so a full run writes about 1.1 MB in total (inferred from the values in the
   code, not counted). Check 36 sends 1,000 updates, check 34 200 increments, check 31 at least 100 transactions.
   Check 31 opens about ten clients over its five steps, at most three at a time; check 30 opens five; every other
-  check opens at most three clients and, in checks 28, 29, 33, 37, 38 and 39, one raw connection. The 16 MB write of
-  question 28 is not tried.
-- Time: about 6 minutes on the emulator (353 s measured for the whole kit with `dart run`'s start; check 39 alone
-  294 s, the other 38 checks 59 s). Check 39 waits 20 s for each request the server does not answer (Q3, Q8, Q9)
-  and 20 s after each Q8 merge; checks 22 and 30 each wait 5 s for their second reading. Each check may take up to 3
-  minutes, check 39 up to 8; check 33 waits up to 150 s for the server, and the clean-up waits 60 s more when a
-  write could still land (below). A run is longer than the five minutes after a sign-in in which Auth accepts the
-  deletion of a user (later it answers `requires-recent-login`), so the kit signs the throwaway user in again, with
-  the password it keeps in memory, right before deleting it.
-- Checks 28, 29, 33, 37, 38 and 39 open a raw protocol connection of their own (version 5, the throwaway user's token
-  in an `auth` request), because the public API does not show frames. It only listens (in checks 38 and 39 also with
-  a hash, in check 39 with a compound hash), unlistens and, in checks 38 and 39, gets below the run's path; in check 39
-  it also puts and merges there (some puts with a hash, as a transaction does); in check 33 it registers one
-  onDisconnect write there and drops the socket without a close. The auth request and its answer are never printed
-  (an auth answer holds the token's claims); the report prints the pushed frames and, in checks 38 and 39, the
-  answers to its other requests, which hold only the kit's own data.
+  check opens at most three clients and, in checks 28, 29, 33, 37, 38, 39 and 40, one raw connection. The 16 MB
+  write of question 28 is not tried.
+- Time: about 6 minutes on the emulator (373 s measured for the whole kit of 40 checks with `dart run`'s start; before
+  check 40 was added, check 39 alone 294 s, the other 38 checks 59 s). Check 39 waits 20 s for each request the server
+  does not answer (Q3, Q8, Q9) and 20 s after each Q8 merge; checks 22 and 30 each wait 5 s for their second reading.
+  Each check may take up to 3 minutes, checks 39 and 40 up to 8 (check 40 waits 20 s for each write or request that does
+  not complete); check 33 waits up to 150 s for the server, and the clean-up waits 60 s more when a write could still
+  land (below). A run is longer than the five minutes after a sign-in in which Auth accepts the deletion of a user
+  (later it answers `requires-recent-login`), so the kit signs the throwaway user in again, with the password it keeps
+  in memory, right before deleting it.
+- Checks 28, 29, 33, 37, 38, 39 and 40 open a raw protocol connection of their own (version 5, the throwaway user's
+  token in an `auth` request), because the public API does not show frames. It only listens (in checks 38 and 39 also
+  with a hash, in check 39 with a compound hash), unlistens and, in checks 38 to 40, gets below the run's path; in
+  checks 39 and 40 it also puts there and in check 39 merges (some puts with a hash, as a transaction does); in check
+  33 it registers one onDisconnect write there and drops the socket without a close. The auth request and its answer
+  are never printed (an auth answer holds the token's claims); the report prints the pushed frames and, in checks 38
+  to 40, the answers to its other requests, which hold only the kit's own data.
 - Credentials: the kit never reads or prints any. With `--create-user` it signs up a throwaway user
   (`database-verify-<run>@example.com`, a random 32-character password that lives in memory and is never printed or
   stored) through `FirebaseUserAuth` (`firebase_auth_providers_dart`), and deletes that user at the end, also when
@@ -306,8 +307,20 @@ observation matched what the emulator showed (one exception: leaf B of check 30,
   sends), with them as a `.priority` leaf, with them as an empty range, a control with every range wrong, and a
   control whose simple hash matches. Each prints the `ch` sent, the answer, whether data came as nothing, a full `d`
   or a range merge `rm`, and the frames (the long filler strings printed as `<540 x>`).
+- **40. A null priority set on a missing node** (production only). Informational. (a) Through the public API, each
+  at its own missing path below `<run>/null_priority/api/`: `setPriority(null)` and every `set` form with no value
+  that the validation lets through (`set(null, priority: 3)`, `set({}, priority: 3)`, `set([], priority: 3)`,
+  `set({'.priority': 3})`, `set({'.value': null, '.priority': 3})`, `set({'.value': {}, '.priority': 3})`,
+  `set({'.priority': null})`; the client sends each of these as a removal, `p <path> null`). For each: how the Future
+  ended (or `NOT COMPLETED` after 20 s), the events of a value listener attached before, the writer's `get()`, a
+  fresh client's `get()` and the REST export. Then five value-less calls the client refuses at the call, with the
+  error (nothing is sent). (b) On the raw connection at `<run>/null_priority/raw/<id>` (r): `p r/x/.priority null`
+  with r missing, with r = `{k:1}` and x missing, and as controls with x `{v:1}`, x `{v:1}` priority 2 and x emptied
+  keeping priority 5; and `p r/x/.priority 3` with x missing. Each prints the setup, a listen at r, the frame sent and
+  every frame received verbatim, a `g` of r and the export; then one ordinary put on the same connection. (c)
+  `setPriority(3)` on a missing path, reported as in (a).
 
-What to send back: the whole report. The most valuable lines are 1, 9, 15, 18, 19, 21, 22 and 27 to 39, and the line
+What to send back: the whole report. The most valuable lines are 1, 9, 15, 18, 19, 21, 22 and 27 to 40, and the line
 after check 3 ("all of it in one set").
 
 ## Known results
@@ -377,6 +390,17 @@ Auth emulator of firebase-tools 15.18.0. Production: not run yet, so every check
   counted). Q5: ranges without the kept priorities get an `rm` with the ranges b..c and d (b as
   `{".priority":5.0}`, d with `f` as `{".priority":2.0}`); with them as a `.priority` leaf, `rm []` (every range
   matched); as an empty range, the same `rm` as without; with a matching simple hash, no data
+- **40**: (a) `setPriority(null)` and every value-less `set` form complete ok; the listener sees only its first
+  `null` (no event after the write), both `get()`s give `null`, the export is `null`. (b) `p r/x/.priority null` is
+  answered `{"s":"ok","d":""}` with r missing, with x missing, and in the three controls; the listen at r gets a
+  `d` push at `r/x/.priority` with data null each time; r stays missing or `{"k":1}`; with x `{v:1}` priority 2 the
+  priority is removed (`{"k":1,"x":{"v":1}}`); x emptied keeping priority 5 is removed (`{"k":1}`).
+  `p r/x/.priority 3` with x missing: `invalid_parameters` "could not set priority on non-existent node". (c)
+  `setPriority(3)` fails with `unknown`, server status `invalid_parameters: could not set priority on non-existent
+  node`; export `null`
+- **40 on production** (2026-11-26): every answer, export and client view as on the emulator; the `d` push at
+  `r/x/.priority` comes only where the write changed something (x with priority 2, x emptied keeping priority 5),
+  none with x missing or without a priority
 
 ## Questions the kit does not answer
 
