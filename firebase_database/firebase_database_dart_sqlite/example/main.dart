@@ -34,6 +34,7 @@ Future<void> main() async {
   );
   final String path = '${cacheDir.path}/firebase_database';
   final String key = 'example-sqlite-${DateTime.now().microsecondsSinceEpoch}';
+  const String written = 'hello from the first session';
 
   try {
     // Session 1: online. Only data under a listener or keepSynced is cached.
@@ -44,8 +45,8 @@ Future<void> main() async {
     );
     final DatabaseReference ref = first.ref(key);
     await ref.keepSynced(true);
-    await ref.set('hello from the first session');
-    print('session 1 wrote: hello from the first session');
+    await ref.set(written);
+    print('session 1 wrote: $written');
     print('session 1 persistence on disk: ${first.persistenceEnabled}');
     await first.close();
 
@@ -57,9 +58,19 @@ Future<void> main() async {
       persistence: sqlitePersistence(path),
     );
     second.goOffline();
-    final DataSnapshot snapshot = await second.ref(key).get();
-    print('session 2 read offline: ${snapshot.value}');
+    // Offline, get() answers from the cache, and throws when the cache has nothing for the path.
+    Object? read;
+    try {
+      read = (await second.ref(key).get()).value;
+    } on FirebaseDatabaseException catch (e) {
+      read = 'nothing (${e.code})';
+    }
+    print('session 2 read offline: $read');
     await second.close();
+    if (read != written) {
+      stderr.writeln('The cache did not hold the value session 1 wrote.');
+      exitCode = 1;
+    }
 
     // Remove the test data from the server.
     final FirebaseDatabase cleanup = FirebaseDatabase(app, emulatorHost: host);
