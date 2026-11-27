@@ -180,7 +180,8 @@ extension _RepoTransactions on Repo {
     try {
       return (transaction.update(current.toJson()), null);
     } on Object catch (e) {
-      _log(DatabaseLogLevel.error, 'Caught Throwable. $e');
+      // The type only, as in the error's details: the text may quote the value it was given.
+      _log(DatabaseLogLevel.error, 'Caught Throwable. ${e.runtimeType}');
       return (
         TransactionOutcome.abort,
         DatabaseError(

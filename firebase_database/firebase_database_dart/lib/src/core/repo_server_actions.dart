@@ -40,8 +40,12 @@ extension _RepoServerActions on Repo {
         events = _serverSyncTree.applyServerOverwrite(path, nodeFromJson(data));
       }
     } on Object catch (e) {
-      // The server sent data the client cannot read; Android logs it as an internal error.
-      _log(DatabaseLogLevel.error, 'FIREBASE INTERNAL ERROR: $e');
+      // The server sent data the client cannot read; Android logs it as an internal error. The
+      // error's text can quote that data, so only its type is logged.
+      _log(
+        DatabaseLogLevel.error,
+        'FIREBASE INTERNAL ERROR at $path: ${e.runtimeType}',
+      );
       return;
     }
     _post(events);
