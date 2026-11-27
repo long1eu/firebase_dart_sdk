@@ -248,4 +248,49 @@ void main() {
     await db1.close();
     await db2.close();
   });
+
+  test('after a crash, an increment acknowledged after the store degraded is applied again at '
+      'the next start (not fixed: documents the limit)', () async {
+    final FakeDatabaseServer server = FakeDatabaseServer();
+    final FirebaseDatabase db1 = open(server, <String>[]);
+    final Future<void> write = db1.ref('a').set(ServerValue.increment(1));
+    await pumpEventQueue();
+    expect(server.requests, <String>['p /a']);
+
+    await degrade(db1);
+    // The server applies the increment: its value at a is 1.
+    server.ackLastWrite();
+    await write;
+    // The process dies here: db1 is never closed, so its store gets no chance to remove the row.
+    expect(writesOnDisk(db1), <Object?>[1]);
+
+    // The next start, on the same server (its connection replaces db1's).
+    final List<String> log = <String>[];
+    final FirebaseDatabase db2 = open(server, log);
+    final List<Object?> values = <Object?>[];
+    final StreamSubscription<DatabaseEvent> sub = db2
+        .ref('a')
+        .onValue
+        .listen((DatabaseEvent e) => values.add(e.snapshot.value));
+    bool sent() =>
+        server.requests.contains('q /a') &&
+        server.requests.where((String r) => r == 'p /a').length == 2;
+    for (int i = 0; i < 300 && !sent(); i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    expect(db2.persistenceEnabled, isTrue, reason: log.join('\n'));
+    // db1's write, then db2's listen and the restored write (in the client's send order).
+    expect(server.requests, <String>['p /a', 'q /a', 'p /a']);
+    // The listen gets the server's value (1). Then the server answers the only pending write, the
+    // restored increment: it resolves it against 1 and pushes 2. With no pending write left, the
+    // client shows the server's value.
+    server.answerListen('a', 1);
+    server.ackLastWrite();
+    await pumpEventQueue();
+    expect(values.last, 2);
+
+    await sub.cancel();
+    await db2.close();
+    await db1.close();
+  });
 }

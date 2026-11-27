@@ -107,9 +107,11 @@ and the tracked queries, restores the writes, and then connects. The layout is A
   can apply twice; a transaction is the exact way to count. Transactions and `onDisconnect` registrations are not
   stored.
 - **A storage error makes the instance memory-only for the session.** Nothing is deleted: the writes committed before
-  the error stay in the file and are sent at the next start, except those the server answered before the instance
-  closed, which are removed at close when the file can be written again. A write made after the error is not durable.
-  The app never receives a `SqliteException`; a row that does not decode is skipped and logged once.
+  the error stay in the file and are sent at the next start, except those the server acknowledged or refused before
+  the instance closed, which are removed at close. After a crash, or with the disk still failing at close, writes
+  already acknowledged or refused are still sent again at the next start (a `ServerValue.increment` among them is
+  applied twice). A write made after the error is not durable. The app never receives a `SqliteException`; a row
+  that does not decode is skipped and logged once.
 - **One moved-aside copy.** A file that cannot be used (damaged, of another program, or written by a newer major
   version of this package) is renamed to `<file>.bad-<time>` and the cache starts empty. Only the newest such copy is
   kept: the next quarantine deletes the previous one, also the file of a newer version after a downgrade and a second
