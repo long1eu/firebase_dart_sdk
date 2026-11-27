@@ -16,7 +16,9 @@ void main() {
     () async {
       final Process process = await Process.start(
         Platform.resolvedExecutable,
-        <String>['run', 'test/api/support/shutdown_snippet/main.dart'],
+        // Not `dart run`: it prints "Running build hooks..." on stdout with no newline on some
+        // SDKs, in front of the program's first line.
+        <String>['test/api/support/shutdown_snippet/main.dart'],
       );
       try {
         final StringBuffer stderrText = StringBuffer();
@@ -30,7 +32,7 @@ void main() {
             .transform(const LineSplitter())
             .forEach((String line) {
               lines.add(line);
-              if (line == 'connected: true' && !connected.isCompleted) {
+              if (line.endsWith('connected: true') && !connected.isCompleted) {
                 connected.complete();
               }
             });
@@ -56,7 +58,10 @@ void main() {
         expect(code, 0, reason: 'stderr: $stderrText');
         expect(
           lines,
-          containsAllInOrder(<String>['connected: false', 'connected: true']),
+          containsAllInOrder(<Matcher>[
+            endsWith('connected: false'),
+            endsWith('connected: true'),
+          ]),
         );
       } finally {
         // A no-op when the child has exited; otherwise it would outlive the test.
