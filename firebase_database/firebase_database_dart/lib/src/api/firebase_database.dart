@@ -955,16 +955,8 @@ final class _Target {
     final RepoInfo info = url == null || url.isEmpty
         ? _defaultDatabase(app)
         : _argument('databaseUrl', () => parseDatabaseUrl(url));
-    final Uri root = Uri.parse('https://${info.host}');
     // The namespace is in the URL when the host does not name it (a custom domain or `?ns=`).
-    return _Target(
-      info,
-      info.namespace == info.host.split('.').first
-          ? root
-          : root.replace(
-              queryParameters: <String, String>{'ns': info.namespace},
-            ),
-    );
+    return _Target(info, persistenceUrlOf(info));
   }
 
   /// The target of the emulator at [emulatorHost], with the namespace of [url]
@@ -1004,9 +996,7 @@ final class _Target {
     });
     return _Target(
       info,
-      Uri.parse(
-        '${info.secure ? 'https' : 'http'}://${info.host}',
-      ).replace(queryParameters: <String, String>{'ns': info.namespace}),
+      persistenceUrlOf(info),
       namespaceWarning: fromHost
           ? 'Database emulator at ${info.host}: the database URL has no ?ns=, so the '
                 'namespace is "${info.namespace}", chosen from the URL host by the emulator\'s '

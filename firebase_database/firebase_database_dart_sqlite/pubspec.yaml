@@ -39,6 +39,8 @@ dependencies:
   sqlite3: '>=2.7.3 <4.0.0'
 
 dev_dependencies:
+  # FirebaseApp for the tests that run the client over this store.
+  firebase_app_dart: ^0.2.0
   # Only for test/readme: a README snippet signs a user in before it opens the database.
   firebase_auth_providers_dart: ^0.4.0
   lints: ^6.1.0
