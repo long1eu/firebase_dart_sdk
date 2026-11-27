@@ -114,8 +114,9 @@ fs.FirebaseDatabase createClient(
 /// query operation that does I/O. `ref`, `child`, `parent`, `root`, `key`,
 /// `path`, `onDisconnect()` and an event stream not listened to yet do not
 /// create it. Deleting the FlutterFire app closes the client; a later use,
-/// after an app of the same name was created again, creates a new one with
-/// the stored settings. After the client is created:
+/// after an app of the same name was created again with the same options,
+/// creates a new one with the stored settings; with other options it throws
+/// a [StateError] (see [forApp]). After the client is created:
 ///
 /// | Setter | Before the client | After it |
 /// |---|---|---|
@@ -157,17 +158,35 @@ class DartFirebaseDatabase extends DatabasePlatform {
   /// it, compared by scheme, lower-case host, port and namespace. So
   /// `FirebaseDatabase.instance` and `instanceFor(app: app, databaseURL: url)`
   /// with the URL of the same database (with or without a trailing slash, in
-  /// any case of the host) share one instance, its settings and its client. A kept
-  /// instance whose app has other options than [app] (the app was deleted
-  /// and created again with other options) is replaced.
+  /// any case of the host) share one instance, its settings and its client.
+  ///
+  /// Throws a [StateError] when any kept instance of the app's name, for any
+  /// database, has an app with other options than [app] (the app was deleted
+  /// and created again under the same name with other options): the kept
+  /// instances and their settings are not replaced, and no instance is made
+  /// for the new options.
   static DartFirebaseDatabase forApp(FirebaseApp app, String? databaseURL) {
     final String key = _instanceKey(app, databaseURL);
+    if (_instances.values.any(
+      (DartFirebaseDatabase it) => it.app?.name == app.name && it.app != app,
+    )) {
+      throw _recreatedWithOtherOptions(app.name);
+    }
     final DartFirebaseDatabase? kept = _instances[key];
-    if (kept != null && kept.app == app && !kept._appDeleted) {
+    if (kept != null && !kept._appDeleted) {
       return kept;
     }
     return _instances[key] = DartFirebaseDatabase._(app, databaseURL);
   }
+
+  /// The error of [forApp] and [client] for an app named [appName] that was
+  /// deleted and created again with other options.
+  static StateError _recreatedWithOtherOptions(String appName) => StateError(
+    'The Firebase app "$appName" was deleted and created again with other '
+    'options. The FirebaseDatabase instances of the earlier app and their '
+    'settings are not replaced: use another app name for the new options, '
+    'or restart the app.',
+  );
 
   /// The key of [forApp]: the app name and the database the client would
   /// connect to (the resolution of the client's constructor). A URL the
@@ -241,8 +260,9 @@ class DartFirebaseDatabase extends DatabasePlatform {
   /// made with, also after that app was deleted and created again).
   ///
   /// Throws a [StateError] on the registered instance, which has no app, and
-  /// `firebase_core`'s `no-app` exception when the app was deleted and not
-  /// created again.
+  /// when the app was deleted and created again with other options (as
+  /// [forApp]); `firebase_core`'s `no-app` exception when the app was deleted
+  /// and not created again.
   fs.FirebaseDatabase get client {
     final fs.FirebaseDatabase? existing = _client;
     if (existing != null && !_appDeleted) {
@@ -256,6 +276,9 @@ class DartFirebaseDatabase extends DatabasePlatform {
       );
     }
     final FirebaseApp app = Firebase.app(stored.name);
+    if (app != stored) {
+      throw _recreatedWithOtherOptions(stored.name);
+    }
     final dart_app.FirebaseApp dartApp = dartAppFor(
       app,
       tokenProviderFor: config.tokenProviderFor,

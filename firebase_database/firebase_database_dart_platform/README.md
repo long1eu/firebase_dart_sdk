@@ -145,8 +145,23 @@ name and database URL, so one directory serves every app.
 - The client's warnings and errors (for example that persistence could not be opened and the client runs in memory)
   are printed with `debugPrint` always; its debug and info lines only after `setLoggingEnabled(true)`.
 - `FirebaseApp.delete()` closes the clients of that app on every platform (through `firebase_core`'s
-  `registerService`). The `FirebaseDatabase` objects of the app keep working once an app of the same name is created
-  again: the next call creates a new client with the settings the object had.
+  `registerService`).
+- Created again under the same name with the same options, the app's `FirebaseDatabase` objects keep working: the next
+  call creates a new client with the settings the object had, also after a second delete and create.
+  `useDatabaseEmulator` called after the delete and before that call takes effect. `instanceFor(app: newApp)` returns
+  the same object, and `clientFor` with the new or the old app object returns its client: one client per database.
+- Created again under the same name with other options (any field that `FirebaseOptions ==` compares; `recaptchaSiteKey`
+  is not one) while a `FirebaseDatabase` instance of the earlier app is kept, every call that needs a client throws a
+  `StateError` ("The Firebase app ... was deleted and created again with other options"), for the database the earlier
+  app used and for any other: the old object's `get`, `set`, `goOnline`, `goOffline` and `purgeOutstandingWrites` (a
+  listen of `onValue` gets it as an error event), `instanceFor(app: newApp, databaseURL: anyUrl)`, and `clientFor` with
+  the new or the old app object, with or without a URL. No client is created, so a setting made before the delete (the
+  emulator, persistence off) is never bypassed. `ref`, `useDatabaseEmulator` and `setPersistenceEnabled` need no client
+  and do not throw. The tests show this on the Dart core of Linux and on test cores that behave like the native ones and
+  like the web one. To use other options, give the app another name, or restart the app.
+- An app that never had a `FirebaseDatabase` instance before its delete has nothing kept: created again with other
+  options, it works as a new app. With the same options, a database the earlier app did not use gets a new client of its
+  own, without the settings of the first database.
 
 ## What is implemented
 
@@ -196,6 +211,9 @@ that same object. With `applyLocally: false`, listeners see no local event befor
   `useDatabaseEmulator` with the same host does nothing and with another one throws a `StateError` (ignoring it would
   send the traffic to production); `setPersistenceEnabled` and `setPersistenceCacheSizeBytes` are ignored with a
   debug message, as on Android; `setLoggingEnabled` takes effect at once.
+- **An app deleted and created again under the same name with other options gets no client** while an instance of
+  the earlier app is kept: each call that needs one throws a `StateError` (see "Emulator, logging, deleting an app").
+  The instances and their settings stay with the earlier app and are not replaced; use another app name or restart.
 - **Persistence is injected** as a factory from the cache size (`persistenceFor`), not switched on by the native SDK.
 - **References are made without the client**: `ref`, `child`, `parent`, `root`, `key`, `path` and `onDisconnect()`
   only build a location. So an invalid key, `ref('a.b')`, is reported at the first read or write of it (an
