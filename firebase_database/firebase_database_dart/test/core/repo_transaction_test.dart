@@ -308,7 +308,9 @@ void main() {
       h.transaction('c', increment);
       await settle();
       expect(
-        h.logs.where((String l) => l.contains('runTransaction() usage detected')),
+        h.logs.where(
+          (String l) => l.contains('runTransaction() usage detected'),
+        ),
         <String>[
           'info: runTransaction() usage detected while persistence is enabled. Please be aware that '
               'transactions *will not* be persisted across database restarts.',

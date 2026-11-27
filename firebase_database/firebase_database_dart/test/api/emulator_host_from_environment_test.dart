@@ -9,7 +9,8 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
-const String _child = 'test/api/support/print_emulator_host_from_environment.dart';
+const String _child =
+    'test/api/support/print_emulator_host_from_environment.dart';
 
 Future<Object?> _readInChild(String value) async {
   final ProcessResult result = await Process.run(
