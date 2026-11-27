@@ -24,7 +24,7 @@ void main() {
       ),
       FirebaseCoreDart.register(
         options: const FirebaseOptions(
-          apiKey: 'AIzaSyBQgB5s3n8WvyCOxhCws-RVf3C-6VnGg0A',
+          apiKey: 'AIzaSyCbP8E_BUgahI04T_JOaJTnMBo1en0Q8RE',
           databaseURL: 'https://flutter-sdk.firebaseio.com',
           projectID: 'flutter-sdk',
           storageBucket: 'flutter-sdk.appspot.com',

@@ -8,7 +8,7 @@ import 'package:firebase_core_dart/firebase_core_dart.dart';
 FirebaseOptions get firebaseOptions {
   assert(isWeb);
   return const FirebaseOptions(
-    apiKey: 'AIzaSyBQgB5s3n8WvyCOxhCws-RVf3C-6VnGg0A',
+    apiKey: 'AIzaSyCbP8E_BUgahI04T_JOaJTnMBo1en0Q8RE',
     databaseURL: 'https://flutter-sdk.firebaseio.com',
     projectID: 'flutter-sdk',
     storageBucket: 'flutter-sdk.appspot.com',
