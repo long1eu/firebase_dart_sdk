@@ -553,7 +553,7 @@ from the server is logged as the server sent it and, with rules debug output on 
 
 ## How it differs from the JS SDK
 
-The 19 you notice are below. The full table, 34 rows with the test that pins each, is section 25 of
+The 19 you notice are below. The full table, 36 rows with the test that pins each, is section 25 of
 [docs/database_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_decisions.md).
 
 | Topic | JS SDK | This client |
