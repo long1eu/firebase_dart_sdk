@@ -114,9 +114,10 @@ fs.FirebaseDatabase createClient(
 /// query operation that does I/O. `ref`, `child`, `parent`, `root`, `key`,
 /// `path`, `onDisconnect()` and an event stream not listened to yet do not
 /// create it. Deleting the FlutterFire app closes the client the instance
-/// has when the delete starts. A use while the delete runs (`firebase_core`
+/// has when the delete starts, unless that client was created while an
+/// earlier delete ran. A use while the delete runs (`firebase_core`
 /// has disposed the services, the core still has the app) creates a client
-/// that the delete does not close; on a core that keeps the
+/// that neither that delete nor a later one closes; on a core that keeps the
 /// `firebase_app_dart` app (the native and web ones) the instance keeps
 /// using it, also after the app was created again. A later use, after an
 /// app of the same name was created again with the same options, creates a

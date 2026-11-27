@@ -145,15 +145,17 @@ name and database URL, so one directory serves every app.
 - The client's warnings and errors (for example that persistence could not be opened and the client runs in memory)
   are printed with `debugPrint` always; its debug and info lines only after `setLoggingEnabled(true)`.
 - `FirebaseApp.delete()` closes the clients of that app on every platform (through `firebase_core`'s
-  `registerService`).
+  `registerService`), except a client created while a delete ran (below).
 - Created again under the same name with the same options, the app's `FirebaseDatabase` objects keep working: the next
   call creates a new client with the settings the object had, also after a second delete and create.
-  `useDatabaseEmulator` called after the delete and before that call takes effect. `instanceFor(app: newApp)` returns
+  `useDatabaseEmulator` called after the delete and before that call takes effect (after a use while the delete ran it
+  throws, as after any first use). `instanceFor(app: newApp)` returns
   the same object, and `clientFor` with the new or the old app object returns the client that object uses.
 - A use while `FirebaseApp.delete()` runs (after `firebase_core` disposed the services, before the core removed the app)
   creates a client with the object's settings that the delete does not close on the native and web cores (shown on test
-  cores that behave like them): the object keeps using it after the app is created again. On the Dart core of Linux the
-  delete closes it, and the next call creates a new one with the same settings.
+  cores that behave like them): the object keeps using it after the app is created again, and a later delete
+  does not close it either. On the Dart core of Linux the delete closes it, and the next call creates a new one with the
+  same settings.
 - When the `firebase_app_dart` app of the name is deleted directly and the FlutterFire app is kept, the next call
   creates a new client with the object's settings.
 - Created again under the same name with other options (any field that `FirebaseOptions ==` compares; `recaptchaSiteKey`
