@@ -339,15 +339,23 @@ after check 3 ("all of it in one set").
 ## Known results
 
 On the emulator: the Database emulator v4.11.2 with the kit's rules on the namespace `verify-database-kit`, and the
-Auth emulator of firebase-tools 15.18.0. Production: run for checks 40 and 41 only (the lines marked "on
-production"); every other check is open there.
+Auth emulator of firebase-tools 15.18.0. Production: the whole kit ran once (checks 1 to 39,
+2026-11-26, 39 PASS, with the client before the emptied-node fix), then check 40 alone (2026-11-26) and check 41 alone
+(2026-11-27), one run each. Where production gave another observation than the emulator, a line
+"N on production" follows the check; without one, production gave the same, timings aside.
 
 - **1**: PASS: plain ws to 127.0.0.1, no other host
+- **1 on production** (2026-11-26): wss with TLS, the certificate checked by `dart:io`; the hello named a server host
+  and the next connection went there
 - **2**: PASS: offset of a few ms
 - **3**: PASS; but the whole value in **one** `set` is refused: `invalid_parameters: Path specified exceeds the maximum
   length that can be written (768 bytes)`, although each part alone is accepted
+- **3 on production** (2026-11-26): the whole value in **one** `set` is accepted; the 768-byte refusal is the
+  emulator's only
 - **4 to 8**: PASS
 - **9**: PASS: the `no_index` warning is sent; a filtered `get()` answers `index-not-defined`
+- **9 on production** (2026-11-26): as above, the `no_index` warning sent (one emulator run of the same kit did not
+  see the warning)
 - **10**: PASS: two runs of the handler (null, then 10)
 - **11 to 13**: PASS
 - **14**: PASS: answered at once (0 ms) from the view `keepSynced` holds
@@ -361,6 +369,8 @@ production"); every other check is open there.
 - **22**: PASS: a fresh client reads priority 0 after both forms; the writer's own listener shows 0 too; in the
   `update` form the writer's listener and its `get()` show 0 at 0 s and at 5 s (listener values: null, `{a:1}` with
   priority 0, `{b:1}` with priority 0)
+- **22 on production** (2026-11-26): run with the client before the emptied-node fix: after the `update` form the
+  writer's listener shows priority null where a fresh client reads 0, as that client does on the emulator
 - **23**: PASS
 - **24 to 26**: PASS, a few ms each on loopback
 - **4** (question 25): the writer saw the local estimate, then the server's value 38 ms later (two events, one run)
@@ -380,7 +390,11 @@ production"); every other check is open there.
   back); line 16 one put frame, `permission-denied`; line 17 the transaction **committed** and the `set` won (99):
   the transaction had been sent, and a sent transaction the server accepts completes as committed, as in the JS SDK;
   line 18 two runs (null, then 5), committed 6; line 19 `max-retries` after 25 runs
+- **31 on production** (2026-11-26): line 15 99 of 100 committed, 1 failed with `max-retries` (final 99, no value
+  went back); lines 16 to 19 as on the emulator
 - **32**: on loopback the 1 MB `get()` took about 8 ms and the small event came after it
+- **32 on production** (2026-11-26): the small event came **before** the 1 MB `get()` finished (51 ms against
+  290 ms), not after it as on loopback
 - **33**: the onDisconnect write ran about 12 ms after the dropped socket
 - **34**: 200; **35**: REST 400 "Invalid path: Path specified exceeds the maximum depth that can be written (32).",
   the client refuses before sending; **36**: acknowledgements in order, final 999, no value went back, about 3,000
@@ -395,6 +409,8 @@ production"); every other check is open there.
   `{".priority":5.0}`, then `null` after `set(n, null)`, then `{"b":1}` after `set(n/b, 1)`: the priority does not
   come back. (e) export `null` after the update (the node is removed), the transaction commits after 1 run.
   (f) both SQLite clients own the file; the transaction commits after 2 runs (null, null)
+- **38 on production** (2026-11-26): run with the client before the emptied-node fix: (c) and (f) fail with
+  `max-retries` after 25 runs, as that client does on the emulator
 - **39**: Q1 without priority: the merge is accepted and the node is **removed** (`null`, both forms); control: kept
   as `{".priority":7}`. Q2: n holds `{"c":{".priority":3.0}}` after the removal, the put of `.priority` 9 is
   accepted: `{".priority":9,"c":{".priority":3.0}}`. Q3: a raw put of `{".priority":5}` gets **no answer**, on a
@@ -404,6 +420,10 @@ production"); every other check is open there.
   counted). Q5: ranges without the kept priorities get an `rm` with the ranges b..c and d (b as
   `{".priority":5.0}`, d with `f` as `{".priority":2.0}`); with them as a `.priority` leaf, `rm []` (every range
   matched); as an empty range, the same `rm` as without; with a matching simple hash, no data
+- **39 on production** (2026-11-26): Q1 to Q7 as on the emulator. A merge that removes the children of a node and
+  writes `.priority` on it keeps the priority on production (`{".priority":2}`; a nested `.priority` 3 kept in one
+  case, `{"b":{".priority":2}}` in another), where the emulator removes the node (`null`): five cases, in question
+  10 (`o2`) and question 11 (`f1a`, `f2a`, `f7b`, `f6b`)
 - **40**: (a) `setPriority(null)` and every value-less `set` form complete ok; the listener sees only its first
   `null` (no event after the write), both `get()`s give `null`, the export is `null`. (b) `p r/x/.priority null` is
   answered `{"s":"ok","d":""}` with r missing, with x missing, and in the three controls; the listen at r gets a
