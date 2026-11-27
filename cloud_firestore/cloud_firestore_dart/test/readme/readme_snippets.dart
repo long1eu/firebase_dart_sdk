@@ -426,8 +426,8 @@ Future<void> migrationGuideLine405() async {
     }
 }
 
-// ../../docs/guides/authentication.md:51
-Future<void> authenticationGuideLine51() async {
+// ../../docs/guides/authentication.md:52
+Future<void> authenticationGuideLine52() async {
   // A signed-in Firebase Auth user: the security rules see request.auth.
   final auth = await FirebaseUserAuth.forApp(app);
   final firestore = FirebaseFirestore.instanceFor(app: app);
@@ -438,8 +438,8 @@ Future<void> authenticationGuideLine51() async {
   //   app.authProvider = applicationDefaultCredentials();   // package:.../adc.dart
 }
 
-// ../../docs/guides/authentication.md:74
-Future<void> authenticationGuideLine74() async {
+// ../../docs/guides/authentication.md:75
+Future<void> authenticationGuideLine75() async {
   final app = FirebaseApp.withOptions(const FirebaseOptions(
     apiKey: '<the Web API key of the project>',
     appId: '1:1234567890:dart:example',
@@ -459,8 +459,8 @@ Future<void> authenticationGuideLine74() async {
   await auth.signOut();
 }
 
-// ../../docs/guides/authentication.md:193
-Future<void> authenticationGuideLine193() async {
+// ../../docs/guides/authentication.md:194
+Future<void> authenticationGuideLine194() async {
   final auth = await FirebaseUserAuth.forApp(app);
   const settings = ActionCodeSettings(
     url: 'https://my-project.web.app/finish-sign-in', // must be an authorized domain
@@ -476,8 +476,8 @@ Future<void> authenticationGuideLine193() async {
   }
 }
 
-// ../../docs/guides/authentication.md:219
-Future<void> authenticationGuideLine219() async {
+// ../../docs/guides/authentication.md:220
+Future<void> authenticationGuideLine220() async {
   final auth = await FirebaseUserAuth.forApp(app);
   const googleIdToken = '<an ID token from Google Sign-In>';
   const appleIdToken = '<an ID token from Sign in with Apple>';
@@ -491,8 +491,8 @@ Future<void> authenticationGuideLine219() async {
   // TwitterAuthProvider.credential(accessToken: ..., secret: ...), YahooAuthProvider.credential(token).
 }
 
-// ../../docs/guides/authentication.md:244
-Future<void> authenticationGuideLine244() async {
+// ../../docs/guides/authentication.md:245
+Future<void> authenticationGuideLine245() async {
   final auth = await FirebaseUserAuth.forApp(app);
   const googleIdToken = '<an ID token from Google Sign-In>';
   try {
@@ -505,26 +505,26 @@ Future<void> authenticationGuideLine244() async {
   }
 }
 
-// ../../docs/guides/authentication.md:277
-Future<void> authenticationGuideLine277() async {
+// ../../docs/guides/authentication.md:278
+Future<void> authenticationGuideLine278() async {
   final auth = await FirebaseUserAuth.forApp(app,
       storage: FileAuthStorage('${Platform.environment['HOME']}/.config/my_tool/session.json'));
   // auth.currentUser is the user of the last run, if there was one.
 }
 
-// ../../docs/guides/authentication.md:285
-Future<void> authenticationGuideLine285() async {
+// ../../docs/guides/authentication.md:286
+Future<void> authenticationGuideLine286() async {
 }
 
-// ../../docs/guides/authentication.md:314
-Future<void> authenticationGuideLine314() async {
+// ../../docs/guides/authentication.md:315
+Future<void> authenticationGuideLine315() async {
   final auth = await FirebaseUserAuth.forApp(app,
       emulatorHost: FirebaseUserAuth.emulatorHostFromEnvironment); // FIREBASE_AUTH_EMULATOR_HOST
   // or emulatorHost: '127.0.0.1:9099'
 }
 
-// ../../docs/guides/authentication.md:340
-Future<void> authenticationGuideLine340() async {
+// ../../docs/guides/authentication.md:341
+Future<void> authenticationGuideLine341() async {
   final app = FirebaseApp.withOptions(const FirebaseOptions(
     apiKey: '',                  // an empty key is not sent; any other key is, with each request
     appId: '1:1234567890:dart:server',
