@@ -80,8 +80,11 @@ Not done:
 - Android-specific pieces of the Android SDK.
 - A full Firebase Auth SDK. Tokens for Firestore (user sign-in over REST, including email links and
   federated sign-in with a token the app already has, service accounts, Application Default Credentials)
-  are in `firebase_auth_providers_dart`, see [Authentication](authentication.md). For phone sign-in,
-  Storage and Realtime Database see [appsup-dart/firebase_dart](https://github.com/appsup-dart/firebase_dart).
+  are in `firebase_auth_providers_dart`, see [Authentication](authentication.md). Phone sign-in and SMS second
+  factors are there too.
+- Cloud Storage and the Realtime Database. They have packages of their own in this repository:
+  `firebase_storage_dart` ([guide](storage.md)) and `firebase_database_dart` with its SQLite cache and Flutter adapter
+  ([guide](database.md)).
 
 Known gaps in what is done:
 
