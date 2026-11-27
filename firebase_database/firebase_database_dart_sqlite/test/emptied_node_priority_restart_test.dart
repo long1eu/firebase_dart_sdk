@@ -49,6 +49,10 @@ FirebaseDatabase _open(
 /// Answers the open listen at [path] as the server does: the data only when the listen's hash
 /// differs from the hash of what the server holds, then the completion. Returns whether data
 /// was sent.
+///
+/// That the server sends the data again after a hash mismatch (so "the server sends p again"
+/// below) is this test's own assumption, not measured; the transaction's hash check is real
+/// (`FakeServerActions` refuses a stale hash).
 bool _answerListen(FakeServerActions server, String path) {
   final ServerCall listen = server
       .callsOf('listen')

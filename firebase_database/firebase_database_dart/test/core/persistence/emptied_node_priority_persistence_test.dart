@@ -7,6 +7,8 @@
 // public `nodeFromJson`) and clears the priority of an emptied node on purpose
 // (`ServerCacheRows._clearEmptiedNodes`), so there the kept priority does not survive a restart:
 // the restarted client hashes the node as empty and the server sends it again.
+import 'package:firebase_database_dart/src/core/compound_write.dart';
+import 'package:firebase_database_dart/src/core/view/event.dart';
 import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:firebase_database_dart/src/core/snap/children_node.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
@@ -61,5 +63,50 @@ void main() {
       Path('p/n'),
     )!;
     expect(shown.priority.value, 5);
+  });
+
+  test('in memory: an acked update is stored in the server\'s order', () async {
+    // x {a: 1} is cached with no active listen, so the ack writes the update into the server
+    // cache by hand. The server applies {a: null, .priority: 7} in two passes: a goes, x is
+    // gone, and the priority lands on nothing. Written in tree order (.priority first), x
+    // would be stored as an emptied node keeping 7.
+    final InMemoryPersistenceStorageEngine engine = persistedEngine(
+      <String, Object?>{
+        'x': <String, Object?>{'a': 1},
+      },
+    );
+    final RepoHarness first = RepoHarness(persistence: managerOver(engine));
+    final Map<String, Object?> update = <String, Object?>{
+      'a': null,
+      '.priority': 7,
+    };
+    first.repo.updateChildren(
+      Path('x'),
+      CompoundWrite.fromValue(update),
+      update,
+    );
+    await settle();
+    first.server.respond(first.server.callsOf('merge').single);
+    await settle();
+    final Node stored = engine.serverCache(Path('x'));
+    expect((stored as ChildrenNode).holdsHiddenState, isFalse);
+    expect(stored.hash(), '');
+
+    // The reader: a restarted client, offline, writes below x; the server would hold x {b: 1}
+    // with no priority.
+    final RepoHarness second = RepoHarness(
+      persistence: managerOver(engine),
+      connected: false,
+    );
+    Object? shown;
+    second.listen(
+      'L',
+      'x',
+      after: (DataEvent e) => shown = e.snapshot.toJson(exportFormat: true),
+    );
+    await settle();
+    second.set('x/b', 1);
+    await settle();
+    expect(shown, <String, Object?>{'b': 1});
   });
 }

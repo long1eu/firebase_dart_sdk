@@ -6,9 +6,12 @@ import 'package:firebase_database_dart/src/core/connection/wire_range_merge.dart
 import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:firebase_database_dart/src/core/snap/child_key.dart';
 import 'package:firebase_database_dart/src/core/snap/children_node.dart';
+import 'package:firebase_database_dart/src/core/snap/comparators.dart';
+import 'package:firebase_database_dart/src/core/snap/index_map.dart';
 import 'package:firebase_database_dart/src/core/snap/indexes/key_index.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
 import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
+import 'package:firebase_database_dart/src/core/util/sorted_map.dart';
 
 /// Replaces every leaf after [exclusiveStart] and up to [inclusiveEnd] with the leaves of [snap]
 /// in that range; a null bound is unbounded.
@@ -76,12 +79,25 @@ final class RangeMerge {
       }
       final List<ChildKey> inOrder = allChildren.toList();
       // The priority goes last, so the node is not empty when it is applied; an emptied node's
-      // kept priority counts.
-      if (!_keptPriority(updateNode).isEmpty || !_keptPriority(node).isEmpty) {
+      // kept priority counts, on both sides.
+      if (!_priorityOf(updateNode).isEmpty || !_priorityOf(node).isEmpty) {
         inOrder.add(ChildKey.priority);
       }
       Node newNode = node;
       for (final ChildKey key in inOrder) {
+        if (key.isPriorityKey) {
+          final Node currentPriority = _priorityOf(node);
+          final Node updatedPriority = _updateRangeInNode(
+            currentPath.child(key),
+            currentPriority,
+            _priorityOf(updateNode),
+          );
+          // Priorities are leaves (or empty): compared by value.
+          if (updatedPriority != currentPriority) {
+            newNode = _withPriority(newNode, updatedPriority);
+          }
+          continue;
+        }
         final Node currentChild = node.getImmediateChild(key);
         final Node updatedChild = _updateRangeInNode(
           currentPath.child(key),
@@ -101,8 +117,25 @@ final class RangeMerge {
     }
   }
 
-  static Node _keptPriority(Node node) =>
+  /// The priority the server holds for [node]: for an emptied node, the priority it kept.
+  static Node _priorityOf(Node node) =>
       node is ChildrenNode ? node.keptPriority : node.priority;
+
+  /// [node] with [priority]. An empty node that holds no hidden state ignores a priority written
+  /// on it, so a non-empty [priority] there makes an emptied node that keeps it: the range data
+  /// came from the server, which holds that priority for a node with no children in the range.
+  static Node _withPriority(Node node, Node priority) {
+    if (node.isEmpty &&
+        !priority.isEmpty &&
+        !(node is ChildrenNode && node.holdsHiddenState)) {
+      return ChildrenNode(
+        SortedMap<ChildKey, Node>(nameComparator),
+        priority,
+        IndexMap.defaultMap,
+      );
+    }
+    return node.updateImmediateChild(ChildKey.priority, priority);
+  }
 
   @override
   String toString() =>

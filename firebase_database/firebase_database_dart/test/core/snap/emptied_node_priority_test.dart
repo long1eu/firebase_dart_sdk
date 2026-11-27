@@ -633,6 +633,107 @@ void main() {
     });
   });
 
+  group('range merges (rm) with a boundary inside a node', () {
+    final Map<String, Object?> cache = <String, Object?>{
+      'X': <String, Object?>{
+        'c0': <String, Object?>{'v': 1},
+        'c9': <String, Object?>{'v': 1},
+        '.priority': 5,
+      },
+    };
+    Node apply(Object? cache, String? start, String? end, Object? data) =>
+        RangeMerge.fromWire(
+          WireRangeMerge(exclusiveStart: start, inclusiveEnd: end, data: data),
+        ).applyTo(nodeFromServerJson(cache));
+    void expectServer(Node got, Map<String, Object?> server) {
+      expect(_children(got).toServerJson(), server);
+      expect(got.hash(), nodeFromServerJson(server).hash());
+    }
+
+    test('a new priority on X and a kept priority on the emptied c0', () {
+      // Another client removed X/c0/v (c0 keeps priority 1) and set X's priority to 7. The
+      // range (start, /X/c0/v] holds X's priority and c0, and X has no visible child in it.
+      final Node got = apply(cache, null, '/X/c0/v', <String, Object?>{
+        'X': <String, Object?>{
+          'c0': <String, Object?>{'.priority': 1},
+          '.priority': 7,
+        },
+      });
+      expectServer(got, <String, Object?>{
+        'X': <String, Object?>{
+          'c0': <String, Object?>{'.priority': 1},
+          'c9': <String, Object?>{'v': 1},
+          '.priority': 7,
+        },
+      });
+      expect(got.getChild(Path('X')).priority.value, 7);
+    });
+
+    test('an unchanged priority on X, sent as {".priority": 5}', () {
+      // c0 removed; X's priority is in the range and the same.
+      final Node got = apply(cache, null, '/X/c0/v', <String, Object?>{
+        'X': <String, Object?>{'.priority': 5},
+      });
+      expectServer(got, <String, Object?>{
+        'X': <String, Object?>{
+          'c9': <String, Object?>{'v': 1},
+          '.priority': 5,
+        },
+      });
+      expect(got.getChild(Path('X')).priority.value, 5);
+    });
+
+    test('a node emptied by the range keeps its priority', () {
+      final Node got = apply(
+        <String, Object?>{
+          'X': <String, Object?>{
+            'c0': <String, Object?>{'v': 1},
+            '.priority': 5,
+          },
+          'Y': 1,
+        },
+        null,
+        '/X/c0/v',
+        <String, Object?>{
+          'X': <String, Object?>{'.priority': 5},
+        },
+      );
+      expectServer(got, <String, Object?>{
+        'X': <String, Object?>{'.priority': 5},
+        'Y': 1,
+      });
+      expect(got.getChild(Path('X')).hash(), _h5);
+    });
+
+    test('a range without the priority drops the kept priority', () {
+      final Node got = apply(
+        <String, Object?>{
+          'X': <String, Object?>{
+            'c0': <String, Object?>{'v': 1},
+            '.priority': 5,
+          },
+          'Y': 1,
+        },
+        null,
+        '/X/c0/v',
+        null,
+      );
+      expectServer(got, <String, Object?>{'Y': 1});
+    });
+
+    test('a start inside X leaves the priority before it', () {
+      // /X/.priority sorts before /X/c0/v, so the range (/X/c0/v, end] does not hold it.
+      final Node got = apply(cache, '/X/c0/v', null, <String, Object?>{'Y': 1});
+      expectServer(got, <String, Object?>{
+        'X': <String, Object?>{
+          'c0': <String, Object?>{'v': 1},
+          '.priority': 5,
+        },
+        'Y': 1,
+      });
+    });
+  });
+
   group('compound hash: kept priorities as .priority leaves (Q5)', () {
     // Production check 39 Q5. The node, as the get answered (the kit writes "<540 x>" for 540
     // times "x"):

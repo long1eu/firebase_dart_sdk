@@ -89,9 +89,12 @@ final class DefaultPersistenceManager implements PersistenceManager {
   }
 
   /// Android: `DefaultPersistenceManager.applyUserWriteToServerCache(Path, CompoundWrite)`.
+  /// Difference: the entries go in the server's order ([writesInServerOrder]: values, then
+  /// priorities, parents first), so a priority written next to a value that empties its node
+  /// is stored as the server holds it.
   @override
   void applyUserMergeToServerCache(Path path, CompoundWrite merge) {
-    for (final MapEntry<Path, Node> write in merge.entries) {
+    for (final MapEntry<Path, Node> write in writesInServerOrder(merge)) {
       applyUserWriteToServerCache(path.childPath(write.key), write.value);
     }
   }

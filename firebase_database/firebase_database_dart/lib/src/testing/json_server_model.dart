@@ -46,7 +46,8 @@ final class JsonServerNode {
 
   /// The node of export JSON [json] as the server sends or stores it (`.value`, `.priority`, a
   /// list read as a map of its indices); `{".priority": p}` is a node that keeps a priority. Null
-  /// for no data.
+  /// for no data. Such an object is kept as an existing node also when a user wrote it, not only
+  /// when the server sent it; that is not measured against a server.
   static JsonServerNode? fromJson(Object? json) {
     if (json == null) {
       return null;

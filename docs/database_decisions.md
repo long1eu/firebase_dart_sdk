@@ -1347,7 +1347,18 @@ are answered; the server removes `r` and refuses the second. This is pinned in `
 (group "a limit of pending writes, not a rule: separate updates are layered"). JS and this client before the change
 never kept that order either. (b) A limit view at the node itself can hold the node's kept priority wrongly in its
 hidden state in the F2 form: its server cache loses it, and its event cache can keep a stale emptied child. Hidden
-state only.
+state only. (c) An update with no emptied node shows a priority the client before the change did not:
+`update r {"x/v": 1, "x/.priority": 3}` with `x` missing now always shows `x` with priority 3 in the local view
+until the server refuses the update; with the listens answered first, the client before the change showed no
+priority. Both show `v: 1`, which the server refuses too. It lasts until the refusal, so offline until the client
+reconnects. Pinned by `test/api/update_priority_keys_test.dart` (`X:{v:1}/3`). (d) In a view that applies a server
+merge child by child (`view_processor_server.dart`), the view's own `.priority` is applied after the children's
+priorities, where the server and the model apply parents first. Believed unobservable: filters ignore the priority
+of the query's own node, and an acknowledgement applies again values copied from the server cache. Inferred, not
+run. (e) A second case of (a): `update {"x/a": null, "x/.priority": 7}` and then `update {"x/b": 1}`, both pending on
+`x = {a: 1}`, show `x = {b: 1}` with priority 7 until they are answered; the server never holds it (the first update
+removes `x`, so its priority lands on nothing, and the second writes `b` with no priority). The client before the
+change shows the same (a reviewer's script on both trees, 2026-11-27).
 
 ## 26. What is not in 0.1
 
