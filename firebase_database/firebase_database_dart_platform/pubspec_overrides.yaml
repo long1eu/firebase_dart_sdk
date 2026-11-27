@@ -5,3 +5,10 @@ dependency_overrides:
     path: ../firebase_database_dart
   firebase_app_dart:
     path: ../../firebase_core/firebase_app_dart
+  # Dev dependencies (pubspec.yaml names their hosted versions).
+  cloud_firestore_dart_flutterfire:
+    path: ../../cloud_firestore/cloud_firestore_dart_flutterfire
+  firebase_auth_dart_platform:
+    path: ../../firebase_auth/firebase_auth_dart_platform
+  firebase_database_dart_sqlite:
+    path: ../firebase_database_dart_sqlite

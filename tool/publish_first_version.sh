@@ -21,6 +21,15 @@
 # ask y/N: then it publishes only with CONFIRM=publish, which is the confirmation, and otherwise
 # stops after the dry run.
 #
+# KEEP_OVERRIDE="<package> [<package> ...]" is for two packages of this repository that need each
+# other, where the first one cannot resolve the second from pub.dev yet (firebase_database_dart has a
+# dev dependency on firebase_database_dart_sqlite, which depends on it). With it the script exports
+# the whole repository at <ref>, deletes every pubspec_overrides.yaml as always, and then writes one
+# into the package with only the named packages, by path into that export. It publishes only when
+# each named package is a dev dependency: an override of a real dependency is for DRY_RUN=1 alone
+# (a rehearsal before the first package is out), and pub marks it with a hint. Without
+# KEEP_OVERRIDE the script does what it always did.
+#
 # It never reads or prints credentials; pub uses the login of whoever runs it.
 set -euo pipefail
 
@@ -35,25 +44,54 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
 git fetch --quiet origin
 
-dir=""
-while IFS= read -r pubspec; do
-  if [ "$(git show "$ref:$pubspec" | sed -n 's/^name: *//p' | head -1)" = "$name" ]; then
-    dir="$(dirname "$pubspec")"
-    break
-  fi
-done < <(git ls-tree -r --name-only "$ref" | grep -E '(^|/)pubspec\.yaml$')
+# Prints the directory of the package named $1 at $ref, or nothing.
+dir_of() {
+  local pubspec
+  while IFS= read -r pubspec; do
+    if [ "$(git -C "$root" show "$ref:$pubspec" | sed -n 's/^name: *//p' | head -1)" = "$1" ]; then
+      dirname "$pubspec"
+      return
+    fi
+  done < <(git -C "$root" ls-tree -r --name-only "$ref" | grep -E '(^|/)pubspec\.yaml$')
+}
 
+dir="$(dir_of "$name")"
 if [ -z "$dir" ]; then
   echo "No package named $name at $ref." >&2
   exit 1
 fi
 
+keep=()
+read -r -a keep <<<"${KEEP_OVERRIDE:-}"
+
 work="$(mktemp -d)"
 cleanup() { if command -v trash >/dev/null; then trash "$work"; else rm -r "$work"; fi; }
 trap cleanup EXIT
-git archive "$ref" "$dir" | tar -x -C "$work"
-cd "$work/$dir"
-find . -name pubspec_overrides.yaml -type f -delete
+if [ "${#keep[@]}" -eq 0 ]; then
+  git archive "$ref" "$dir" | tar -x -C "$work"
+  cd "$work/$dir"
+  find . -name pubspec_overrides.yaml -type f -delete
+else
+  git archive "$ref" | tar -x -C "$work"
+  find "$work" -name pubspec_overrides.yaml -type f -delete
+  cd "$work/$dir"
+  # The names below `dependencies:` (not dev_dependencies) of this package.
+  real="$(awk '/^[a-z_]+:/ { in_deps = ($1 == "dependencies:") } in_deps && /^  [a-z0-9_]+:/ { sub(":.*", "", $1); print $1 }' pubspec.yaml)"
+  echo "dependency_overrides:" >pubspec_overrides.yaml
+  for kept in "${keep[@]}"; do
+    kept_dir="$(dir_of "$kept")"
+    if [ -z "$kept_dir" ]; then
+      echo "KEEP_OVERRIDE: no package named $kept at $ref." >&2
+      exit 1
+    fi
+    if grep -qx "$kept" <<<"$real" && [ "${DRY_RUN:-}" != 1 ]; then
+      echo "KEEP_OVERRIDE: $kept is a dependency of $name, not a dev dependency. An archive resolved" >&2
+      echo "against a local path is not published; this is for DRY_RUN=1 only." >&2
+      exit 1
+    fi
+    printf '  %s:\n    path: %s\n' "$kept" "$work/$kept_dir" >>pubspec_overrides.yaml
+  done
+fi
 
 version="$(sed -n 's/^version: *//p' pubspec.yaml | head -1)"
 if ! grep -Eq "^## \\[?${version//./\\.}\\]?( |$)" CHANGELOG.md; then
@@ -73,6 +111,7 @@ if grep -Eq '^\s*sdk:\s*flutter\s*$' pubspec.yaml; then pub=(flutter pub); else 
 echo "Package:  $name $version"
 echo "From:     $ref:$dir ($(git -C "$root" rev-parse --short "$ref"))"
 echo "Tool:     ${pub[*]}"
+if [ "${#keep[@]}" -gt 0 ]; then echo "Override: ${keep[*]} (by path, from the same export)"; fi
 echo
 "${pub[@]}" get
 "${pub[@]}" publish --dry-run
