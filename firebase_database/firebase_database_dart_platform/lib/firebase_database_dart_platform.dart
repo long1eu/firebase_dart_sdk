@@ -8,7 +8,10 @@
 ///
 /// * On Linux, where neither `firebase_database` nor `firebase_core` has an
 ///   implementation, adding this package is enough: Flutter calls
-///   [FirebaseDatabaseDart.registerWith] before `main`.
+///   [FirebaseDatabaseDart.registerWith] before `main`. That registration
+///   has no token provider and no persistence: the connection carries no
+///   user and keeps its data in memory, unless `main` calls
+///   [FirebaseDatabaseDart.use] with them before the first use.
 /// * On Windows, the same when the app lists this package as a direct
 ///   dependency: it replaces the native `firebase_database` plugin.
 /// * On any other platform, call [FirebaseDatabaseDart.use] at the start of
@@ -69,13 +72,23 @@ abstract final class FirebaseDatabaseDart {
 
   /// Makes `firebase_database_dart` the implementation of `firebase_database`
   /// on any platform. Call it at the start of `main`, before `Firebase` or
-  /// `FirebaseDatabase` is used; calling it again changes the configuration.
+  /// `FirebaseDatabase` is used. Calling it again replaces the whole
+  /// configuration: [tokenProviderFor], [appCheckProviderFor] and
+  /// [persistenceFor] left out of the later call are unset, not kept from the
+  /// earlier one. A Dart core an earlier call installed stays installed.
   ///
   /// * [tokenProviderFor] returns the token provider of the connection of a
   ///   FlutterFire app: `FirebaseAuthDart.userAuthFor(app)` of
   ///   `firebase_auth_dart_platform`, or a `FlutterFireAuthTokenProvider` of
-  ///   `cloud_firestore_dart_flutterfire`. Called once per app; without it,
-  ///   or when it returns null, the connection carries no user. The provider
+  ///   `cloud_firestore_dart_flutterfire`. Called when a client is created
+  ///   and the `firebase_app_dart` app of its FlutterFire app has no token
+  ///   provider yet: while it returns null, for every client created (each
+  ///   database, each new client after a delete); once it returned a
+  ///   provider, not again for that `firebase_app_dart` app. The Dart core
+  ///   of Linux deletes that app with the FlutterFire app, so a delete and
+  ///   create calls it again; the native and web cores keep it, with its
+  ///   provider. Without it, or when it returns null, the connection carries
+  ///   no user. The provider
   ///   is installed as a `TokenOnChangeProvider`, whose change events carry
   ///   the token. A `firebase_app_dart` app that already exists with the
   ///   name of the FlutterFire app keeps its own providers, and gets these
@@ -83,7 +96,8 @@ abstract final class FirebaseDatabaseDart {
   /// * [appCheckProviderFor] returns the App Check token provider of the
   ///   connection of a FlutterFire app (`FlutterFireAppCheckProvider` of
   ///   `cloud_firestore_dart_flutterfire` for the official
-  ///   `firebase_app_check`). Called once per app.
+  ///   `firebase_app_check`). Called as [tokenProviderFor] is, when the
+  ///   `firebase_app_dart` app has no App Check provider yet.
   /// * [persistenceFor] makes the clients keep their cache and pending writes
   ///   on disk (see [DatabasePersistenceFactory]); without it every client is
   ///   in memory. `FirebaseDatabase.setPersistenceEnabled(false)` turns it
