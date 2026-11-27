@@ -121,8 +121,38 @@ final class FakeServerActions implements ServerActions {
   /// Whether [shutdown] was called.
   bool isShutdown = false;
 
-  /// Whether [connect] was called more recently than [disconnect].
-  bool isConnected = false;
+  /// Whether the fake is connected: [connect] sets it, [disconnect] clears it.
+  ///
+  /// Setting it by hand changes the send order as those do, without telling the delegate or
+  /// answering anything: false forgets what was sent on the connection; true (from false) counts
+  /// every unanswered request as sent and replays the unanswered writes, puts and merges first.
+  bool get isConnected => _isConnected;
+  set isConnected(bool value) {
+    if (value == _isConnected) {
+      return;
+    }
+    _isConnected = value;
+    if (!value) {
+      _sendLog.clear();
+      return;
+    }
+    for (final ServerCall call in calls) {
+      if (!call._answered) {
+        call._sent = true;
+      }
+    }
+    final List<ServerCall> pending = pendingWrites;
+    _sendLog
+      ..clear()
+      ..addAll(pending.where((ServerCall c) => _putOrMerge.contains(c.action)))
+      ..addAll(
+        pending.where(
+          (ServerCall c) => _onDisconnectActions.contains(c.action),
+        ),
+      );
+  }
+
+  bool _isConnected = false;
 
   /// The calls with action [action].
   List<ServerCall> callsOf(String action) =>
@@ -629,8 +659,9 @@ final class FakeServerActions implements ServerActions {
     if (!sent.contains(call)) {
       throw StateError(
         '$helper answers $call (call ${calls.indexOf(call)}), which was not sent on the '
-        'current connection: it was made while offline and connect() has not replayed it. '
-        'Call connect() first, or pass outOfOrder: true with a reason.',
+        'current connection: it was made while offline, or sent before the last disconnect(), '
+        'and connect() has not sent it again. Call connect() first, or pass outOfOrder: true '
+        'with a reason.',
       );
     }
     final ServerCall oldest = sent.first;
@@ -710,25 +741,11 @@ final class FakeServerActions implements ServerActions {
   /// [ServerCall.sent] from now on. The unanswered puts and merges leave first, then the
   /// onDisconnect requests, each in call order, as `PersistentConnection._replay` sends them.
   void connect() {
-    final bool wasConnected = isConnected;
     isConnected = true;
     for (final ServerCall call in calls) {
       if (!call._answered) {
         call._sent = true;
       }
-    }
-    if (!wasConnected) {
-      final List<ServerCall> pending = pendingWrites;
-      _sendLog
-        ..clear()
-        ..addAll(
-          pending.where((ServerCall c) => _putOrMerge.contains(c.action)),
-        )
-        ..addAll(
-          pending.where(
-            (ServerCall c) => _onDisconnectActions.contains(c.action),
-          ),
-        );
     }
     _delegate.onConnect();
   }
@@ -738,7 +755,6 @@ final class FakeServerActions implements ServerActions {
   /// handler that purges) is not answered again.
   void disconnect() {
     isConnected = false;
-    _sendLog.clear();
     for (final ServerCall call in pendingWrites) {
       if (call.answered) {
         continue;

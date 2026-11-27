@@ -29,7 +29,8 @@ final class SimServer {
   /// Called after [data] changed.
   void Function()? onChange;
 
-  /// Whether the next write is refused with `permission_denied`.
+  /// Whether the next write the server answers, the oldest unanswered one, is refused with
+  /// `permission_denied`.
   bool rejectNext = false;
 
   /// Called after a write was refused because of [rejectNext], which is false again by then.
@@ -122,16 +123,20 @@ final class SimServer {
 
   /// Answers the oldest unanswered write, which is the [code] request at [path], and applies it to
   /// [data] when the page said its data. Returns whether [data] changed.
+  ///
+  /// The page's data and [rejectNext] are used only once the fake took the answer: when the answer
+  /// throws (the connection dropped since the request left), both are kept for the resent request.
   bool _answerWrite(String code, String path) {
-    final _Intent? intent = _take(code, path);
     if (rejectNext) {
-      rejectNext = false;
       fake.failNextWrite('permission_denied');
+      rejectNext = false;
+      _take(code, path);
       log('refused $code /$path: permission_denied');
       onReject?.call();
       return false;
     }
     fake.ackNextWrite();
+    final _Intent? intent = _take(code, path);
     if (intent == null) {
       log('acknowledged $code /$path (the page did not say its data)');
       return false;

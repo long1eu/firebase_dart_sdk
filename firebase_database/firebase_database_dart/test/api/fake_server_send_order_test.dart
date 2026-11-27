@@ -228,6 +228,36 @@ void main() {
       );
     });
 
+    test(
+      'isConnected set by hand forgets and replays as disconnect and connect do',
+      () {
+        final List<String> done = <String>[];
+        server
+          ..onDisconnectPut(
+            '/a',
+            0,
+            onComplete: (String s, Object? _) => done.add('a:$s'),
+          )
+          ..isConnected = false
+          ..put('/b', 2, onComplete: (String s, Object? _) => done.add('b:$s'));
+        expect(
+          () => server.respond(server.callsOf('onDisconnectPut').single),
+          throwsA(
+            isA<StateError>().having(
+              (StateError e) => e.message,
+              'message',
+              contains('sent before the last disconnect()'),
+            ),
+          ),
+        );
+        server
+          ..isConnected = true
+          ..ackNextWrite()
+          ..ackNextOnDisconnect();
+        expect(done, <String>['b:ok', 'a:ok']);
+      },
+    );
+
     test('disconnect answers a sent transaction put behind a plain put', () {
       final List<String> done = <String>[];
       server
