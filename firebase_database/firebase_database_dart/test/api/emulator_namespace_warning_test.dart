@@ -1,5 +1,6 @@
-// The warning for an emulator namespace taken from the URL host (no ?ns=): logged once, at the
-// first connection, also after a reconnect; nothing with ?ns=, without a URL or an emulator.
+// The warning for an emulator namespace chosen from the URL host (no ?ns=): logged once, at the
+// first connection, also after a reconnect; nothing with ?ns=, without a URL or an emulator. Each
+// negative case has a positive control in the same test.
 // Each test connects to a FakeDatabaseServer; no test answers a pending request.
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_database_dart/firebase_database_dart.dart';
@@ -13,26 +14,33 @@ import 'package:test/test.dart';
 import 'support/fake_time.dart';
 import 'support/harness.dart';
 
+int _apps = 0;
+
 const Duration _reconnectDelay = Duration(seconds: 1);
 
 /// Builds a database on [server] with [databaseUrl] and [emulatorHost], connects it, drops the
 /// connection once, lets it reconnect, and returns the warnings logged.
+/// [app] defaults to [newTestApp]; [logger], when given, is called after the warning is recorded.
+/// [connected] receives the values of `.info/connected`.
 List<String> warningsOverTwoConnections(
   FakeTime time,
   FakeDatabaseServer server, {
   String? databaseUrl,
   String? emulatorHost,
+  FirebaseApp? app,
+  DatabaseLogger? logger,
+  List<Object?>? connected,
 }) {
   final List<String> warnings = <String>[];
-  final FirebaseApp app = newTestApp();
   final FirebaseDatabase db = firebaseDatabaseWithConnection(
-    app,
+    app ?? newTestApp(),
     databaseUrl: databaseUrl,
     emulatorHost: emulatorHost,
     logger: (DatabaseLogLevel level, String message) {
       if (level == DatabaseLogLevel.warning) {
         warnings.add(message);
       }
+      logger?.call(level, message);
     },
     connectionFactory: (ServerActionsDelegate delegate, DatabaseLogger? _) =>
         server.connect(
@@ -45,6 +53,12 @@ List<String> warningsOverTwoConnections(
           ),
         ),
   );
+  if (connected != null) {
+    db
+        .ref('.info/connected')
+        .onValue
+        .listen((DatabaseEvent e) => connected.add(e.snapshot.value));
+  }
   db.goOnline();
   time.elapse(Duration.zero);
   server.dropConnection();
@@ -121,7 +135,7 @@ void main() {
     });
   });
 
-  test('a URL with ?ns= logs no warning', () {
+  test('a URL with ?ns= logs no warning; the same host without it does', () {
     fakeTime((FakeTime time) {
       expect(
         warningsOverTwoConnections(
@@ -132,10 +146,20 @@ void main() {
         ),
         isEmpty,
       );
+      expect(
+        warningsOverTwoConnections(
+          time,
+          FakeDatabaseServer(),
+          databaseUrl: 'http://localhost:9000',
+          emulatorHost: '127.0.0.1:9000',
+        ),
+        hasLength(1),
+      );
     });
   });
 
-  test('no URL, or a host naming the default database, logs no warning', () {
+  test('no URL, or a host naming the default database, logs no warning; '
+      'another database on the same domain does', () {
     fakeTime((FakeTime time) {
       expect(
         warningsOverTwoConnections(
@@ -154,10 +178,19 @@ void main() {
         ),
         isEmpty,
       );
+      expect(
+        warningsOverTwoConnections(
+          time,
+          FakeDatabaseServer(),
+          databaseUrl: 'https://test-project-other.firebaseio.com',
+          emulatorHost: '127.0.0.1:9000',
+        ),
+        hasLength(1),
+      );
     });
   });
 
-  test('no emulator host logs no warning', () {
+  test('no emulator host logs no warning; the same URL with one does', () {
     fakeTime((FakeTime time) {
       expect(
         warningsOverTwoConnections(
@@ -167,6 +200,58 @@ void main() {
         ),
         isEmpty,
       );
+      expect(
+        warningsOverTwoConnections(
+          time,
+          FakeDatabaseServer(),
+          databaseUrl: 'https://demo.firebaseio.com',
+          emulatorHost: '127.0.0.1:9000',
+        ),
+        hasLength(1),
+      );
+    });
+  });
+
+  test('without a project id any namespace from the host warns', () {
+    fakeTime((FakeTime time) {
+      FirebaseApp noProject() => FirebaseApp.withOptions(
+        const FirebaseOptions(apiKey: 'k', appId: '1:1:dart:x'),
+        name: 'no-project-${_apps++}',
+      );
+      for (final String url in <String>[
+        'https://null-default-rtdb.firebaseio.com',
+        'http://my-mac.local:9000',
+      ]) {
+        final List<String> warnings = warningsOverTwoConnections(
+          time,
+          FakeDatabaseServer(),
+          app: noProject(),
+          databaseUrl: url,
+          emulatorHost: '127.0.0.1:9000',
+        );
+        expect(warnings, hasLength(1), reason: url);
+      }
+    });
+  });
+
+  test('a logger that throws does not stop the first connect', () {
+    fakeTime((FakeTime time) {
+      final List<Object?> connected = <Object?>[];
+      final List<String> warnings = warningsOverTwoConnections(
+        time,
+        FakeDatabaseServer(),
+        databaseUrl: 'http://localhost:9000',
+        emulatorHost: '127.0.0.1:9000',
+        connected: connected,
+        logger: (DatabaseLogLevel level, String message) {
+          if (level == DatabaseLogLevel.warning) {
+            throw StateError('logger');
+          }
+        },
+      );
+      expect(warnings, hasLength(1));
+      // Connected, dropped, connected again: the first connect reached the Repo.
+      expect(connected, <Object?>[false, true, false, true]);
     });
   });
 }

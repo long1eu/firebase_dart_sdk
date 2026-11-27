@@ -250,6 +250,15 @@ void main() {
       ('http://1.b.c.d', 'fake-server'),
       ('http://2147483647.b.c.d', 'fake-server'),
       ('http://2147483648.b.c.d', '2147483648'),
+      ('http://4294967296.b.c.d', '4294967296'),
+      // Leading zeros count for nothing, as in the emulator's int parser.
+      ('http://0000000001.b.c.d', 'fake-server'),
+      ('http://00000000001.b.c.d', 'fake-server'),
+      ('http://0000000000002147483647.b.c.d', 'fake-server'),
+      ('http://0000000000002147483648.b.c.d', '0000000000002147483648'),
+      // A bare host is read as https: 443 is dropped, 80 stays.
+      ('localhost:443', 'localhost'),
+      ('localhost:80', 'fake-server'),
       // A custom domain or a firebase.com host without ns: no longer refused in emulator mode.
       ('https://db.example.com', 'db'),
       ('https://foo.firebase.com', 'foo'),

@@ -81,13 +81,19 @@ final class FirebaseDatabase {
   /// `http://localhost` gives `localhost`, and `http://localhost:9000`, `http://my-mac:9000` (a
   /// one-label name with a port) and any IP address give `fake-server`. With no URL at all
   /// (neither the argument nor the app's `databaseURL`, or an empty argument) the namespace is the
-  /// project's default database `<projectId>-default-rtdb`, the only one where the emulator
-  /// applies the `firebase.json` rules file; a production URL of that database or `?ns=` with
-  /// that name reach it too.
+  /// project's default database `<projectId>-default-rtdb`; a production URL of that database or
+  /// `?ns=` with that name reach it too. The emulator applies the rules of `firebase.json` only
+  /// to the databases `firebase.json` names, by default `<projectId>-default-rtdb`; every other
+  /// namespace has open rules. Measured (our emulator probe, one rules file): only the default
+  /// namespace got the rules. Read in firebase-tools' code (`getRulesConfig`), not run: the array
+  /// form of `"database"` gives rules to each named instance.
   ///
-  /// When the namespace came from the host and is not `<projectId>-default-rtdb`, [logger]
-  /// receives one warning at the first connection (not again on a reconnect) that names the
-  /// namespace and the emulator host. A URL with `?ns=`, or no URL, logs nothing. User info, a
+  /// When the namespace came from the host (no `?ns=`) and is not `<projectId>-default-rtdb`, or
+  /// the app has no project id, [logger] receives one warning at the first connection of this
+  /// instance (not again on a reconnect). It names the namespace and the emulator host and says
+  /// to give `?ns=` when `firebase.json` does not name that namespace; the client cannot read
+  /// `firebase.json`, so it also warns when it does. A logger that throws does not stop the
+  /// connection. A URL with `?ns=`, or no URL, logs nothing. User info, a
   /// path, a fragment, a query key other than `ns` and an invalid namespace still throw an
   /// [ArgumentError] whose message does not quote the URL. See
   /// [emulatorHostFromEnvironment]. [mockUserToken] is sent to the emulator as it is: build a
@@ -647,7 +653,8 @@ FirebaseDatabase firebaseDatabaseWithConnection(
 );
 
 /// [factory] with [message] logged as a warning when its first connection is up; reconnects and
-/// later connections of the same database log nothing.
+/// later connections of the same database log nothing. An error thrown by the logger is dropped,
+/// so the connect still reaches the Repo.
 ServerActionsFactory _warnAtFirstConnect(
   ServerActionsFactory factory,
   String message,
@@ -657,7 +664,11 @@ ServerActionsFactory _warnAtFirstConnect(
     _OnConnectDelegate(delegate, () {
       if (!warned) {
         warned = true;
-        logger?.call(DatabaseLogLevel.warning, message);
+        try {
+          logger?.call(DatabaseLogLevel.warning, message);
+        } on Object {
+          // A throwing logger must not stop the connect that follows.
+        }
       }
     }),
     logger,
@@ -924,9 +935,12 @@ final class _Target {
       }
       // The URL is valid here, so it parses; without a scheme it was read as https.
       final Uri parsed = Uri.parse(url.contains('://') ? url : 'https://$url');
+      // Without a project id the default database is unknown: any namespace from the host warns.
+      final String? projectId = app.options.projectId;
       fromHost =
           !parsed.queryParameters.containsKey('ns') &&
-          namespace != '${app.options.projectId?.toLowerCase()}-default-rtdb';
+          (projectId == null ||
+              namespace != '${projectId.toLowerCase()}-default-rtdb');
     }
     final RepoInfo info = _argument('emulatorHost', () {
       final ({String host, int port}) address = parseEmulatorHost(emulatorHost);
@@ -939,15 +953,18 @@ final class _Target {
       ).replace(queryParameters: <String, String>{'ns': info.namespace}),
       namespaceWarning: fromHost
           ? 'Database emulator at ${info.host}: the database URL has no ?ns=, so the '
-                'namespace is "${info.namespace}", taken from the URL host as the emulator '
-                'does. The emulator applies the firebase.json rules only to the project\'s '
-                'default database; name the namespace with ?ns=<name>.'
+                'namespace is "${info.namespace}", chosen from the URL host by the emulator\'s '
+                'rule (fake-server when the host names none). The emulator applies the rules '
+                'of firebase.json only to the databases firebase.json names (by default '
+                '<projectId>-default-rtdb); any other namespace has open rules. If '
+                '"${info.namespace}" is not named there, give the database with ?ns=<name>.'
           : null,
     );
   }
 
   /// The warning to log once at the first connection, or null: set when the emulator namespace
-  /// came from the URL host (no `?ns=`) and is not the project's default database.
+  /// came from the URL host (no `?ns=`) and is not the project's default database, or the app
+  /// has no project id.
   final String? namespaceWarning;
 
   /// The default database of the app's project id; throws an [ArgumentError] without one.

@@ -99,11 +99,13 @@ RepoInfo parseDatabaseUrl(String url) {
 /// Host header rule (`EmulatorDecoder.parseSubdomain`, emulator 4.11.2) is applied to the
 /// lowercased `host[:port]` of the URL, the port left out when it is the scheme's default (80
 /// for `http` and `ws`, 443 for `https` and `wss`): split on `.`, the first part is the
-/// namespace when it is a valid namespace name and, for four or more parts, not a 32-bit int;
-/// else `fake-server`. A port stays attached to the last part, so a one-label host with a port
-/// never matches. Examples: `my-mac.local:9000` gives `my-mac`, `db.example.com` gives `db`,
-/// `localhost` and `localhost:80` give `localhost`, `localhost:9000`, `my-mac:9000` and any IP
-/// address give `fake-server`. Throws [FormatException] for user info, a fragment, a non-root
+/// namespace when it is a valid namespace name and, for four or more parts, not a 32-bit int
+/// (leading zeros allowed); else `fake-server`. A port stays attached to the last part, so a
+/// one-label host with a port never matches. Examples: `http://my-mac.local:9000` gives
+/// `my-mac`, `https://db.example.com` gives `db`, `http://localhost` and `http://localhost:80`
+/// give `localhost` (a bare `localhost:80` is read as https, so its port stays and it gives
+/// `fake-server`), and `http://localhost:9000`, `http://my-mac:9000` and any IP address give
+/// `fake-server`. Throws [FormatException] for user info, a fragment, a non-root
 /// path, any query key but `ns`, `ns` given twice, an invalid `ns` or query, another scheme, or
 /// an invalid host or port.
 String emulatorUrlNamespace(String url) {
@@ -140,10 +142,11 @@ String emulatorUrlNamespace(String url) {
   );
   final List<String> labels = hostHeader.split('.');
   final String first = labels.first;
-  // The emulator's number test accepts a valid 32-bit int only.
+  // The emulator's number test: a valid 32-bit int, any count of leading zeros.
+  final String digits = first.replaceFirst(RegExp(r'^0+(?=[0-9])'), '');
   final bool numeric =
-      RegExp(r'^[0-9]{1,10}$').hasMatch(first) &&
-      int.parse(first) <= 0x7fffffff;
+      RegExp(r'^[0-9]{1,10}$').hasMatch(digits) &&
+      int.parse(digits) <= 0x7fffffff;
   return _namespacePattern.hasMatch(first) && (labels.length < 4 || !numeric)
       ? first
       : _emulatorFallbackNamespace;
