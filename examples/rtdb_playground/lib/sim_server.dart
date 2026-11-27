@@ -131,7 +131,7 @@ final class SimServer {
       fake.failNextWrite('permission_denied');
       rejectNext = false;
       _take(code, path);
-      log('refused $code /$path: permission_denied');
+      log('refused ${_actionOf(code)} /$path: permission_denied');
       onReject?.call();
       return false;
     }
@@ -152,8 +152,11 @@ final class SimServer {
     return true;
   }
 
+  /// The name the page and the log use for a write request: `p` is a set, `m` an update.
+  static String _actionOf(String code) => code == 'p' ? 'set' : 'update';
+
   _Intent? _take(String code, String path) {
-    final String action = code == 'p' ? 'set' : 'update';
+    final String action = _actionOf(code);
     for (int i = 0; i < _intents.length; i++) {
       if (_intents[i].action == action && _intents[i].path == path) {
         return _intents.removeAt(i);

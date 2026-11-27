@@ -48,5 +48,15 @@ for name in $names; do
   checked=$((checked + 1))
 done
 
+# The smoke test waits for the playground's reject button by its label: a label changed in the page
+# and not in tool/smoke_gallery.mjs fails here, before a browser starts.
+labels="$(sed -n "s/^const REJECT_O[NF]* = '\\(.*\\)';\$/\\1/p" "$root/tool/smoke_gallery.mjs")"
+[ "$(printf '%s\n' "$labels" | grep -c .)" -eq 2 ] ||
+  missing "the two REJECT_ labels in tool/smoke_gallery.mjs"
+while IFS= read -r label; do
+  grep -q -F "'$label'" "$root/examples/rtdb_playground/web/main.dart" ||
+    missing "the reject button label '$label' in examples/rtdb_playground/web/main.dart"
+done <<<"$labels"
+
 [ "$checked" -gt 0 ] || missing "any example folder under $out"
 echo "check_gallery: $checked examples ok in $out"
