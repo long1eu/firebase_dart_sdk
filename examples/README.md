@@ -119,7 +119,7 @@ no-backend exit code is `78` in all three.
   `flutter_notes` and `web_app`) and can be copied out as they are; they have no tests, except
   `playground`, which has a smoke test that needs no emulator.
 - The `rtdb_*` packages take `firebase_app_dart` and `firebase_database_dart` from this repository (path
-  dependencies or `dependency_overrides`); `rtdb_web_app` and `rtdb_presence_worker` declare `^0.2.0` and `^0.0.1`
+  dependencies or `dependency_overrides`); `rtdb_web_app` and `rtdb_presence_worker` declare `^0.2.0` and `^0.1.0`
   with overrides, so they also run against the code next to them.
 - CI: `tool/test_all.sh` runs `dart pub get` and `dart analyze` for every `examples/*/pubspec.yaml`, and does not
   run their tests. `tool/build_gallery.sh` builds the web gallery (`playground`, `web_app`, `rtdb_web_app`,

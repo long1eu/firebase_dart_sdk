@@ -18,9 +18,9 @@ dependencies:
   # Implements firebase_database. As a direct dependency it replaces the
   # native Windows plugin, and Flutter registers it before main() through its
   # dartPluginClass. firebase_core stays native.
-  firebase_database_dart_platform: ^0.0.1
+  firebase_database_dart_platform: ^0.1.0
   # The SQLite cache of the optional disk cache (--dart-define=DISK_CACHE=true).
-  firebase_database_dart_sqlite: ^0.0.1
+  firebase_database_dart_sqlite: ^0.1.0
   flutter:
     sdk: flutter
   path_provider: ^2.1.6
@@ -32,8 +32,8 @@ dev_dependencies:
   integration_test:
     sdk: flutter
 
-# firebase_database_dart_platform and the packages under it are not on pub.dev
-# yet: the overrides take them from this repository. Outside the repository,
+# firebase_database_dart_platform and the packages under it are on pub.dev:
+# the overrides take them from this repository. Outside the repository,
 # remove this section and depend on the versions on pub.dev.
 dependency_overrides:
   firebase_app_dart:

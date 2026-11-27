@@ -6,15 +6,11 @@
 // ignore_for_file: type=lint, unused_local_variable, unused_import
 // ignore_for_file: unused_element
 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_database_dart_platform/firebase_database_dart_platform.dart';
-import 'package:firebase_database_dart_sqlite/firebase_database_dart_sqlite.dart';
 
-// ../../docs/guides/database_flutter.md:86
-Future<void> guideLine86() async {
-  void usePersistence(String directory) {
-    FirebaseDatabaseDart.use(
-      persistenceFor: (int cacheSizeBytes) =>
-          sqlitePersistence(directory, cacheSizeBytes: cacheSizeBytes),
-    );
-  }
+// ../../docs/guides/database_flutter.md:245
+Future<void> guideLine245() async {
+  FirebaseDatabase.instance.useDatabaseEmulator('127.0.0.1', 9100);
 }
