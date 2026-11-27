@@ -546,14 +546,14 @@ await logged.close();
 ```
 
 `DatabaseLogger` is the type of the callback, `void Function(DatabaseLogLevel level, String message)`. The levels are
-`debug`, `info`, `warning` and `error`. Warnings include the missing-index one ("Using an unspecified
-index": a query that is filtered on the client because the rules have no `.indexOn`), a cache that runs memory-only and
-failed persisted writes. Requests that carry credentials are logged as `<action> (contents hidden)`, URLs without their
-query, and snapshot data appears at the debug level only; it is your users' data.
+`debug`, `info`, `warning` and `error`. Warnings include the missing-index one ("Using an unspecified index": a query
+filtered on the client because the rules have no `.indexOn`), a memory-only cache and failed persisted writes. Requests
+with credentials are logged as `<action> (contents hidden)`. The client never logs values it holds or sends; a message
+from the server is logged as the server sent it and, with rules debug output on (emulator), may quote data.
 
 ## How it differs from the JS SDK
 
-The 19 you notice are below. The full table, 33 rows with the test that pins each, is section 25 of
+The 19 you notice are below. The full table, 38 rows with the test that pins each, is section 25 of
 [docs/database_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_decisions.md).
 
 | Topic | JS SDK | This client |

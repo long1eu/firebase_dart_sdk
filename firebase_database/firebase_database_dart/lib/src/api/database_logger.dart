@@ -3,7 +3,8 @@
 ///
 /// Logging is a constructor parameter of `FirebaseDatabase`: pass a [DatabaseLogger] and the client calls
 /// it with a [DatabaseLogLevel] (`debug`, `info`, `warning`, `error`) and a message that never holds a
-/// token. With no logger the client is silent. There is no global switch; FlutterFire's
+/// token, a value you read or write, or a query's bound values ([DatabaseLogger] lists what it
+/// holds). With no logger the client is silent. There is no global switch; FlutterFire's
 /// `setLoggingEnabled` is the shim's, which passes a callback that reads its own flag.
 library;
 
