@@ -128,7 +128,9 @@ abstract final class FirebaseDatabaseDart {
   /// `serverTimeOffset`, `onChildEvents`, `close`, or `serverStatus` on the
   /// errors. Creates the client when the instance has none yet, which fixes
   /// its settings. Only for an app whose `FirebaseDatabase` this package
-  /// implements.
+  /// implements. Throws a [StateError], and creates no client, when [app] was
+  /// deleted and created again under the same name with other options while
+  /// an instance of the earlier app is kept, for any database.
   static fs.FirebaseDatabase clientFor(
     FirebaseApp app, {
     String? databaseURL,
