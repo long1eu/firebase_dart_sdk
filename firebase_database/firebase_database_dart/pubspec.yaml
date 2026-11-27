@@ -1,9 +1,8 @@
 name: firebase_database_dart
 description: >-
-  Unofficial pure-Dart client of the Firebase Realtime Database. Work in
-  progress: tested against the emulator only.
-version: 0.0.1
-publish_to: none
+  Unofficial pure-Dart client of the Firebase Realtime Database for the Dart
+  VM and the web: listeners, queries, transactions, onDisconnect.
+version: 0.1.0
 homepage: https://github.com/long1eu/firebase_dart_sdk
 repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_database/firebase_database_dart
 issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
@@ -34,8 +33,17 @@ dependencies:
   web: ^1.1.0
 
 dev_dependencies:
+  # The production verification kit (test/production) parses its command line.
+  args: ^2.5.0
   # Controlled time in unit tests, as cloud_firestore_dart.
   fake_async: ^1.3.0
+  # The production verification kit signs a throwaway user in. Resolved from
+  # ../../firebase_auth/firebase_auth_providers_dart through pubspec_overrides.yaml.
+  firebase_auth_providers_dart: ^0.4.0
+  # The production verification kit restarts a client on the SQLite cache (check 38). Resolved
+  # from ../firebase_database_dart_sqlite through pubspec_overrides.yaml; it depends on this
+  # package, which pub allows for a dev dependency.
+  firebase_database_dart_sqlite: ^0.1.0
   # The emulator tests' owner writes and reads over REST (test/integration/emulator_rig.dart);
   # 1.5.0 is the version firebase_storage_dart uses.
   http: ^1.5.0

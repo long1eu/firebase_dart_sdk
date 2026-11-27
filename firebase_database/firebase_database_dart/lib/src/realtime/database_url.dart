@@ -37,16 +37,20 @@ const String _cloudWorkstationSuffix = '.cloudworkstations.dev';
 const String _defaultNamespaceSuffix = '-default-rtdb';
 const int _httpsPort = 443;
 
+/// The namespace the Database emulator uses when a request names none it can read.
+const String _emulatorFallbackNamespace = 'fake-server';
+
 /// Parses [url] as a production database URL (2.1, threat model T6) into a [RepoInfo] with
 /// `secure` true and `isUsingEmulator` false.
 ///
 /// Accepts `https://` and `wss://` (and a bare host, read as `https`); the host is lowercased.
 /// Namespace: the `ns` parameter when given, else the first label of a `firebaseio.com` /
 /// `firebasedatabase.app` host. Throws [FormatException] for: `http`/`ws` (the message points to
-/// `useEmulator`, T3), userinfo, a fragment, any query key but `ns`, a non-root path, an empty
-/// host, IP literals other than loopback, a port other than 443, a custom domain without `ns`, a
-/// namespace that does not match `^[a-z0-9-]{1,63}$` after lowercasing, and the domain
-/// `firebase.com` (2.1 step 6). The message never quotes a query value.
+/// the `emulatorHost` argument and FlutterFire's `useDatabaseEmulator`, T3), userinfo, a
+/// fragment, any query key but `ns`, a non-root path, an empty host, IP literals other than
+/// loopback, a port other than 443, a custom domain without `ns`, a namespace that does not match
+/// `^[a-z0-9-]{1,63}$` after lowercasing, and the domain `firebase.com` (2.1 step 6). The message
+/// never quotes a query value.
 ///
 /// A loopback host (`localhost`, `127.0.0.0/8`, `::1`) may name any port: a TLS front of a local
 /// server. Everything else is reached on 443 only.
@@ -55,8 +59,9 @@ RepoInfo parseDatabaseUrl(String url) {
   final String scheme = uri.scheme;
   if (scheme == 'http' || scheme == 'ws') {
     throw const FormatException(
-      'Database URL must use https: a plain-text database is only reachable through '
-      'useEmulator (emulatorDatabase)',
+      'Database URL must use https: a plain-text database is only reachable as the Database '
+      "emulator; pass emulatorHost: 'host:port' to FirebaseDatabase (in FlutterFire, call "
+      'useDatabaseEmulator(host, port))',
     );
   }
   if (scheme != 'https' && scheme != 'wss') {
@@ -87,6 +92,178 @@ RepoInfo parseDatabaseUrl(String url) {
     secure: true,
   );
 }
+
+/// The URL that keys the persisted cache of [info] (`PersistenceKey.databaseUrl`): `https://<host>`
+/// for a production database, followed by `?ns=<namespace>` when the first label of the host is not
+/// the namespace; `http://<host>:<port>?ns=<namespace>` for the emulator (`https` for
+/// `*.cloudworkstations.dev`, and the default port left out).
+Uri persistenceUrlOf(RepoInfo info) {
+  final Uri root = Uri.parse(
+    '${info.secure ? 'https' : 'http'}://${info.host}',
+  );
+  if (!info.isUsingEmulator && info.namespace == info.host.split('.').first) {
+    return root;
+  }
+  return root.replace(queryParameters: <String, String>{'ns': info.namespace});
+}
+
+/// The URL under which a `FirebaseDatabase` keys the persisted cache of the database at [url]
+/// (`PersistenceKey.databaseUrl`, `FirebaseDatabase.databaseUrl`). A key the client produced gives
+/// itself.
+///
+/// What is read as what:
+///
+/// * An `http://` or `ws://` URL, or a `*.cloudworkstations.dev` URL with a query, is an emulator
+///   key `<scheme>://<host>[:<port>]?ns=<namespace>`: it must have `?ns=`; no port means 80 (443 on
+///   a cloud workstation, whose key is `https`).
+/// * Anything else (`https://`, `wss://`, a bare host) is a production database URL, read by the
+///   rules of the `FirebaseDatabase` constructor: scheme, case of host and namespace, port 443, a
+///   trailing `/` and a `?ns=` equal to the first label of the host make no difference. Without a
+///   query, a host that does not name its namespace (a custom domain, a loopback host, a cloud
+///   workstation) is read with `?ns=<first label>`, as the client leaves that `ns` out of its key.
+///
+/// On a cloud workstation (`*.cloudworkstations.dev`) a production database and the emulator on
+/// the same host and namespace can meet. A production database spelled with `?ns=<first label>`
+/// is read as the emulator's key (the client's own key for it has no query); pass
+/// `FirebaseDatabase.databaseUrl` for it. And the client itself gives a production database with
+/// any other `?ns=` the same key as the emulator on that host at port 443, so the two share one
+/// cache.
+///
+/// Throws a [FormatException] for a URL that the constructor would refuse, or an emulator URL
+/// without `?ns=`. The message does not quote the URL.
+Uri persistenceDatabaseUrl(Uri url) {
+  final Uri uri = _parseUrl(url.toString());
+  final String scheme = uri.scheme.toLowerCase();
+  final String host = uri.host.toLowerCase();
+  final bool hasQuery = uri.query.isNotEmpty;
+  final bool emulator =
+      scheme == 'http' ||
+      scheme == 'ws' ||
+      (hasQuery && host.endsWith(_cloudWorkstationSuffix));
+  if (!emulator) {
+    final Uri production = !hasQuery && _namespaceOfHost(host) == null
+        ? uri.replace(
+            queryParameters: <String, String>{'ns': host.split('.').first},
+          )
+        : uri;
+    return persistenceUrlOf(parseDatabaseUrl(production.toString()));
+  }
+  if (uri.hasFragment) {
+    throw const FormatException('Database URL must not have a fragment');
+  }
+  final String? namespace = _namespaceParameter(uri);
+  if (namespace == null) {
+    throw const FormatException(
+      'An emulator database URL needs the database name as ?ns=<name>',
+    );
+  }
+  final int port = uri.hasPort
+      ? uri.port
+      : (host.endsWith(_cloudWorkstationSuffix) ? _httpsPort : 80);
+  final RepoInfo info;
+  try {
+    info = emulatorDatabase(host, port, namespace: namespace);
+  } on ArgumentError catch (e) {
+    throw FormatException('Emulator database URL: ${e.message}');
+  }
+  return persistenceUrlOf(info);
+}
+
+/// The namespace a database URL names when the client talks to an emulator (2.4); the URL's
+/// host and port are not used to connect.
+///
+/// Accepts `http`, `https`, `ws` and `wss` (and a bare host), any valid host name or IP address
+/// and any port. The namespace is the `ns` parameter, lowercased; without one, the emulator's
+/// Host header rule (`EmulatorDecoder.parseSubdomain`, emulator 4.11.2) is applied to the
+/// lowercased `host[:port]` of the URL, the port left out when it is the scheme's default (80
+/// for `http` and `ws`, 443 for `https` and `wss`): split on `.`, the first part is the
+/// namespace when it is a valid namespace name and, for four or more parts, not a 32-bit int
+/// (leading zeros allowed); else `fake-server`. A port stays attached to the last part, so a
+/// one-label host with a port never matches. Examples: `http://my-mac.local:9000` gives
+/// `my-mac`, `https://db.example.com` gives `db`, `http://localhost` and `http://localhost:80`
+/// give `localhost` (a bare `localhost:80` is read as https, so its port stays and it gives
+/// `fake-server`), and `http://localhost:9000`, `http://my-mac:9000` and any IP address give
+/// `fake-server`. Throws [FormatException] for user info, a fragment, a non-root
+/// path, any query key but `ns`, `ns` given twice, an invalid `ns` or query, another scheme, or
+/// an invalid host or port.
+String emulatorUrlNamespace(String url) {
+  final Uri uri = _parseUrl(url);
+  const List<String> schemes = <String>['http', 'https', 'ws', 'wss'];
+  if (!schemes.contains(uri.scheme)) {
+    throw const FormatException(
+      'Database URL scheme must be http, https, ws or wss',
+    );
+  }
+  if (uri.hasFragment) {
+    throw const FormatException('Database URL must not have a fragment');
+  }
+  final String? namespaceParameter = _namespaceParameter(uri);
+  final String host = uri.host.toLowerCase();
+  final String? problem = _hostProblem(host, anyIp: true);
+  if (problem != null) {
+    throw FormatException('Database URL: $problem');
+  }
+  final int? port = uri.hasPort ? uri.port : null;
+  if (port != null) {
+    _checkPort(port);
+  }
+  if (namespaceParameter != null) {
+    return namespaceParameter;
+  }
+  // A client leaves the scheme's default port out of the Host header; ws is http, wss is https.
+  final int defaultPort = uri.scheme == 'http' || uri.scheme == 'ws'
+      ? 80
+      : _httpsPort;
+  final String hostHeader = joinHostPort(
+    host,
+    port == defaultPort ? null : port,
+  );
+  final List<String> labels = hostHeader.split('.');
+  final String first = labels.first;
+  // The emulator's number test: a valid 32-bit int, any count of leading zeros.
+  final String digits = first.replaceFirst(RegExp(r'^0+(?=[0-9])'), '');
+  final bool numeric =
+      RegExp(r'^[0-9]{1,10}$').hasMatch(digits) &&
+      int.parse(digits) <= 0x7fffffff;
+  return _namespacePattern.hasMatch(first) && (labels.length < 4 || !numeric)
+      ? first
+      : _emulatorFallbackNamespace;
+}
+
+/// The namespace [url] names, read as for an emulator instance: the `ns` parameter (lowercased
+/// and checked as in [parseDatabaseUrl]), else the first label of a `firebaseio.com` /
+/// `firebasedatabase.app` host, else null. A text without a scheme is read as `https`.
+///
+/// Throws [FormatException] for text that `Uri` cannot parse, a scheme other than `http`,
+/// `https`, `ws` and `wss`, user info, a fragment, a missing or invalid host (a DNS name or an IP
+/// literal), and a query that [parseDatabaseUrl] refuses. The port is not checked. The message
+/// never quotes the URL.
+String? namespaceOfUrl(String url) {
+  final String text = _schemePrefix.hasMatch(url) ? url : 'https://$url';
+  final Uri? uri = Uri.tryParse(text);
+  if (uri == null) {
+    throw const FormatException('Not a valid database URL');
+  }
+  if (!_emulatorSchemes.contains(uri.scheme.toLowerCase())) {
+    throw const FormatException(
+      'Database URL scheme must be http, https, ws or wss',
+    );
+  }
+  if (uri.userInfo.isNotEmpty) {
+    throw const FormatException('Database URL must not have user info');
+  }
+  if (uri.hasFragment) {
+    throw const FormatException('Database URL must not have a fragment');
+  }
+  final String host = _unbracket(uri.host).toLowerCase();
+  final String? problem = _hostProblem(host, anyIp: true);
+  if (problem != null) {
+    throw FormatException('Database URL: $problem');
+  }
+  return _namespaceParameter(uri) ?? _namespaceOfHost(host);
+}
+
+const Set<String> _emulatorSchemes = <String>{'http', 'https', 'ws', 'wss'};
 
 /// The [RepoInfo] of the default database of [projectId]:
 /// `<projectId>-default-rtdb.firebaseio.com`, namespace `<projectId>-default-rtdb` (1.1,

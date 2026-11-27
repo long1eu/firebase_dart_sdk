@@ -140,9 +140,11 @@ extension _RepoGet on Repo {
     try {
       node = nodeFromServerJson(payload);
     } on Object catch (e) {
+      // The error's text can quote the server's data, so only its type is logged.
       _log(
         DatabaseLogLevel.error,
-        'Failed to parse server response for get(): $e',
+        'Failed to parse server response for get() at ${query.path}: '
+        '${e.runtimeType}',
       );
       _releaseGetQuery(query);
       request.completer.completeError(
@@ -183,12 +185,18 @@ extension _RepoGet on Repo {
     if (!_closed) {
       _releaseGetQuery(request.query);
     }
+    // The query's shape only: its bounds are user values (JS logs the whole query).
     _log(
       DatabaseLogLevel.debug,
-      'get for query ${request.query} failed: $error',
+      'get for query ${_queryShape(request.query)} failed: '
+      '${error is ServerActionsException ? error : error.runtimeType}',
     );
     request.completer.completeError(
-      error is ServerActionsException
+      // After close the connection's shutdown fails the get with the status `database_closed`,
+      // which the wire mapping reads as `unknown`; the get fails with the local closed error.
+      _closed
+          ? Repo._closedError()
+          : error is ServerActionsException
           ? DatabaseError.fromStatus(error.status, error.reason)
           : DatabaseError.local(
               DatabaseErrorCode.unknown,
@@ -197,4 +205,22 @@ extension _RepoGet on Repo {
             ),
     );
   }
+}
+
+/// The path and shape of [query] for a log line: the index, which bounds are set and whether
+/// each is inclusive, and the limit with its side. Never a bound value or a bound key.
+String _queryShape(QuerySpec query) {
+  final QueryParams params = query.params;
+  final List<String> parts = <String>['order ${params.index.queryDefinition}'];
+  if (params.hasStart) {
+    parts.add(params.startInclusive ? 'start inclusive' : 'start exclusive');
+  }
+  if (params.hasEnd) {
+    parts.add(params.endInclusive ? 'end inclusive' : 'end exclusive');
+  }
+  if (params.hasLimit) {
+    final String side = params.isViewFromLeft ? 'first' : 'last';
+    parts.add('limit ${params.limit} $side');
+  }
+  return '${query.path} (${parts.join(', ')})';
 }

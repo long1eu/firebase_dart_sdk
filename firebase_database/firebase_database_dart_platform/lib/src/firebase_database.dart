@@ -19,9 +19,10 @@ import 'package:flutter/foundation.dart';
 /// `(int cacheSizeBytes) => sqlitePersistence(directory, cacheSizeBytes: cacheSizeBytes)`
 /// of `firebase_database_dart_sqlite`.
 ///
-/// It is called once per instance (app and database URL), when the instance
-/// creates its client, and only when persistence is on (see
-/// `FirebaseDatabaseDart.use`). The client keys the cache by app name and
+/// It is called each time an instance (app and database URL) creates a
+/// client, and only when persistence is on (see `FirebaseDatabaseDart.use`):
+/// at the first use, and again when the instance creates a new client after
+/// the app was deleted. The client keys the cache by app name and
 /// database URL, so one directory serves every app.
 typedef DatabasePersistenceFactory =
     fs.DatabasePersistence Function(int cacheSizeBytes);
@@ -113,16 +114,29 @@ fs.FirebaseDatabase createClient(
 /// `goOffline`, `purgeOutstandingWrites`, `push`, listen, or reference or
 /// query operation that does I/O. `ref`, `child`, `parent`, `root`, `key`,
 /// `path`, `onDisconnect()` and an event stream not listened to yet do not
-/// create it. Deleting the FlutterFire app closes the client; a later use,
-/// after an app of the same name was created again, creates a new one with
-/// the stored settings. After the client is created:
+/// create it. Deleting the FlutterFire app closes the client the instance
+/// has when the delete starts, unless that client was created while an
+/// earlier delete ran. A use while the delete runs (`firebase_core`
+/// has disposed the services, the core still has the app) creates a client
+/// that neither that delete nor a later one closes; on a core that keeps the
+/// `firebase_app_dart` app (the native and web ones) the instance keeps
+/// using it, also after the app was created again. A later use, after an
+/// app of the same name was created again with the same options, creates a
+/// new client with the stored settings when the instance has none open;
+/// with other options it throws a [StateError] (see [forApp]). After the
+/// client is created:
 ///
 /// | Setter | Before the client | After it |
 /// |---|---|---|
 /// | `useDatabaseEmulator` | stored | same value: nothing; another: [StateError] |
-/// | `setPersistenceEnabled` | stored | same value: nothing; another: ignored, one `debugPrint` (as Android) |
-/// | `setPersistenceCacheSizeBytes` | checked (1 MiB to 100 MiB, else [ArgumentError]), stored | checked, then as `setPersistenceEnabled` |
+/// | `setPersistenceEnabled` | stored | as the client is (on disk or in memory): nothing; else ignored, one `debugPrint` (as Android) |
+/// | `setPersistenceCacheSizeBytes` | checked (1 MiB to 100 MiB, else [ArgumentError]), stored | checked; the stored size (10 MiB when none): nothing; else ignored, one `debugPrint` |
 /// | `setLoggingEnabled` | stored | takes effect at once |
+///
+/// A client is on disk only when `FirebaseDatabaseDart.use` was given a
+/// persistence factory, so without one `setPersistenceEnabled(true)` after
+/// the client is ignored with that line, also when it was called with
+/// `true` before.
 class DartFirebaseDatabase extends DatabasePlatform {
   /// The instance without an app, for [DatabasePlatform.instance].
   DartFirebaseDatabase() : super();
@@ -157,17 +171,34 @@ class DartFirebaseDatabase extends DatabasePlatform {
   /// it, compared by scheme, lower-case host, port and namespace. So
   /// `FirebaseDatabase.instance` and `instanceFor(app: app, databaseURL: url)`
   /// with the URL of the same database (with or without a trailing slash, in
-  /// any case of the host) share one instance, its settings and its client. A kept
-  /// instance whose app has other options than [app] (the app was deleted
-  /// and created again with other options) is replaced.
+  /// any case of the host) share one instance, its settings and its client.
+  /// A kept instance is never replaced, also when its client's
+  /// `firebase_app_dart` app was deleted: its [client] then makes a new
+  /// client with the stored settings.
+  ///
+  /// Throws a [StateError] when any kept instance of the app's name, for any
+  /// database, has an app with other options than [app] (the app was deleted
+  /// and created again under the same name with other options): the kept
+  /// instances and their settings are not replaced, and no instance is made
+  /// for the new options.
   static DartFirebaseDatabase forApp(FirebaseApp app, String? databaseURL) {
     final String key = _instanceKey(app, databaseURL);
-    final DartFirebaseDatabase? kept = _instances[key];
-    if (kept != null && kept.app == app && !kept._appDeleted) {
-      return kept;
+    if (_instances.values.any(
+      (DartFirebaseDatabase it) => it.app?.name == app.name && it.app != app,
+    )) {
+      throw _recreatedWithOtherOptions(app.name);
     }
-    return _instances[key] = DartFirebaseDatabase._(app, databaseURL);
+    return _instances[key] ??= DartFirebaseDatabase._(app, databaseURL);
   }
+
+  /// The error of [forApp] and [client] for an app named [appName] that was
+  /// deleted and created again with other options.
+  static StateError _recreatedWithOtherOptions(String appName) => StateError(
+    'The Firebase app "$appName" was deleted and created again with other '
+    'options. The FirebaseDatabase instances of the earlier app and their '
+    'settings are not replaced: use another app name for the new options, '
+    'or restart the app.',
+  );
 
   /// The key of [forApp]: the app name and the database the client would
   /// connect to (the resolution of the client's constructor). A URL the
@@ -241,8 +272,9 @@ class DartFirebaseDatabase extends DatabasePlatform {
   /// made with, also after that app was deleted and created again).
   ///
   /// Throws a [StateError] on the registered instance, which has no app, and
-  /// `firebase_core`'s `no-app` exception when the app was deleted and not
-  /// created again.
+  /// when the app was deleted and created again with other options (as
+  /// [forApp]); `firebase_core`'s `no-app` exception when the app was deleted
+  /// and not created again.
   fs.FirebaseDatabase get client {
     final fs.FirebaseDatabase? existing = _client;
     if (existing != null && !_appDeleted) {
@@ -256,6 +288,9 @@ class DartFirebaseDatabase extends DatabasePlatform {
       );
     }
     final FirebaseApp app = Firebase.app(stored.name);
+    if (app != stored) {
+      throw _recreatedWithOtherOptions(stored.name);
+    }
     final dart_app.FirebaseApp dartApp = dartAppFor(
       app,
       tokenProviderFor: config.tokenProviderFor,
@@ -344,9 +379,9 @@ class DartFirebaseDatabase extends DatabasePlatform {
 
   /// `DatabasePlatform.setPersistenceEnabled`: whether the client gets the
   /// persistence of [DartDatabaseConfig.persistenceFor]. Persistence is on when
-  /// `use` was given a factory and the app did not disable it; `true` without
-  /// a factory prints one warning and stays in memory, never throws. See the
-  /// table of the class.
+  /// `use` was given a factory and the app did not disable it. Before the
+  /// client, each call with `true` without a factory prints a warning and the
+  /// data stays in memory; it never throws. See the table of the class.
   @override
   void setPersistenceEnabled(bool enabled) {
     final DatabaseClientSettings? settings = _settings;

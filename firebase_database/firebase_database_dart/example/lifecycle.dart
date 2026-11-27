@@ -28,17 +28,14 @@ Future<void> main() async {
     // first use.
     print('url: ${first.databaseUrl}');
 
-    // Listeners are open streams; close() ends them with an error
-    // 'database-closed' and then done, and fails pending writes the same way.
-    final Completer<Object> ended = Completer<Object>();
-    first
-        .ref(key)
-        .onValue
-        .listen((_) {}, onError: (Object error) => ended.complete(error));
+    // Listeners are open streams; close() is not a failure, so it ends them
+    // with done and no error. Pending writes fail with 'database-closed'.
+    final Completer<void> ended = Completer<void>();
+    first.ref(key).onValue.listen((_) {}, onDone: ended.complete);
     await settle();
     await first.close();
-    final Object error = await ended.future;
-    print('stream ended with: ${(error as FirebaseDatabaseException).code}');
+    await ended.future;
+    print('stream ended with done');
 
     // After close() every async call fails with 'database-closed'. ref() still
     // works because it makes no request. close() is idempotent.

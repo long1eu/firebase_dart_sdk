@@ -16,8 +16,8 @@ late FirebaseApp app;
 late FirebaseDatabase database;
 late DatabaseReference ref;
 
-// ../firebase_database_dart/README.md:114
-Future<void> clientReadmeLine114() async {
+// ../firebase_database_dart/README.md:121
+Future<void> clientReadmeLine121() async {
   final FirebaseApp projectApp = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: '<the Web API key of the project>',
@@ -36,8 +36,8 @@ Future<void> clientReadmeLine114() async {
   await db.close();
 }
 
-// ../firebase_database_dart/README.md:147
-Future<void> clientReadmeLine147() async {
+// ../firebase_database_dart/README.md:154
+Future<void> clientReadmeLine154() async {
   final DatabaseReference ada = database.ref('users/ada');
 
   await ada.set(<String, Object?>{'name': 'Ada', 'age': 36, 'city': 'London'});
@@ -56,8 +56,8 @@ Future<void> clientReadmeLine147() async {
   await ada.remove(); // set(null)
 }
 
-// ../firebase_database_dart/README.md:200
-Future<void> clientReadmeLine200() async {
+// ../firebase_database_dart/README.md:207
+Future<void> clientReadmeLine207() async {
   final DatabaseReference items = database.ref('items');
 
   final subscription = items.onValue.listen((DatabaseEvent event) {
@@ -77,8 +77,8 @@ Future<void> clientReadmeLine200() async {
   await subscription.cancel();
 }
 
-// ../firebase_database_dart/README.md:237
-Future<void> clientReadmeLine237() async {
+// ../firebase_database_dart/README.md:244
+Future<void> clientReadmeLine244() async {
   final Query players = database.ref('players');
 
   // Results are ascending; for a top three take the last three and reverse them.
@@ -101,8 +101,8 @@ Future<void> clientReadmeLine237() async {
   print(sorted.children.length);
 }
 
-// ../firebase_database_dart/README.md:285
-Future<void> clientReadmeLine285() async {
+// ../firebase_database_dart/README.md:293
+Future<void> clientReadmeLine293() async {
   final TransactionResult result = await database.ref('seats').runTransaction((Object? current) {
     if (current == null) {
       return Transaction.success(null); // the first run often sees null, the client has no data yet
@@ -113,8 +113,8 @@ Future<void> clientReadmeLine285() async {
   print('committed: ${result.committed}, value: ${result.snapshot.value}');
 }
 
-// ../firebase_database_dart/README.md:314
-Future<void> clientReadmeLine314() async {
+// ../firebase_database_dart/README.md:322
+Future<void> clientReadmeLine322() async {
   final DatabaseReference status = database.ref('status/ada');
   // Register again at every connection: the server forgets the registrations when the
   // connection ends, and the client does not keep them across a restart.
@@ -129,8 +129,8 @@ Future<void> clientReadmeLine314() async {
   await presence.cancel();
 }
 
-// ../firebase_database_dart/README.md:341
-Future<void> clientReadmeLine341() async {
+// ../firebase_database_dart/README.md:349
+Future<void> clientReadmeLine349() async {
   await database.ref('post').set(<String, Object?>{
     'title': 'Hello',
     'createdAt': ServerValue.timestamp, // milliseconds since the epoch, on the server
@@ -141,8 +141,8 @@ Future<void> clientReadmeLine341() async {
   print('offset: ${database.serverTimeOffset}, now on the server: ${database.estimatedServerTime}');
 }
 
-// ../firebase_database_dart/README.md:362
-Future<void> clientReadmeLine362() async {
+// ../firebase_database_dart/README.md:370
+Future<void> clientReadmeLine370() async {
   database.onConnected.listen((bool connected) => print('connected: $connected'));
   await database.onConnected.firstWhere((bool connected) => connected);
 
@@ -152,8 +152,8 @@ Future<void> clientReadmeLine362() async {
   await queued;
 }
 
-// ../firebase_database_dart/README.md:405
-Future<void> clientReadmeLine405() async {
+// ../firebase_database_dart/README.md:413
+Future<void> clientReadmeLine413() async {
   // Before the FirebaseDatabase is constructed: it reads the app's providers then.
   final FirebaseUserAuth auth = await FirebaseUserAuth.forApp(app);
   await auth.signInAnonymously();
@@ -161,8 +161,8 @@ Future<void> clientReadmeLine405() async {
   await signedIn.close();
 }
 
-// ../firebase_database_dart/README.md:424
-Future<void> clientReadmeLine424() async {
+// ../firebase_database_dart/README.md:432
+Future<void> clientReadmeLine432() async {
   final FirebaseDatabase asAda = FirebaseDatabase(
     app,
     emulatorHost: '127.0.0.1:9100',
@@ -175,8 +175,8 @@ Future<void> clientReadmeLine424() async {
   await asAda.close();
 }
 
-// ../firebase_database_dart/README.md:452
-Future<void> clientReadmeLine452() async {
+// ../firebase_database_dart/README.md:460
+Future<void> clientReadmeLine460() async {
   const String supportDirectory = '/path/to/app/support';
   final FirebaseDatabase cached = FirebaseDatabase(
     app,
@@ -202,8 +202,8 @@ Future<void> clientReadmeLine452() async {
   );
 }
 
-// ../firebase_database_dart/README.md:494
-Future<void> clientReadmeLine494() async {
+// ../firebase_database_dart/README.md:502
+Future<void> clientReadmeLine502() async {
   try {
     await ref.get();
   } on FirebaseDatabaseException catch (e) {
@@ -218,8 +218,8 @@ Future<void> clientReadmeLine494() async {
   }
 }
 
-// ../firebase_database_dart/README.md:533
-Future<void> clientReadmeLine533() async {
+// ../firebase_database_dart/README.md:541
+Future<void> clientReadmeLine541() async {
   final FirebaseDatabase logged = FirebaseDatabase(
     app,
     logger: (DatabaseLogLevel level, String message) {
@@ -240,8 +240,8 @@ Future<void> sqliteReadmeLine48() async {
   await cached.close();
 }
 
-// README.md:71
-Future<void> sqliteReadmeLine71() async {
+// README.md:73
+Future<void> sqliteReadmeLine73() async {
   await database.close();
   await clearSqlitePersistence(
     '/path/to/app/support/firebase_database',
@@ -250,8 +250,8 @@ Future<void> sqliteReadmeLine71() async {
   );
 }
 
-// ../../docs/guides/database.md:87
-Future<void> databaseGuideLine87() async {
+// ../../docs/guides/database.md:89
+Future<void> databaseGuideLine89() async {
   ref.child('private').onValue.listen(
     (DatabaseEvent event) => print(event.snapshot.value),
     onError: (Object error) {
@@ -267,8 +267,8 @@ Future<void> databaseGuideLine87() async {
   }
 }
 
-// ../../docs/guides/database.md:188
-Future<void> databaseGuideLine188() async {
+// ../../docs/guides/database.md:190
+Future<void> databaseGuideLine190() async {
   final FirebaseDatabase cached = FirebaseDatabase(
     app,
     persistence: sqlitePersistence('/var/lib/my-app/rtdb', cacheSizeBytes: 50 * 1024 * 1024),
@@ -279,8 +279,8 @@ Future<void> databaseGuideLine188() async {
   await cached.close();
 }
 
-// ../../docs/guides/database.md:245
-Future<void> databaseGuideLine245() async {
+// ../../docs/guides/database.md:247
+Future<void> databaseGuideLine247() async {
   database.onConnected.listen((bool connected) => print('connected: $connected'));
   ProcessSignal.sigterm.watch().first.then((ProcessSignal _) async {
     await database.close();
@@ -288,8 +288,8 @@ Future<void> databaseGuideLine245() async {
   });
 }
 
-// ../../docs/guides/database.md:276
-Future<void> databaseGuideLine276() async {
+// ../../docs/guides/database.md:278
+Future<void> databaseGuideLine278() async {
   final FirebaseDatabase asAda = FirebaseDatabase(
     app,
     emulatorHost: '127.0.0.1:9100',

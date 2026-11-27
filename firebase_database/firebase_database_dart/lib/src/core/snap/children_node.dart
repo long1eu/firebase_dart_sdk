@@ -367,7 +367,12 @@ class ChildrenNode implements Node {
     if (!exportFormat) {
       final int? arrayLength = _arrayLength();
       if (arrayLength != null) {
-        final List<Object?> array = List<Object?>.filled(arrayLength, null);
+        // Growable: a transaction handler gets this list and may add to or remove from it.
+        final List<Object?> array = List<Object?>.filled(
+          arrayLength,
+          null,
+          growable: true,
+        );
         _children.inOrderTraversal((ChildKey key, Node child) {
           array[int.parse(key.name)] = child.toJson();
           return false;

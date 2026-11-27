@@ -1,14 +1,17 @@
 class FakeDatabaseServer
   acceptConnections: bool
-  ackLastOnDisconnect(): void
-  ackLastWrite(): void
+  ackLastOnDisconnect({bool outOfOrder}): void
+  ackLastWrite({bool outOfOrder}): void
+  ackNextOnDisconnect(): void
+  ackNextWrite(): void
   answerGet(String path, Object value): void
   answerListen(String path, Object value, {Map<String, Object> query}): void
   cancelListen(String path, String status, {Map<String, Object> query}): void
   dropConnection(): void
   failGet(String path, String status): void
-  failLastWrite(String status): void
+  failLastWrite(String status, {bool outOfOrder}): void
   failListen(String path, String status, {Map<String, Object> query}): void
+  failNextWrite(String status): void
   get connectionAttempts: int
   get receivedAuthTokens: List<String>
   get requests: List<String>

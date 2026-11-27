@@ -13,12 +13,12 @@ and adding the dependency registers it. On Windows FlutterFire has its own plugi
 app that lists this package as a direct dependency gets this package in its place. On the other platforms it is an
 opt-in through `FirebaseDatabaseDart.use()`. It is not affiliated with or endorsed by Google or Firebase.
 
-> **Status: 0.0.1, not published, work in progress.** What is and is not verified:
+> **Status: 0.1.0, first version** ([differences](#how-it-differs-from-the-official-plugin)). What ran and what did not:
 >
-> - The client underneath, `firebase_database_dart`, passes its own suites (2,371 tests on the Dart VM) and its tests
+> - The client underneath, `firebase_database_dart`, passes its own suites (2,645 tests on the Dart VM) and its tests
 >   against the Database emulator.
-> - This package has 136 tests, 5 of them skipped without the emulator (another session's run). The unit tests run
->   against the client's fake server (`package:firebase_database_dart/testing.dart`).
+> - This package has 328 tests, 5 of them skipped without the emulator (another session's run, 2026-11-27). The unit
+>   tests run against the client's fake server (`package:firebase_database_dart/testing.dart`).
 > - FlutterFire's own `firebase_database` integration suite (77 tests) is the acceptance gate
 >   (`tool/test_flutterfire_database_gate.sh`, against the Database emulator): 76 pass and 1 skips itself, on
 >   macOS with the host test runner. It has **not run** on Linux or Windows.
@@ -37,7 +37,7 @@ opt-in through `FirebaseDatabaseDart.use()`. It is not affiliated with or endors
 dependencies:
   firebase_core: ^5.1.0
   firebase_database: ^13.1.0
-  firebase_database_dart_platform: ^0.0.1
+  firebase_database_dart_platform: ^0.1.0
 ```
 
 **On Linux** nothing else is needed for the emulator or open rules: Flutter calls `FirebaseDatabaseDart.registerWith()`
@@ -114,12 +114,19 @@ Without it, or when it returns null, the connection sends no App Check token.
 
 | Argument | Default | What it does |
 | --- | --- | --- |
-| `tokenProviderFor` | none: no user | Returns the token provider of a FlutterFire app; called once per app. |
-| `appCheckProviderFor` | none: no App Check token | Returns the App Check token provider of a FlutterFire app; called once per app. |
+| `tokenProviderFor` | none: no user | Returns the token provider of a FlutterFire app; called when a client is created and the app has no token provider yet (below). |
+| `appCheckProviderFor` | none: no App Check token | Returns the App Check token provider of a FlutterFire app; called as `tokenProviderFor` is. |
 | `persistenceFor` | none: memory only | A `DatabasePersistenceFactory`: returns the client's `DatabasePersistence` for the cache size the app set (below). |
 | `useDartCore` | Linux only | Installs a small pure-Dart `firebase_core` in place of its method-channel implementation; a core another package installed is kept. Pass `true` for any platform (tests), `false` to never do it. |
 
 `use()` throws a `StateError` once an instance has created its client, because the configuration is read then.
+Called again before that, it replaces the whole configuration: `tokenProviderFor`, `appCheckProviderFor` and
+`persistenceFor` left out of the later call are unset, not kept from the earlier one (a Dart core already installed
+stays). The provider factories are called when a client is created and the `firebase_app_dart` app of the FlutterFire
+app has no provider of that kind yet: while a factory returns null, for every client created (each database, each new
+client after a delete); once it returned a provider, not again for that app. The Dart core of Linux deletes the
+`firebase_app_dart` app with the FlutterFire app, so a delete and create calls the factories again; the native and web
+cores keep that app and its providers.
 `FirebaseDatabaseDart.clientFor(app)` returns the client behind an instance, for what the official API does not
 have: `onConnected`, `isConnected`, `serverTimeOffset`, `onChildEvents`, `close`.
 
@@ -127,9 +134,9 @@ have: `onConnected`, `isConnected`, `serverTimeOffset`, `onChildEvents`, `close`
 
 The clients keep their data in memory unless `use` was given `persistenceFor`, a function from the cache size to a
 `DatabasePersistence`. The disk one comes from `firebase_database_dart_sqlite` (this package does not depend on it).
-The function is called once per instance (app and database URL), when the instance creates its client, with the size
-of `FirebaseDatabase.setPersistenceCacheSizeBytes`, 10 MiB when the app set none. The client keys the cache by app
-name and database URL, so one directory serves every app.
+The function is called each time an instance (app and database URL) creates a client, at the first use and again
+after the app was deleted, with the size of `FirebaseDatabase.setPersistenceCacheSizeBytes`, 10 MiB when the app set
+none. The client keys the cache by app name and database URL, so one directory serves every app.
 
 - `setPersistenceEnabled(false)` turns it off for an instance; `setPersistenceEnabled(true)` without
   `persistenceFor` prints a warning and stays in memory.
@@ -145,8 +152,36 @@ name and database URL, so one directory serves every app.
 - The client's warnings and errors (for example that persistence could not be opened and the client runs in memory)
   are printed with `debugPrint` always; its debug and info lines only after `setLoggingEnabled(true)`.
 - `FirebaseApp.delete()` closes the clients of that app on every platform (through `firebase_core`'s
-  `registerService`). The `FirebaseDatabase` objects of the app keep working once an app of the same name is created
-  again: the next call creates a new client with the settings the object had.
+  `registerService`), except a client created while a delete ran (below).
+- Created again under the same name with the same options, the app's `FirebaseDatabase` objects keep working: the next
+  call creates a new client with the settings the object had, also after a second delete and create.
+  `useDatabaseEmulator` called after the delete and before that call takes effect (after a use while the delete ran it
+  throws, as after any first use). `instanceFor(app: newApp)` returns
+  the same object, and `clientFor` with the new or the old app object returns the client that object uses.
+- A use while `FirebaseApp.delete()` runs (after `firebase_core` disposed the services, before the core removed the app)
+  creates a client with the object's settings that the delete does not close on the native and web cores (shown on test
+  cores that behave like them): the object keeps using it after the app is created again, and a later delete
+  does not close it either. On the Dart core of Linux the delete closes it, and the next call creates a new one with the
+  same settings.
+- When the `firebase_app_dart` app of the name is deleted directly and the FlutterFire app is kept, the next call
+  creates a new client with the object's settings.
+- Created again under the same name with other options (any field that `FirebaseOptions ==` compares; `recaptchaSiteKey`
+  is not one) while an instance of the earlier app is kept, a call that needs a new client throws a `StateError` ("The
+  Firebase app ... was deleted and created again with other options"), for the database the earlier app used and for any
+  other: `instanceFor(app: newApp, databaseURL: anyUrl)`, `clientFor` with the new or the old app object, with or
+  without a URL, and the old object's `get`, `set`, `goOnline`, `goOffline` and `purgeOutstandingWrites` (a listen of
+  `onValue` gets it as an error event). An old object used while the delete ran is the exception on the native and web
+  cores: it keeps the client made then, with the earlier app's options and its settings, and its calls work. No client
+  without the settings made before the delete is created. `ref`, `useDatabaseEmulator` and `setPersistenceEnabled` need
+  no client and do not throw. The tests show this on the Dart core and on test cores that behave like the native ones
+  and like the web one.
+- Instances are never released, so after such a recreate the name throws for the rest of the process; creating the app
+  again with the earlier options makes it work again. To use other options, give the app another name, or restart the
+  app. A test suite that, in one process, uses a database of an app name and later creates that name again with other
+  options meets this throw; give each test its own app name.
+- An app that never had a `FirebaseDatabase` instance before its delete has nothing kept: created again with other
+  options, it works as a new app. With the same options, a database the earlier app did not use gets a new client of its
+  own, without the settings of the first database.
 
 ## What is implemented
 
@@ -157,7 +192,7 @@ name and database URL, so one directory serves every app.
 | `goOnline`, `goOffline`, `purgeOutstandingWrites` | the same client calls | pending writes fail with `write-cancelled` |
 | `ref`, `refFromURL`, `child`, `parent`, `root`, `key`, `path` | the location's keys | no client, no I/O |
 | `set`, `setWithPriority`, `update`, `setPriority`, `remove`, `push` | `set`, `update`, `setPriority`, `push` | map keys are stringified (as FlutterFire does) |
-| `onValue`, `onChildAdded`, `onChildChanged`, `onChildRemoved`, `onChildMoved`, `once`, `get` | the client's streams and `get` | |
+| `onValue`, `onChildAdded`, `onChildChanged`, `onChildRemoved`, `onChildMoved`, `once`, `get` | the client's streams and `get` | a `once()` pending at close or app deletion fails with `StateError` "No element"; `get()` fails with `database-closed` |
 | `orderBy*`, `startAt`, `startAfter`, `endAt`, `endBefore`, `equalTo`, `limitToFirst`, `limitToLast`, `keepSynced` | the client's `Query` | |
 | `runTransaction(handler, applyLocally:)` | `runTransaction` | the handler gets a fresh mutable copy on each run; it may run several times |
 | `onDisconnect()`: `set`, `setWithPriority`, `update`, `remove`, `cancel` | `onDisconnect` | |
@@ -194,8 +229,14 @@ that same object. With `applyLocally: false`, listeners see no local event befor
   listen of an event stream, `push`, `goOnline`...). `push()` makes no request, but it needs the client for the
   server time offset of the key, so call `useDatabaseEmulator` before it. After the client is created,
   `useDatabaseEmulator` with the same host does nothing and with another one throws a `StateError` (ignoring it would
-  send the traffic to production); `setPersistenceEnabled` and `setPersistenceCacheSizeBytes` are ignored with a
-  debug message, as on Android; `setLoggingEnabled` takes effect at once.
+  send the traffic to production); `setPersistenceEnabled` that does not match the client (on disk only with
+  `persistenceFor`) and `setPersistenceCacheSizeBytes` with another size than the stored one are ignored with a debug
+  message, as on Android; `setLoggingEnabled` takes effect at once.
+- **An app deleted and created again under the same name with other options gets no client** while an instance of
+  the earlier app is kept: each call that needs one throws a `StateError` (see "Emulator, logging, deleting an app").
+  The instances and their settings stay with the earlier app, are not replaced and are never released, so the name
+  throws for the rest of the process unless it is created again with the earlier options; use another app name or
+  restart.
 - **Persistence is injected** as a factory from the cache size (`persistenceFor`), not switched on by the native SDK.
 - **References are made without the client**: `ref`, `child`, `parent`, `root`, `key`, `path` and `onDisconnect()`
   only build a location. So an invalid key, `ref('a.b')`, is reported at the first read or write of it (an
@@ -207,6 +248,10 @@ that same object. With `applyLocally: false`, listeners see no local event befor
   children from the parent's `value` map, so there they see it.
 - **A stream ends after the server cancels its listen** (`permission-denied`, then done), as the client's streams do;
   on Android the stream reports the error and stays open, so an `await for` loop ends here and waits there.
+- **Closing the client or deleting the app is not an error**: every stream ends with done and no error event, as the
+  client's streams do. FlutterFire's `once(eventType)` is the `first` of the stream of that event type (`onValue` by
+  default), so a `once()` pending then fails with `StateError` "No element" instead of `database-closed`; `get()` and
+  the other Futures fail with `database-closed`.
 - **A child snapshot keeps its priority** (`snapshot.child('a').priority`, `children`); the native plugins give null.
 - **A whole-number priority is an `int`** (`1`, not `1.0`), as values are; on Android FlutterFire returns every
   numeric priority as a `double`, so `priority as double` must become `(priority as num).toDouble()`.
@@ -219,7 +264,7 @@ that same object. With `applyLocally: false`, listeners see no local event befor
 - **Modifiers are applied in one order** (orderBy, start, end, limit) whatever the call order, so
   `startAt(1).orderByChild('x')` works; an invalid combination is an error of the stream or of `get`, not of the call.
 - **Error codes**: the client's `write-canceled` is reported as `write-cancelled` and `operation-failed` as `failure`,
-  FlutterFire's spellings; `database-closed` (the instance was closed or its app deleted) is not in FlutterFire.
+  FlutterFire's spellings; `database-closed` (a Future of a closed client or deleted app) is not in FlutterFire.
 - **Programmer errors stay Dart errors**: a bad path, key, value or query is an `ArgumentError` or a `StateError`,
   and a transaction handler's exception is rethrown as itself, where the native plugins report
   `FirebaseException('unknown')`.
@@ -241,5 +286,5 @@ working; call `use()` to choose otherwise.
 
 ## Example
 
-[`example/main.dart`](example/main.dart) writes, listens, runs a transaction and registers an `onDisconnect` write
+[`example/main.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_database/firebase_database_dart_platform/example/main.dart) writes, listens, runs a transaction and registers an `onDisconnect` write
 against the Database emulator.

@@ -18,33 +18,39 @@ extension _RepoServerActions on Repo {
     final Path path = Path(wirePath);
     _log(DatabaseLogLevel.debug, 'onDataUpdate: $path');
     _dataUpdateCount++;
+    // Read first, then apply, so the log line can say which failed. Each logs the error's type
+    // and a fixed reason only: the error's text can quote the data (Android logs both as an
+    // internal error).
+    final Map<Path, Node>? children;
+    final Node? node;
+    try {
+      children = isMerge ? _changedChildren(data) : null;
+      node = isMerge ? null : nodeFromServerJson(data);
+    } on Object catch (e) {
+      _log(
+        DatabaseLogLevel.error,
+        'FIREBASE INTERNAL ERROR at $path: the server sent data the client cannot read '
+        '(${e.runtimeType})',
+      );
+      return;
+    }
     final List<Event> events;
     try {
-      if (tag != null) {
-        if (isMerge) {
-          events = _serverSyncTree.applyTaggedQueryMerge(
-            path,
-            _changedChildren(data),
-            Tag(tag),
-          );
-        } else {
-          events = _serverSyncTree.applyTaggedQueryOverwrite(
-            path,
-            nodeFromServerJson(data),
-            Tag(tag),
-          );
-        }
-      } else if (isMerge) {
-        events = _serverSyncTree.applyServerMerge(path, _changedChildren(data));
+      if (children != null) {
+        events = tag == null
+            ? _serverSyncTree.applyServerMerge(path, children)
+            : _serverSyncTree.applyTaggedQueryMerge(path, children, Tag(tag));
       } else {
-        events = _serverSyncTree.applyServerOverwrite(
-          path,
-          nodeFromServerJson(data),
-        );
+        events = tag == null
+            ? _serverSyncTree.applyServerOverwrite(path, node!)
+            : _serverSyncTree.applyTaggedQueryOverwrite(path, node!, Tag(tag));
       }
     } on Object catch (e) {
-      // The server sent data the client cannot read; Android logs it as an internal error.
-      _log(DatabaseLogLevel.error, 'FIREBASE INTERNAL ERROR: $e');
+      _log(
+        DatabaseLogLevel.error,
+        'FIREBASE INTERNAL ERROR at $path: applying server data failed, in the local cache '
+        'or the client (${e.runtimeType})',
+      );
       return;
     }
     _post(events);
@@ -72,12 +78,33 @@ extension _RepoServerActions on Repo {
     final Path path = Path(wirePath);
     _log(DatabaseLogLevel.debug, 'onRangeMergeUpdate: $path');
     _dataUpdateCount++;
-    final List<RangeMerge> parsed = <RangeMerge>[
-      for (final WireRangeMerge merge in merges) RangeMerge.fromWire(merge),
-    ];
-    final List<Event> events = tag != null
-        ? _serverSyncTree.applyTaggedRangeMerges(path, parsed, Tag(tag))
-        : _serverSyncTree.applyServerRangeMerges(path, parsed);
+    // Read first, then apply, logged as in _onDataUpdate: the error's type and a fixed reason.
+    final List<RangeMerge> parsed;
+    try {
+      parsed = <RangeMerge>[
+        for (final WireRangeMerge merge in merges) RangeMerge.fromWire(merge),
+      ];
+    } on Object catch (e) {
+      _log(
+        DatabaseLogLevel.error,
+        'FIREBASE INTERNAL ERROR at $path: the server sent a range merge the client cannot '
+        'read (${e.runtimeType})',
+      );
+      return;
+    }
+    final List<Event> events;
+    try {
+      events = tag != null
+          ? _serverSyncTree.applyTaggedRangeMerges(path, parsed, Tag(tag))
+          : _serverSyncTree.applyServerRangeMerges(path, parsed);
+    } on Object catch (e) {
+      _log(
+        DatabaseLogLevel.error,
+        'FIREBASE INTERNAL ERROR at $path: applying a server range merge failed, in the local '
+        'cache or the client (${e.runtimeType})',
+      );
+      return;
+    }
     _post(events);
     if (events.isNotEmpty) {
       _rerunTransactions(path);
@@ -153,7 +180,11 @@ extension _RepoServerActions on Repo {
       _infoData.updateSnapshot(path, node);
       _post(_infoSyncTree.applyServerOverwrite(path, node));
     } on Object catch (e) {
-      _log(DatabaseLogLevel.error, 'Failed to parse info update: $e');
+      // The type only, as every other parse failure (the values are the client's own).
+      _log(
+        DatabaseLogLevel.error,
+        'Failed to parse info update for $key: ${e.runtimeType}',
+      );
     }
   }
 }

@@ -7,12 +7,13 @@ is the entry point: which package to add, what a connection carries, rules and e
 the JS SDK or FlutterFire, offline behaviour, the connection on a desktop or a server, and tests. The [client
 README](../../firebase_database/firebase_database_dart/README.md) has the install steps and one example of each call;
 this guide does not repeat them. The client is at 0.0.1. It has run against the Database emulator and, once, against a
-production database (the verification kit, 39 checks); where a statement below depends on the server, it says what was
-measured. What has run, and what never ran against production, is in section 23 of the [decisions
-document](../database_decisions.md). It includes the client's test suite on the Dart VM (2,371 tests) and in Chrome on
-dart2js (2,328) and dart2wasm (2,332), the SQLite package (247 tests), the adapter (136 tests, 5 skipped without the
-emulator), and example apps on Windows 11 and Linux x64 (4 integration tests each). CI runs on GitHub Actions
-(`.github/workflows/ci.yml`) and passes. Not run: a release build of a desktop app, Safari, Firefox and a real display.
+production database (the verification kit: all 41 checks in one run on 2026-11-27, and all passed); where a statement
+below depends on the server, it says what was measured. What has run, and what never ran against production, is in
+section 23 of the [decisions document](../database_decisions.md). It includes the client's test suite on the Dart VM
+(2,645 tests, 60 skipped) and in Chrome on dart2js (2,584) and dart2wasm (2,588), the SQLite package (287 tests), the
+adapter (328 tests, 5 skipped without the emulator), and example apps on Windows 11 and Linux x64 (4 integration tests
+each). CI runs on GitHub Actions (`.github/workflows/ci.yml`) and passes. Not run: a release build of a desktop app,
+Safari, Firefox and a real display.
 
 ## Which package do I add
 
@@ -45,8 +46,9 @@ database that is created and closed without use opens no socket. The URL is the 
 constructor refuses, with an `ArgumentError` before any connection, a URL with a path, a custom domain without `?ns=`, a
 port other than 443 on a host that is not loopback, an invalid project id, and plain `http://` outside the emulator; a
 start that fails fails every pending and later call. `refFromUrl` refuses user info, plain http, other ports and extra
-query keys. The disk cache is keyed by the app name and the normalised database URL: every spelling of one URL shares
-one cache, and two `?ns=` values on one host are two caches.
+query keys. The disk cache is keyed by the app name and the normalised database URL: every spelling of one URL with a
+host name shares one cache, two `?ns=` values on one host are two caches, and a loopback host is kept as written
+(`localhost`, `127.0.0.1` and `[::1]` are three caches).
 
 After the hello of the server, the client sends the credentials and then the listens and writes, without waiting for
 the answers:
@@ -111,10 +113,10 @@ downloads more than you asked for.
 
 The codes are listed in the [README](../../firebase_database/firebase_database_dart/README.md#errors) and in the
 documentation of `FirebaseDatabaseException`. A bad path, key, value or query is an `ArgumentError` or `StateError` at
-the call, before anything is sent, not an exception through a Future. One limit only the emulator has: in one `set`,
-a value whose longest chain of keys together with the path is longer than 768 bytes is refused there with `unknown`
-(`invalid_parameters` in `serverStatus`), while a flat multi-path `update` is checked path by path. The production
-server accepted the same `set` (measured once on each).
+the call, before anything is sent, not an exception through a Future. That includes a `set` whose longest chain of keys
+together with the path is longer than 768 bytes: the client throws and sends nothing, and a flat multi-path `update` is
+checked path by path. The emulator refused, with `unknown`, a chain of about 765 bytes that the client accepts; the
+production server accepted it (measured once on each).
 
 ## What surprises people from the JS SDK or FlutterFire
 
@@ -238,7 +240,7 @@ Dart's `HttpClient` does. Loopback addresses and the emulator are always reached
 API. A proxy that refuses the tunnel fails the connection attempt with an error that names the proxy and the status.
 
 **Shutting down.** An open `FirebaseDatabase` keeps a command line program alive. `close()` ends every stream with
-`database-closed`, fails the Futures of writes that are still pending with `database-closed`, releases the cache lease
+done and no error, fails the Futures of writes that are still pending with `database-closed`, releases the cache lease
 and closes the socket; the server then runs the `onDisconnect` operations you registered. Await your writes before
 `close()` in a server that handles `SIGTERM`; with no SQLite cache an unacknowledged write is lost.
 

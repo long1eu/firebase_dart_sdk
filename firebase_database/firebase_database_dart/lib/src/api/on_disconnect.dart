@@ -17,8 +17,11 @@ import 'package:meta/meta.dart';
 ///
 /// Each Future completes when the server has registered the write. Only registered writes count: when the
 /// connection is lost, the client also applies them locally, raising events after the `.info/connected`
-/// false event, and then forgets them. Registrations are never persisted; after a restart, register them
-/// again when `FirebaseDatabase.onConnected` turns true.
+/// false event, and then forgets them. Applying them overrides running transactions at, above or below
+/// each location as a `DatabaseReference.set` there would (see `DatabaseReference.runTransaction`); a
+/// transaction whose value was sent before the drop has failed with `disconnected` by then. Registrations
+/// are never persisted; after a restart, register them again when `FirebaseDatabase.onConnected` turns
+/// true.
 ///
 /// A Future fails with `permission-denied` when the rules refuse the write, and with `disconnected` when the
 /// connection dropped after the request was sent and before the server answered: the registration may not
@@ -63,7 +66,9 @@ final class OnDisconnect {
   }
 
   /// On disconnect, writes each entry of [values] below the location, leaving other children alone. Keys
-  /// may be multi-segment paths (`'a/b'`).
+  /// may be multi-segment paths (`'a/b'`). A key that names the location itself (`''`, `'/'` or any
+  /// string of only slashes) throws an [ArgumentError] that names the key, and nothing is
+  /// registered; use [set] to replace the location on disconnect, or [remove] to delete it.
   ///
   /// An empty [values] map registers nothing and completes the Future in a microtask, with no
   /// request.

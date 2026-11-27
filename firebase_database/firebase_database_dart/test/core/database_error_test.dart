@@ -18,7 +18,6 @@ void main() {
     statusNetworkError: DatabaseErrorCode.networkError,
     'write_canceled': DatabaseErrorCode.writeCanceled,
     'no_index': DatabaseErrorCode.indexNotDefined,
-    'database_closed': DatabaseErrorCode.databaseClosed,
     'unknown': DatabaseErrorCode.unknown,
     // Local statuses of JS and Android.
     statusDisconnect: DatabaseErrorCode.disconnected,
@@ -37,11 +36,35 @@ void main() {
     });
   }
 
-  test('every code maps back from its own wire status', () {
-    for (final DatabaseErrorCode code in DatabaseErrorCode.values) {
-      expect(DatabaseErrorCode.fromWireStatus(code.wireStatus), code);
-    }
-  });
+  test(
+    'every code but the local-only database-closed maps back from its own wire status',
+    () {
+      for (final DatabaseErrorCode code in DatabaseErrorCode.values) {
+        expect(
+          DatabaseErrorCode.fromWireStatus(code.wireStatus),
+          code == DatabaseErrorCode.databaseClosed
+              ? DatabaseErrorCode.unknown
+              : code,
+        );
+      }
+    },
+  );
+
+  test(
+    'a wire database_closed is unknown and keeps the raw status; closed() is local',
+    () {
+      final DatabaseError wire = DatabaseError.fromStatus(
+        'DATABASE_CLOSED',
+        'x',
+      );
+      expect(wire.code, DatabaseErrorCode.unknown);
+      expect(wire.rawStatus, 'DATABASE_CLOSED');
+      expect(wire.details, 'DATABASE_CLOSED: x');
+      final DatabaseError closed = DatabaseError.closed();
+      expect(closed.code, DatabaseErrorCode.databaseClosed);
+      expect(closed.isLocal, isTrue);
+    },
+  );
 
   test('an unknown status is unknown and keeps the raw status', () {
     final DatabaseError withReason = DatabaseError.fromStatus(

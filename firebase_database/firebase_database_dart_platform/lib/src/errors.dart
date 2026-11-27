@@ -49,8 +49,11 @@ String flutterFireCode(String code) => flutterFireCodes[code] ?? 'unknown';
 /// `firebase_database_dart` throws a `FirebaseDatabaseException`, which extends
 /// the `FirebaseException` of `firebase_app_dart` (plugin `firebase_database`).
 /// Apps catch the [FirebaseException] of `firebase_core`, a different class,
-/// so the fields are copied over, with the code through [flutterFireCode] and
-/// the message of the client. Another `firebase_app_dart` exception (from a
+/// so message and stack trace are copied over, with the plugin
+/// `firebase_database` and the code through [flutterFireCode].
+/// `serverStatus` and `cause` of the client exception have no field there
+/// and are dropped; calls on the client of `FirebaseDatabaseDart.clientFor`
+/// keep them. Another `firebase_app_dart` exception (from a
 /// token provider, say) is copied with its plugin and code as they are.
 /// Anything else, `ArgumentError`, `StateError` and the exception a
 /// transaction handler threw included, is returned unchanged (the same

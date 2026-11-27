@@ -88,7 +88,7 @@ void main() {
     final RepoHarness h = await _withCounter(0);
     h.transaction('c', (_) => const TransactionSuccess(1));
     await settle();
-    h.server.failLastWrite('permission_denied', 'no');
+    h.server.failLastWrite('permission_denied', reason: 'no');
     await settle();
     expect(h.log, <String>[
       'H(0)',

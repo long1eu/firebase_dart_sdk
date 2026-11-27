@@ -346,7 +346,7 @@ void main() {
       Object? error;
       w.db.ref('a').set(1).catchError((Object e) => error = e);
       time.elapse(Duration.zero);
-      w.server.failLastWrite(status, reason);
+      w.server.failLastWrite(status, reason: reason);
       time.elapse(Duration.zero);
       return error! as FirebaseDatabaseException;
     }
@@ -873,8 +873,8 @@ void main() {
   });
 
   group('refFromUrl', () {
-    timed('on the emulator, any host is accepted and only the path is used '
-        '(m10)', (FakeTime time) {
+    timed('on the emulator, any host is accepted; the path is used and a '
+        'namespace in the URL must be this one (m10)', (FakeTime time) {
       final FirebaseDatabase db = FirebaseDatabase(
         newTestApp(),
         emulatorHost: '127.0.0.1:9000',
@@ -886,7 +886,9 @@ void main() {
         db.ref('a/b').path,
       );
       expect(
-        db.refFromUrl('http://127.0.0.1:9000/c?ns=x').path,
+        db
+            .refFromUrl('http://127.0.0.1:9000/c?ns=test-project-default-rtdb')
+            .path,
         db.ref('c').path,
       );
     });

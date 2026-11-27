@@ -31,15 +31,23 @@ import 'package:meta/meta.dart';
 /// Writes. A write's local events are queued before its Future completes, so listeners see it at once,
 /// offline too. The Future completes when the server answers; while offline it stays pending, not failed. A
 /// refused write rolls back with events, then fails (for example `permission-denied`). Writes are at least
-/// once: a write whose acknowledgement was lost is sent again after reconnecting.
+/// once: a write whose acknowledgement was lost is sent again after reconnecting. After
+/// [FirebaseDatabase.close] a valid write fails its Future with `database-closed`; an invalid value still
+/// throws at the call.
 ///
 /// Values. A value is null, a `bool`, a `num`, a `String`, a `List` or a `Map` with `String` keys, at any
-/// depth, or a `ServerValue`. The client checks it at the call, with the JS SDK's rules, and throws an
-/// [ArgumentError] for a key with forbidden characters (`.`, `#`, `$`, `[`, `]`, `/` or control characters),
-/// a path deeper than 32 segments or longer than 768 bytes, NaN or Infinity, a priority that is not null, a
-/// `num` or a `String`, a leaf over 10 MB, a map key that is not a `String`, or a lone surrogate in a string
-/// or key. A `List` is written as a map with index keys. A `-0.0` is sent as 0. Writes under `.info` throw
-/// an [ArgumentError].
+/// depth, or a `ServerValue`. A map may also hold `.priority`, and `.value` when it has no other child: a
+/// value with its priority. A `.priority` key wins over a `priority` argument. The client checks the value
+/// at the call, with the JS SDK's rules, and throws an [ArgumentError] for any other key with forbidden
+/// characters (`.`, `#`, `$`, `[`, `]`, `/` or control characters), a path deeper than 32 segments or
+/// longer than 768 bytes (this location's path and the keys inside the value, in UTF-8, with one byte for
+/// each `/`), NaN or Infinity, a `priority` argument that is not null, a `num`, a `String` or a
+/// `ServerValue`, a leaf over 10 MB, a map key that is not a `String`, or a lone surrogate in a string or
+/// key. [child], [push], [FirebaseDatabase.ref], [setPriority] and an empty [update] check no depth or
+/// length. A `List` is written as a map with index keys. An empty map or list, or one that holds only
+/// nulls, is no data: writing it removes the location. A `-0.0` is sent as 0, and a `double` with no
+/// fraction is stored and read back as an `int` (`5.0` reads as `5`). Writes under `.info` throw an
+/// [ArgumentError].
 ///
 /// ```dart
 /// final DatabaseReference post = db.ref('posts').push();
@@ -67,7 +75,9 @@ final class DatabaseReference extends Query {
   DatabaseReference get root => database.ref();
 
   /// The reference at [path] below this one. [path] may have several segments; empty segments are dropped,
-  /// so `child('a//b')` is `child('a/b')`. Throws an [ArgumentError] for an invalid key.
+  /// so `child('a//b')` is `child('a/b')` and `child('/')` is this location. Throws an [ArgumentError]
+  /// for an empty [path] or an invalid key; `.info` is accepted on the root only. It checks no depth or
+  /// length; see the class documentation for the writes that do.
   DatabaseReference child(String path) {
     if (spec.path.isEmpty) {
       validateRootPathString('child', 'path', path);
@@ -95,13 +105,19 @@ final class DatabaseReference extends Query {
     );
   }
 
-  /// Replaces the data at this location with [value], and its priority with [priority] when given.
-  /// A `null` [value] removes the data. Fires local events before the Future completes; see the
-  /// class documentation for completion, rollback and value rules. With `persistence` the write is
-  /// stored on disk and sent again after a restart; the Future of the run that made it is gone
-  /// then. The Database emulator refuses, with `unknown`, a [value] whose longest chain of keys
-  /// together with this path is longer than 768 bytes; the production server accepted the same
-  /// write (measured once on each). A flat multi-path [update] is checked path by path.
+  /// Replaces the data at this location with [value], and its priority with [priority]. Without
+  /// [priority] the location has no priority afterwards, unless [value] is a map with a `.priority`
+  /// key. A `null` [value], or an empty map or list (see the class documentation), removes the data,
+  /// and no priority is kept. Fires local events before the Future completes; see the class
+  /// documentation for completion, rollback and value rules. A transaction at, above or below this
+  /// location may fail with `overridden-by-set` (see [runTransaction]). With `persistence` the write
+  /// is stored on disk and sent again after a restart; the Future of the run that made it is gone
+  /// then.
+  ///
+  /// A [value] whose longest chain of keys together with this path is longer than 768 bytes throws
+  /// an [ArgumentError], and nothing is sent. The Database emulator refused, with `unknown`, a write
+  /// the client accepts, with a chain of about 765 bytes; the production server accepted that write
+  /// (measured once on each). A flat multi-path [update] is checked path by path.
   Future<void> set(Object? value, {Object? priority}) =>
       _set('set', value, priority);
 
@@ -122,9 +138,19 @@ final class DatabaseReference extends Query {
 
   /// Writes each entry of [values] below this location, leaving other children alone. Keys may be
   /// multi-segment paths (`'a/b'`), which makes one atomic write to several places; a `null` value removes
-  /// that child. Two keys where one is a prefix of the other throw an [ArgumentError].
+  /// that child. Two keys where one path is the other or an ancestor of it (`'a'` and `'a/b'`, or
+  /// `'a/b'` and `'/a//b'`) throw an [ArgumentError]; `'a'` and `'ab'` do not. A key that names this
+  /// location itself (`''`, `'/'` or any string of only slashes) throws an [ArgumentError] that names
+  /// the key, and nothing is written; use [set] to replace the location or [remove] to delete it.
   ///
-  /// An empty [values] map writes nothing and completes the Future in a microtask, with no request.
+  /// An entry that is, or holds, a map with a non-null `.priority` and no value (only nulls or empty
+  /// maps) throws an [ArgumentError]: the server answers such a merge with an error tied to no
+  /// request, so its Future would never complete. [set] does not check this: there such a map is no
+  /// data. A transaction at, above or below a written path may fail with `overridden-by-set` (see
+  /// [runTransaction]).
+  ///
+  /// An empty [values] map writes nothing and completes the Future in a microtask, with no write
+  /// request.
   ///
   /// The server refuses the whole update when keys create a node and set its priority separately
   /// (`{'x/v': 1, 'x/.priority': 3}` with `x` missing): the local write reverts and the Future
@@ -143,9 +169,11 @@ final class DatabaseReference extends Query {
     );
   }
 
-  /// Sets the priority of this location: null, a `num` or a `String`. With `persistence` the write
-  /// is stored on disk and sent again after a restart; the Future of the run that made it is gone
-  /// then.
+  /// Sets the priority of this location: null, a `num`, a `String` or a `ServerValue`. The client
+  /// keeps no priority for a location that holds no data: there the write is sent but raises no
+  /// local event. To create data with a priority, use `set(value, priority: p)`. It checks no depth
+  /// or length. With `persistence` the write is stored on disk and sent again after a restart; the
+  /// Future of the run that made it is gone then.
   Future<void> setPriority(Object? priority) {
     final Path path = spec.path;
     validateWritablePath('setPriority', path);
@@ -167,15 +195,22 @@ final class DatabaseReference extends Query {
   /// Android SDKs, so a [set] made right after this call comes after the transaction. Events and the Future
   /// still wait for a later microtask. While the database is still opening its persistence, the first run
   /// happens once it has opened. The handler returns a [Transaction], never a `Future`: it cannot wait. It
-  /// may run again when the server's value differs (see [TransactionHandler]). A write the handler makes to
-  /// this location, above or below it aborts this transaction with `overridden-by-set`. With
-  /// [applyLocally] each run raises local events, which a later run or an abort may revert; with
-  /// [applyLocally] false there are no local events before the server answers.
+  /// may run again when the server's value differs (see [TransactionHandler]). With [applyLocally] each
+  /// run raises local events, which a later run or an abort may revert; with [applyLocally] false there
+  /// are no local events before the server answers.
+  ///
+  /// A write the handler makes to this location, above or below it fails this transaction with
+  /// `overridden-by-set`. Other writes there ([set], [remove], [setPriority], an [update] that writes
+  /// at, above or below this location, and the onDisconnect writes the client applies when the
+  /// connection drops) fail it with `overridden-by-set` at once while it waits for an earlier
+  /// transaction at, above or below it. Once its value is sent, it waits for the server's answer: it
+  /// commits when the server accepts the value, and fails with `overridden-by-set` when the server
+  /// answers that its data was stale. A transaction made while offline counts as sent.
   ///
   /// Completes with `committed` true when the server took the value, or false when the handler
   /// aborted. Fails with the handler's own error when it throws, `max-retries` when the handler has
   /// run 25 times and the server still refuses the value, `disconnected` when the connection drops
-  /// after the value was sent, `overridden-by-set` when a later [set] replaces it, and
+  /// after the value was sent, `overridden-by-set` when another write overrides it (see above), and
   /// `write-canceled` after [FirebaseDatabase.purgeOutstandingWrites]. While offline the handler
   /// runs on the local value (with [applyLocally] its result raises local events) and the Future
   /// stays pending until the connection returns; there is no timeout. Transactions are kept in
@@ -183,7 +218,11 @@ final class DatabaseReference extends Query {
   ///
   /// ```dart
   /// final TransactionResult r = await db.ref('seats/left').runTransaction((Object? v) {
-  ///   final int left = (v as int?) ?? 0;
+  ///   // Nothing cached yet: commit null. When the server holds a value, this runs again with it.
+  ///   if (v == null) {
+  ///     return Transaction.success(null);
+  ///   }
+  ///   final int left = v as int;
   ///   return left == 0 ? Transaction.abort() : Transaction.success(left - 1);
   /// });
   /// ```

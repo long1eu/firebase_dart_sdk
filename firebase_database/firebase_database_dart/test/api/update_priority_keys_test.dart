@@ -98,7 +98,7 @@ void main() {
       expect(w.server.callsOf('merge').single.data, keys);
       expect(w.log, <String>['X:{v:1}/3', 'S:{k:1,x:{v:1}}/null']);
 
-      w.server.failLastWrite('invalid_parameters', _reason);
+      w.server.failLastWrite('invalid_parameters', reason: _reason);
       w.settle();
       expect(w.log, <String>[
         'X:{v:1}/3',

@@ -29,7 +29,7 @@ database. Without `FIREBASE_DATABASE_EMULATOR_HOST` they stop with a message. Th
 | `server_values.dart` | `ServerValue.timestamp` and `increment`, the local estimate, `estimatedServerTime`. |
 | `auth_and_rules.dart` | `mockUserToken` and a rule that refuses (`permission-denied`); loads the rules it needs and restores open ones. |
 | `error_handling.dart` | `FirebaseDatabaseException` (`code`, `serverStatus`) against `ArgumentError` and `StateError`. |
-| `lifecycle.dart` | Independent instances, `close()`, the `database-closed` error on streams and calls. |
+| `lifecycle.dart` | Independent instances, `close()`: streams end with done, calls fail with `database-closed`. |
 | `cookbook/presence.dart` | Online and offline with `onConnected` and `onDisconnect`. |
 | `cookbook/counter.dart` | A shared counter: read-then-set (wrong), `ServerValue.increment`, a transaction. |
 | `cookbook/chat.dart` | A chat room: push keys, a `limitToLast` window, a typing flag cleared on disconnect. |
