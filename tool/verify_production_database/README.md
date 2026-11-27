@@ -1,11 +1,11 @@
 # Realtime Database production verification kit
 
-`firebase_database_dart` was verified against the Database emulator only. This kit runs 40 named checks against a
+`firebase_database_dart` was verified against the Database emulator only. This kit runs 41 named checks against a
 **real** Realtime Database and prints, for each one, `PASS`, `FAIL`, `INCONCLUSIVE` or `SKIPPED` with a one-line
 explanation. It asks what the emulator cannot answer (TLS and the host the server names, rules with a real ID token,
 a token refresh and a sign-out on a live connection, priorities on the real server, timings), runs a base line of
 the public API on both backends, and runs the core side's production questions
-(`rtdb/from_helper/reports/production_questions.md`) as informational checks 27 to 36, plus checks 37 to 40.
+(`rtdb/from_helper/reports/production_questions.md`) as informational checks 27 to 36, plus checks 37 to 41.
 
 The code is `firebase_database/firebase_database_dart/test/production/verify_production.dart`; `run.sh` here runs it
 from the right directory. It is modelled on the Storage kit (`tool/verify_production_storage`).
@@ -50,27 +50,30 @@ real project.
   the kit exits 2 with "install the rules"; after it, a refusal in a check is a `FAIL`.
 - It prints the project, the database URL and the run's path first. Against production it does nothing more without
   `--yes`.
-- Size and load: 40 checks. The largest write is one string of 1,000,000 bytes (check 32, read back once); every
+- Size and load: 41 checks. The largest write is one string of 1,000,000 bytes (check 32, read back once); every
   other write is at most about 1.4 KB, so a full run writes about 1.1 MB in total (inferred from the values in the
   code, not counted). Check 36 sends 1,000 updates, check 34 200 increments, check 31 at least 100 transactions.
   Check 31 opens about ten clients over its five steps, at most three at a time; check 30 opens five; every other
-  check opens at most three clients and, in checks 28, 29, 33, 37, 38, 39 and 40, one raw connection. The 16 MB
-  write of question 28 is not tried.
+  check opens at most three clients and, in checks 28, 29, 33, 37, 38, 39 and 40, one raw connection (check 39 opens
+  three more in turn for Q13, one at a time beside its first; check 41 opens three raw connections and no client). The
+  16 MB write of question 28 is not tried.
 - Time: about 6 minutes on the emulator (373 s measured for the whole kit of 40 checks with `dart run`'s start; before
-  check 40 was added, check 39 alone 294 s, the other 38 checks 59 s). Check 39 waits 20 s for each request the server
+  check 40 was added, check 39 alone 294 s, the other 38 checks 59 s; check 41 was not timed, it waits at least 1.8 s in
+  each of its six cases). Check 39 waits 20 s for each request the server
   does not answer (Q3, Q8, Q9) and 20 s after each Q8 merge; checks 22 and 30 each wait 5 s for their second reading.
-  Each check may take up to 3 minutes, checks 39 and 40 up to 8 (check 40 waits 20 s for each write or request that does
-  not complete); check 33 waits up to 150 s for the server, and the clean-up waits 60 s more when a write could still
-  land (below). A run is longer than the five minutes after a sign-in in which Auth accepts the deletion of a user
-  (later it answers `requires-recent-login`), so the kit signs the throwaway user in again, with the password it keeps
-  in memory, right before deleting it.
-- Checks 28, 29, 33, 37, 38, 39 and 40 open a raw protocol connection of their own (version 5, the throwaway user's
-  token in an `auth` request), because the public API does not show frames. It only listens (in checks 38 and 39 also
-  with a hash, in check 39 with a compound hash), unlistens and, in checks 38 to 40, gets below the run's path; in
-  checks 39 and 40 it also puts there and in check 39 merges (some puts with a hash, as a transaction does); in check
-  33 it registers one onDisconnect write there and drops the socket without a close. The auth request and its answer
-  are never printed (an auth answer holds the token's claims); the report prints the pushed frames and, in checks 38
-  to 40, the answers to its other requests, which hold only the kit's own data.
+  Each check may take up to 3 minutes, checks 39 to 41 up to 8 (checks 40 and 41 wait 20 s for each write or request
+  that does not complete); check 33 waits up to 150 s for the server, and the clean-up waits 60 s more when a write
+  could still land (below). A run is longer than the five minutes after a sign-in in which Auth accepts the deletion
+  of a user (later it answers `requires-recent-login`), so the kit signs the throwaway user in again, with the password
+  it keeps in memory, right before deleting it.
+- Checks 28, 29, 33, 37, 38, 39 and 40 open a raw protocol connection of their own, check 41 three (version 5, the
+  throwaway user's token in an `auth` request), because the public API does not show frames. It only listens (in
+  checks 38 and 39 also with a hash, in check 39 with a compound hash), unlistens and, in checks 38 to 41, gets below
+  the run's path; in checks 39 to 41 it also puts there and in checks 39 and 41 merges (some puts with a hash, as a
+  transaction does); in check 33 it registers one onDisconnect write there and drops the socket without a close, and
+  check 39 does the same with one onDisconnect merge on each of its three Q13 connections. The
+  auth request and its answer are never printed (an auth answer holds the token's claims); the report prints the
+  pushed frames and, in checks 38 to 41, the answers to its other requests, which hold only the kit's own data.
 - Credentials: the kit never reads or prints any. With `--create-user` it signs up a throwaway user
   (`database-verify-<run>@example.com`, a random 32-character password that lives in memory and is never printed or
   stored) through `FirebaseUserAuth` (`firebase_auth_providers_dart`), and deletes that user at the end, also when
@@ -319,14 +322,24 @@ observation matched what the emulator showed (one exception: leaf B of check 30,
   keeping priority 5; and `p r/x/.priority 3` with x missing. Each prints the setup, a listen at r, the frame sent and
   every frame received verbatim, a `g` of r and the export; then one ordinary put on the same connection. (c)
   `setPriority(3)` on a missing path, reported as in (a).
+- **41. A merge key that names the location itself, raw frames** (production only). Informational. Three raw
+  connections: a writer, a listener at the merge's location and a listener above it. For each case at
+  `<run>/empty_merge_key/<id>` (up), the writer puts up = `{loc: {k:1, j:2}, sib: 5}`, the listeners listen at
+  `up/loc` and at up, and the writer sends a merge (`m`) at `up/loc` with the key `""`, `"/"` or `"//"` (each parses
+  to the empty path, the location itself) alone (`{"":7}`, a1 to a3) and beside a normal key (`{"":7,"n":3}`, a4 to
+  a6). Each prints the setup, both listen answers, the frame sent, the answer, every frame each of the three
+  connections received within 1 s after the merge, a `g` of up and the export of up; then one ordinary put on the
+  writer connection. A raw connection sends each form as given: the client's `update` and `OnDisconnect.update`
+  refuse every one of them with an `ArgumentError` and send nothing (`{'': 7}` points to `set()`, `{'': null}` to
+  `remove()`).
 
-What to send back: the whole report. The most valuable lines are 1, 9, 15, 18, 19, 21, 22 and 27 to 40, and the line
+What to send back: the whole report. The most valuable lines are 1, 9, 15, 18, 19, 21, 22 and 27 to 41, and the line
 after check 3 ("all of it in one set").
 
 ## Known results
 
 On the emulator: the Database emulator v4.11.2 with the kit's rules on the namespace `verify-database-kit`, and the
-Auth emulator of firebase-tools 15.18.0. Production: not run yet, so every check is open there.
+Auth emulator of firebase-tools 15.18.0. Production: run for checks 40 and 41 only (the lines marked "on production"); every other check is open there.
 
 - **1**: PASS: plain ws to 127.0.0.1, no other host
 - **2**: PASS: offset of a few ms
@@ -401,6 +414,11 @@ Auth emulator of firebase-tools 15.18.0. Production: not run yet, so every check
 - **40 on production** (2026-11-26): every answer, export and client view as on the emulator; the `d` push at
   `r/x/.priority` comes only where the write changed something (x with priority 2, x emptied keeping priority 5),
   none with x missing or without a priority
+- **41**: each of the six merges (`""`, `"/"`, `"//"`, alone and beside `n`) is answered
+  `{"s":"invalid_parameters","d":"Empty strings are not valid keys"}` within 22 ms; no frame to either listener; `g`
+  and export of up unchanged (`{"loc":{"j":2,"k":1},"sib":5}`); the writer's next put is answered ok
+- **41 on production** (2026-11-27): every answer, frame, `g` and export as on the emulator; the answers came within
+  161 ms
 
 ## Questions the kit does not answer
 

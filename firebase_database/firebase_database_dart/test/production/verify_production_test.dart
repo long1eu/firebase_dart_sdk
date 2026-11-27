@@ -368,6 +368,45 @@ Future<void> main() async {
         }, reason: e.key);
       }
       expect(raw['after'], ok);
+      // Check 41, a merge key that names the location itself. Every value pinned here was
+      // measured equal on the emulator and on production, 2026-11-27. The writer's frame timings
+      // are not pinned (they differ between runs).
+      final Map<String, Object?> emptyKey =
+          observed('41')['raw']! as Map<String, Object?>;
+      const String emptyKeyRefused =
+          '{"s":"invalid_parameters","d":"Empty strings are not valid keys"}';
+      const String up = '{"loc":{"j":2,"k":1},"sib":5}';
+      // Per case, in the order the check runs them: the request number of the merge, its data.
+      final Map<String, (int, String)> emptyKeyCases = <String, (int, String)>{
+        'a1': (3, '{"":7}'),
+        'a4': (6, '{"":7,"n":3}'),
+        'a2': (9, '{"/":7}'),
+        'a5': (12, '{"/":7,"n":3}'),
+        'a3': (15, '{"//":7}'),
+        'a6': (18, '{"//":7,"n":3}'),
+      };
+      expect(emptyKey.keys, <String>[...emptyKeyCases.keys, 'after']);
+      for (final MapEntry<String, (int, String)> e in emptyKeyCases.entries) {
+        final (int r, String data) = e.value;
+        expect(emptyKey[e.key], <String, Object?>{
+          'setup': ok,
+          'startExport': up,
+          'listen': <String>['{"s":"ok","d":{}}', '{"s":"ok","d":{}}'],
+          'sent':
+              '{"t":"d","d":{"r":$r,"a":"m","b":{"p":"/<run>/empty_merge_key/'
+              '${e.key}/loc","d":$data}}}',
+          'answer': emptyKeyRefused,
+          'writerFrames': <String>[
+            '{"t":"d","d":{"r":$r,"b":$emptyKeyRefused}}',
+          ],
+          'unlisten': <String>['ok', 'ok'],
+          'pushedAtLoc': 0,
+          'pushedAbove': 0,
+          'g': '{"s":"ok","d":$up}',
+          'export': up,
+        }, reason: e.key);
+      }
+      expect(emptyKey['after'], ok);
 
       final String runId = run.runPath!.split('/').last;
       expect(run.removed, hasLength(2));
