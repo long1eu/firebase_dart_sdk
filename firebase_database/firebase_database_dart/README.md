@@ -276,7 +276,8 @@ where the rules have no `.indexOn` for it. A listener or `once()` has no such li
 downloads the location, filters it itself and logs a warning ("Using an unspecified index", the server's `no_index`
 warning). When the client is not connected, `get()` waits 3 s for a connection and then answers from the cache, only
 when the cache holds the complete value for that query (its limit applied; a cached empty location answers null), or
-fails with `unavailable`; a refusal by the rules is `permission-denied`, never a cached answer.
+fails with `unavailable`; after `goOffline()` there is no wait and the cache answers at once. A refusal by the rules
+is `permission-denied`, never a cached answer.
 
 More: [queries.dart](example/queries.dart).
 
