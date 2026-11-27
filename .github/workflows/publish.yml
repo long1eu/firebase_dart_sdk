@@ -15,7 +15,9 @@ name: Publish to pub.dev
 #   firebase_auth_secure_storage_flutter (needed by firebase_auth_dart_platform, so release it first),
 #   firebase_auth_dart_platform (needs firebase_auth_providers_dart 0.4.0 and
 #   firebase_auth_secure_storage_flutter 0.1.1, so release those first),
-#   firebase_admin_dart, firebase_storage_dart, firebase_storage_dart_platform
+#   firebase_admin_dart, firebase_storage_dart, firebase_storage_dart_platform,
+#   firebase_database_dart, firebase_database_dart_sqlite, firebase_database_dart_platform (needs
+#   cloud_firestore_dart_flutterfire and firebase_auth_dart_platform, so release those first)
 #
 # How it is allowed to publish (there is no stored secret):
 # - pub.dev trusts a short-lived OpenID Connect token that GitHub issues to this job. For that,
@@ -74,7 +76,10 @@ jobs:
             firebase_auth/firebase_auth_dart_platform \
             firebase_admin/firebase_admin_dart \
             firebase_storage/firebase_storage_dart \
-            firebase_storage/firebase_storage_dart_platform; do
+            firebase_storage/firebase_storage_dart_platform \
+            firebase_database/firebase_database_dart \
+            firebase_database/firebase_database_dart_sqlite \
+            firebase_database/firebase_database_dart_platform; do
             if [ "$(basename "$candidate")" = "$name" ]; then dir="$candidate"; fi
           done
           if [ -z "$dir" ]; then

@@ -37,12 +37,12 @@ Errors are shown in the status line at the bottom with their `FirebaseException`
 dependencies:
   firebase_core: ^5.1.0
   firebase_database: ^13.1.0
-  firebase_database_dart_platform: ^0.0.1   # replaces the native plugin on Windows
-  firebase_database_dart_sqlite: ^0.0.1     # only for the disk cache
+  firebase_database_dart_platform: ^0.1.0   # replaces the native plugin on Windows
+  firebase_database_dart_sqlite: ^0.1.0     # only for the disk cache
   path_provider: ^2.1.6                     # only for the disk cache directory
 ```
 
-`firebase_database_dart_platform` and the packages under it are not on pub.dev yet, so `pubspec.yaml` has a
+`firebase_database_dart_platform` and the packages under it are on pub.dev; `pubspec.yaml` still has a
 `dependency_overrides` section that takes them, `firebase_database_dart` and `firebase_app_dart` from this
 repository. Outside the repository, remove that section and use the versions on pub.dev. The dependencies need
 Dart 3.12, so Flutter 3.44 or later.
