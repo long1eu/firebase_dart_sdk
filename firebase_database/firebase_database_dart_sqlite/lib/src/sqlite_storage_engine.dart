@@ -42,17 +42,23 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
   bool _successful = false;
   int _sizeAtBegin = 0;
 
-  /// The write removals of the open transaction: ids, or all writes.
-  final Set<int> _removedNow = <int>{};
-  bool _removedAllNow = false;
+  /// The ids of the pending writes this store knows to be in the file: loaded at start, or saved
+  /// by a transaction that committed, and not removed by one.
+  final Set<int> _idsInFile = <int>{};
 
-  /// Write removals of transactions that were meant to commit but did not reach the file (a busy
-  /// file, or a storage error that degraded the store). Left in the file, those writes would be
-  /// loaded and sent again at the next start although the server already answered them. They are
-  /// applied again in the next transaction that reaches the file, or at [close] after a storage
-  /// error ([SqliteConnection.removeUserWritesAfterDegraded]).
+  /// The writes the open transaction saves, and those it removes (every one in [_idsInFile] for
+  /// `removeAllUserWrites`).
+  final Set<int> _savedNow = <int>{};
+  final Set<int> _removedNow = <int>{};
+
+  /// Removals of rows in [_idsInFile] by transactions that were meant to commit but did not reach
+  /// the file (a busy file, or a storage error that degraded the store). Left in the file, those
+  /// writes would be loaded and sent again at the next start although the server already answered
+  /// them. They are applied again in the next transaction that reaches the file, or at [close]
+  /// after a storage error, and then only while the file is provably still this store's
+  /// ([SqliteConnection.close]). Ids of writes made after the error never reached the file and are
+  /// never in this set.
   final Set<int> _unsavedRemovals = <int>{};
-  bool _unsavedRemoveAll = false;
 
   /// Whether the open transaction applies [_unsavedRemovals] again.
   bool _retryingRemovals = false;
@@ -74,16 +80,7 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
   bool get isDurable => _connection.isDurable;
 
   @override
-  void close() {
-    if (_connection.state == StoreState.degraded &&
-        (_unsavedRemoveAll || _unsavedRemovals.isNotEmpty)) {
-      _connection.removeUserWritesAfterDegraded(
-        _unsavedRemovals,
-        all: _unsavedRemoveAll,
-      );
-    }
-    _connection.close();
-  }
+  void close() => _connection.close(removeWriteIds: _unsavedRemovals);
 
   @override
   void beginTransaction() {
@@ -96,16 +93,11 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
     _open = true;
     _successful = false;
     _sizeAtBegin = _serverCache.size;
+    _savedNow.clear();
     _removedNow.clear();
-    _removedAllNow = false;
-    _retryingRemovals =
-        reachesFile && (_unsavedRemoveAll || _unsavedRemovals.isNotEmpty);
+    _retryingRemovals = reachesFile && _unsavedRemovals.isNotEmpty;
     if (_retryingRemovals) {
-      if (_unsavedRemoveAll) {
-        _userWrites.removeAll();
-      } else {
-        _unsavedRemovals.forEach(_userWrites.remove);
-      }
+      _unsavedRemovals.forEach(_userWrites.remove);
     }
   }
 
@@ -132,30 +124,30 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
         _serverCache.size = _sizeAtBegin;
       }
     }
-    if (committed && _retryingRemovals) {
-      _unsavedRemovals.clear();
-      _unsavedRemoveAll = false;
-    }
-    if (!committed && _successful) {
+    if (committed) {
+      if (_retryingRemovals) {
+        _idsInFile.removeAll(_unsavedRemovals);
+        _unsavedRemovals.clear();
+      }
+      _idsInFile
+        ..removeAll(_removedNow)
+        ..addAll(_savedNow.difference(_removedNow));
+    } else if (_successful) {
       _keepUnsavedRemovals();
     }
     _open = false;
     _successful = false;
   }
 
-  /// Keeps the removals of a transaction that was meant to commit and did not, while the file is
-  /// still this store's (durable or degraded; a fenced file belongs to another owner).
+  /// Keeps the removals of a transaction that was meant to commit and did not, limited to rows this
+  /// store knows to be in the file, while the file is still this store's (durable or degraded; a
+  /// fenced file belongs to another owner).
   void _keepUnsavedRemovals() {
     final StoreState state = _connection.state;
     if (state != StoreState.durable && state != StoreState.degraded) {
       return;
     }
-    if (_removedAllNow) {
-      _unsavedRemovals.clear();
-      _unsavedRemoveAll = true;
-    } else if (!_unsavedRemoveAll) {
-      _unsavedRemovals.addAll(_removedNow);
-    }
+    _unsavedRemovals.addAll(_removedNow.intersection(_idsInFile));
   }
 
   @override
@@ -163,6 +155,7 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
     if (!_canMutate()) {
       return;
     }
+    _savedNow.add(writeId);
     _userWrites.saveOverwrite(path, node, writeId);
   }
 
@@ -171,6 +164,7 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
     if (!_canMutate()) {
       return;
     }
+    _savedNow.add(writeId);
     _userWrites.saveMerge(path, children, writeId);
   }
 
@@ -184,15 +178,22 @@ final class SqliteStorageEngine implements PersistenceStorageEngine {
   }
 
   @override
-  List<UserWriteRecord> loadUserWrites() => _userWrites.load();
+  List<UserWriteRecord> loadUserWrites() {
+    final List<UserWriteRecord> writes = _userWrites.load();
+    if (isDurable) {
+      _idsInFile.addAll(writes.map((UserWriteRecord write) => write.writeId));
+    }
+    return writes;
+  }
 
   @override
   void removeAllUserWrites() {
     if (!_canMutate()) {
       return;
     }
-    _removedNow.clear();
-    _removedAllNow = true;
+    _removedNow
+      ..addAll(_idsInFile)
+      ..addAll(_savedNow);
     _userWrites.removeAll();
   }
 

@@ -245,7 +245,6 @@ final class _StoreOpener {
         log: options.log,
         periodicTimer: options.periodicTimer,
         onClosed: onClosed,
-        openDatabase: options.openDatabase,
       );
       handedOver = true;
       connection.startLeaseRefresh();

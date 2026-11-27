@@ -279,6 +279,28 @@ final class SqliteLease {
     return false;
   }
 
+  /// Whether the row still names this connection with the epoch it acquired. Run inside the
+  /// caller's `BEGIN IMMEDIATE`.
+  ///
+  /// True proves that no other connection owned the file and no clear touched it since this
+  /// connection last wrote the row, even after this connection stopped refreshing it: an owner id
+  /// is random per connection and only this connection writes it; every acquisition by another
+  /// connection writes its own id, a clear writes the tombstone and then deletes the file, a
+  /// quarantine moves the file aside, and a release deletes the row (so the row can only be
+  /// absent, or another's, afterwards).
+  bool isStillOurs(sqlite.Database db) {
+    final LeaseRow? row = read(db);
+    return row != null && row.ownerId == ownerId && row.epoch == _epoch;
+  }
+
+  /// Deletes the row if it is still ours, inside the caller's transaction.
+  void releaseInTransaction(sqlite.Database db) {
+    db.execute(
+      'DELETE FROM lease WHERE id = 0 AND owner_id = ? AND epoch = ?',
+      <Object?>[ownerId, _epoch],
+    );
+  }
+
   /// Removes the row if it is still ours, in a transaction of its own; best effort.
   void release(sqlite.Database db) {
     try {

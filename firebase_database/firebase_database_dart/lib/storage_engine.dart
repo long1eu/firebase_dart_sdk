@@ -10,8 +10,9 @@
 /// needs to read, walk and size stored data. An engine stores a query as its path and
 /// `QuerySpec.toWireObject()`, and rebuilds it with `QuerySpec.fromPathAndWireObject`.
 /// [InMemoryPersistenceStorageEngine] is the reference engine that every engine's behaviour is checked
-/// against. [persistenceDatabaseUrl] turns any spelling of a database URL into the one the client
-/// puts in [PersistenceKey.databaseUrl], for an engine function that deletes a cache by URL.
+/// against. [persistenceDatabaseUrl] turns a database URL into the key the client puts in
+/// [PersistenceKey.databaseUrl] (a key gives itself), for an engine function that deletes a cache
+/// by URL.
 ///
 /// ```dart
 /// final FirebaseDatabase db = FirebaseDatabase(

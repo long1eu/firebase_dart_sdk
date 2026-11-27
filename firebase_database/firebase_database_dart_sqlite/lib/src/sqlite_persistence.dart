@@ -43,12 +43,13 @@ DatabasePersistence sqlitePersistence(
 /// Deletes the cache files of [databaseUrl] of the app named [appName] in [directory]: the
 /// database file, its side files and its moved-aside copies.
 ///
-/// [databaseUrl] is normalised as `FirebaseDatabase` does it when it opens the cache
-/// ([persistenceDatabaseUrl]), so any spelling of the database URL clears the same files: a
-/// trailing `/`, `wss://`, the case of the host and a `?ns=` equal to the first label of the host
-/// make no difference. `FirebaseDatabase.databaseUrl` is already in that form. An emulator cache
-/// is named by its `http://<host>:<port>?ns=<namespace>` URL. Fails with an [ArgumentError] for a
-/// URL that is not a database URL.
+/// [databaseUrl] is normalised by [persistenceDatabaseUrl], the function `FirebaseDatabase` keys
+/// its cache with: `FirebaseDatabase.databaseUrl` clears its own files, and so do the spellings of
+/// a production URL that the constructor accepts (a trailing `/`, `wss://`, the case of the host,
+/// port 443, a `?ns=` equal to the first label of the host). An emulator cache is named by
+/// `http://<host>[:<port>]?ns=<namespace>` (`https` on a cloud workstation). The one spelling that
+/// names another cache is described at [persistenceDatabaseUrl]. Fails with an [ArgumentError] for
+/// a URL that is not a database URL.
 ///
 /// Fails with a [StateError] while an instance holds the file (in this process or another: an
 /// owner that refreshes its lease during one observation period, about 7.5 s) or another clear of
@@ -88,9 +89,11 @@ PersistenceStorageEngine engineOverConnection(
 /// error: a file written by a newer version, a damaged file or a file of something else is moved
 /// aside (`<file>.bad-<time>`, the newest one kept) and the cache starts empty; a storage error
 /// during the session (a full disk) makes the instance continue in memory. The file then keeps
-/// the writes that were pending at the error, and the next start sends them again; those the server
-/// answers before the instance closes are removed from the file at close, when it can be written
-/// again (otherwise they are sent again too). Each case is logged once, without data.
+/// the writes that were pending at the error, and the next start sends them again. Of those, the
+/// ones the server answers before the instance closes are removed at close, but only when no other
+/// instance took the file over and no clear deleted it meanwhile, and the file can be written then;
+/// in every other case (also after a crash) they are sent again. Each case is logged once, without
+/// data.
 final class SqlitePersistence {
   /// SQLite files in [directory]; see [sqlitePersistence].
   SqlitePersistence(
@@ -227,8 +230,8 @@ final class SqlitePersistence {
     );
     const ({String? refusal, LeaseRow? tombstone}) inUse = (
       refusal:
-          'Another process or isolate is using the offline cache of this database; close the '
-          'database there first.',
+          'The offline cache of this database is in use: by an open database (in this isolate '
+          'or another isolate or process) or by another clear; close the database first.',
       tombstone: null,
     );
     final sqlite.Database db;
@@ -248,12 +251,16 @@ final class SqlitePersistence {
         final int now = _options.nowMs();
         if (first.ownerId == SqliteLease.clearingOwnerId &&
             first.expiresAtMs >= now) {
-          final int seconds = ((first.expiresAtMs - now) / 1000).ceil();
+          // By the clearing side's clock, so only roughly ours.
+          final int seconds = ((first.expiresAtMs - now) / 1000).ceil().clamp(
+            1,
+            SqliteLease.tombstoneDuration.inSeconds,
+          );
           return (
             refusal:
                 'Another clear of the offline cache of this database is running, or one failed '
-                'and could not remove its mark from the file; retry in $seconds s, when the '
-                'mark expires.',
+                'and could not remove its mark from the file; retry in about $seconds s, when '
+                'the mark expires.',
             tombstone: null,
           );
         }

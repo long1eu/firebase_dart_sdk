@@ -131,12 +131,43 @@ void main() {
             allOf(
               contains('Another clear'),
               contains('could not remove its mark'),
-              contains('retry in 45 s'),
+              contains('retry in about 45 s'),
             ),
           ),
         ),
       );
       expect(File(path).existsSync(), isTrue);
+    },
+  );
+
+  test(
+    'a mark of another isolate refuses a second clear until it expires, then the clear runs '
+    'after one observation',
+    () async {
+      final String path = persistence.pathOf(key);
+      (await persistence.open(key)).close();
+      // Another isolate's clear failed and could not remove its mark: this isolate does not know it.
+      final sqlite.Database other = sqlite.sqlite3.open(path);
+      expect(
+        SqliteLease.writeTombstone(
+          other,
+          observed: null,
+          nowMs: fixture.clock.nowMs,
+        ),
+        isTrue,
+      );
+      StoreFixture.closeRaw(other);
+
+      await expectLater(persistence.clear(key), throwsStateError);
+      expect(File(path).existsSync(), isTrue);
+
+      fixture.clock.advance(
+        SqliteLease.tombstoneDuration + const Duration(milliseconds: 1),
+      );
+      await persistence.clear(key);
+
+      expect(File(path).existsSync(), isFalse);
+      expect(fixture.clock.delays, <Duration>[SqliteLease.observation]);
     },
   );
 }

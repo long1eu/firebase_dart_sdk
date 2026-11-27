@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:firebase_database_dart/firebase_database_dart.dart'
     show DatabaseLogLevel, DatabaseLogger;
@@ -34,8 +35,9 @@ enum StoreState {
 
   /// A storage error (disk full, I/O error, corruption, or a file busy [maxConsecutiveBusy] times
   /// in a row) stopped the writes during the session. Nothing is deleted: the file keeps everything
-  /// committed before the error, pending writes included. Writes the client removes afterwards
-  /// are deleted at close by [SqliteConnection.removeUserWritesAfterDegraded].
+  /// committed before the error, pending writes included. The lease row stays but is no longer
+  /// refreshed, so another connection takes the file over after one observation period;
+  /// [SqliteConnection.close] releases it when nobody did.
   degraded,
 
   /// [SqliteConnection.close] was called.
@@ -69,8 +71,8 @@ enum StoreState {
 /// builds degrade.
 final class SqliteConnection {
   /// A connection that owns [database] (at [path]) under [lease]. Called by the opener only, after
-  /// the lease was acquired; call [startLeaseRefresh] next. [openDatabase] opens the file again for
-  /// [removeUserWritesAfterDegraded]; `sqlite3.open` when null.
+  /// the lease was acquired; call [startLeaseRefresh] next. [openDatabase] opens the existing file
+  /// again at the [close] of a degraded store; by default `sqlite3.open` without creating it.
   SqliteConnection.durable({
     required sqlite.Database database,
     required String this.path,
@@ -84,7 +86,7 @@ final class SqliteConnection {
        _log = log,
        _periodicTimer = periodicTimer,
        _onClosed = onClosed,
-       _openDatabase = openDatabase ?? sqlite.sqlite3.open,
+       _openDatabase = openDatabase ?? _openExisting,
        _state = StoreState.durable;
 
   /// A connection without a file. [reason] is logged once; it must not contain data.
@@ -295,7 +297,11 @@ final class SqliteConnection {
 
   /// Rolls back an open transaction, releases the lease, checkpoints the write-ahead log and closes
   /// the file. Idempotent; never throws.
-  void close() {
+  ///
+  /// A degraded store opens the file once more ([_finishDegraded]): when it is provably still this
+  /// connection's, it deletes the rows of [removeWriteIds] (pending writes the client removed after
+  /// the storage error) and releases the lease.
+  void close({Iterable<int> removeWriteIds = const <int>[]}) {
     if (_state == StoreState.closed) {
       return;
     }
@@ -312,6 +318,9 @@ final class SqliteConnection {
         _quietly(() => db.select('PRAGMA wal_checkpoint(TRUNCATE)'));
       });
     }
+    if (_state == StoreState.degraded) {
+      _finishDegraded(removeWriteIds.toList());
+    }
     _inTransaction = false;
     _dispose();
     _state = StoreState.closed;
@@ -320,94 +329,79 @@ final class SqliteConnection {
     onClosed?.call();
   }
 
-  /// After [StoreState.degraded], one attempt to delete from the file the pending writes the client
-  /// removed after the storage error ([writeIds], or every write when [all]): the server answered
-  /// them, and left in the file they would be loaded and sent again at the next start.
-  ///
-  /// Opens the file again, takes the lease back when it is free or still names this connection,
-  /// deletes the rows in one transaction and releases the lease. Does nothing in any other state.
-  /// When the file is still unusable, or another owner holds it, the rows stay and one warning
-  /// says that they may be sent again. Never throws; waits at most [busyTimeoutMs] per statement.
-  /// The engine calls it from its `close`, before [close].
-  void removeUserWritesAfterDegraded(
-    Iterable<int> writeIds, {
-    required bool all,
-  }) {
-    final List<int> ids = writeIds.toList();
+  /// At the close of a degraded store: opens the file again (never creating it) and, in one
+  /// transaction, when the lease row still names this connection ([SqliteLease.isStillOurs]),
+  /// deletes the rows of [ids] and the lease row. When another connection or a clear took the file
+  /// since the error, or the file is gone, nothing is changed. Never throws; waits at most
+  /// [busyTimeoutMs] for the lock.
+  void _finishDegraded(List<int> ids) {
     final String? file = path;
     final sqlite.Database Function(String path)? reopen = _openDatabase;
-    if (_state != StoreState.degraded ||
-        (ids.isEmpty && !all) ||
-        file == null ||
-        reopen == null) {
+    if (file == null || reopen == null) {
       return;
     }
-    final String what = all ? 'the pending writes' : '${ids.length} write(s)';
+    final String what =
+        '${ids.length} write(s) the server answered after the storage error';
     sqlite.Database? db;
     try {
       db = reopen(file);
       db.select('PRAGMA busy_timeout = $busyTimeoutMs');
-      db.select('PRAGMA synchronous = FULL');
-      final LeaseAttempt attempt = _lease!.tryAcquire(db);
-      if (attempt is! LeaseAcquired) {
-        _log(
-          DatabaseLogLevel.warning,
-          'Realtime Database offline cache: another process or isolate owns the file now, or it '
-          'is being cleared; '
-          '$what the server answered after the storage error may be sent again by it.',
-        );
+      db.execute('BEGIN IMMEDIATE');
+      if (!_lease!.isStillOurs(db)) {
+        db.execute('ROLLBACK');
+        if (ids.isNotEmpty) {
+          _log(
+            DatabaseLogLevel.info,
+            'Realtime Database offline cache: the file was taken over or cleared after the '
+            'storage error; $what were left in it.',
+          );
+        }
         return;
       }
-      _deleteUserWrites(db, ids, all: all);
-      _lease.release(db);
-      _log(
-        DatabaseLogLevel.info,
-        'Realtime Database offline cache: $what the server answered after the storage error '
-        'were removed from the file.',
-      );
+      _deleteUserWrites(db, ids);
+      _lease.releaseInTransaction(db);
+      db.execute('COMMIT');
+      if (ids.isNotEmpty) {
+        _log(
+          DatabaseLogLevel.info,
+          'Realtime Database offline cache: $what were removed from the file.',
+        );
+      }
     } on sqlite.SqliteException catch (e) {
       final sqlite.Database? opened = db;
       if (opened != null) {
-        _withoutBusyWait(opened, () => _lease!.release(opened));
+        _quietly(() => opened.execute('ROLLBACK'));
       }
-      _log(
-        DatabaseLogLevel.warning,
-        'Realtime Database offline cache: $what the server answered after the storage error '
-        'could not be removed from the file (SQLite result code ${e.resultCode}); they are sent '
-        'again at the next start.',
-      );
+      if (ids.isNotEmpty && File(file).existsSync()) {
+        _log(
+          DatabaseLogLevel.warning,
+          'Realtime Database offline cache: $what could not be removed from the file (SQLite '
+          'result code ${e.resultCode}); the next start may send them again.',
+        );
+      }
     } finally {
       // ignore: deprecated_member_use
       _quietly(() => db?.dispose());
     }
   }
 
-  static void _deleteUserWrites(
-    sqlite.Database db,
-    List<int> ids, {
-    required bool all,
-  }) {
-    db.execute('BEGIN IMMEDIATE');
+  static sqlite.Database _openExisting(String path) =>
+      sqlite.sqlite3.open(path, mode: sqlite.OpenMode.readWrite);
+
+  static void _deleteUserWrites(sqlite.Database db, List<int> ids) {
+    if (ids.isEmpty) {
+      return;
+    }
+    final sqlite.PreparedStatement delete = db.prepare(
+      'DELETE FROM user_writes WHERE id = ?',
+    );
     try {
-      if (all) {
-        db.execute('DELETE FROM user_writes');
-      } else {
-        final sqlite.PreparedStatement delete = db.prepare(
-          'DELETE FROM user_writes WHERE id = ?',
-        );
-        try {
-          for (final int id in ids) {
-            delete.execute(<Object?>[id]);
-          }
-        } finally {
-          // ignore: deprecated_member_use
-          delete.dispose();
-        }
+      for (final int id in ids) {
+        delete.execute(<Object?>[id]);
       }
-      db.execute('COMMIT');
-    } on Object {
-      _quietly(() => db.execute('ROLLBACK'));
-      rethrow;
+    } finally {
+      // ignore: deprecated_member_use
+      delete.dispose();
     }
   }
 
@@ -489,13 +483,10 @@ final class SqliteConnection {
     _state = next;
     _refreshTimer?.cancel();
     _refreshTimer = null;
-    final sqlite.Database db = _db!;
+    // Nothing is deleted: the failed transaction was rolled back, so the file is consistent as of
+    // its last commit and keeps the pending writes. A degraded store keeps its lease row (no longer
+    // refreshed): at close it proves that nobody took the file since (see close).
     _rollbackQuietly();
-    if (next == StoreState.degraded) {
-      // Nothing is deleted: the failed transaction was rolled back, so the file is consistent as of
-      // its last commit and keeps the pending writes (revised after review, 2026-11-22).
-      _withoutBusyWait(db, () => _lease!.release(db));
-    }
     _dispose();
     _log(
       DatabaseLogLevel.warning,

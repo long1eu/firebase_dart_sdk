@@ -92,6 +92,15 @@ void main() {
     }
   });
 
+  /// Waits until [done] is true, polling every 10 ms; gives up after 20 s of wall time, well past
+  /// what the start of a store takes on a loaded machine (the fake clock makes its waits instant).
+  Future<void> waitFor(bool Function() done) async {
+    final Stopwatch watch = Stopwatch()..start();
+    while (!done() && watch.elapsed < const Duration(seconds: 20)) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+  }
+
   /// Starts a new instance on the same files and returns the requests its server received up to
   /// and including a probe write made after the start.
   Future<List<String>> restart() async {
@@ -100,9 +109,7 @@ void main() {
     final FirebaseDatabase db = open(server, log);
     // Restored writes are sent before any write made after the start.
     unawaited(db.ref('probe').set(true).catchError((Object _) {}));
-    for (int i = 0; i < 300 && !server.requests.contains('p /probe'); i++) {
-      await Future<void>.delayed(const Duration(milliseconds: 10));
-    }
+    await waitFor(() => server.requests.contains('p /probe'));
     expect(server.requests, contains('p /probe'));
     expect(db.persistenceEnabled, isTrue, reason: log.join('\n'));
     final List<String> requests = server.requests;
@@ -235,9 +242,7 @@ void main() {
     final List<String> log2 = <String>[];
     final FirebaseDatabase db2 = open(server2, log2);
     unawaited(db2.ref('probe').set(true).catchError((Object _) {}));
-    for (int i = 0; i < 300 && !server2.requests.contains('p /probe'); i++) {
-      await Future<void>.delayed(const Duration(milliseconds: 10));
-    }
+    await waitFor(() => server2.requests.contains('p /probe'));
     expect(db2.persistenceEnabled, isTrue, reason: log2.join('\n'));
     expect(server2.requests, <String>['p /a', 'p /probe']);
 
@@ -275,9 +280,7 @@ void main() {
     bool sent() =>
         server.requests.contains('q /a') &&
         server.requests.where((String r) => r == 'p /a').length == 2;
-    for (int i = 0; i < 300 && !sent(); i++) {
-      await Future<void>.delayed(const Duration(milliseconds: 10));
-    }
+    await waitFor(sent);
     expect(db2.persistenceEnabled, isTrue, reason: log.join('\n'));
     // db1's write, then db2's listen and the restored write (in the client's send order).
     expect(server.requests, <String>['p /a', 'q /a', 'p /a']);

@@ -103,28 +103,43 @@ Uri persistenceUrlOf(RepoInfo info) {
 }
 
 /// The URL under which a `FirebaseDatabase` keys the persisted cache of the database at [url]
-/// (`PersistenceKey.databaseUrl`, `FirebaseDatabase.databaseUrl`): every spelling of one database
-/// gives the same value, and the result of this function gives itself.
+/// (`PersistenceKey.databaseUrl`, `FirebaseDatabase.databaseUrl`). A key the client produced gives
+/// itself.
 ///
-/// An `https://` or `wss://` URL (or a bare host) is read as a production database URL by the
-/// rules of the `FirebaseDatabase` constructor: scheme, case of the host, port 443, a trailing `/`
-/// and a `?ns=` equal to the first label of the host make no difference. An `http://` or `ws://`
-/// URL, or one on a `*.cloudworkstations.dev` host, is read as the emulator key
-/// `<scheme>://<host>:<port>?ns=<namespace>`, and must name its namespace with `?ns=`.
+/// What is read as what:
+///
+/// * An `http://` or `ws://` URL, or a `*.cloudworkstations.dev` URL with a query, is an emulator
+///   key `<scheme>://<host>[:<port>]?ns=<namespace>`: it must have `?ns=`; no port means 80 (443 on
+///   a cloud workstation, whose key is `https`).
+/// * Anything else (`https://`, `wss://`, a bare host) is a production database URL, read by the
+///   rules of the `FirebaseDatabase` constructor: scheme, case of host and namespace, port 443, a
+///   trailing `/` and a `?ns=` equal to the first label of the host make no difference. Without a
+///   query, a host that does not name its namespace (a custom domain, a loopback host, a cloud
+///   workstation) is read with `?ns=<first label>`, as the client leaves that `ns` out of its key.
+///
+/// One spelling maps to another database's key: a production database on a cloud workstation
+/// spelled with `?ns=<first label>` is read as the emulator key; pass `FirebaseDatabase.databaseUrl`
+/// for it.
 ///
 /// Throws a [FormatException] for a URL that the constructor would refuse, or an emulator URL
 /// without `?ns=`. The message does not quote the URL.
 Uri persistenceDatabaseUrl(Uri url) {
-  final String text = url.toString();
-  final String scheme = url.scheme.toLowerCase();
+  final Uri uri = _parseUrl(url.toString());
+  final String scheme = uri.scheme.toLowerCase();
+  final String host = uri.host.toLowerCase();
+  final bool hasQuery = uri.query.isNotEmpty;
   final bool emulator =
       scheme == 'http' ||
       scheme == 'ws' ||
-      url.host.toLowerCase().endsWith(_cloudWorkstationSuffix);
+      (hasQuery && host.endsWith(_cloudWorkstationSuffix));
   if (!emulator) {
-    return persistenceUrlOf(parseDatabaseUrl(text));
+    final Uri production = !hasQuery && _namespaceOfHost(host) == null
+        ? uri.replace(
+            queryParameters: <String, String>{'ns': host.split('.').first},
+          )
+        : uri;
+    return persistenceUrlOf(parseDatabaseUrl(production.toString()));
   }
-  final Uri uri = _parseUrl(text);
   if (uri.hasFragment) {
     throw const FormatException('Database URL must not have a fragment');
   }
@@ -134,9 +149,12 @@ Uri persistenceDatabaseUrl(Uri url) {
       'An emulator database URL needs the database name as ?ns=<name>',
     );
   }
+  final int port = uri.hasPort
+      ? uri.port
+      : (host.endsWith(_cloudWorkstationSuffix) ? _httpsPort : 80);
   final RepoInfo info;
   try {
-    info = emulatorDatabase(uri.host, uri.port, namespace: namespace);
+    info = emulatorDatabase(host, port, namespace: namespace);
   } on ArgumentError catch (e) {
     throw FormatException('Emulator database URL: ${e.message}');
   }
