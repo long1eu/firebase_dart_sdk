@@ -41,8 +41,9 @@ email/password, email link and custom-token sign-in, federated sign-in with a to
 sign-out, FlutterFire's auth streams, tenants, the language of the emails, the password policy, and the
 REST-backed account operations of the JS SDK: password reset, email verification and action codes, email,
 password and profile updates, reauthentication, reload and deletion (the package README has the table). There
-are no popup or redirect flows (nothing opens a sign-in page), no phone sign-in and no sign-in with a second
-factor.
+is phone sign-in with an SMS code that the app asks for, and second factors with authenticator apps (TOTP) and
+SMS. On desktop and the command line, `signInWithOAuthLoopback` opens the system browser for Google, GitHub or
+an OIDC provider; there are no popup or redirect flows in a browser.
 
 ## With Firestore
 
