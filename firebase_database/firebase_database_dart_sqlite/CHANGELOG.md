@@ -1,3 +1,7 @@
+## 0.1.1
+
+- An example, `example/main.dart`. No code change.
+
 ## 0.1.0
 
 - First version. The SQLite offline cache of `firebase_database_dart`, for the Dart VM and Flutter, on top of

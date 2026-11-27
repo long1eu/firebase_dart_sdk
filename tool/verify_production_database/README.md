@@ -10,9 +10,9 @@ The code is `firebase_database/firebase_database_dart/test/production/verify_pro
 from the right directory. It is modelled on the Storage kit (`tool/verify_production_storage`).
 
 **Status of the kit itself:** it runs against the Database emulator (v4.11.2) and the Auth emulator, where every
-check passes (`test/production/verify_production_test.dart` pins the results below). Run 15 on 2026-11-27 ran the
-whole kit in one run on the final client of this version: 41 of 41 PASS on the emulator and 41 of 41 PASS against a
-dedicated production database. Check 42 was added after run 15; run 16 on 2026-11-28 ran it alone: PASS on both.
+check passes (`test/production/verify_production_test.dart` pins the results below). Run 17 on 2026-11-28 ran the
+whole kit in one run on the client of version 0.1.1, with `--expect-emptied-node-fix`: 42 of 42 PASS on the emulator
+and 42 of 42 PASS against a dedicated production database.
 
 ## Before you run it against production
 
@@ -157,11 +157,12 @@ failed, 1 when one is `FAIL`, 2 for a usage error (a missing variable, a URL tha
 other than `ns`, an unknown check id, a failed sign-up), a missing `--yes` or rules that refuse the preflight, 3 when
 the clean-up or the deletion of the user failed, 130 when a signal stopped the run, 64 for an unknown flag.
 
-`--expect-emptied-node-fix`: pass it only for a client that has the emptied-node priority fix (the client keeps the
-server's priority of a node emptied by its own write). The trunk and release 0.1 do not have it; they keep the JS
-SDK's behaviour there. With the flag, checks 22 and 38 (c), (e), (f) decide as written below. Without it they print
-what they observe, say whether the client keeps the JS SDK's behaviour, and are `PASS`; the plan names the mode in
-its `client:` line.
+`--expect-emptied-node-fix`: makes checks 22 and 38 (c), (e), (f) decide as written below, for a client that keeps
+the server's priority of a node emptied by its own write. The client of this repository does (version 0.1.1 and the
+trunk); release 0.1.0 does not, and keeps the JS SDK's behaviour there. Run the kit with the flag for this client.
+Without the flag the same checks only print what they observe, say whether the client keeps the JS SDK's behaviour,
+and are `PASS` whatever it is, so that a client without the fix can still run the kit; the plan names the mode in its
+`client:` line.
 
 ## The checks and how to read them
 
@@ -356,7 +357,11 @@ Auth emulator of firebase-tools 15.18.0. Production: checks 1 to 39 ran as one r
 the client before the emptied-node fix), check 40 alone (2026-11-26) and check 41 alone (2026-11-27). Run 15
 (2026-11-27, the whole kit of 41 checks in one run, 41 PASS on the emulator and 41 PASS on production) ran without
 `--expect-emptied-node-fix`, so checks 22 and 38 (c), (e) and (f) were informational and recorded that the client
-drops the priority of an emptied node, as the JS SDK does. Where production gave another observation than the
+drops the priority of an emptied node, as the JS SDK does. Check 42 ran alone on 2026-11-28 (run 16, PASS on both).
+Run 17 (2026-11-28, the whole kit of 42 checks in one run, with `--expect-emptied-node-fix`, on the client of
+version 0.1.1) gave 42 PASS on the emulator and 42 PASS on production. Checks 22 and 38 (c), (e) and (f) below are
+described for that client, as run 17 measured them on both backends; the lines for the other checks keep the run
+named on them. Where production gave another observation than the
 emulator, a line "N on production" follows the check; without one, production gave the same, timings aside.
 
 - **1**: PASS: plain ws to 127.0.0.1, no other host
@@ -382,11 +387,10 @@ emulator, a line "N on production" follows the check; without one, production ga
 - **19**: PASS: cancelled with `permission_denied`; the write is refused
 - **20**: PASS
 - **21**: PASS, priority KEPT: `{".priority":0.0,"a":1}`, then `{".priority":0.0}`, then `{".priority":0.0,"b":1}`
-- **22**: PASS: a fresh client reads priority 0 after both forms; the writer's own listener shows priority null after
-  both; in the `update` form the writer's listener and its `get()` show null at 0 s and at 5 s (listener values: null,
-  `{a:1}` with priority 0, `{b:1}` with priority null). The client of the repository has no emptied-node fix. With
-  `--expect-emptied-node-fix` this part decides: a client with the fix shows priority 0 in the writer's listener and
-  its `get()` at 0 s and at 5 s
+- **22** (run 17, with `--expect-emptied-node-fix`, both backends): PASS: a fresh client reads priority 0 after both
+  forms; the writer's own listener shows priority 0 after both, as the fresh client does; in the `update` form the
+  writer's listener and its `get()` show priority 0 at 0 s and at 5 s (listener values: null, `{a:1}` with priority 0,
+  `{b:1}` with priority 0)
 - **23**: PASS
 - **24 to 26**: PASS, a few ms each on loopback
 - **4** (question 25): the writer saw the local estimate, then the server's value 1 ms later (two events) in two runs,
@@ -408,30 +412,31 @@ emulator, a line "N on production" follows the check; without one, production ga
   and the `set` won (99): the transaction had been sent, and a sent transaction the server accepts completes as
   committed, as in the JS SDK; line 18 two runs (null, then 5), committed 6; line 19 `max-retries` after 25 runs in
   two of three runs, and in the third it committed after 15 runs (the rival's writes race the transaction)
-- **31 on production** (2026-11-26 and run 15): line 15 99 of 100 committed, 1 failed with `max-retries` (final 99), and
-  98 of 100 in run 15 (2 failed with `max-retries`, final 98); no value went back in either; line 19 `max-retries`
-  after 25 runs on 2026-11-26, and committed after 18 runs in run 15; lines 16 to 18 as on the emulator
+- **31 on production** (2026-11-26, run 15 and run 17): line 15 99 of 100 committed, 1 failed with `max-retries` (final
+  99), and 98 of 100 in run 15 (2 failed with `max-retries`, final 98); no value went back in either; line 19
+  `max-retries` after 25 runs on 2026-11-26, committed after 18 runs in run 15 and after 2 runs in run 17 (line 15 in
+  run 17: 99 of 100, as on 2026-11-26); lines 16 to 18 as on the emulator
 - **32**: on loopback the 1 MB `get()` took 4 to 6 ms and the small event came after it (on the emulator, 3 runs)
-- **32 on production** (2026-11-26 and run 15): on 2026-11-26 the small event came **before** the 1 MB `get()`
-  finished; in run 15 the `get()` took 364 ms and the small event came at 377 ms, after it, as on loopback
+- **32 on production** (2026-11-26, run 15 and run 17): on 2026-11-26 the small event came **before** the 1 MB `get()`
+  finished; in run 15 the `get()` took 364 ms and the small event came at 377 ms, after it, as on loopback; in run 17
+  the `get()` took 519 ms and the small event came at 65 ms, before it
 - **33**: the onDisconnect write ran about 12 ms after the dropped socket
 - **34**: 200; **35**: REST 400 "Invalid path: Path specified exceeds the maximum depth that can be written (32).",
   the client refuses before sending; **36**: acknowledgements in order, final 999, no value went back, 4,975 to
   8,403 operations per second on loopback (on the emulator, 3 runs)
 - **37**: into the window, one tagged put of `c4` alone (`{".priority":0,"n":4}`); out of it, one tagged merge at the
   query path with c2 (re-entering) and **c4 whole with priority 9, not null**
-- **38**: (a) the listen of the emptied node answers `{"s":"ok","d":{}}` and pushes `{".priority":5.0}`, the get
-  answers the same data; the parent pushes and gets `{"n":{".priority":5.0}}`. (b) the update is accepted, export
-  `{".priority":7}`; `setPriority(9)` is accepted, export `{".priority":9}`. (c) the transaction fails with
-  `max-retries` after 25 runs of the handler (null each time), export `{".priority":5.0}`; the listens with the
-  kit's hashes get no data for either the emptied node or the control (the hash matched), the one with a wrong hash
-  gets `{"b":1}`. (d) export
-  `{".priority":5.0}`, then `null` after `set(n, null)`, then `{"b":1}` after `set(n/b, 1)`: the priority does not
-  come back. (e) export `null` after the update (the node is removed), the transaction commits after 1 run.
-  (f) the SQLite cache is durable before and after the reopen; the transaction fails with `max-retries` after 25
-  runs of the handler (null each time), export `{".priority":5.0}`. The client of the repository has no emptied-node
-  fix. With `--expect-emptied-node-fix` (c) and (f) decide: a client with the fix commits (c) after 2 runs (null,
-  null, export `{"t":2}`) and (f) after 1 run (null) (on the emulator, one run)
+- **38** (run 17, with `--expect-emptied-node-fix`, both backends): (a) the listen of the emptied node answers
+  `{"s":"ok","d":{}}` and pushes `{".priority":5.0}`, the get answers the same data; the parent pushes and gets
+  `{"n":{".priority":5.0}}`. (b) the update is accepted, export `{".priority":7}`; `setPriority(9)` is accepted,
+  export `{".priority":9}`. (c) the transaction commits after 2 runs of the handler (null, null), export `{"t":2}`;
+  the listens with the kit's hashes get no data for either the emptied node or the control (the hash matched), the one
+  with a wrong hash gets `{"b":1}`. (d) export `{".priority":5.0}`, then `null` after `set(n, null)`, then `{"b":1}`
+  after `set(n/b, 1)`: the priority does not come back. (e) export `null` after the update (the node is removed), the
+  transaction commits after 1 run, export `{"t":1}`. (f) the SQLite cache is durable before and after the reopen; the
+  transaction commits within two runs: after 2 runs on production (null, null, export `{"t":2}`), after 1 run on the
+  emulator (null, export `{"t":1}`). The three transactions (c), (e) and (f) commit within two runs on both backends.
+  A client without the fix fails (c) and (f) with `max-retries` after 25 runs of the handler
 - **39**: Q1 without priority: the merge is accepted and the node is **removed** (`null`, both forms); control: kept
   as `{".priority":7}`. Q2: n holds `{"c":{".priority":3.0}}` after the removal, the put of `.priority` 9 is
   accepted: `{".priority":9,"c":{".priority":3.0}}`. Q3: a raw put of `{".priority":5}` gets **no answer**, on a

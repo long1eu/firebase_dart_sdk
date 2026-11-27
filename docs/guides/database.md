@@ -6,11 +6,11 @@ WebSocket protocol of the Firebase JS SDK), `firebase_database_dart_sqlite` (a d
 is the entry point: which package to add, what a connection carries, rules and errors, what surprises people who know
 the JS SDK or FlutterFire, offline behaviour, the connection on a desktop or a server, and tests. The [client
 README](../../firebase_database/firebase_database_dart/README.md) has the install steps and one example of each call;
-this guide does not repeat them. The client is at 0.1.0. It has run against the Database emulator and, once, against a
-production database (the verification kit: all 41 checks in one run on 2026-11-27, and all passed); where a statement
+this guide does not repeat them. The client is at 0.1.1. It has run against the Database emulator and, once, against a
+production database (the verification kit: all 42 checks in one run on 2026-11-28, and all passed); where a statement
 below depends on the server, it says what was measured. What has run, and what never ran against production, is in
 section 23 of the [decisions document](../database_decisions.md). It includes the client's test suite on the Dart VM
-(2,645 tests, 60 skipped) and in Chrome on dart2js (2,584) and dart2wasm (2,588), the SQLite package (287 tests), the
+(2,773 tests, 60 skipped) and in Chrome on dart2js (2,712) and dart2wasm (2,716), the SQLite package (288 tests), the
 adapter (328 tests, 5 skipped without the emulator), and example apps on Windows 11 and Linux x64 (4 integration tests
 each). CI runs on GitHub Actions (`.github/workflows/ci.yml`) and passes. Not run: a release build of a desktop app,
 Safari, Firefox and a real display.

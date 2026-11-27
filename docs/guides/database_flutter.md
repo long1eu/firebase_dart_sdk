@@ -10,7 +10,8 @@ It does not cover Firestore or Storage (see [The official cloud_firestore API on
 cloud_firestore_dart](flutterfire_platform.md) and
 [Coming from FlutterFire's cloud_firestore](migrating_from_flutterfire.md)),
 the web (the adapter does not support it: keep the official plugin there), or a server or command line
-program (use the client directly, see its README). Both packages are at 0.1.0 and published on pub.dev.
+program (use the client directly, see its README). The adapter is at 0.1.0 and the client under it at 0.1.1; 0.1.0
+of both is published on pub.dev.
 
 ## Which route
 

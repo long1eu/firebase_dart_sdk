@@ -39,7 +39,7 @@ const Set<String> _needsOtherPackages = <String>{};
 /// Blocks of route B (the client's own Dart API) without an import line: they use the client, and
 /// the `database` of the block before them.
 const Set<String> _clientBlocks = <String>{
-  '../../docs/guides/database_flutter.md:221',
+  '../../docs/guides/database_flutter.md:222',
 };
 
 /// What a snippet may assume to exist.

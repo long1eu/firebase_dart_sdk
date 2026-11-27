@@ -8,16 +8,18 @@ no native SDK in the build; for servers and command line tools in Dart there is 
 the WebSocket protocol of the Firebase JS SDK, with Dart names (`DatabaseReference`, `onValue`, `runTransaction`) and
 Dart streams. It is not affiliated with or supported by Google or Firebase.
 
-> **Status: 0.1.0, first version.** The known limits are under [Limits](#limits). What has run (the maintainer's
-> runs on the merged trunk, with the connection tests; the record is in
+> **Status: 0.1.1.** The first version was 0.1.0; in this one a node keeps its priority when its last child is
+> removed and another is added, and a transaction on a node that holds only a priority commits (see the changelog).
+> The known limits are under [Limits](#limits). What has run (the maintainer's runs on the merged trunk, with the
+> connection tests; the record is in
 > [docs/database_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_decisions.md),
 > section 23):
 >
-> - The client, on 2026-11-27: 2,645 tests (60 skipped) on the Dart VM; the whole test tree in Chrome, 2,584 with
->   dart2js and 2,588 with dart2wasm.
+> - The client, on 2026-11-28: 2,773 tests (60 skipped) on the Dart VM; the whole test tree in Chrome, 2,712 with
+>   dart2js (25 skipped) and 2,716 with dart2wasm (24 skipped).
 > - The emulator tests (tag `emulator`) against the Firebase Database emulator (v4.11.2): 29 pass, 2 slow
 >   ones skip themselves.
-> - The SQLite cache package: 287 tests on Dart 3.12.2 (2026-11-27); 247 on Dart 3.11.5 and 3.8.0 at an earlier commit.
+> - The SQLite cache package: 288 tests on Dart 3.12.2 (2026-11-28); 247 on Dart 3.11.5 and 3.8.0 at an earlier commit.
 > - The adapter: 328 tests with 5 skipped without the emulator (another session's run, 2026-11-27). FlutterFire's
 >   `firebase_database` integration suite through the adapter: 76 pass, 1 skips itself (macOS host test runner,
 >   emulator).
@@ -30,9 +32,9 @@ Dart streams. It is not affiliated with or supported by Google or Firebase.
 > - Independent reviews, all findings fixed with a test each: connection (3 high, 8 medium, 7 low), SQLite engine (1, 5,
 >   10), adapter (2, 4, 6), API and core (1, 4, 4).
 >
-> - Production: all 41 checks of the verification kit passed in one run on this client on 2026-11-27 against a
->   dedicated database, and 41 of 41 passed on the emulator; earlier runs passed too. What it covers and what never ran
->   there is in section 23 of the decisions document.
+> - Production: all 42 checks of the verification kit passed in one run on this client on 2026-11-28 against a
+>   dedicated database (with `--expect-emptied-node-fix`), and 42 of 42 passed on the emulator; earlier runs passed
+>   too. What it covers and what never ran there is in section 23 of the decisions document.
 > - CI on GitHub Actions passes (`.github/workflows/ci.yml`).
 >
 > What has **not** run: a release build of a desktop app, Safari, Firefox and a real display. One person maintains it.
@@ -65,7 +67,7 @@ dart pub add firebase_database_dart_sqlite   # only for the offline cache
 dart pub add firebase_auth_providers_dart    # only when the rules look at auth
 ```
 
-Dart 3.8 or later; no Flutter dependency. The commands write the constraint `^0.1.0` for this package and for the
+Dart 3.8 or later; no Flutter dependency. The commands write the constraint `^0.1.1` for this package and for the
 SQLite cache.
 
 ## Quick start with the emulator
@@ -627,8 +629,19 @@ The 19 you notice are below. The full table, 40 rows with the test that pins eac
   while the client is offline after a local removal, until the server sends it. See "Behaviours shared with the JS
   SDK that are kept" in
   [docs/database_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_decisions.md).
+- **Emptied-node priorities: what the fix does not cover.** Two pending updates on one node are layered into one
+  write and their priorities are ordered by depth, not by write order, so a listener added meanwhile can hold a
+  priority as hidden state until both are answered, and `update {"x/a": null, "x/.priority": 7}` followed by
+  `update {"x/b": 1}` shows `x = {b: 1}` with priority 7 until the server answers; the JS SDK shows the same. An
+  `update` that creates a node and sets its priority through separate keys shows the priority until the server
+  refuses the update. The server counts an emptied node in a query window's hash, and a limit or range view can hold
+  one with a stale priority, or drop it when its window holds emptied nodes only; such a window is sent again at the
+  next listen, and no wrong data is shown. With the SQLite cache, an acknowledged update that removes a child, adds
+  one that a listen is waiting for and sets the node's priority stores the node without the priority until the node
+  is loaded again (also in 0.1.0), and a node emptied by a removal shows no priority from the cache after a refill.
+  The record is section 25 of the decisions document.
 - **Transactions and `onDisconnect` registrations are not persisted.** After a restart, register them again.
-- **Production was measured by one run of the verification kit.** Token expiry, a rules change during a connection,
+- **Production was measured by runs of the verification kit.** Token expiry, a rules change during a connection,
   ping answers and the size limits beyond a 1 MB value and a depth of 32 are not measured there; the three connection
   timeouts (30 s, 15 s, 60 s) are chosen, not measured.
 - **Not in this version:**
@@ -647,14 +660,14 @@ The 19 you notice are below. The full table, 40 rows with the test that pins eac
 
 | Platform | Client | What ran |
 |---|---|---|
-| macOS | Dart VM | 2,645 tests, 60 skipped (2026-11-27); 29 emulator tests; FlutterFire's suite through the adapter (76 pass, 1 skips) |
+| macOS | Dart VM | 2,773 tests, 60 skipped (2026-11-28); 29 emulator tests; FlutterFire's suite through the adapter (76 pass, 1 skips) |
 | Linux x64 | Dart VM | 2,058 tests, at an earlier commit; the Linux example app with the adapter passes its 4 integration tests |
 | Windows 11 x64 | Dart VM | 2,126 tests at an earlier commit; the Windows example app with the adapter passes its 4 integration tests |
-| Web, dart2js | Chrome on macOS | 2,584 tests (whole test tree, 2026-11-27); 1,125 on Linux x64 at an earlier commit |
-| Web, dart2wasm | Chrome on macOS | 2,588 tests (whole test tree, 2026-11-27); 1,128 on Linux x64 at an earlier commit |
+| Web, dart2js | Chrome on macOS | 2,712 tests, 25 skipped (whole test tree, 2026-11-28); 1,125 on Linux x64 at an earlier commit |
+| Web, dart2wasm | Chrome on macOS | 2,716 tests, 24 skipped (whole test tree, 2026-11-28); 1,128 on Linux x64 at an earlier commit |
 
 No release build of a desktop app has run, and Safari and Firefox are untested. The main library imports no `dart:io`
-and no native code. The SQLite cache needs `package:sqlite3` and is not available on the web; it ran 287 tests on Dart
+and no native code. The SQLite cache needs `package:sqlite3` and is not available on the web; it ran 288 tests on Dart
 3.12.2 (247 on Dart 3.11.5 and on Dart 3.8.0 at an earlier commit). It declares Android, iOS, macOS, Windows and Linux;
 no run is recorded on Android or iOS.
 
