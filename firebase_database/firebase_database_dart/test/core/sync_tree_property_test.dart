@@ -3,44 +3,73 @@
 // server on a FakeServerActions. Two properties:
 //
 // A. Whenever nothing is pending (no unanswered write, every listen answered), each value
-//    listener's last value equals its view's server cache, filtered by its query. This needs no
-//    model: it compares the client with itself.
+//    listener's last value equals its view's server cache, filtered by its query, and a view of
+//    a query that loads all data holds the hidden state of its server cache (equal hashes). This
+//    needs no model: it compares the client with itself.
 // B. Once everything is answered, every listener, a new listener per query and get() equal the
-//    model's data.
+//    model's data; a new listener and get() of a query that loads all data also hash as the
+//    model's server does.
 //
-// The model follows what was measured on the emulator (docs/database_decisions.md section 25):
-// writes apply in the order sent; a priority written on a node that does not exist refuses the
-// whole write; one update applies all its children at once, so its node keeps its priority unless
-// the update writes `.priority`; a node with no value and no children has no priority, except
-// that the emulator keeps it when the node is emptied by a write below it (not verified on
-// production), so B accepts either answer. The server sends a write to the listens it holds,
-// from reading a listen to reading its unlisten: as written to a plain listen at or above it,
-// as whole data to one below it. To the limit query it sends the frames measured for a
-// key-ordered limitToFirst query (rtdb/from_helper/reports/limit_query_frames.md): a set at or
-// above its path puts the whole window; an update at or above it merges its relative paths
-// when the window keeps its children, the entering child whole and the removed one null when it
-// changes, and nothing when no window child is touched (its own priority included); an update
-// that writes below one window child next to a key outside the window puts that child whole at
-// its path; a write below it goes as written while its child stays in the window, a put of null
-// at the child's path when it empties a window child and none enters, nothing for a child
-// outside, the entering child alone at its path when it pushes another out, and a merge of the
-// entering children and the leaving ones otherwise: null for a removed child, whole for one moved
-// out by its priority. The production run of 2026-11-25 (rtdb/from_boss/
-// prodkit_production_run_2026-11-25.txt, checks 28, 29 and 37) sent the same frames for the
-// shapes it covered, the tagged frame first; the put of null for an emptied child was measured
-// on the emulator only. Not measured, and kept as the model's guess: the order by priority of
-// this query beyond a child moved in and out by its priority, an update that changes one window
-// child while another enters or that pushes a child out (the whole window is put), an update key
-// at or above the query path, and a window merge whose entering child sorts before a child that
-// stays (measured only after it).
+// The model is the shared server model of lib/src/testing/json_server_model.dart (a plain JSON
+// tree, no client node code), which FakeServerActions plays too. Measured on production
+// (rtdb/from_boss/prodkit_production_run3_2026-11-25.txt checks 27 and 38; run 2 check 22;
+// prodkit_production_run4_check39_2026-11-25.txt check 39;
+// prodkit_production_run8_check39_q11_2026-11-25.txt): writes apply in the order sent; a
+// node whose last child is removed by a write below it keeps its priority, and a write at or
+// above it drops it; one update is applied in two passes whatever its key order: every value
+// entry first, then every priority entry, parents first, each landing only on a node that at
+// that moment has a value or holds hidden state (Q1, Q6, Q10, F1 to F9 of run 8; three separate
+// writes keep it, Q4); a node holding only emptied children takes a priority (Q2); a priority on
+// a node that does not exist refuses the write (check 27), a null one is answered ok and changes
+// nothing (check 40); the hash counts kept priorities;
+// listen and get answers carry `{".priority": p}` for an emptied node, also inside its parent;
+// the compound hash counts a kept priority as a `.priority` leaf (Q5).
 //
-// The unchanged code fails some seeds, for behaviours that are documented and kept. The test
-// fails when a seed outside [_knownFailures] fails, or a listed seed passes.
+// Model rules no production frame covers (the model's choice; the client agrees):
+// - M1. Measured since (production run 9 and the emulator, 2026-11-26, check 39 Q12,
+//   rtdb/from_boss/prodkit_production_run9_check39_q12_2026-11-26.txt): an update that writes a
+//   priority and creates its node in the same message is refused whole, in either key order, as
+//   a priority on a missing node; the check is made on the data before the update.
+// - M2. `.priority: null` on an emptied node drops it.
+// - M3. Whole data pushed to a listen below another client's write carries `{".priority": p}`
+//   like a listen answer.
+// - M4. The children of a limit window are sent with their `{".priority": p}` descendants; an
+//   emptied child is not a window member, and a child leaving the window because it was emptied
+//   is sent as null.
+// - M5. A write forwarded as written to a listen at or above it carries nothing more.
+// - M6. The model never sends a range merge (`rm`) and ignores compound hashes.
+// - M7. A leaf with a priority at depth 3 takes `.priority` writes like any node with a value.
+// - M8. A value written below a leaf keeps the leaf's priority on the new children (the
+//   generator never writes below a leaf).
+//
+// The server sends a write to the listens it holds, from reading a listen to reading its
+// unlisten: as written to a plain listen at or above it, as whole data to one below it. To the
+// limit query it sends the frames measured for a key-ordered limitToFirst query
+// (rtdb/from_helper/reports/limit_query_frames.md): a set at or above its path puts the whole
+// window; an update at or above it merges its relative paths when the window keeps its children,
+// the entering child whole and the removed one null when it changes, and nothing when no window
+// child is touched (its own priority included); an update that writes below one window child
+// next to a key outside the window puts that child whole at its path; a write below it goes as
+// written while its child stays in the window, a put of null at the child's path when it empties
+// a window child and none enters, nothing for a child outside, the entering child alone at its
+// path when it pushes another out, and a merge of the entering children and the leaving ones
+// otherwise: null for a removed child, whole for one moved out by its priority. The production
+// run of 2026-11-25 (rtdb/from_boss/prodkit_production_run_2026-11-25.txt, checks 28, 29 and 37)
+// sent the same frames for the shapes it covered, the tagged frame first; the put of null for an
+// emptied child was measured on the emulator only. Not measured, and kept as the model's guess:
+// the order by priority of this query beyond a child moved in and out by its priority, an update
+// that changes one window child while another enters or that pushes a child out (the whole
+// window is put), an update key at or above the query path, and a window merge whose entering
+// child sorts before a child that stays (measured only after it).
+//
+// The test fails when a seed outside [_knownFailures] fails, or a listed seed passes.
 //
 // A wider range, by hand on the VM (the list covers [_defaultSeeds] only, so every failing seed
-// outside it is reported, with its sequence):
-//   dart run -DFUZZ_SEEDS=0-100000 test/core/sync_tree_property_test.dart
+// outside it is reported, with its sequence); FUZZ_DUMP writes the failing seeds as JSON lines:
+//   dart run --enable-asserts -DFUZZ_SEEDS=0-100000 -DFUZZ_DUMP=/tmp/seeds.jsonl \
+//     test/core/sync_tree_property_test.dart
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:firebase_database_dart/src/core/callback_event_registration.dart';
@@ -62,33 +91,33 @@ import 'package:firebase_database_dart/src/core/view/query_params.dart';
 import 'package:firebase_database_dart/src/core/view/query_spec.dart';
 import 'package:firebase_database_dart/src/core/view/view.dart';
 import 'package:firebase_database_dart/src/testing/fake_server_actions.dart';
+import 'package:firebase_database_dart/src/testing/json_server_model.dart';
 import 'package:test/test.dart';
 
 const (int, int) _defaultSeeds = (0, 10000);
 
-/// The failing seeds of [_defaultSeeds] by cause: a row of the table "Behaviours shared with the
-/// JS SDK that are kept" (docs/database_decisions.md section 25) or, where no row fits, a
-/// listener that differs from its own server cache with nothing pending. Each group starts with
-/// its shortest sequence, found by shrinking one of its seeds; data as in [_initial].
+/// The failing seeds by cause; [_defaultSeeds] holds none. A new group starts with its shortest
+/// sequence, found by shrinking one of its seeds; data as in [_initial].
 const Map<String, List<int>> _knownFailures = <String, List<int>>{
-  // listen /b; update /b {y: 1, x: null}. The listener shows {y: 1} without the priority 3 the
-  // server keeps (seed 9709). The other seeds lose a priority the same way, in the listener or in
-  // the client's server cache (then property A fails first): an update that writes the priority
-  // itself, two writes of this client refilled by another client's (4302), and a refused write
-  // whose revert refills the node (6434).
+  // The groups of rtdb/from_helper/reports/wide_seeds_round3_limit_classification.md (seeds 0 to
+  // 299999, limit query /a orderByPriority limitToFirst(2)); in none does hidden state decide the
+  // failure, and all fail the same on the trunk.
   // dart format off
-  'row 2: an emptied and refilled node loses its priority': <int>[
-    867, 1177, 1219, 2311, 2372, 2963, 3038, 3054, 3223, 3579, 3977, 4302, 4451, 4933, 5098,
-    5358, 5915, 6026, 6108, 6169, 6171, 6268, 6434, 6598, 6626, 7138, 7192, 7391, 7564, 7642,
-    7873, 8224, 8911, 9550, 9709,
+  // Group R: the limit view's server cache short after a default listen took over (row 7 of
+  // "Behaviours shared with the JS SDK that are kept"); 24768, 165358 and 167845 leave the
+  // listener wrong (property B), the others the cache only. Shortest (95040): listen
+  // /a:{"l":2,"vf":"l"}; serve; listen /a:default; set /a/x/u 1; serve; other update /a {"x":null}
+  'group R: limit view server cache short after a default listen took over': <int>[
+    6892, 12944, 15580, 17434, 22925, 24768, 28802, 53038, 60676, 61383, 81628, 95040, 95959,
+    108626, 118921, 130468, 131009, 137624, 152480, 153895, 155494, 156387, 165358, 167845,
+    168570, 174285, 177344, 178722, 210298, 215182, 250134, 251256, 251431, 252308,
+    255287, 256221, 256506, 288075,
   ],
-  // listen /; set /b/x null; set /b/x 1. Settled, the listener shows b with its priority 3 and
-  // the client's server cache shows b without it (seed 9964). The server emptied b in between;
-  // the emulator would keep the priority (row 4), so the listener agrees with the emulator and
-  // the cache with a server that drops it.
-  'listener differs from own server cache, nothing pending': <int>[
-    1984, 2717, 3289, 6012, 9798, 9964,
-  ],
+  // Group S of that report (a server merge refilling a full window from the complete cache as
+  // it was before the merge: 4614, 11541, 174519, 245589) passes since each child of a server
+  // merge sees the merge's earlier children (row 32 of docs/database_decisions.md section 25).
+  // Group V: a refused update at the view path reverted over a filtered cache (row 5).
+  'group V: a revert at the view path over a filtered cache': <int>[279390],
   // dart format on
 };
 
@@ -107,7 +136,7 @@ final List<QuerySpec> _queries = <QuerySpec>[
 /// The server's data before the client starts.
 const Map<String, Object?> _initial = <String, Object?>{
   'a': <String, Object?>{
-    'x': 1,
+    'x': <String, Object?>{'u': 1},
     'y': <String, Object?>{'u': 2, '.priority': 2},
     '.priority': 1,
   },
@@ -153,8 +182,9 @@ final class _Serve extends _Op {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The generator. Depth 1 (a, b) only ever holds objects, and leaves carry no priority, so no
-// write meets the unmeasured case of a priority on a leaf that turns into children.
+// The generator. Depths 1 (a, b) and 2 (a/x, ...) only ever hold objects and leaves sit at depth
+// 3, where nothing is written below them, so no write meets the unmeasured case of a priority on
+// a leaf that turns into children. Priorities are written at every depth that holds values.
 
 const List<List<String>> _keysAt = <List<String>>[
   <String>['a', 'b'],
@@ -169,8 +199,11 @@ Object? _value(math.Random r, int depth, {bool nullable = true}) {
   if (nullable && r.nextInt(4) == 0) {
     return null;
   }
-  if (depth == 3 || depth == 2 && r.nextBool()) {
-    return 1 + r.nextInt(3);
+  if (depth == 3) {
+    final int leaf = 1 + r.nextInt(3);
+    return r.nextInt(4) == 0
+        ? <String, Object?>{'.value': leaf, '.priority': 1 + r.nextInt(3)}
+        : leaf;
   }
   final Map<String, Object?> m = <String, Object?>{};
   final List<String> keys = _keysAt[depth];
@@ -186,17 +219,41 @@ Object? _value(math.Random r, int depth, {bool nullable = true}) {
 int _depth(String path) => Path(path).length;
 
 const List<String> _setPaths = <String>['a', 'b', 'a/x', 'a/y', 'b/x', 'a/x/u'];
+const List<String> _priorityNodes = <String>[
+  'a',
+  'b',
+  'a/x',
+  'a/y',
+  'b/x',
+  'a/x/u',
+];
 const Map<String, List<String>> _updateKeys = <String, List<String>>{
-  '': <String>['a', 'b', 'a/x', 'b/y', 'a/.priority', 'b/.priority'],
-  'a': <String>['x', 'y', 'z', 'x/u', '.priority'],
-  'b': <String>['x', 'y', 'x/v', '.priority'],
-  'a/x': <String>['u', 'v'],
+  '': <String>[
+    'a',
+    'b',
+    'a/x',
+    'b/y',
+    'a/.priority',
+    'b/.priority',
+    'a/x/.priority',
+  ],
+  'a': <String>[
+    'x',
+    'y',
+    'z',
+    'x/u',
+    '.priority',
+    'x/.priority',
+    'y/.priority',
+  ],
+  'b': <String>['x', 'y', 'x/v', '.priority', 'x/.priority'],
+  'a/x': <String>['u', 'v', '.priority', 'u/.priority'],
 };
 
 _Write _write(math.Random r, {required bool ours}) {
   final int c = r.nextInt(10);
   if (c < 2) {
-    final String node = r.nextBool() ? 'a' : 'b';
+    final String node = _priorityNodes[r.nextInt(_priorityNodes.length)];
     return _Write('$node/.priority', _priority(r), ours: ours);
   }
   if (c < 6) {
@@ -240,12 +297,72 @@ List<_Op> _generate(int seed) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The server model.
+// The server model: a plain JSON tree, built without the client's node code.
 
 bool _covers(String outer, String inner) =>
     outer == '/' || inner == outer || inner.startsWith('$outer/');
 
 String _wire(String path) => '/$path'.replaceAll('//', '/');
+
+List<String> _keys(String path) =>
+    path.split('/').where((String k) => k.isNotEmpty).toList();
+
+// The server's data and rules: the shared model of lib/src/testing/json_server_model.dart,
+// which FakeServerActions plays too.
+typedef _M = JsonServerNode;
+
+/// Whether [n] has a value (a leaf, or a child with one).
+bool _visible(_M? n) => n != null && n.hasValue;
+
+/// The export JSON of [n]: what readers see, or with [hidden] what the server sends.
+Object? _export(_M? n, {required bool hidden}) => n?.toJson(hidden: hidden);
+
+/// The hash the server compares (kept priorities included).
+String _hash(_M? n) => n?.hash() ?? '';
+
+List<MapEntry<String, _M>> _byPriority(Map<String, _M> children) =>
+    JsonServerNode.byPriority(children);
+
+_M? _get(_M? n, List<String> keys) {
+  _M? at = n;
+  for (final String k in keys) {
+    at = at?.children[k];
+  }
+  return at;
+}
+
+/// The window of the limit query at [n]: its first two children with a value by priority.
+Map<String, _M> _window(_M? n) => <String, _M>{
+  if (n != null)
+    for (final MapEntry<String, _M> e in _byPriority(<String, _M>{
+      for (final MapEntry<String, _M> c in n.children.entries)
+        if (_visible(c.value)) c.key: c.value,
+    }).take(2))
+      e.key: e.value,
+};
+
+/// What [q] shows of [n], as the server sends it ([hidden]) or as readers see it.
+Object? _shownJson(QuerySpec q, _M? n, {required bool hidden}) {
+  if (q.loadsAllData) {
+    return _export(n, hidden: hidden);
+  }
+  final Map<String, Object?> m = <String, Object?>{
+    for (final MapEntry<String, _M> e in _window(n).entries)
+      e.key: _export(e.value, hidden: hidden),
+  };
+  return m.isEmpty ? null : m;
+}
+
+/// [json] with map keys sorted, for comparing.
+Object? _canonical(Object? json) => json is Map
+    ? <String, Object?>{
+        for (final String k
+            in (json.keys.map((Object? k) => '$k').toList()..sort()))
+          k: _canonical(json[k]),
+      }
+    : json;
+
+String _jsonOf(Object? json) => jsonEncode(_canonical(json));
 
 Node _shown(QuerySpec q, Node data) => q.loadsAllData
     ? data
@@ -255,22 +372,21 @@ Node _shown(QuerySpec q, Node data) => q.loadsAllData
         null,
       );
 
-/// The children of [n] in export form, by key.
-Map<String, Object?> _children(Node n) => <String, Object?>{
-  for (final MapEntry<String, Object?> e
-      in ((n.toJson(exportFormat: true) as Map<String, Object?>?) ??
-              <String, Object?>{})
-          .entries)
-    if (e.key != '.priority') e.key: e.value,
-};
-
 String _json(Node? n) =>
     n == null ? 'nothing' : jsonEncode(n.toJson(exportFormat: true));
+
+/// [n] as the server would send it (kept priorities included).
+String _server(Node n) => jsonEncode(
+  n is ChildrenNode ? n.toServerJson() : n.toJson(exportFormat: true),
+);
 
 final class _Server {
   _Server(this.fake);
   final FakeServerActions fake;
-  Node data = nodeFromJson(_initial);
+  JsonServerModel model = JsonServerModel(_initial);
+
+  /// The root node.
+  _M? get data => model.root;
 
   /// The listens the server holds (it has handled the listen and not the unlisten).
   final List<ServerCall> listens = <ServerCall>[];
@@ -278,70 +394,29 @@ final class _Server {
   /// How many of the client's messages the server has handled.
   int handled = 0;
 
-  /// Applies [w]; false when the server refuses it.
+  _M? at(String path) => model.at(path);
+
+  /// The data at [path] as the server sends it (kept priorities included).
+  Object? sent(String path) => _export(at(path), hidden: true);
+
+  /// Applies [w] as the server does ([JsonServerModel.write]); false when the server refuses it.
   bool apply(_Write w) {
-    final Node before = data;
-    final Path at = Path(w.path);
-    final Map<String, Object?> entries = w.merge
-        ? (w.data! as Map<String, Object?>)
-        : <String, Object?>{'': w.data};
-    for (final String k in entries.keys) {
-      final Path p = at.childPath(Path(k));
-      if ((p.back?.isPriorityKey ?? false) &&
-          data.getChild(p.parent!).isEmpty) {
-        return false;
-      }
+    final _M? before = data?.copy();
+    // A set of a null priority that changes nothing is answered ok and sent to no listen
+    // (production run 13, check 40).
+    final bool silent = model.changesNothing(w.path, w.data, merge: w.merge);
+    if (!model.write(w.path, w.data, merge: w.merge)) {
+      return false;
     }
-    // New children first, then removals, then priorities: the update's node is empty
-    // afterwards only when it is empty once the whole update is applied.
-    int rank(MapEntry<String, Object?> e) => e.key.endsWith('.priority')
-        ? 2
-        : (nodeFromJson(e.value).isEmpty ? 1 : 0);
-    final List<MapEntry<String, Object?>> ordered = entries.entries.toList()
-      ..sort((a, b) => rank(a) - rank(b));
-    for (final MapEntry<String, Object?> e in ordered) {
-      final Path p = at.childPath(Path(e.key));
-      final Node n = nodeFromJson(e.value);
-      data = data.updateChild(p, n);
-      _emulate(p, n);
+    if (!silent) {
+      _publish(w, before);
     }
-    _publish(w, before);
     return true;
-  }
-
-  /// [data] as the emulator holds it: a node emptied by a write below it keeps its priority,
-  /// and shows it again once a later write below it refills it. The answer of a production
-  /// server is not known, so a listener may show either.
-  Node emulator = nodeFromJson(_initial);
-
-  /// The kept priorities of the empty nodes of [emulator], by path.
-  final Map<String, Node> _kept = <String, Node>{};
-
-  void _emulate(Path p, Node n) {
-    // A write at or above an empty node replaces it, priority and all.
-    _kept.removeWhere((String k, Node _) => p.contains(Path(k)));
-    final Node before = emulator;
-    emulator = emulator.updateChild(p, n);
-    for (Path? up = p.parent; up != null; up = up.parent) {
-      final Node priority = before.getChild(up).priority;
-      if (!priority.isEmpty && emulator.getChild(up).isEmpty) {
-        _kept['$up'] = priority;
-      }
-    }
-    for (final String k in _kept.keys.toList()) {
-      final Node node = emulator.getChild(Path(k));
-      if (!node.isEmpty) {
-        emulator = emulator.updateChild(
-          Path(k),
-          node.updatePriority(_kept.remove(k)!),
-        );
-      }
-    }
   }
 
   /// Sends [w] to the listens it touches; [before] is the data before it. A plain listen at or
   /// above the write gets it as written, one below it its whole data.
-  void _publish(_Write w, Node before) {
+  void _publish(_Write w, _M? before) {
     final String wp = _wire(w.path);
     // The emulator sends a write's tagged frames before the untagged ones (measured, 18 runs:
     // reports/limit_merge_order.md). The other order would let an untagged put push a child out of
@@ -358,10 +433,7 @@ final class _Server {
       } else if (_covers(lp, wp)) {
         fake.deliverDataUpdate(wp, w.data, isMerge: w.merge);
       } else if (_covers(wp, lp)) {
-        fake.deliverDataUpdate(
-          lp,
-          data.getChild(Path(lp)).toJson(exportFormat: true),
-        );
+        fake.deliverDataUpdate(lp, sent(lp));
       }
     }
   }
@@ -370,19 +442,17 @@ final class _Server {
   /// `limitToFirst(2)` query (rtdb/from_helper/reports/limit_query_frames.md, cases A1 to C5),
   /// as production sent them (prodkit_production_run_2026-11-25.txt, checks 28 and 37).
   /// Shapes neither measured keep the whole window as a put at the query path.
-  void _publishTagged(ServerCall l, _Write w, Node before) {
+  void _publishTagged(ServerCall l, _Write w, _M? before) {
     final QuerySpec q = _queries.firstWhere(
       (QuerySpec q) => q.toListenSpec() == l.spec,
     );
     final String lp = l.spec!.path;
+    final List<String> qKeys = _keys(lp);
     void send(String path, Object? json, {bool merge = false}) =>
         fake.deliverDataUpdate(path, json, isMerge: merge, tag: l.tag);
-    final Node window = _shown(q, data.getChild(q.path));
-    void sendWindow() => send(lp, window.toJson(exportFormat: true));
-    final Map<String, Object?> was = _children(
-      _shown(q, before.getChild(q.path)),
-    );
-    final Map<String, Object?> now = _children(window);
+    void sendWindow() => send(lp, _shownJson(q, at(lp), hidden: true));
+    final Map<String, _M> was = _window(_get(before, qKeys));
+    final Map<String, _M> now = _window(at(lp));
     final List<String> left = <String>[
       for (final String k in was.keys)
         if (!now.containsKey(k)) k,
@@ -391,18 +461,18 @@ final class _Server {
       for (final String k in now.keys)
         if (!was.containsKey(k)) k,
     ];
-    // A child that left the window but still exists was pushed out by one that entered.
-    bool removed(String k) => data.getChild(q.path.childPath(Path(k))).isEmpty;
+    // A child that left the window but still has a value was pushed out by one that entered.
+    bool removed(String k) => !_visible(at('$lp/$k'));
+    Object? whole(String k) => _export(at('$lp/$k'), hidden: true);
     // The entering children whole; a leaving child null when it was removed, else whole with its
     // new value and priority (production: c4 moved out by its priority, check 37).
     final Map<String, Object?> diff = <String, Object?>{
-      for (final String k in entered) k: now[k],
-      for (final String k in left)
-        k: data.getChild(q.path.childPath(Path(k))).toJson(exportFormat: true),
+      for (final String k in entered) k: whole(k),
+      for (final String k in left) k: removed(k) ? null : whole(k),
     };
-    final Path at = Path(w.path);
-    if (at.length > q.path.length) {
-      final String child = Path.relative(q.path, at).front!.name;
+    final Path at_ = Path(w.path);
+    if (at_.length > q.path.length) {
+      final String child = Path.relative(q.path, at_).front!.name;
       if (left.isEmpty && entered.isEmpty) {
         // In the window: as written (C1, C5); outside it: nothing (C3).
         if (was.containsKey(child)) {
@@ -412,7 +482,7 @@ final class _Server {
           entered.single == child &&
           !left.any(removed)) {
         // The entering child alone, whole; the client drops what it pushes out (C4).
-        send('$lp/$child', now[child]);
+        send('$lp/$child', whole(child));
       } else if (entered.isEmpty) {
         // A window child emptied by a write below it, nothing entering: a put of null at the
         // child's path, not the write as written (emulator: set a/x/u null on x {u}).
@@ -434,7 +504,7 @@ final class _Server {
     final Map<String, Object?> below = <String, Object?>{};
     for (final MapEntry<String, Object?> e
         in (w.data! as Map<String, Object?>).entries) {
-      final Path full = at.childPath(Path(e.key));
+      final Path full = at_.childPath(Path(e.key));
       if (full.contains(q.path)) {
         sendWindow(); // replaces the query node: not measured
         return;
@@ -466,7 +536,7 @@ final class _Server {
           inWindow.keys.any((String k) => k.contains('/'))) {
         // One window child written below it, next to a key outside the window: that child
         // whole at its path (production, line mixed: update a/n and d/n).
-        send('$lp/${changed.single}', now[changed.single]);
+        send('$lp/${changed.single}', whole(changed.single));
       } else {
         send(lp, inWindow, merge: true); // A3, B3
       }
@@ -500,10 +570,9 @@ final class _Server {
           final QuerySpec q = _queries.firstWhere(
             (QuerySpec q) => q.toListenSpec() == c.spec,
           );
-          final Node at = data.getChild(Path(c.spec!.path));
           fake.deliverDataUpdate(
             c.spec!.path,
-            _shown(q, at).toJson(exportFormat: true),
+            _shownJson(q, at(c.spec!.path), hidden: true),
             tag: c.tag,
           );
           listens.add(c);
@@ -515,10 +584,7 @@ final class _Server {
           );
           return;
         case 'get':
-          fake.respond(
-            c,
-            data: data.getChild(Path(c.spec!.path)).toJson(exportFormat: true),
-          );
+          fake.respond(c, data: sent(c.spec!.path));
           return;
       }
     }
@@ -593,23 +659,41 @@ Future<String?> _check(List<_Op> ops) async {
       // A limit query's view can hold more than its window (the data of a listen above it),
       // and a limit query does not show the priority of its node.
       final Node cache = _shown(l.query, view.serverCache);
-      if (cache.hash() != l.value!.hash()) {
+      if (_jsonOf(l.value!.toJson(exportFormat: true)) !=
+          _jsonOf(cache.toJson(exportFormat: true))) {
         return 'A: listener ${l.query} shows ${_json(l.value)}, '
             'its server cache ${_json(cache)}';
+      }
+      // Kept priorities raise no event, so the view's event cache, not the last value, must
+      // hold the server cache's hidden state.
+      if (l.query.loadsAllData &&
+          view.eventCache.hash() != view.serverCache.hash()) {
+        return 'A: view ${l.query} holds ${_server(view.eventCache)}, '
+            'its server cache ${_server(view.serverCache)}';
       }
     }
     return null;
   }
 
-  String? matchesServer(String who, QuerySpec q, Node? got) {
-    final Node want = _shown(q, server.data.getChild(q.path));
-    final Node kept = _shown(q, server.emulator.getChild(q.path));
-    if (got != null &&
-        (got.hash() == want.hash() || got.hash() == kept.hash())) {
-      return null;
+  /// [got] against the model: the value readers see, and with [hash] the hash the server
+  /// compares (kept priorities included), for a query that loads all data.
+  String? matchesServer(
+    String who,
+    QuerySpec q,
+    Node? got, {
+    bool hash = false,
+  }) {
+    final _M? at = server.at(q.path.toString());
+    final Object? want = _shownJson(q, at, hidden: false);
+    if (got == null ||
+        _jsonOf(got.toJson(exportFormat: true)) != _jsonOf(want)) {
+      return 'B: $who $q shows ${_json(got)}, server ${_jsonOf(want)}';
     }
-    return 'B: $who $q shows ${_json(got)}, server ${_json(want)}'
-        '${kept.hash() == want.hash() ? '' : ' (emulator ${_json(kept)})'}';
+    if (hash && q.loadsAllData && got.hash() != _hash(at)) {
+      return 'B: $who $q holds ${_server(got)}, '
+          'server ${_jsonOf(_export(at, hidden: true))}';
+    }
+    return null;
   }
 
   for (int i = 0; i < ops.length; i++) {
@@ -648,7 +732,12 @@ Future<String?> _check(List<_Op> ops) async {
   ];
   server.drain();
   for (final _Listener l in fresh) {
-    final String? failure = matchesServer('new listener', l.query, l.value);
+    final String? failure = matchesServer(
+      'new listener',
+      l.query,
+      l.value,
+      hash: true,
+    );
     if (failure != null) {
       return failure;
     }
@@ -656,7 +745,7 @@ Future<String?> _check(List<_Op> ops) async {
   for (final QuerySpec q in _queries.where((QuerySpec q) => q.loadsAllData)) {
     final Future<Node> got = repo.getValue(q);
     server.drain();
-    final String? failure = matchesServer('get()', q, await got);
+    final String? failure = matchesServer('get()', q, await got, hash: true);
     if (failure != null) {
       return failure;
     }
@@ -666,6 +755,10 @@ Future<String?> _check(List<_Op> ops) async {
 
 /// The `FUZZ_SEEDS` define, `<first>-<end>` (end excluded), or empty.
 const String _range = String.fromEnvironment('FUZZ_SEEDS');
+
+/// The `FUZZ_DUMP` define: a file that receives every failing seed as a JSON line
+/// (`{"seed": n, "f": "<failure>\n    <sequence>"}`), or empty.
+const String _dump = String.fromEnvironment('FUZZ_DUMP');
 
 (int, int) _seeds() {
   if (_range.isEmpty) {
@@ -695,6 +788,14 @@ void main() {
         if (failure != null) {
           failing[seed] = '$failure\n    ${ops.join('; ')}';
         }
+      }
+      if (_dump.isNotEmpty) {
+        File(_dump).writeAsStringSync(
+          <String>[
+            for (final MapEntry<int, String> e in failing.entries)
+              '${jsonEncode(<String, Object?>{'seed': e.key, 'f': e.value})}\n',
+          ].join(),
+        );
       }
       final Set<int> known = <int>{
         for (final List<int> seeds in _knownFailures.values)

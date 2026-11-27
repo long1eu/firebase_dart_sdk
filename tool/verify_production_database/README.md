@@ -1,18 +1,18 @@
 # Realtime Database production verification kit
 
-This kit runs 41 named checks against a **real** Realtime Database and prints, for each one, `PASS`, `FAIL`,
+This kit runs 42 named checks against a **real** Realtime Database and prints, for each one, `PASS`, `FAIL`,
 `INCONCLUSIVE` or `SKIPPED` with a one-line explanation. It asks what the emulator cannot answer (TLS and the host the
 server names, rules with a real ID token, a token refresh and a sign-out on a live connection, priorities on the real
 server, timings), runs a base line of the public API on both backends, and runs the core side's production questions
-(`rtdb/from_helper/reports/production_questions.md`) as informational checks 27 to 36, plus checks 37 to 41.
+(`rtdb/from_helper/reports/production_questions.md`) as informational checks 27 to 36, plus checks 37 to 42.
 
 The code is `firebase_database/firebase_database_dart/test/production/verify_production.dart`; `run.sh` here runs it
 from the right directory. It is modelled on the Storage kit (`tool/verify_production_storage`).
 
 **Status of the kit itself:** it runs against the Database emulator (v4.11.2) and the Auth emulator, where every
-check passes (`test/production/verify_production_test.dart` pins the results below). Run 15 on 2026-11-27 ran the
-whole kit in one run on the final client of this version: 41 of 41 PASS on the emulator and 41 of 41 PASS against a
-dedicated production database.
+check passes (`test/production/verify_production_test.dart` pins the results below). Run 17 on 2026-11-28 ran the
+whole kit in one run on the client of version 0.1.1, with `--expect-emptied-node-fix`: 42 of 42 PASS on the emulator
+and 42 of 42 PASS against a dedicated production database.
 
 ## Before you run it against production
 
@@ -50,30 +50,31 @@ dedicated production database.
   the kit exits 2 with "install the rules"; after it, a refusal in a check is a `FAIL`.
 - It prints the project, the database URL and the run's path first. Against production it does nothing more without
   `--yes`.
-- Size and load: 41 checks. The largest write is one string of 1,000,000 bytes (check 32, read back once); every
+- Size and load: 42 checks. The largest write is one string of 1,000,000 bytes (check 32, read back once); every
   other write is at most about 1.4 KB, so a full run writes about 1.1 MB in total (inferred from the values in the
   code, not counted). Check 36 sends 1,000 updates, check 34 200 increments, check 31 at least 100 transactions.
   Check 31 opens about ten clients over its five steps, at most three at a time; check 30 opens five; every other
-  check opens at most three clients and, in checks 28, 29, 33, 37, 38, 39 and 40, one raw connection (check 39 opens
-  three more in turn for Q13, one at a time beside its first; check 41 opens three raw connections and no client). The
-  16 MB write of question 28 is not tried.
+  check opens at most three clients and, in checks 28, 29, 33, 37, 38, 39, 40 and 42, one raw connection (check 39
+  opens three more in turn for Q13, one at a time beside its first; check 41 opens three raw connections and no
+  client). The 16 MB write of question 28 is not tried.
 - Time: about 6 minutes on the emulator (373 s measured for the whole kit of 40 checks with `dart run`'s start; before
   check 40 was added, check 39 alone 294 s, the other 38 checks 59 s; check 41 was not timed, it waits at least 1.8 s in
-  each of its six cases). Check 39 waits 20 s for each request the server
-  does not answer (Q3, Q8, Q9) and 20 s after each Q8 merge; checks 22 and 30 each wait 5 s for their second reading.
+  each of its six cases; check 42 was not timed, it waits 0.8 s after each of its seven listens). Check 39 waits 20 s
+  for each request the server does not answer (Q3, Q8, Q9) and 20 s after each Q8 merge; checks 22 and 30 each wait
+  5 s for their second reading.
   Each check may take up to 3 minutes, checks 39 to 41 up to 8 (checks 40 and 41 wait 20 s for each write or request
   that does not complete); check 33 waits up to 150 s for the server, and the clean-up waits 60 s more when a write
   could still land (below). A run is longer than the five minutes after a sign-in in which Auth accepts the deletion
   of a user (later it answers `requires-recent-login`), so the kit signs the throwaway user in again, with the password
   it keeps in memory, right before deleting it.
-- Checks 28, 29, 33, 37, 38, 39 and 40 open a raw protocol connection of their own, check 41 three (version 5, the
+- Checks 28, 29, 33, 37, 38, 39, 40 and 42 open a raw protocol connection of their own, check 41 three (version 5, the
   throwaway user's token in an `auth` request), because the public API does not show frames. It only listens (in
-  checks 38 and 39 also with a hash, in check 39 with a compound hash), unlistens and, in checks 38 to 41, gets below
-  the run's path; in checks 39 to 41 it also puts there and in checks 39 and 41 merges (some puts with a hash, as a
-  transaction does); in check 33 it registers one onDisconnect write there and drops the socket without a close, and
-  check 39 does the same with one onDisconnect merge on each of its three Q13 connections. The
+  checks 38, 39 and 42 also with a hash, in check 39 with a compound hash), unlistens and, in checks 38 to 42, gets
+  below the run's path; in checks 39 to 42 it also puts there and in checks 39 and 41 merges (some puts with a hash,
+  as a transaction does); in check 33 it registers one onDisconnect write there and drops the socket without a close,
+  and check 39 does the same with one onDisconnect merge on each of its three Q13 connections. The
   auth request and its answer are never printed (an auth answer holds the token's claims); the report prints the
-  pushed frames and, in checks 38 to 41, the answers to its other requests, which hold only the kit's own data.
+  pushed frames and, in checks 38 to 42, the answers to its other requests, which hold only the kit's own data.
 - Credentials: the kit never reads or prints any. With `--create-user` it signs up a throwaway user
   (`database-verify-<run>@example.com`, a random 32-character password that lives in memory and is never printed or
   stored) through `FirebaseUserAuth` (`firebase_auth_providers_dart`), and deletes that user at the end, also when
@@ -156,11 +157,12 @@ failed, 1 when one is `FAIL`, 2 for a usage error (a missing variable, a URL tha
 other than `ns`, an unknown check id, a failed sign-up), a missing `--yes` or rules that refuse the preflight, 3 when
 the clean-up or the deletion of the user failed, 130 when a signal stopped the run, 64 for an unknown flag.
 
-`--expect-emptied-node-fix`: pass it only for a client that has the emptied-node priority fix (the client keeps the
-server's priority of a node emptied by its own write). The trunk and release 0.1 do not have it; they keep the JS
-SDK's behaviour there. With the flag, checks 22 and 38 (c), (e), (f) decide as written below. Without it they print
-what they observe, say whether the client keeps the JS SDK's behaviour, and are `PASS`; the plan names the mode in
-its `client:` line.
+`--expect-emptied-node-fix`: makes checks 22 and 38 (c), (e), (f) decide as written below, for a client that keeps
+the server's priority of a node emptied by its own write. The client of this repository does (version 0.1.1 and the
+trunk); release 0.1.0 does not, and keeps the JS SDK's behaviour there. Run the kit with the flag for this client.
+Without the flag the same checks only print what they observe, say whether the client keeps the JS SDK's behaviour,
+and are `PASS` whatever it is, so that a client without the fix can still run the kit; the plan names the mode in its
+`client:` line.
 
 ## The checks and how to read them
 
@@ -332,8 +334,20 @@ observation matched what the emulator showed (one exception: leaf B of check 30,
   writer connection. A raw connection sends each form as given: the client's `update` and `OnDisconnect.update`
   refuse every one of them with an `ArgumentError` and send nothing (`{'': 7}` points to `set()`, `{'': null}` to
   `remove()`).
+- **42. Hash of a query window that holds an emptied node, raw frames** (production only). Informational. One raw
+  connection puts `<run>/emptied_window` = `{a, h, c, d}` with priorities 1 to 4 (`h` = `{v:1}` priority 2, the others
+  `{n:...}`), then `h/v` null, so the server holds `h` as `{".priority":2}`; it prints both answers, a `g` and the
+  export, and the hash of `h` as stored next to SHA-1 of `priority:number:<IEEE 754 hex of 2>:`. Then two tagged
+  queries by priority: `limitToFirst(3)` (wire `{"l":3,"vf":"l"}`) and `startAt(1).endAt(3)` (wire
+  `{"sp":1,"sin":true,"ep":3,"ein":true}`). Each is listened with no hash, then with the simple hash, formed by the kit
+  from the `g` data, of its window counting `h` (`withH`: a, h, c) and of its window without `h` (`withoutH`: a, c,
+  what the client holds, since it drops a node that keeps only a priority); the limit query also with a, c, d
+  (`refilled`: the window if the server did not count `h` toward the limit). Each listen has a tag of its own and is
+  ended before the next. For each it prints the hash, the answer, whether data came (`DATA SENT`, the hash was not
+  accepted) or not (`no data`, accepted), the shape of `h` in the data, and every frame; then which candidates the
+  server accepted. A reader can tell from it whether the server's window hash counts an emptied node.
 
-What to send back: the whole report. The most valuable lines are 1, 9, 15, 18, 19, 21, 22 and 27 to 41, and the line
+What to send back: the whole report. The most valuable lines are 1, 9, 15, 18, 19, 21, 22 and 27 to 42, and the line
 after check 3 ("all of it in one set").
 
 ## Known results
@@ -343,7 +357,11 @@ Auth emulator of firebase-tools 15.18.0. Production: checks 1 to 39 ran as one r
 the client before the emptied-node fix), check 40 alone (2026-11-26) and check 41 alone (2026-11-27). Run 15
 (2026-11-27, the whole kit of 41 checks in one run, 41 PASS on the emulator and 41 PASS on production) ran without
 `--expect-emptied-node-fix`, so checks 22 and 38 (c), (e) and (f) were informational and recorded that the client
-drops the priority of an emptied node, as the JS SDK does. Where production gave another observation than the
+drops the priority of an emptied node, as the JS SDK does. Check 42 ran alone on 2026-11-28 (run 16, PASS on both).
+Run 17 (2026-11-28, the whole kit of 42 checks in one run, with `--expect-emptied-node-fix`, on the client of
+version 0.1.1) gave 42 PASS on the emulator and 42 PASS on production. Checks 22 and 38 (c), (e) and (f) below are
+described for that client, as run 17 measured them on both backends; the lines for the other checks keep the run
+named on them. Where production gave another observation than the
 emulator, a line "N on production" follows the check; without one, production gave the same, timings aside.
 
 - **1**: PASS: plain ws to 127.0.0.1, no other host
@@ -369,11 +387,10 @@ emulator, a line "N on production" follows the check; without one, production ga
 - **19**: PASS: cancelled with `permission_denied`; the write is refused
 - **20**: PASS
 - **21**: PASS, priority KEPT: `{".priority":0.0,"a":1}`, then `{".priority":0.0}`, then `{".priority":0.0,"b":1}`
-- **22**: PASS: a fresh client reads priority 0 after both forms; the writer's own listener shows priority null after
-  both; in the `update` form the writer's listener and its `get()` show null at 0 s and at 5 s (listener values: null,
-  `{a:1}` with priority 0, `{b:1}` with priority null). The client of the repository has no emptied-node fix. With
-  `--expect-emptied-node-fix` this part decides: a client with the fix shows priority 0 in the writer's listener and
-  its `get()` at 0 s and at 5 s
+- **22** (run 17, with `--expect-emptied-node-fix`, both backends): PASS: a fresh client reads priority 0 after both
+  forms; the writer's own listener shows priority 0 after both, as the fresh client does; in the `update` form the
+  writer's listener and its `get()` show priority 0 at 0 s and at 5 s (listener values: null, `{a:1}` with priority 0,
+  `{b:1}` with priority 0)
 - **23**: PASS
 - **24 to 26**: PASS, a few ms each on loopback
 - **4** (question 25): the writer saw the local estimate, then the server's value 1 ms later (two events) in two runs,
@@ -395,30 +412,31 @@ emulator, a line "N on production" follows the check; without one, production ga
   and the `set` won (99): the transaction had been sent, and a sent transaction the server accepts completes as
   committed, as in the JS SDK; line 18 two runs (null, then 5), committed 6; line 19 `max-retries` after 25 runs in
   two of three runs, and in the third it committed after 15 runs (the rival's writes race the transaction)
-- **31 on production** (2026-11-26 and run 15): line 15 99 of 100 committed, 1 failed with `max-retries` (final 99), and
-  98 of 100 in run 15 (2 failed with `max-retries`, final 98); no value went back in either; line 19 `max-retries`
-  after 25 runs on 2026-11-26, and committed after 18 runs in run 15; lines 16 to 18 as on the emulator
+- **31 on production** (2026-11-26, run 15 and run 17): line 15 99 of 100 committed, 1 failed with `max-retries` (final
+  99), and 98 of 100 in run 15 (2 failed with `max-retries`, final 98); no value went back in either; line 19
+  `max-retries` after 25 runs on 2026-11-26, committed after 18 runs in run 15 and after 2 runs in run 17 (line 15 in
+  run 17: 99 of 100, as on 2026-11-26); lines 16 to 18 as on the emulator
 - **32**: on loopback the 1 MB `get()` took 4 to 6 ms and the small event came after it (on the emulator, 3 runs)
-- **32 on production** (2026-11-26 and run 15): on 2026-11-26 the small event came **before** the 1 MB `get()`
-  finished; in run 15 the `get()` took 364 ms and the small event came at 377 ms, after it, as on loopback
+- **32 on production** (2026-11-26, run 15 and run 17): on 2026-11-26 the small event came **before** the 1 MB `get()`
+  finished; in run 15 the `get()` took 364 ms and the small event came at 377 ms, after it, as on loopback; in run 17
+  the `get()` took 519 ms and the small event came at 65 ms, before it
 - **33**: the onDisconnect write ran about 12 ms after the dropped socket
 - **34**: 200; **35**: REST 400 "Invalid path: Path specified exceeds the maximum depth that can be written (32).",
   the client refuses before sending; **36**: acknowledgements in order, final 999, no value went back, 4,975 to
   8,403 operations per second on loopback (on the emulator, 3 runs)
 - **37**: into the window, one tagged put of `c4` alone (`{".priority":0,"n":4}`); out of it, one tagged merge at the
   query path with c2 (re-entering) and **c4 whole with priority 9, not null**
-- **38**: (a) the listen of the emptied node answers `{"s":"ok","d":{}}` and pushes `{".priority":5.0}`, the get
-  answers the same data; the parent pushes and gets `{"n":{".priority":5.0}}`. (b) the update is accepted, export
-  `{".priority":7}`; `setPriority(9)` is accepted, export `{".priority":9}`. (c) the transaction fails with
-  `max-retries` after 25 runs of the handler (null each time), export `{".priority":5.0}`; the listens with the
-  kit's hashes get no data for either the emptied node or the control (the hash matched), the one with a wrong hash
-  gets `{"b":1}`. (d) export
-  `{".priority":5.0}`, then `null` after `set(n, null)`, then `{"b":1}` after `set(n/b, 1)`: the priority does not
-  come back. (e) export `null` after the update (the node is removed), the transaction commits after 1 run.
-  (f) the SQLite cache is durable before and after the reopen; the transaction fails with `max-retries` after 25
-  runs of the handler (null each time), export `{".priority":5.0}`. The client of the repository has no emptied-node
-  fix. With `--expect-emptied-node-fix` (c) and (f) decide: a client with the fix commits (c) after 2 runs (null,
-  null, export `{"t":2}`) and (f) after 1 run (null) (on the emulator, one run)
+- **38** (run 17, with `--expect-emptied-node-fix`, both backends): (a) the listen of the emptied node answers
+  `{"s":"ok","d":{}}` and pushes `{".priority":5.0}`, the get answers the same data; the parent pushes and gets
+  `{"n":{".priority":5.0}}`. (b) the update is accepted, export `{".priority":7}`; `setPriority(9)` is accepted,
+  export `{".priority":9}`. (c) the transaction commits after 2 runs of the handler (null, null), export `{"t":2}`;
+  the listens with the kit's hashes get no data for either the emptied node or the control (the hash matched), the one
+  with a wrong hash gets `{"b":1}`. (d) export `{".priority":5.0}`, then `null` after `set(n, null)`, then `{"b":1}`
+  after `set(n/b, 1)`: the priority does not come back. (e) export `null` after the update (the node is removed), the
+  transaction commits after 1 run, export `{"t":1}`. (f) the SQLite cache is durable before and after the reopen; the
+  transaction commits within two runs: after 2 runs on production (null, null, export `{"t":2}`), after 1 run on the
+  emulator (null, export `{"t":1}`). The three transactions (c), (e) and (f) commit within two runs on both backends.
+  A client without the fix fails (c) and (f) with `max-retries` after 25 runs of the handler
 - **39**: Q1 without priority: the merge is accepted and the node is **removed** (`null`, both forms); control: kept
   as `{".priority":7}`. Q2: n holds `{"c":{".priority":3.0}}` after the removal, the put of `.priority` 9 is
   accepted: `{".priority":9,"c":{".priority":3.0}}`. Q3: a raw put of `{".priority":5}` gets **no answer**, on a
@@ -448,6 +466,12 @@ emulator, a line "N on production" follows the check; without one, production ga
   and export of up unchanged (`{"loc":{"j":2,"k":1},"sib":5}`); the writer's next put is answered ok
 - **41 on production** (2026-11-27, alone and in run 15): every answer, frame, `g` and export as on the emulator; the
   answers came within 161 ms alone and within 178 ms in run 15
+- **42**: `h` is stored as `{".priority":2.0}` and its hash is the emptied-node form. `limitToFirst(3)`: a listen
+  without a hash gets data with `h` as `{".priority":2.0}`; the hash of a, h, c (h counted) is accepted, no data;
+  the hash of a, c and the hash of a, c, d (the window refilled) each get data. `startAt(1).endAt(3)`: the hash with
+  `h` counted is accepted; the hash without it gets data. So the server counts an emptied node in a query window's
+  hash and toward a limit
+- **42 on production** (2026-11-28, run 16, alone): every answer as on the emulator
 
 ## Questions the kit does not answer
 

@@ -58,9 +58,15 @@ final class LimitedFilter implements NodeFilter {
     final Node child = _rangedFilter.matches(NamedNode(key, newChild))
         ? newChild
         : ChildrenNode.empty;
-    if (snap.getImmediateChild(key) == child) {
-      // No change.
-      return snap;
+    final Node oldChild = snap.getImmediateChild(key);
+    if (oldChild == child) {
+      // No change in value. A change of hidden state (a priority kept by a node emptied below
+      // it) raises no event; it is stored for a child in the window only.
+      if (oldChild.isEmpty ||
+          ChildrenNode.sameHiddenAlong(oldChild, child, affectedPath)) {
+        return snap;
+      }
+      return snap.updateImmediateChild(key, child);
     } else if (snap.numChildren < _limit) {
       return _rangedFilter.indexedFilter.updateChild(
         snap,

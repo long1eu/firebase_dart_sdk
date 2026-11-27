@@ -55,7 +55,7 @@ endorsed by Google or Firebase.
   second factor proven by a real SMS (phone sign-in was run against a real project with a test phone number
   only), Messaging or the other Firebase services this repository does not port, or admin jobs such as bulk
   writes and recursive deletes (use `firebase_admin_sdk`).
-- You need the Realtime Database in production today: that client is at version 0.1.0, and against production only its
+- You need the Realtime Database in production today: that client is at version 0.1.1, and against production only its
   verification kit ran, once, and the report of its large-snapshot benchmark is not written yet.
 - You need a vendor to call: one person maintains it, with no SLA.
 
@@ -102,8 +102,8 @@ from 0.1? The 0.2 API took FlutterFire's names: [what changed](docs/api_migratio
 | [`firebase_auth_secure_storage_dart`](firebase_auth/firebase_auth_secure_storage_dart/) | 0.1.0 | Command line tools and servers that keep the signed-in session in the system's secret store (macOS Keychain; Linux and Windows untested) instead of a file |
 | [`firebase_storage_dart`](firebase_storage/firebase_storage_dart/) | 0.2.0 | Apps and servers that upload, download and list Cloud Storage for Firebase objects ([guide](docs/guides/storage.md), [parity](docs/storage_parity.md)) |
 | [`firebase_admin_dart`](firebase_admin/firebase_admin_dart/) | 0.1.2 | Servers, tools and integration tests that mint custom tokens, manage users or verify ID tokens |
-| [`firebase_database_dart`](firebase_database/firebase_database_dart/) | 0.1.0 | Dart programs, servers and web apps that use the Realtime Database through this client ([guide](docs/guides/database.md)) |
-| [`firebase_database_dart_sqlite`](firebase_database/firebase_database_dart_sqlite/) | 0.1.0 | Anyone who wants the Realtime Database cache on disk on the VM or in Flutter |
+| [`firebase_database_dart`](firebase_database/firebase_database_dart/) | 0.1.1 | Dart programs, servers and web apps that use the Realtime Database through this client ([guide](docs/guides/database.md)) |
+| [`firebase_database_dart_sqlite`](firebase_database/firebase_database_dart_sqlite/) | 0.1.1 | Anyone who wants the Realtime Database cache on disk on the VM or in Flutter |
 | [`firebase_database_dart_platform`](firebase_database/firebase_database_dart_platform/) | 0.1.0 | Flutter apps written against the official `firebase_database` API, on desktop |
 
 ## How it fits together
@@ -245,26 +245,23 @@ code; he reviews and tests it. Response times are in the [support policy](docs/s
 
 This repository ports Firestore and the Firebase Core pieces it needs, a Firebase Auth client in
 `firebase_auth/firebase_auth_providers_dart`, and a few Firebase Auth admin calls in
-`firebase_admin/firebase_admin_dart`. `firebase_auth/firebase_auth_dart_platform` runs the official
-`firebase_auth` API on top of the Auth client. The Auth client covers email, anonymous, custom token,
-email link and provider sign-in (with tokens the app holds, or through a loopback browser flow on
-desktop), phone sign-in, account management, linking, and TOTP and SMS multi-factor; it has no popup or redirect
-sign-in. Phone sign-in and SMS second factors were run against one real project with a test phone number, not
-with a real SMS.
-[docs/auth_parity.md](docs/auth_parity.md) compares it with the JS SDK, method by method.
-`firebase_storage/firebase_storage_dart` is a Cloud Storage for Firebase client
-([docs/storage_parity.md](docs/storage_parity.md)).
-`firebase_database/firebase_database_dart` is a Realtime Database client for the Dart VM and the web, ported from
-the protocol of the JS SDK; `firebase_database_dart_sqlite` keeps its cache on disk and
-`firebase_database_dart_platform` runs the official `firebase_database` API on top of it. Version 0.1.0 is published on
-pub.dev. What has run: its test suites on macOS, Windows 11 and Linux (Dart VM and Chrome), 33 tests against the
-Database emulator, FlutterFire's own `firebase_database` integration suite through the adapter, and one Flutter
-Windows debug app against the emulator; against production, its verification kit (41 checks), once. What has not: a
-release build of a desktop app, Safari and Firefox; the report of its large-snapshot benchmark is not written yet.
-See its [README](firebase_database/firebase_database_dart/README.md), the [guide](docs/guides/database.md) and the
-[decisions](docs/database_decisions.md). The other directories
-under `firebase_auth`, and `google_sign_in_dart`, are older code from
-the original project and are not part of the migrated, tested set.
+`firebase_admin/firebase_admin_dart`. `firebase_auth/firebase_auth_dart_platform` runs the official `firebase_auth` API
+on top of the Auth client. The Auth client covers email, anonymous, custom token, email link and provider sign-in (with
+tokens the app holds, or through a loopback browser flow on desktop), phone sign-in, account management, linking, and
+TOTP and SMS multi-factor; it has no popup or redirect sign-in. Phone sign-in and SMS second factors were run against
+one real project with a test phone number, not with a real SMS. [docs/auth_parity.md](docs/auth_parity.md) compares it
+with the JS SDK, method by method. `firebase_storage/firebase_storage_dart` is a Cloud Storage for Firebase client
+([docs/storage_parity.md](docs/storage_parity.md)). `firebase_database/firebase_database_dart` is a Realtime Database
+client for the Dart VM and the web, ported from the protocol of the JS SDK; `firebase_database_dart_sqlite` keeps its
+cache on disk and `firebase_database_dart_platform` runs the official `firebase_database` API on top of it. Version
+0.1.0 of the three packages is published on pub.dev; the client and the SQLite package are at 0.1.1 in this repository.
+What has run: its test suites on macOS, Windows 11 and Linux (Dart VM and Chrome), 33 tests against the Database
+emulator, FlutterFire's own `firebase_database` integration suite through the adapter, and one Flutter Windows debug app
+against the emulator; against production, its verification kit (42 checks), once. What has not: a release build of a
+desktop app, Safari and Firefox; the report of its large-snapshot benchmark is not written yet. See its
+[README](firebase_database/firebase_database_dart/README.md), the [guide](docs/guides/database.md) and the
+[decisions](docs/database_decisions.md). The other directories under `firebase_auth`, and `google_sign_in_dart`, are
+older code from the original project and are not part of the migrated, tested set.
 
 ## Packages
 

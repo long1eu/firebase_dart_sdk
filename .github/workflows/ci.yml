@@ -58,6 +58,8 @@ jobs:
       gallery: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.gallery == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         if: ${{ github.event_name != 'workflow_dispatch' }}
@@ -167,6 +169,8 @@ jobs:
               firebase_database_dart firebase_database_dart_sqlite examples
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/dart
         with:
           sdk: 3.8.0
@@ -263,6 +267,8 @@ jobs:
               firebase_database_dart firebase_database_dart_sqlite examples
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/dart
         with:
           sdk: stable
@@ -340,6 +346,8 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/dart
         with:
           sdk: stable
@@ -390,6 +398,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Set the emulator work directory
         # The `runner` context is not available in job-level `env`.
         run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
@@ -469,6 +479,8 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Set the emulator work directory
         # The `runner` context is not available in job-level `env`.
         run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
@@ -523,6 +535,8 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Set the emulator work directory
         # The `runner` context is not available in job-level `env`.
         run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
@@ -568,6 +582,8 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Set the emulator work directory
         # The `runner` context is not available in job-level `env`.
         run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
@@ -602,6 +618,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Set the emulator work directory
         # The `runner` context is not available in job-level `env`.
         run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
@@ -1056,6 +1074,8 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Set the emulator work directory
         # The `runner` context is not available in job-level `env`.
         run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
@@ -1153,6 +1173,8 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/dart
         with:
           sdk: 3.12.2

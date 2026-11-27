@@ -109,24 +109,22 @@ final class ViewProcessor {
           );
         }
       case AckUserWrite():
-        if (!operation.revert) {
-          newViewCache = _ackUserWrite(
-            oldViewCache,
-            operation.path,
-            operation.affectedTree,
-            writesCache,
-            optCompleteCache,
-            accumulator,
-          );
-        } else {
-          newViewCache = revertUserWrite(
-            oldViewCache,
-            operation.path,
-            writesCache,
-            optCompleteCache,
-            accumulator,
-          );
-        }
+        newViewCache = !operation.revert
+            ? _ackUserWrite(
+                oldViewCache,
+                operation.path,
+                operation.affectedTree,
+                writesCache,
+                optCompleteCache,
+                accumulator,
+              )
+            : revertUserWrite(
+                oldViewCache,
+                operation.path,
+                writesCache,
+                optCompleteCache,
+                accumulator,
+              );
       case ListenComplete():
         newViewCache = _listenComplete(
           oldViewCache,
@@ -212,15 +210,17 @@ final class ViewProcessor {
         // There is no complete child node available.
         newChild = ChildrenNode.empty;
       } else if (childChangePath.back!.isPriorityKey &&
-          childNode.getChild(childChangePath.parent!).isEmpty) {
+          _ignoresPriority(childNode.getChild(childChangePath.parent!))) {
         // A priority update on an empty node: if the node exists on the server, the server
-        // sends the priority down with it, so ignore it for now.
+        // sends the priority down with it, so ignore it for now. A node that keeps a priority
+        // takes it, as the server does.
         newChild = childNode;
       } else {
         newChild = childNode.updateChild(childChangePath, changedSnap);
       }
     }
-    if (oldChild == newChild) {
+    if (oldChild == newChild &&
+        ChildrenNode.sameHiddenAlong(oldChild, newChild, childChangePath)) {
       return oldViewCache;
     }
     final Node newEventSnap = filter.updateChild(
@@ -238,8 +238,13 @@ final class ViewProcessor {
     );
   }
 
+  /// Whether a priority written on [node] is ignored: it is empty and holds no hidden state.
+  static bool _ignoresPriority(Node node) => !ChildrenNode.takesPriority(node);
+
   /// JS `viewProcessorApplyUserMerge`: the writes to children in view first (a limit window may
-  /// make room), then the others.
+  /// make room), then the others; then the priority writes, parents first, as the server applies
+  /// one update (production check 39: a priority lands only on a node that has a value or holds
+  /// hidden state at that moment).
   ViewCache _applyUserMerge(
     ViewCache viewCache,
     Path path,
@@ -253,22 +258,31 @@ final class ViewProcessor {
       "Can't have a merge that is an overwrite",
     );
     ViewCache curViewCache = viewCache;
-    final List<MapEntry<Path, Node>> writes = changedChildren.entries.toList();
+    final List<MapEntry<Path, Node>> writes = writesInServerOrder(
+      changedChildren,
+    );
+    ViewCache apply(MapEntry<Path, Node> write) => _applyUserOverwrite(
+      curViewCache,
+      path.childPath(write.key),
+      write.value,
+      writesCache,
+      serverCache,
+      accumulator,
+    );
+    bool isPriority(MapEntry<Path, Node> write) =>
+        write.key.back?.isPriorityKey ?? false;
     for (final bool inView in <bool>[true, false]) {
-      for (final MapEntry<Path, Node> entry in writes) {
-        final Path writePath = path.childPath(entry.key);
-        if (viewCache.eventCache.isCompleteForChild(writePath.front!) ==
-            inView) {
-          curViewCache = _applyUserOverwrite(
-            curViewCache,
-            writePath,
-            entry.value,
-            writesCache,
-            serverCache,
-            accumulator,
-          );
+      for (final MapEntry<Path, Node> write in writes) {
+        final Path writePath = path.childPath(write.key);
+        if (!isPriority(write) &&
+            viewCache.eventCache.isCompleteForChild(writePath.front!) ==
+                inView) {
+          curViewCache = apply(write);
         }
       }
+    }
+    for (final MapEntry<Path, Node> write in writes.where(isPriority)) {
+      curViewCache = apply(write);
     }
     return curViewCache;
   }

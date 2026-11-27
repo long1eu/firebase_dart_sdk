@@ -18,8 +18,8 @@ class DefaultFirebaseOptions {
   static ctx.FirebaseOptions get currentPlatform => throw UnimplementedError();
 }
 
-// ../../docs/guides/database_flutter.md:56
-Future<void> guideLine56() async {
+// ../../docs/guides/database_flutter.md:57
+Future<void> guideLine57() async {
   Future<void> main() async {
     WidgetsFlutterBinding.ensureInitialized();
     FirebaseDatabaseDart.use(); // not needed on Linux and Windows

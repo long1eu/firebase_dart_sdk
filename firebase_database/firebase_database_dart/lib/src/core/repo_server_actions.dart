@@ -25,7 +25,7 @@ extension _RepoServerActions on Repo {
     final Node? node;
     try {
       children = isMerge ? _changedChildren(data) : null;
-      node = isMerge ? null : nodeFromJson(data);
+      node = isMerge ? null : nodeFromServerJson(data);
     } on Object catch (e) {
       _log(
         DatabaseLogLevel.error,
@@ -63,7 +63,7 @@ extension _RepoServerActions on Repo {
   static Map<Path, Node> _changedChildren(Object? data) => <Path, Node>{
     for (final MapEntry<Object?, Object?> entry
         in (data! as Map<Object?, Object?>).entries)
-      Path('${entry.key}'): nodeFromJson(entry.value),
+      Path('${entry.key}'): nodeFromServerJson(entry.value),
   };
 
   /// Android `Repo.onRangeMergeUpdate`.

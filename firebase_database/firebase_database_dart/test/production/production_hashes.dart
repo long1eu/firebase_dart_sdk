@@ -1,4 +1,4 @@
-// Node hashes formed from JSON, for the raw requests of checks 38 and 39 of the production
+// Node hashes formed from JSON, for the raw requests of checks 38, 39 and 42 of the production
 // verification kit. No client node code is used: the kit forms the hashes from the data a raw `g`
 // answered, so that it can offer the server more than one candidate and print which one matches.
 //
