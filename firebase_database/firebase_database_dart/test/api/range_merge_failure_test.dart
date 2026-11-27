@@ -113,9 +113,14 @@ void main() {
     time.elapse(Duration.zero);
     expect(
       w.messages,
+      // The type's name differs by compiler: _AssertionError on the VM, _AssertionErrorImpl on dart2wasm.
       contains(
-        'error: FIREBASE INTERNAL ERROR at /a: applying a server range merge failed, '
-        'in the local cache or the client (_AssertionError)',
+        matches(
+          RegExp(
+            r'^error: FIREBASE INTERNAL ERROR at /a: applying a server range merge failed, '
+            r'in the local cache or the client \(\w*AssertionError\w*\)$',
+          ),
+        ),
       ),
     );
     w.expectNoDataInLogs();
