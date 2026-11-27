@@ -87,7 +87,7 @@ mode for a real project that has not been run yet; see [Known limitations](#know
 | Cursors `startAt`, `startAfter`, `endAt`, `endBefore` (values or snapshot) | supported | `startAt([...])`, `startAtDocument(snapshot)`, ...; `test/integration/firebase/firestore/cursor_test.dart` |
 | `documentId()` | supported | `FieldPath.documentId`; `test/integration/firebase/firestore/query_where_test.dart` |
 | `getDocs`, `getDocsFromCache`, `getDocsFromServer` | supported | `query.get()`, `get(const GetOptions(source: Source.cache))`, `... Source.server` |
-| Vector search `findNearest` on a classic query | supported (extra) | `Query.findNearest(...)`, server only. Not in the JS client SDK (there it is a pipeline stage); follows the Android SDK. `test/integration/firebase/firestore/vector_test.dart` |
+| Vector search `findNearest` on a classic query | supported (extra) | `Query.findNearest(...)`, server only. Not in any official client SDK on a classic query: JS, Android and iOS have it only as a pipeline stage, C++ not at all. `test/integration/firebase/firestore/vector_test.dart` |
 
 ## Aggregations
 
