@@ -124,7 +124,8 @@ final class DatabaseReference extends Query {
   /// multi-segment paths (`'a/b'`), which makes one atomic write to several places; a `null` value removes
   /// that child. Two keys where one is a prefix of the other throw an [ArgumentError]. A key that
   /// names this location itself (`''`, `'/'` or any string of only slashes) throws an
-  /// [ArgumentError] that names the key, and nothing is written; use [set] to replace the location.
+  /// [ArgumentError] that names the key, and nothing is written; use [set] to replace the location
+  /// or [remove] to delete it.
   ///
   /// An empty [values] map writes nothing and completes the Future in a microtask, with no request.
   ///

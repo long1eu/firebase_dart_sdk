@@ -205,6 +205,25 @@ void validateFirebaseMergePaths(String errorPrefix, List<Path> mergePaths) {
   }
 }
 
+/// The longest key [_locationKeyError] prints whole; a longer one is cut to this many characters.
+const int _maxPrintedLocationKey = 20;
+
+/// The error for the merge key [key] that names the location itself, with a hint for [value]:
+/// `remove()` for null, `set()` otherwise. [key] is only slashes or empty; a key longer than
+/// [_maxPrintedLocationKey] characters is printed cut, with its length.
+ArgumentError _locationKeyError(String errorPrefix, String key, Object? value) {
+  final String shown = key.length <= _maxPrintedLocationKey
+      ? '"$key"'
+      : '"${key.substring(0, _maxPrintedLocationKey)}..." (${key.length} characters)';
+  final String hint = value == null
+      ? 'Use remove() to delete the location'
+      : 'Use set() to replace the location';
+  return ArgumentError(
+    '${errorPrefix}contains the key $shown, which names the location itself, not a child below '
+    'it. $hint, or name the children to write.',
+  );
+}
+
 /// Validates the argument of `update` at [path]. A key that parses to the empty path (`''`, or only
 /// slashes such as `'/'` and `'//'`) is refused: it would name [path] itself.
 void validateFirebaseMergeDataArg(
@@ -235,10 +254,7 @@ void validateFirebaseMergeDataArg(
     }
     final Path curPath = Path(key);
     if (curPath.isEmpty) {
-      throw ArgumentError(
-        '${errorPrefix}contains the key "$key", which names the location itself, not a child '
-        'below it. Use set() to replace the location, or name the children to write.',
-      );
+      throw _locationKeyError(errorPrefix, key, entry.value);
     }
     validateFirebaseData(
       errorPrefix,
