@@ -78,12 +78,33 @@ extension _RepoServerActions on Repo {
     final Path path = Path(wirePath);
     _log(DatabaseLogLevel.debug, 'onRangeMergeUpdate: $path');
     _dataUpdateCount++;
-    final List<RangeMerge> parsed = <RangeMerge>[
-      for (final WireRangeMerge merge in merges) RangeMerge.fromWire(merge),
-    ];
-    final List<Event> events = tag != null
-        ? _serverSyncTree.applyTaggedRangeMerges(path, parsed, Tag(tag))
-        : _serverSyncTree.applyServerRangeMerges(path, parsed);
+    // Read first, then apply, logged as in _onDataUpdate: the error's type and a fixed reason.
+    final List<RangeMerge> parsed;
+    try {
+      parsed = <RangeMerge>[
+        for (final WireRangeMerge merge in merges) RangeMerge.fromWire(merge),
+      ];
+    } on Object catch (e) {
+      _log(
+        DatabaseLogLevel.error,
+        'FIREBASE INTERNAL ERROR at $path: the server sent a range merge the client cannot '
+        'read (${e.runtimeType})',
+      );
+      return;
+    }
+    final List<Event> events;
+    try {
+      events = tag != null
+          ? _serverSyncTree.applyTaggedRangeMerges(path, parsed, Tag(tag))
+          : _serverSyncTree.applyServerRangeMerges(path, parsed);
+    } on Object catch (e) {
+      _log(
+        DatabaseLogLevel.error,
+        'FIREBASE INTERNAL ERROR at $path: applying a server range merge failed, in the local '
+        'cache or the client (${e.runtimeType})',
+      );
+      return;
+    }
     _post(events);
     if (events.isNotEmpty) {
       _rerunTransactions(path);

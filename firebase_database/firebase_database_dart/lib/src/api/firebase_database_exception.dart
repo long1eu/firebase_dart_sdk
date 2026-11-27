@@ -59,7 +59,7 @@ final class FirebaseDatabaseException extends FirebaseException {
 
   /// The error that caused this one, when there is one (an error from outside the package, or the
   /// error behind a failure the client raised itself). It is never part of [message] or [toString]: its
-  /// text may hold credentials.
+  /// text may hold credentials. Where it was thrown, when the client knows, is [stackTrace].
   final Object? cause;
 
   @override
@@ -93,8 +93,9 @@ const List<String> firebaseDatabaseExceptionCodes = <String>[
 /// The public exception for a core [error]: the kebab-case code of [DatabaseError.code], its message, and
 /// the wire status followed by the server's reason as [FirebaseDatabaseException.serverStatus]. There is
 /// none for [DatabaseErrorCode.databaseClosed] and for a [DatabaseError.isLocal] error, which did not come
-/// from the server; the cause of a local error is [FirebaseDatabaseException.cause]. For a status the
-/// client does not know, the details already hold `status: reason` and are the
+/// from the server; the cause of a local error is [FirebaseDatabaseException.cause], and where it was
+/// thrown ([DatabaseError.causeStackTrace]) is [FirebaseException.stackTrace] unless [stackTrace] is
+/// given. For a status the client does not know, the details already hold `status: reason` and are the
 /// [FirebaseDatabaseException.serverStatus] as they are.
 @internal
 FirebaseDatabaseException exceptionFromDatabaseError(
@@ -115,6 +116,6 @@ FirebaseDatabaseException exceptionFromDatabaseError(
         ? status
         : '$status: $details',
     cause: error.cause,
-    stackTrace: stackTrace,
+    stackTrace: stackTrace ?? error.causeStackTrace,
   );
 }

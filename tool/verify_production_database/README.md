@@ -1,18 +1,18 @@
 # Realtime Database production verification kit
 
-`firebase_database_dart` was verified against the Database emulator only. This kit runs 41 named checks against a
-**real** Realtime Database and prints, for each one, `PASS`, `FAIL`, `INCONCLUSIVE` or `SKIPPED` with a one-line
-explanation. It asks what the emulator cannot answer (TLS and the host the server names, rules with a real ID token,
-a token refresh and a sign-out on a live connection, priorities on the real server, timings), runs a base line of
-the public API on both backends, and runs the core side's production questions
+This kit runs 41 named checks against a **real** Realtime Database and prints, for each one, `PASS`, `FAIL`,
+`INCONCLUSIVE` or `SKIPPED` with a one-line explanation. It asks what the emulator cannot answer (TLS and the host the
+server names, rules with a real ID token, a token refresh and a sign-out on a live connection, priorities on the real
+server, timings), runs a base line of the public API on both backends, and runs the core side's production questions
 (`rtdb/from_helper/reports/production_questions.md`) as informational checks 27 to 36, plus checks 37 to 41.
 
 The code is `firebase_database/firebase_database_dart/test/production/verify_production.dart`; `run.sh` here runs it
 from the right directory. It is modelled on the Storage kit (`tool/verify_production_storage`).
 
 **Status of the kit itself:** it runs against the Database emulator (v4.11.2) and the Auth emulator, where every
-check passes (`test/production/verify_production_test.dart` pins the results below). It has **not** been run against a
-real project.
+check passes (`test/production/verify_production_test.dart` pins the results below). Run 15 on 2026-11-27 ran the
+whole kit in one run on the final client of this version: 41 of 41 PASS on the emulator and 41 of 41 PASS against a
+dedicated production database.
 
 ## Before you run it against production
 
@@ -339,10 +339,12 @@ after check 3 ("all of it in one set").
 ## Known results
 
 On the emulator: the Database emulator v4.11.2 with the kit's rules on the namespace `verify-database-kit`, and the
-Auth emulator of firebase-tools 15.18.0. Production: the whole kit ran once (checks 1 to 39,
-2026-11-26, 39 PASS, with the client before the emptied-node fix), then check 40 alone (2026-11-26) and check 41 alone
-(2026-11-27), one run each. Where production gave another observation than the emulator, a line
-"N on production" follows the check; without one, production gave the same, timings aside.
+Auth emulator of firebase-tools 15.18.0. Production: checks 1 to 39 ran as one run on 2026-11-25 and 26 (39 PASS, with
+the client before the emptied-node fix), check 40 alone (2026-11-26) and check 41 alone (2026-11-27). Run 15
+(2026-11-27, the whole kit of 41 checks in one run, 41 PASS on the emulator and 41 PASS on production) ran without
+`--expect-emptied-node-fix`, so checks 22 and 38 (c), (e) and (f) were informational and recorded that the client
+drops the priority of an emptied node, as the JS SDK does. Where production gave another observation than the
+emulator, a line "N on production" follows the check; without one, production gave the same, timings aside.
 
 - **1**: PASS: plain ws to 127.0.0.1, no other host
 - **1 on production** (2026-11-26): wss with TLS, the certificate checked by `dart:io`; the hello named a server host
@@ -393,11 +395,12 @@ Auth emulator of firebase-tools 15.18.0. Production: the whole kit ran once (che
   and the `set` won (99): the transaction had been sent, and a sent transaction the server accepts completes as
   committed, as in the JS SDK; line 18 two runs (null, then 5), committed 6; line 19 `max-retries` after 25 runs in
   two of three runs, and in the third it committed after 15 runs (the rival's writes race the transaction)
-- **31 on production** (2026-11-26): line 15 99 of 100 committed, 1 failed with `max-retries` (final 99, no value
-  went back); line 19 `max-retries` after 25 runs; lines 16 to 18 as on the emulator
+- **31 on production** (2026-11-26 and run 15): line 15 99 of 100 committed, 1 failed with `max-retries` (final 99), and
+  98 of 100 in run 15 (2 failed with `max-retries`, final 98); no value went back in either; line 19 `max-retries`
+  after 25 runs on 2026-11-26, and committed after 18 runs in run 15; lines 16 to 18 as on the emulator
 - **32**: on loopback the 1 MB `get()` took 4 to 6 ms and the small event came after it (on the emulator, 3 runs)
-- **32 on production** (2026-11-26): the small event came **before** the 1 MB `get()` finished, not after it as on
-  loopback
+- **32 on production** (2026-11-26 and run 15): on 2026-11-26 the small event came **before** the 1 MB `get()`
+  finished; in run 15 the `get()` took 364 ms and the small event came at 377 ms, after it, as on loopback
 - **33**: the onDisconnect write ran about 12 ms after the dropped socket
 - **34**: 200; **35**: REST 400 "Invalid path: Path specified exceeds the maximum depth that can be written (32).",
   the client refuses before sending; **36**: acknowledgements in order, final 999, no value went back, 4,975 to
@@ -443,8 +446,8 @@ Auth emulator of firebase-tools 15.18.0. Production: the whole kit ran once (che
 - **41**: each of the six merges (`""`, `"/"`, `"//"`, alone and beside `n`) is answered
   `{"s":"invalid_parameters","d":"Empty strings are not valid keys"}` within 22 ms; no frame to either listener; `g`
   and export of up unchanged (`{"loc":{"j":2,"k":1},"sib":5}`); the writer's next put is answered ok
-- **41 on production** (2026-11-27): every answer, frame, `g` and export as on the emulator; the answers came within
-  161 ms
+- **41 on production** (2026-11-27, alone and in run 15): every answer, frame, `g` and export as on the emulator; the
+  answers came within 161 ms alone and within 178 ms in run 15
 
 ## Questions the kit does not answer
 
@@ -454,9 +457,9 @@ of a real project), line 27 (a token that expires while offline: it would take a
 
 ## Not verified
 
-- Any run against a real project.
 - App Check: the kit sets no App Check provider.
-- A regional database (`*.firebasedatabase.app`) and a custom domain; give one with `--database-url` to see check 1.
+- A custom domain and the legacy `firebaseio.com` host; give one with `--database-url` to see check 1. Run 15 used a
+  regional `*.firebasedatabase.app` database.
 - Size limits beyond the 768-byte path and 32 levels of check 3, and quotas.
 - A token that expires on its own (check 18 forces a refresh) and a revoked token.
 - Browser behaviour: the kit runs on the Dart VM.

@@ -259,7 +259,7 @@ the protocol of the JS SDK; `firebase_database_dart_sqlite` keeps its cache on d
 `firebase_database_dart_platform` runs the official `firebase_database` API on top of it. Version 0.0.1, not
 published. What has run: its test suites on macOS, Windows 11 and Linux (Dart VM and Chrome), 33 tests against the
 Database emulator, FlutterFire's own `firebase_database` integration suite through the adapter, and one Flutter
-Windows debug app against the emulator; against production, its verification kit (39 checks), once. What has not: a
+Windows debug app against the emulator; against production, its verification kit (41 checks), once. What has not: a
 release build of a desktop app, Safari and Firefox; the report of its large-snapshot benchmark is not written yet.
 See its [README](firebase_database/firebase_database_dart/README.md), the [guide](docs/guides/database.md) and the
 [decisions](docs/database_decisions.md). The other directories
