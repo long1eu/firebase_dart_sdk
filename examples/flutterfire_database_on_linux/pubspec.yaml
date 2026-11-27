@@ -15,7 +15,7 @@ dependencies:
   firebase_database: ^13.1.0
   # Implements firebase_database (and firebase_core) on Linux. Flutter registers
   # it before main() through its dartPluginClass; the app does not import it.
-  firebase_database_dart_platform: ^0.0.1
+  firebase_database_dart_platform: ^0.1.0
   flutter:
     sdk: flutter
 
@@ -26,7 +26,7 @@ dev_dependencies:
   integration_test:
     sdk: flutter
 
-# firebase_database_dart_platform is not on pub.dev yet: the overrides make it
+# firebase_database_dart_platform is on pub.dev; the overrides make it
 # and the packages under it come from this repository. Outside the repository,
 # remove this section and depend on the versions on pub.dev.
 dependency_overrides:
