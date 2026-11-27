@@ -8,7 +8,7 @@ app is offline. It is not affiliated with or endorsed by Google or Firebase.
 > **Status: 0.0.1, work in progress, not published.** What has run (the counts are from the maintainer's runs on the
 > merged trunk):
 >
-> - The package has 249 tests, which pass on Dart 3.12.2 (2026-11-27; 247 passed on Dart 3.11.5 and on Dart 3.8.0 at
+> - The package has 287 tests, which pass on Dart 3.12.2 (2026-11-27; 247 passed on Dart 3.11.5 and on Dart 3.8.0 at
 >   an earlier commit), including Android's own persistence suites run on the SQLite engine.
 > - On Windows 11 x64 the disk cache test of the Windows example app passed with an earlier version of the app.
 > - The SQLite engine had an independent review (1 high, 5 medium and 10 low findings), all fixed with a test each.
@@ -149,7 +149,7 @@ and the tracked queries, restores the writes, and then connects. The layout is A
 
 | Platform | What ran |
 |---|---|
-| Dart VM | 249 tests on Dart 3.12.2 (2026-11-27; 247 on Dart 3.11.5 and on Dart 3.8.0 at an earlier commit), including Android's persistence suites on the SQLite engine |
+| Dart VM | 287 tests on Dart 3.12.2 (2026-11-27; 247 on Dart 3.11.5 and on Dart 3.8.0 at an earlier commit), including Android's persistence suites on the SQLite engine |
 | Windows 11 x64 | the disk cache test of the Windows example app, with an earlier version of the app |
 | Linux x64 | no run of this package is recorded; the client's own suites ran there (see its README) |
 | Android, iOS | declared in `pubspec.yaml`; no run is recorded |

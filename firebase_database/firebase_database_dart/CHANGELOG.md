@@ -5,20 +5,23 @@
   Dart streams. It is not affiliated with or supported by Google or Firebase.
 - It covers reads and writes, listeners, queries, transactions, `onDisconnect`, server values and the connection
   state. An optional disk cache is in `firebase_database_dart_sqlite`.
-- Where it ran. Dart VM: macOS (2,456 tests of the client; 29 tests against the Database emulator v4.11.2), Linux x64
-  in a Debian 13 container and Windows 11 x64 (both at an earlier commit). Web: Chrome on macOS, the whole test tree,
-  2,411 tests with dart2js and 2,415 with dart2wasm. Not run: a release build of a desktop app, Safari, Firefox and a
-  real display.
-- Verified against production. The verification kit (39 checks) ran once against a dedicated database instance of one
-  Firebase project, on 2026-11-25 and 26, on the client at an earlier commit, and all 39 passed. "Run" here means one
-  run of the kit, not repeated runs. Some checks are informational and record what the client does. The kit signs up
-  a throwaway user, writes about 1.1 MB below a path of its own and removes it. It covers the connection and its TLS,
-  the server's host, every value type, server values, listeners, queries, transactions, `onDisconnect`, offline
-  writes, rules with and without a user, a token refresh on a live connection, a sign-out, timings, a 1 MB value,
-  pipelined writes, and raw frames for the server's answers about priorities and limit queries.
+- Where it ran. Dart VM: macOS (2,639 tests of the client, 60 of them skipped; 29 tests against the Database emulator
+  v4.11.2), Linux x64 in a Debian 13 container and Windows 11 x64 (both at an earlier commit). Web: Chrome on macOS, the
+  whole test tree, 2,578 tests with dart2js and 2,582 with dart2wasm. Not run: a release build of a desktop app, Safari,
+  Firefox and a real display.
+- Verified against production. The verification kit has 41 checks. Checks 1 to 39 ran once as one run against a
+  dedicated database instance of one Firebase project, on 2026-11-25 and 26, on the client at an earlier commit, and all
+  39 passed; check 40 (2026-11-26) and check 41 (2026-11-27) each ran alone, once, and gave the same answers as on the
+  emulator (`tool/verify_production_database/README.md`, "Known results"). "Run" here means one run, not repeated runs.
+  Some checks are informational and record what the client does. The kit signs up a throwaway user, writes about 1.1 MB
+  below a path of its own and removes it. It covers the connection and its TLS, the server's host, every value type,
+  server values, listeners, queries, transactions, `onDisconnect`, offline writes, rules with and without a user, a
+  token refresh on a live connection, a sign-out, timings, a 1 MB value, pipelined writes, and raw frames for the
+  server's answers about priorities and limit queries.
 - Never run against production: token expiry after an hour, a rules change during a connection, a 10 MiB string leaf
-  and a 16 MB write, App Check with a real provider, the legacy `firebaseio.com` host and a custom domain, and the
-  re-send of an `increment` whose answer was lost.
+  and a 16 MB write, App Check with a real provider, the legacy `firebaseio.com` host and a custom domain, the re-send
+  of an `increment` whose answer was lost, the limit-view race of section 25 and a plain `set` of a null priority on a
+  missing node (only the `update` form ran). Section 23 of `docs/database_decisions.md` has the list.
 - Known limits:
   - Writes are delivered at least once. A re-sent `ServerValue.increment` can apply twice; use a transaction to count.
   - A hung TLS handshake cannot be closed on the Dart VM. The client gives up after its 30 s connect timeout and
@@ -30,11 +33,16 @@
   - One process or isolate owns a cache file; a second one runs memory-only with one logged warning.
   - Transactions and `onDisconnect` registrations are not persisted.
   - Priorities and pending writes. As in the JS SDK, a node that is emptied and refilled loses its priority locally
-    while the server keeps it, and a transaction on a node that holds only a priority fails with `max-retries`.
+    while the server keeps it, and a transaction on a node that holds only a priority fails with `max-retries`
+    (reported upstream as firebase/firebase-js-sdk #10688; README, "Known limits", and section 25 of
+    `docs/database_decisions.md`, table "Behaviours shared with the JS SDK that are kept", rows 2 and 8).
+  - A write below a leaf that the server refuses shows a wrong value until the refusal arrives, 2 to 4 ms on the
+    emulator; the JS SDK keeps the wrong value until a listener is attached again (firebase/firebase-js-sdk #10687; the
+    offline form, #10686, is right in this client). Section 25 of `docs/database_decisions.md`, same table, row 1.
   - Not in this version: long polling, web disk persistence, a REST client, an instance cache, typed converters, the
     compat API and a proxy option in the API. On the Dart VM a secure connection honours `HTTPS_PROXY` and `NO_PROXY`.
 - Differences from the JS SDK are in the README, "How it differs from the JS SDK", and in section 25 of
-  `docs/database_decisions.md` (33 rows, each with the test that pins it).
+  `docs/database_decisions.md` (38 rows, each with the test that pins it).
 - `FirebaseDatabase(app, databaseUrl:, emulatorHost:, mockUserToken:, persistence:, logger:)`: one instance is one
   connection; configuration is constructor-only and there is no instance cache. A new instance opens no connection:
   the first operation that needs the server (a read, a listener, a write, a transaction, an `onDisconnect` call,
@@ -70,6 +78,8 @@
   server's reason as its message and `status: reason` as `serverStatus`, as for the other codes; a `get()` fails the
   same way as a write. A `get()` whose answer the client cannot read fails with `unknown`, a fixed message, the
   original error as `cause` and no `serverStatus`.
+- Closing the database or deleting its app ends every stream with done and no error; pending Futures fail with
+  `database-closed`. A server refusal ends a stream with an error; losing the connection never does.
 - Logging through a callback, off by default; credentials are never logged.
 - Optional disk persistence through `firebase_database_dart_sqlite`; only data under a listener or `keepSynced` is
   written to the cache; an offline `get()` answers from the cache only when it holds the complete value for the query;
@@ -79,7 +89,12 @@
   it with `QuerySpec.fromPathAndWireObject`; `Index`, `KeyIndex` and `NamedNode` are exported there; the
   `QuerySpec(path, params)` and `ImmutableTree(value, children)` constructors, `QuerySpec.params`,
   `QuerySpec.toListenSpec` and `ImmutableTree.children` are `@internal`.
-- `package:firebase_database_dart/testing.dart`: a fake server for tests of your own code.
+- `package:firebase_database_dart/testing.dart`: a fake server for tests of your own code. Breaking for tests that
+  acked the newest write first: `FakeDatabaseServer`'s `ackLastWrite`, `failLastWrite` and `ackLastOnDisconnect` now
+  throw a `StateError` when the newest request is not the oldest unanswered one, because a test must answer writes and
+  `onDisconnect` requests in the order they left (after a reconnect, puts and merges before `onDisconnect` requests
+  made offline, as the client sends them). Pass `outOfOrder: true` to keep the old behaviour; the new `ackNextWrite`,
+  `failNextWrite` and `ackNextOnDisconnect` answer the oldest.
 - The event dispatcher yields to the event loop after 1,000 events with an unthrottled task in the browser, so a burst
   of events in a hidden tab is delivered in bounded time.
 - A limit query under a listener at or above its path keeps the right window when one update by another client

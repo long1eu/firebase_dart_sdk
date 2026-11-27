@@ -115,8 +115,10 @@ final class FirebaseDatabase {
   /// restart. [logger] receives log messages (silent when null).
   ///
   /// The constructor is synchronous, also with persistence: opening the store and restoring writes
-  /// happen in the background, and calls made meanwhile wait for it, in call order. If the start
-  /// fails after the store opened, every waiting and later call fails with that error.
+  /// happen in the background, and calls made meanwhile wait for it, and their local effects apply
+  /// in call order. The order in which their requests then leave is not the call order across
+  /// kinds: a listen or a get may leave before an earlier set. If the start fails after the store
+  /// opened, every waiting and later call fails with that error.
   ///
   /// The persisted cache is keyed by the app name and [databaseUrl], which is normalised: every
   /// spelling of one URL with a host name shares one cache, and two namespaces on one host never
