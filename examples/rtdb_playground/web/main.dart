@@ -29,8 +29,8 @@ void _showReject() {
   final web.Element button = _byId('reject');
   button.setAttribute('aria-pressed', '${_sim.rejectNext}');
   button.textContent = _sim.rejectNext
-      ? 'Next write will be rejected (click to cancel)'
-      : 'Server rejects next write';
+      ? 'The oldest unanswered write will be rejected (click to cancel)'
+      : 'Server rejects the oldest unanswered write';
 }
 
 void main() {

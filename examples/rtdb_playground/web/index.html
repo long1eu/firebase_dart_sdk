@@ -31,7 +31,7 @@
       <div class="status">
         <label class="switch"><input type="checkbox" id="reachable" checked> Server reachable</label>
         <span id="conn" class="badge">starting</span>
-        <button type="button" id="reject" class="danger" aria-pressed="false">Server rejects next write</button>
+        <button type="button" id="reject" class="danger" aria-pressed="false">Server rejects the oldest unanswered write</button>
       </div>
       <div class="two">
         <div>
@@ -107,7 +107,8 @@
     <section id="server-panel" aria-labelledby="server-title">
       <h2 id="server-title">What the server saw</h2>
       <p class="hint">Requests are recorded when they are sent. While the server is unreachable nothing
-        is sent: writes wait in the client and are sent after it connects, newest answered first.</p>
+        is sent: writes wait in the client and are sent after it connects, and the server answers them in the
+        order they were sent, oldest first.</p>
       <ol id="server-log" class="log"></ol>
     </section>
   </main>
