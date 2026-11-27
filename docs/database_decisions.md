@@ -1194,6 +1194,7 @@ the number; the section each reason cites has the upstream lines.
 | 34 | Update key naming the location itself | `update({'': v})`, `{'/': v}`, `{'//': v}` accepted at the call (`J:core/util/validation.ts:253-289`, `new Path(key)` with no empty-path check; Android the same, `A:core/utilities/Validation.java:134-168`): the location is replaced locally until the server refuses the merge with `invalid_parameters` "Empty strings are not valid keys" and the write reverts (measured on the emulator and on production, 2026-11-27) | `update` and `OnDisconnect.update` throw an `ArgumentError` that names the key; nothing is sent | `empty_merge_key_test`; `validation_test` (`test/core/util/`, group "merges") |
 | 35 | Failed `get` and unreadable data in the log | `'get for query ' + stringify(query) + ' failed: ' + err`, the query with its bound values, when logging is on (`J:core/Repo.ts:533`) | the path, the query's shape (index, which bounds are set and inclusive, limit and side) and the server status; no bound value or key; data the client cannot parse is logged by error type and path | `logging_and_urls_test` |
 | 36 | `refFromUrl` of another database | host compared, namespace not; no check at all for a custom host, the emulator included; a bad percent escape kept raw (`J:api/Reference_impl.ts:516-529`, `J:core/util/libs/parser.ts:28-30`, read) | host and namespace compared (a database `https://a.firebaseio.com?ns=b` refuses `https://a.firebaseio.com/x`); on the emulator host and port are not compared, but a namespace the URL names must be this one, and the URL must be http(s) or ws(s) with a valid host, no user info, no fragment and no query key other than `ns`; a bad percent escape in the path throws; no message quotes the whole URL, its user info or its query | `logging_and_urls_test`; `api_behaviour_test` (m10) |
+| 37 | `databaseUrl` with an emulator | namespace from `ns`, else the first label of a host with three or more labels, else empty (allowed for `localhost` only; no `ns` is sent and the emulator reads its Host header) | namespace from `ns`, else the emulator's own Host rule applied to the URL's `host:port` (first label when valid and not numeric, else `fake-server`); host, port and scheme are not checked; one warning to the logger when the namespace came from the host and is not `<projectId>-default-rtdb` | `emulator_url_test`; `emulator_namespace_warning_test` |
 
 Test file names are given without their directory: `scenarios_test`, `snapshot_test`, `public_surface_test`,
 `validation_test`, `api_behaviour_test` and `revert_under_pending_write_test` are in `test/api/`; `repo_get_test`,
@@ -1251,6 +1252,10 @@ Test file names are given without their directory: `scenarios_test`, `snapshot_t
 36. A reference made from another database's URL reads and writes this database at that path, and an error that
     quotes the URL can print a password. On the emulator the host names no database, so only the namespace can
     be compared.
+37. The emulator ignores the URL's host, so only the namespace matters. Mirroring the emulator's rule gives the
+    database the emulator would pick for that URL, and refuses no address a developer uses (Android's
+    `10.0.2.2`, a LAN address, a `.local` name). `fake-server` is not the project's default database and has
+    open rules, which the warning and the constructor doc say. Both tests are in `test/api/`.
 
 Status: built.
 
