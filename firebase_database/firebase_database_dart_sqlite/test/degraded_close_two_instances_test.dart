@@ -3,11 +3,14 @@
 @TestOn('vm')
 library;
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:firebase_database_dart/storage_engine.dart';
 import 'package:firebase_database_dart_sqlite/firebase_database_dart_sqlite.dart';
 import 'package:firebase_database_dart_sqlite/src/posix_file_mode.dart';
+import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';
+import 'package:firebase_database_dart_sqlite/src/sqlite_lease.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:test/test.dart';
 
@@ -170,6 +173,49 @@ void main() {
           );
         }
       }
+    },
+  );
+
+  test(
+    'a reopen at close that throws something other than a SqliteException does not escape '
+    'close',
+    () async {
+      // A store file with its tables, then a connection built by hand so the reopen can fail.
+      (await fixture.open()).close();
+      final sqlite.Database db = sqlite.sqlite3.open(fixture.path);
+      final SqliteLease lease = SqliteLease(
+        ownerId: 'owner-hand',
+        nowMs: fixture.clock.now,
+      );
+      expect(lease.tryAcquire(db), isA<LeaseAcquired>());
+      bool closed = false;
+      final SqliteConnection store = SqliteConnection.durable(
+        database: db,
+        path: fixture.path,
+        lease: lease,
+        log: (_, String message) => fixture.log.add(message),
+        periodicTimer: (Duration period, void Function(Timer timer) tick) =>
+            FakePeriodicTimer(period, tick),
+        onClosed: () => closed = true,
+        openDatabase: (String path) => throw StateError('no native library'),
+      );
+      final sqlite.Database other = fixture.raw();
+      other.execute('BEGIN IMMEDIATE');
+      for (int i = 0; i < 3; i++) {
+        store.refreshLease();
+      }
+      other.execute('ROLLBACK');
+      StoreFixture.closeRaw(other);
+      expect(store.state, StoreState.degraded);
+
+      store.close(removeWriteIds: <int>[1]);
+
+      expect(store.state, StoreState.closed);
+      expect(closed, isTrue);
+      expect(
+        fixture.log.last,
+        contains('could not be removed from the file (StateError)'),
+      );
     },
   );
 }

@@ -117,9 +117,12 @@ Uri persistenceUrlOf(RepoInfo info) {
 ///   query, a host that does not name its namespace (a custom domain, a loopback host, a cloud
 ///   workstation) is read with `?ns=<first label>`, as the client leaves that `ns` out of its key.
 ///
-/// One spelling maps to another database's key: a production database on a cloud workstation
-/// spelled with `?ns=<first label>` is read as the emulator key; pass `FirebaseDatabase.databaseUrl`
-/// for it.
+/// On a cloud workstation (`*.cloudworkstations.dev`) a production database and the emulator on
+/// the same host and namespace can meet. A production database spelled with `?ns=<first label>`
+/// is read as the emulator's key (the client's own key for it has no query); pass
+/// `FirebaseDatabase.databaseUrl` for it. And the client itself gives a production database with
+/// any other `?ns=` the same key as the emulator on that host at port 443, so the two share one
+/// cache.
 ///
 /// Throws a [FormatException] for a URL that the constructor would refuse, or an emulator URL
 /// without `?ns=`. The message does not quote the URL.

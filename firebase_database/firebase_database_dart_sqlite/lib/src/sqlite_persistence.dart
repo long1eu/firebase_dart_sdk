@@ -43,12 +43,12 @@ DatabasePersistence sqlitePersistence(
 /// Deletes the cache files of [databaseUrl] of the app named [appName] in [directory]: the
 /// database file, its side files and its moved-aside copies.
 ///
-/// [databaseUrl] is normalised by [persistenceDatabaseUrl], the function `FirebaseDatabase` keys
-/// its cache with: `FirebaseDatabase.databaseUrl` clears its own files, and so do the spellings of
+/// [databaseUrl] is normalised by [persistenceDatabaseUrl], which maps a URL onto the key
+/// `FirebaseDatabase` builds: `FirebaseDatabase.databaseUrl` clears its own files, and so do the spellings of
 /// a production URL that the constructor accepts (a trailing `/`, `wss://`, the case of the host,
 /// port 443, a `?ns=` equal to the first label of the host). An emulator cache is named by
-/// `http://<host>[:<port>]?ns=<namespace>` (`https` on a cloud workstation). The one spelling that
-/// names another cache is described at [persistenceDatabaseUrl]. Fails with an [ArgumentError] for
+/// `http://<host>[:<port>]?ns=<namespace>` (`https` on a cloud workstation). The cloud-workstation
+/// cases where a spelling names another cache are described at [persistenceDatabaseUrl]. Fails with an [ArgumentError] for
 /// a URL that is not a database URL.
 ///
 /// Fails with a [StateError] while an instance holds the file (in this process or another: an
@@ -90,10 +90,13 @@ PersistenceStorageEngine engineOverConnection(
 /// aside (`<file>.bad-<time>`, the newest one kept) and the cache starts empty; a storage error
 /// during the session (a full disk) makes the instance continue in memory. The file then keeps
 /// the writes that were pending at the error, and the next start sends them again. Of those, the
-/// ones the server answers before the instance closes are removed at close, but only when no other
-/// instance took the file over and no clear deleted it meanwhile, and the file can be written then;
-/// in every other case (also after a crash) they are sent again. Each case is logged once, without
-/// data.
+/// ones the server answers before the instance closes are removed at close, when no other instance
+/// took the file over and no clear deleted it meanwhile, and the file can be written then. After a
+/// crash, or with the file still failing at close, they are sent again; an instance that took the
+/// file over sends them itself; after a clear nothing is sent. The degraded store keeps its lease
+/// row unrefreshed, so another instance takes over after one observation period (running
+/// `PRAGMA quick_check` first when the store was in another process). Each case is logged once,
+/// without data.
 final class SqlitePersistence {
   /// SQLite files in [directory]; see [sqlitePersistence].
   SqlitePersistence(

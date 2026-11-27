@@ -731,13 +731,20 @@ inside every write transaction (`BEGIN IMMEDIATE`) stops a former owner. `persis
 truth. Closing releases the lease; `clearSqlitePersistence` clears under the lease and writes a tombstone row
 before it deletes the files.
 
-**A storage error never deletes pending writes and never wipes the store.** The failed transaction rolls back,
-the engine stops writing, releases the lease and reads as empty for the rest of the session, and the file keeps
-everything committed before the error. `SQLITE_BUSY` and `SQLITE_LOCKED` roll back that transaction and leave
-the store durable; it degrades only after 3 in a row. The busy timeout is 1 s for normal work and 0 for
-clean-up. The app never receives a `SqliteException`. A bad row (a write, a cache row or a lease row that does
-not decode) is a cache miss: it is logged once and skipped, never thrown, and a lease row that does not read
-counts as not ours.
+**A storage error never deletes pending writes and never wipes the store.** The failed transaction rolls back, the
+engine stops writing and reads as empty for the rest of the session, and the file keeps everything committed before
+the error. It keeps its lease row without refreshing it, so another connection takes the file over after one
+observation period (with `PRAGMA quick_check` when the store ran in another process). At close the store opens the
+file once more, without creating it, and in one `BEGIN IMMEDIATE` deletes the writes the server answered after the
+error and its lease row, only while the row still holds its own owner id and epoch. That proves nobody else had the
+file since: an owner id is random per connection and only that connection writes it, a takeover writes its own id, a
+clear writes its tombstone and then deletes the file (or removes the tombstone, leaving no row), a quarantine
+renames the file, and a release deletes the row. Only ids the store saw committed in the file are deleted; writes
+made after the error never are. `SQLITE_BUSY` and `SQLITE_LOCKED` roll back that transaction and leave the store
+durable; it degrades only after 3 in a row. The busy timeout is 1 s for normal work and for that reopen at close,
+and 0 for other clean-up. The app never receives a `SqliteException`. A bad row (a write, a cache row or a lease row
+that does not decode) is a cache miss: it is logged once and skipped, never thrown, and a lease row that does not
+read counts as not ours.
 
 A file the engine cannot trust is handled at the next open: a foreign file, a corrupt file or a file of a
 newer major version is renamed aside together with its `-wal` file (one copy kept) and an empty cache starts;

@@ -332,8 +332,9 @@ final class SqliteConnection {
   /// At the close of a degraded store: opens the file again (never creating it) and, in one
   /// transaction, when the lease row still names this connection ([SqliteLease.isStillOurs]),
   /// deletes the rows of [ids] and the lease row. When another connection or a clear took the file
-  /// since the error, or the file is gone, nothing is changed. Never throws; waits at most
-  /// [busyTimeoutMs] for the lock.
+  /// since the error, or the file is gone, nothing is changed. Sets `synchronous = FULL` as the
+  /// opener does. Never throws, whatever fails (SQLite, the file system, the native library); waits
+  /// at most [busyTimeoutMs] for the lock.
   void _finishDegraded(List<int> ids) {
     final String? file = path;
     final sqlite.Database Function(String path)? reopen = _openDatabase;
@@ -346,6 +347,7 @@ final class SqliteConnection {
     try {
       db = reopen(file);
       db.select('PRAGMA busy_timeout = $busyTimeoutMs');
+      db.select('PRAGMA synchronous = FULL');
       db.execute('BEGIN IMMEDIATE');
       if (!_lease!.isStillOurs(db)) {
         db.execute('ROLLBACK');
@@ -367,21 +369,33 @@ final class SqliteConnection {
           'Realtime Database offline cache: $what were removed from the file.',
         );
       }
-    } on sqlite.SqliteException catch (e) {
+    } on Object catch (e) {
       final sqlite.Database? opened = db;
-      if (opened != null) {
-        _quietly(() => opened.execute('ROLLBACK'));
-      }
-      if (ids.isNotEmpty && File(file).existsSync()) {
-        _log(
-          DatabaseLogLevel.warning,
-          'Realtime Database offline cache: $what could not be removed from the file (SQLite '
-          'result code ${e.resultCode}); the next start may send them again.',
-        );
-      }
+      _ignoringErrors(() => opened?.execute('ROLLBACK'));
+      _ignoringErrors(() {
+        if (ids.isNotEmpty && File(file).existsSync()) {
+          final String why = e is sqlite.SqliteException
+              ? 'SQLite result code ${e.resultCode}'
+              : e.runtimeType.toString();
+          _log(
+            DatabaseLogLevel.warning,
+            'Realtime Database offline cache: $what could not be removed from the file ($why); '
+            'the next start may send them again.',
+          );
+        }
+      });
     } finally {
       // ignore: deprecated_member_use
-      _quietly(() => db?.dispose());
+      _ignoringErrors(() => db?.dispose());
+    }
+  }
+
+  /// Runs [body] and drops anything it throws: for the last steps of [close], which must not throw.
+  static void _ignoringErrors(void Function() body) {
+    try {
+      body();
+    } on Object {
+      // Nothing more can be done for a store that is being closed.
     }
   }
 
