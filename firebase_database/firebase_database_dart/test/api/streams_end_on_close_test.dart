@@ -108,6 +108,53 @@ void main() {
     expect(h.log, <String>['S:V(1)', 'S:E(permission-denied)', 'S:done']);
   });
 
+  _scenario(
+    'a paused subscription gets its buffered events, then done, after resume',
+    (Harness h) {
+      final StreamSubscription<DatabaseEvent> s = h.listenAnswered(
+        'S',
+        h.ref('a').onValue,
+        'a',
+        1,
+      );
+      s.pause();
+      h.server.push('a', 2);
+      h.settle();
+      unawaited(h.db.close());
+      h.settle();
+      expect(h.log, <String>['S:V(1)']);
+      s.resume();
+      h.settle();
+      expect(h.log, <String>['S:V(1)', 'S:V(2)', 'S:done']);
+    },
+  );
+
+  _scenario(
+    'a server status database_closed is not a close: refusal and cancel deliver unknown',
+    (Harness h) {
+      h.listen('R', h.ref('r').onValue);
+      h.settle();
+      h.server.failListen('r', 'database_closed');
+      h.settle();
+      h.listenAnswered('C', h.ref('c').onValue, 'c', 1);
+      h.server.cancelListen('c', 'DATABASE_CLOSED');
+      h.settle();
+      h.trackEvent('O', h.ref('o').once());
+      h.settle();
+      h.server.failListen('o', 'database_closed');
+      h.settle();
+      expect(h.log, <String>[
+        'R:E(unknown)',
+        'R:done',
+        'C:V(1)',
+        'C:E(unknown)',
+        'C:done',
+        'O:E(unknown)',
+      ]);
+      expect(h.db.isConnected, isTrue);
+    },
+  );
+
   _scenario('pending Futures still fail with database-closed', (Harness h) {
     h.track('W', h.ref('w').set(1));
     h.trackValue('G', h.ref('g').get());

@@ -713,8 +713,7 @@ final class Repo implements ServerActionsDelegate {
 
   static bool _isInfo(Path path) => path.front?.name == ChildKey.info.name;
 
-  static DatabaseError _closedError() =>
-      DatabaseError.fromStatus(DatabaseErrorCode.databaseClosed.wireStatus);
+  static DatabaseError _closedError() => DatabaseError.closed();
 
   /// The error of a request [status] (null for `ok`) with the reason in [data] (Android
   /// `Repo.fromErrorCode`).

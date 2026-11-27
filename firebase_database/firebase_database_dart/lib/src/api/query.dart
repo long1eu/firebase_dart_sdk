@@ -48,7 +48,8 @@ import 'package:meta/meta.dart';
 ///
 /// Delivery. No listener runs inside the call that caused it: events go through one queue per
 /// database, drained in a microtask. [FirebaseDatabase.close] drops the events still queued for
-/// open streams, then each gets done in a microtask. Inside one change, events come child
+/// open streams, then each gets done in a microtask; a paused subscription gets done after
+/// `resume`, following the events already buffered in it. Inside one change, events come child
 /// removed, added, moved, changed, then value; deeper locations before shallower ones. Changes are
 /// delivered in the order they were applied. Pausing a subscription buffers its events without
 /// bound; nothing is dropped. Order across subscriptions holds only for `listen` callbacks that are

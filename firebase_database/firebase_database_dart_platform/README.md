@@ -157,7 +157,7 @@ name and database URL, so one directory serves every app.
 | `goOnline`, `goOffline`, `purgeOutstandingWrites` | the same client calls | pending writes fail with `write-cancelled` |
 | `ref`, `refFromURL`, `child`, `parent`, `root`, `key`, `path` | the location's keys | no client, no I/O |
 | `set`, `setWithPriority`, `update`, `setPriority`, `remove`, `push` | `set`, `update`, `setPriority`, `push` | map keys are stringified (as FlutterFire does) |
-| `onValue`, `onChildAdded`, `onChildChanged`, `onChildRemoved`, `onChildMoved`, `once`, `get` | the client's streams and `get` | |
+| `onValue`, `onChildAdded`, `onChildChanged`, `onChildRemoved`, `onChildMoved`, `once`, `get` | the client's streams and `get` | a `once()` pending at close or app deletion fails with `StateError` "No element"; `get()` fails with `database-closed` |
 | `orderBy*`, `startAt`, `startAfter`, `endAt`, `endBefore`, `equalTo`, `limitToFirst`, `limitToLast`, `keepSynced` | the client's `Query` | |
 | `runTransaction(handler, applyLocally:)` | `runTransaction` | the handler gets a fresh mutable copy on each run; it may run several times |
 | `onDisconnect()`: `set`, `setWithPriority`, `update`, `remove`, `cancel` | `onDisconnect` | |
@@ -207,6 +207,9 @@ that same object. With `applyLocally: false`, listeners see no local event befor
   children from the parent's `value` map, so there they see it.
 - **A stream ends after the server cancels its listen** (`permission-denied`, then done), as the client's streams do;
   on Android the stream reports the error and stays open, so an `await for` loop ends here and waits there.
+- **Closing the client or deleting the app is not an error**: every stream ends with done and no error event, as the
+  client's streams do. FlutterFire's `once()` is `onValue.first`, so a `once()` pending then fails with `StateError`
+  "No element" instead of `database-closed`; `get()` and the other Futures fail with `database-closed`.
 - **A child snapshot keeps its priority** (`snapshot.child('a').priority`, `children`); the native plugins give null.
 - **A whole-number priority is an `int`** (`1`, not `1.0`), as values are; on Android FlutterFire returns every
   numeric priority as a `double`, so `priority as double` must become `(priority as num).toDouble()`.
@@ -219,7 +222,7 @@ that same object. With `applyLocally: false`, listeners see no local event befor
 - **Modifiers are applied in one order** (orderBy, start, end, limit) whatever the call order, so
   `startAt(1).orderByChild('x')` works; an invalid combination is an error of the stream or of `get`, not of the call.
 - **Error codes**: the client's `write-canceled` is reported as `write-cancelled` and `operation-failed` as `failure`,
-  FlutterFire's spellings; `database-closed` (the instance was closed or its app deleted) is not in FlutterFire.
+  FlutterFire's spellings; `database-closed` (a Future of a closed client or deleted app) is not in FlutterFire.
 - **Programmer errors stay Dart errors**: a bad path, key, value or query is an `ArgumentError` or a `StateError`,
   and a transaction handler's exception is rethrown as itself, where the native plugins report
   `FirebaseException('unknown')`.

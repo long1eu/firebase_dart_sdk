@@ -227,8 +227,8 @@ database, in a microtask, never inside the call that caused them.
 Inside one change the order is: removed, added, moved, changed, then value. Four separate streams keep that order only
 while none of them is paused, and `await for` pauses its subscription after every event. `onChildEvents` is the form
 whose order survives that. A server refusal (a rule) ends a stream with an error; losing the connection never does,
-and a listener simply gets its data again after the reconnect. Closing the database ends streams with
-`database-closed`.
+and a listener simply gets its data again after the reconnect. Closing the database or deleting its app
+ends streams with done and no error; pending Futures fail with `database-closed`.
 
 More: [listeners.dart](example/listeners.dart).
 

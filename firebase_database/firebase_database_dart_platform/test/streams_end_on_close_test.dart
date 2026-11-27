@@ -117,4 +117,33 @@ void main() {
       await expectation;
     },
   );
+
+  test(
+    'app deleted: a pending get() fails with database-closed, a pending once() with '
+    'the StateError of Stream.first',
+    () async {
+      final FirebaseApp app = await newApp();
+      final FirebaseDatabase db = FirebaseDatabase.instanceFor(app: app);
+      final Future<DataSnapshot> get = db.ref('g').get();
+      final Future<DatabaseEvent> once = db.ref('o').once();
+      await settle();
+      final Future<void> getFails = expectLater(
+        get,
+        throwsDatabaseCode('database-closed'),
+      );
+      final Future<void> onceFails = expectLater(
+        once,
+        throwsA(
+          isA<StateError>().having(
+            (StateError e) => e.message,
+            'message',
+            'No element',
+          ),
+        ),
+      );
+      await app.delete();
+      await getFails;
+      await onceFails;
+    },
+  );
 }

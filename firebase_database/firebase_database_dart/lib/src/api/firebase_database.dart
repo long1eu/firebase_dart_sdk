@@ -149,6 +149,9 @@ final class FirebaseDatabase {
   final FirebaseApp app;
 
   late final _Target _target;
+
+  /// The name of [app], read at construction: [FirebaseApp.name] throws once the app is deleted.
+  late final String _appName;
   late final ServerActionsFactory _connectionFactory;
   late final PushIdGenerator _pushIds;
   DatabasePersistence? _persistence;
@@ -180,6 +183,7 @@ final class FirebaseDatabase {
     double Function()? random,
   }) {
     _target = target;
+    _appName = app.name;
     _connectionFactory = connectionFactory;
     _persistence = persistence;
     _logger = logger;
@@ -348,12 +352,8 @@ final class FirebaseDatabase {
           c.addSync(_toEvent(query, event));
         }
       },
-      // A close is not a failure: the stream ends with done only.
-      onCancel: (DatabaseError error) => listener.end(
-        error.code == DatabaseErrorCode.databaseClosed
-            ? null
-            : exceptionFromDatabaseError(error),
-      ),
+      onCancel: (DatabaseError error) =>
+          listener.end(exceptionFromDatabaseError(error)),
     )..isUserInitiated = true;
     listener = _Listener(registration, c, _listeners);
     _listeners.add(listener);
@@ -500,9 +500,15 @@ final class FirebaseDatabase {
   bool get isConnected =>
       !_closed && !_appDeleted && _infoValue('connected') == true;
 
-  /// Whether [app] was deleted; its close runs one event later, through `onDeleteApp`.
-  bool get _appDeleted =>
-      !Firebase.apps.any((FirebaseApp candidate) => identical(candidate, app));
+  /// Whether [app] was deleted; its close runs one event later, through `onDeleteApp`. One map
+  /// lookup while the app lives; an app made again with the same name is another object.
+  bool get _appDeleted {
+    try {
+      return !identical(Firebase.app(_appName), app);
+    } on FirebaseException {
+      return true;
+    }
+  }
 
   /// The server's clock minus this device's (`.info/serverTimeOffset`); zero until the first connection.
   Duration get serverTimeOffset {
@@ -532,7 +538,8 @@ final class FirebaseDatabase {
   /// Closes the instance. Idempotent.
   ///
   /// Every open stream ends with done and no error event (a close is not a failure): the events
-  /// still queued for it are dropped inside this call, and done comes in a microtask. Every
+  /// still queued for it are dropped inside this call, and done comes in a microtask (after
+  /// `resume` for a paused subscription, following its buffered events). Every
   /// pending Future (writes, gets, `once`, transactions, onDisconnect operations) fails with
   /// `database-closed`, then the returned Future completes. Writes that were not acknowledged fail
   /// here; with persistence they stay on disk and the next instance sends them. Closing ends the

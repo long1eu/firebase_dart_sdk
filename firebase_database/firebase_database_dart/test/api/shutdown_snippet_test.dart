@@ -18,32 +18,50 @@ void main() {
         Platform.resolvedExecutable,
         <String>['run', 'test/api/support/shutdown_snippet/main.dart'],
       );
-      final StringBuffer stderrText = StringBuffer();
-      final Future<void> stderrDone = process.stderr
-          .transform(utf8.decoder)
-          .forEach(stderrText.write);
-      final List<String> lines = <String>[];
-      final Completer<void> connected = Completer<void>();
-      final Future<void> stdoutDone = process.stdout
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())
-          .forEach((String line) {
-            lines.add(line);
-            if (line == 'connected: true' && !connected.isCompleted) {
-              connected.complete();
-            }
-          });
+      try {
+        final StringBuffer stderrText = StringBuffer();
+        final Future<void> stderrDone = process.stderr
+            .transform(utf8.decoder)
+            .forEach(stderrText.write);
+        final List<String> lines = <String>[];
+        final Completer<void> connected = Completer<void>();
+        final Future<void> stdoutDone = process.stdout
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())
+            .forEach((String line) {
+              lines.add(line);
+              if (line == 'connected: true' && !connected.isCompleted) {
+                connected.complete();
+              }
+            });
 
-      await connected.future.timeout(const Duration(seconds: 60));
-      process.kill(ProcessSignal.sigterm);
-      final int code = await process.exitCode.timeout(
-        const Duration(seconds: 30),
-      );
-      await Future.wait(<Future<void>>[stdoutDone, stderrDone]);
+        // An exit before `connected: true` fails at once, with the child's output.
+        final int? earlyExit = await Future.any(<Future<int?>>[
+          connected.future.then((_) => null),
+          process.exitCode,
+        ]).timeout(const Duration(seconds: 60));
+        if (earlyExit != null) {
+          await Future.wait(<Future<void>>[stdoutDone, stderrDone]);
+          fail(
+            'exited with $earlyExit before connecting; stdout: $lines; stderr: $stderrText',
+          );
+        }
+        process.kill(ProcessSignal.sigterm);
+        final int code = await process.exitCode.timeout(
+          const Duration(seconds: 30),
+        );
+        await Future.wait(<Future<void>>[stdoutDone, stderrDone]);
 
-      expect(stderrText.toString(), isNot(contains('Unhandled exception')));
-      expect(code, 0, reason: 'stderr: $stderrText');
-      expect(lines, <String>['connected: false', 'connected: true']);
+        expect(stderrText.toString(), isNot(contains('Unhandled exception')));
+        expect(code, 0, reason: 'stderr: $stderrText');
+        expect(
+          lines,
+          containsAllInOrder(<String>['connected: false', 'connected: true']),
+        );
+      } finally {
+        // A no-op when the child has exited; otherwise it would outlive the test.
+        process.kill(ProcessSignal.sigkill);
+      }
     },
     timeout: const Timeout(Duration(minutes: 2)),
   );

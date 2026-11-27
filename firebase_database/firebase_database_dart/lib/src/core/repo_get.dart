@@ -188,7 +188,11 @@ extension _RepoGet on Repo {
       'get for query ${request.query} failed: $error',
     );
     request.completer.completeError(
-      error is ServerActionsException
+      // After close the connection's shutdown fails the get with the status `database_closed`,
+      // which the wire mapping reads as `unknown`; the get fails with the local closed error.
+      _closed
+          ? Repo._closedError()
+          : error is ServerActionsException
           ? DatabaseError.fromStatus(error.status, error.reason)
           : DatabaseError.local(
               DatabaseErrorCode.unknown,
