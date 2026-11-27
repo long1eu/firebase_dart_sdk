@@ -79,18 +79,20 @@ void main() {
     expect(scheduler.getTask(TaskId.onlineStateTimeout), isNull);
   });
 
-  test('a restarted stream after a failure while online arms the timeout',
-      () async {
-    await tracker.handleWatchStreamStart();
-    await tracker.updateState(OnlineState.online);
-    await tracker.handleWatchStreamFailure(const GrpcError.unavailable());
-    await tracker.handleWatchStreamStart();
+  test(
+    'a restarted stream after a failure while online arms the timeout',
+    () async {
+      await tracker.handleWatchStreamStart();
+      await tracker.updateState(OnlineState.online);
+      await tracker.handleWatchStreamFailure(const GrpcError.unavailable());
+      await tracker.handleWatchStreamStart();
 
-    expect(scheduler.getTask(TaskId.onlineStateTimeout), isNotNull);
-    scheduler.runUntil(TaskId.onlineStateTimeout);
-    await Future<void>.delayed(Duration.zero);
-    expect(states.last, OnlineState.offline);
-  });
+      expect(scheduler.getTask(TaskId.onlineStateTimeout), isNotNull);
+      scheduler.runUntil(TaskId.onlineStateTimeout);
+      await Future<void>.delayed(Duration.zero);
+      expect(states.last, OnlineState.offline);
+    },
+  );
 
   test('further starts after a failure do not re-arm the timeout', () async {
     await tracker.handleWatchStreamStart();
@@ -118,5 +120,46 @@ void main() {
     await tracker.updateState(OnlineState.offline);
 
     expect(states, <OnlineState>[OnlineState.online, OnlineState.offline]);
+  });
+
+  /// Runs [body] and returns the warning lines it printed.
+  Future<List<String>> warningsOf(Future<void> Function() body) async {
+    final List<String> lines = <String>[];
+    await runZoned(
+      body,
+      zoneSpecification: ZoneSpecification(
+        print: (Zone self, ZoneDelegate parent, Zone zone, String line) {
+          lines.add(line);
+        },
+      ),
+    );
+    return lines.where((String line) => line.startsWith('W:')).toList();
+  }
+
+  test('warns once when the backend was never reached', () async {
+    final List<String> warnings = await warningsOf(() async {
+      await tracker.handleWatchStreamStart();
+      await tracker.handleWatchStreamFailure(const GrpcError.unavailable());
+      await tracker.handleWatchStreamStart();
+      await tracker.handleWatchStreamFailure(const GrpcError.unavailable());
+    });
+
+    expect(warnings, hasLength(1));
+    expect(
+      warnings.single,
+      contains('Could not reach Cloud Firestore backend'),
+    );
+  });
+
+  test('does not warn after the backend was reached once', () async {
+    final List<String> warnings = await warningsOf(() async {
+      await tracker.handleWatchStreamStart();
+      await tracker.updateState(OnlineState.online);
+      await tracker.handleWatchStreamFailure(const GrpcError.unavailable());
+      await tracker.handleWatchStreamFailure(const GrpcError.unavailable());
+    });
+
+    expect(states.last, OnlineState.offline);
+    expect(warnings, isEmpty);
   });
 }
