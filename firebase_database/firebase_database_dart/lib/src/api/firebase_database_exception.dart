@@ -25,7 +25,7 @@ import 'package:meta/meta.dart';
 /// | `index-not-defined` | the query orders by a child that has no `.indexOn` rule (server status `no_index`) |
 /// | `operation-failed` | the server reported that the operation failed (server status `failure`) |
 /// | `too-big` | the data is larger than the server accepts in one request (server status `too_big`) |
-/// | `database-closed` | the `FirebaseDatabase` was closed, or its app deleted |
+/// | `database-closed` | a Future of a `FirebaseDatabase` that was closed, or whose app was deleted (streams end with done instead) |
 /// | `data-stale` | the server answered `datastale` to a request other than a transaction's (a fake server can) |
 /// | `unknown` | any other server status (`invalid_parameters`, `internal_error`, ...); the raw status is in [serverStatus] |
 ///

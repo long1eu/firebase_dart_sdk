@@ -262,3 +262,4 @@ databasePersistence({(.PersistenceKey, {logger: dart.core.(.DatabaseLogLevel, da
 estimateSerializedNodeSize(Node node): int
 var keyIndex: KeyIndex
 nodeFromJson(Object json, [Object priority]): Node
+persistenceDatabaseUrl(Uri url): Uri

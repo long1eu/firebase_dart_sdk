@@ -58,10 +58,10 @@ abstract interface class Node implements Comparable<Node> {
   /// null for the empty node.
   Object? get value;
 
-  /// The JSON value as a fresh, mutable copy: maps, numbers ([num] as `int` or `double` per the
-  /// number rules), strings, booleans or null. With [exportFormat], priorities appear as
-  /// `.priority` and leaves with a priority as `{'.value': v, '.priority': p}` (the put wire
-  /// form; numbers as stored).
+  /// The JSON value as a fresh, mutable copy: maps and growable lists (at every depth), numbers
+  /// ([num] as `int` or `double` per the number rules), strings, booleans or null. With
+  /// [exportFormat], priorities appear as `.priority` and leaves with a priority as
+  /// `{'.value': v, '.priority': p}` (the put wire form; numbers as stored).
   Object? toJson({bool exportFormat = false});
 
   /// The base64 SHA-1 hash of the node, equal to the JS SDK's for the same data.
