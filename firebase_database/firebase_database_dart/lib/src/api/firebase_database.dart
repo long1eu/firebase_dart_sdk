@@ -186,6 +186,9 @@ final class FirebaseDatabase {
   final FirebaseApp app;
 
   late final _Target _target;
+
+  /// The name of [app], read at construction: [FirebaseApp.name] throws once the app is deleted.
+  late final String _appName;
   late final ServerActionsFactory _connectionFactory;
   late final PushIdGenerator _pushIds;
   DatabasePersistence? _persistence;
@@ -217,6 +220,7 @@ final class FirebaseDatabase {
     double Function()? random,
   }) {
     _target = target;
+    _appName = app.name;
     final String? warning = target.namespaceWarning;
     _connectionFactory = warning == null
         ? connectionFactory
@@ -367,7 +371,12 @@ final class FirebaseDatabase {
     Query query,
     Set<EventType> types,
   ) => Stream<DatabaseEvent>.multi((MultiStreamController<DatabaseEvent> c) {
-    final Object? failure = _closed ? _closedError() : _startError;
+    // After close the stream ends at once with done, as an open stream does at close.
+    if (_closed) {
+      c.close();
+      return;
+    }
+    final Object? failure = _startError;
     if (failure != null) {
       c
         ..addError(failure)
@@ -542,12 +551,28 @@ final class FirebaseDatabase {
 
   /// Whether the client is connected to the server (`.info/connected`). The first event is the current
   /// state.
+  ///
+  /// [close] (also run when the app is deleted) ends the stream with done and no error; no final
+  /// `false` event comes before it.
   Stream<bool> get onConnected => ref(
     '.info/connected',
   ).onValue.map((DatabaseEvent event) => event.snapshot.value == true);
 
-  /// The current value of [onConnected], synchronously.
-  bool get isConnected => _infoValue('connected') == true;
+  /// The current value of [onConnected], synchronously. Always false once [close] has been called
+  /// or the app deleted (from the moment `app.delete()` is called, before the close it starts has
+  /// run), whatever it was before.
+  bool get isConnected =>
+      !_closed && !_appDeleted && _infoValue('connected') == true;
+
+  /// Whether [app] was deleted; its close runs one event later, through `onDeleteApp`. One map
+  /// lookup while the app lives; an app made again with the same name is another object.
+  bool get _appDeleted {
+    try {
+      return !identical(Firebase.app(_appName), app);
+    } on FirebaseException {
+      return true;
+    }
+  }
 
   /// The server's clock minus this device's (`.info/serverTimeOffset`); zero until the first connection.
   Duration get serverTimeOffset {
@@ -576,13 +601,16 @@ final class FirebaseDatabase {
 
   /// Closes the instance. Idempotent.
   ///
-  /// Every open stream gets the error `database-closed` and ends, inside this call; then every
-  /// pending write and transaction Future fails with `database-closed`; then the returned Future
-  /// completes. Writes that were not acknowledged fail here; with persistence they stay on disk and
-  /// the next instance sends them. Closing ends the connection, so the server applies the
-  /// onDisconnect writes this client registered. Afterwards every asynchronous call fails with
-  /// `database-closed`, [ref] still works (it makes no request), and [goOnline] and [goOffline] do
-  /// nothing.
+  /// Every open stream ends with done and no error event (a close is not a failure): the events
+  /// still queued for it are dropped inside this call, and done comes in a microtask (after
+  /// `resume` for a paused subscription, following its buffered events). Every
+  /// pending Future (writes, gets, `once`, transactions, onDisconnect operations) fails with
+  /// `database-closed`, then the returned Future completes. Writes that were not acknowledged fail
+  /// here; with persistence they stay on disk and the next instance sends them. Closing ends the
+  /// connection, so the server applies the onDisconnect writes this client registered.
+  /// Afterwards every asynchronous call fails with `database-closed`, a stream listened to ends
+  /// with done and no error, [ref] still works (it makes no request), and [goOnline] and
+  /// [goOffline] do nothing.
   Future<void> close() => _closeFuture ??= _close();
 
   Future<void> _close() async {
@@ -590,10 +618,10 @@ final class FirebaseDatabase {
     _queue.clear();
     final StreamSubscription<String>? deleteSubscription = _deleteSubscription;
     _deleteSubscription = null;
-    final FirebaseDatabaseException error = _closedError();
     for (final _Listener listener in List<_Listener>.of(_listeners)) {
-      listener.end(error);
+      listener.end(null);
     }
+    final FirebaseDatabaseException error = _closedError();
     for (final _Pending<Object?> pending in List<_Pending<Object?>>.of(
       _pending,
     )) {
@@ -617,6 +645,9 @@ final class FirebaseDatabase {
 extension FirebaseDatabaseInternal on FirebaseDatabase {
   /// Whether [FirebaseDatabase.close] was called.
   bool get isClosed => _closed;
+
+  /// The `database-closed` exception that Futures fail with after [FirebaseDatabase.close].
+  FirebaseDatabaseException closedError() => _closedError();
 
   /// The stream of the events of [types] on [query]: one registration per listen.
   Stream<DatabaseEvent> eventStream(Query query, Set<EventType> types) =>
@@ -798,17 +829,19 @@ final class _Listener {
   final Set<_Listener> _owner;
   bool ended = false;
 
-  /// Ends the stream with [error] then done; queued events of the registration are dropped.
-  void end(Object error) {
+  /// Ends the stream with [error], when not null, then done; queued events of the registration
+  /// are dropped.
+  void end(Object? error) {
     if (ended) {
       return;
     }
     ended = true;
     _owner.remove(this);
     registration.zombify();
-    controller
-      ..addErrorSync(error)
-      ..closeSync();
+    if (error != null) {
+      controller.addErrorSync(error);
+    }
+    controller.closeSync();
   }
 }
 
