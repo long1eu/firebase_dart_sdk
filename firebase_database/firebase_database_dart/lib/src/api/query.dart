@@ -29,22 +29,36 @@ import 'package:meta/meta.dart';
 /// ```dart
 /// final Query top = db.ref('scores').orderByValue().limitToLast(10);
 /// top.onValue.listen((DatabaseEvent e) {
-///   for (final DataSnapshot s in e.snapshot.children) print('${s.key}: ${s.value}');
+///   for (final DataSnapshot s in e.snapshot.children) {
+///     print('${s.key}: ${s.value}');
+///   }
 /// });
 /// ```
 ///
+/// Order. Bounds and limits apply to the query's order. With no `orderBy*` that order is the
+/// priority order, not the value: `ref.startAt(2)` keeps the children whose priority is at least
+/// 2, so on data written without priorities it keeps none. Call an `orderBy*` first.
+///
 /// Validation. The client checks a query when you build it, in release builds too, with the JS SDK's rules:
 /// one `orderBy*`; at most one start bound and one end bound; [equalTo] excludes both; a `key:` argument only
-/// where the order allows it; a limit above 0. A violation throws an [ArgumentError] (a bad argument) or a
-/// [StateError] (a second `orderBy*`, start, end or limit) at the call.
+/// where the order allows it; a bound of a type the order allows (a `String` for [orderByKey];
+/// `null`, a number or a `String` for the priority order; no non-empty map or list for any
+/// order); a limit above 0. A bound is checked against the order in effect when it is set, and
+/// again by a later `orderBy*`. A violation throws an [ArgumentError] (a bad argument) or a
+/// [StateError] (a second `orderBy*`, start, end or limit) at the call; a second bound of a refused
+/// type throws the [ArgumentError].
 ///
 /// Streams. Every event getter returns a stream made with `Stream.multi`: not broadcast, and each `listen`,
 /// also a second `listen` on the same stream object, is its own registration that gets its own initial
 /// events. Equal queries share one listen on the server. Cancelling a subscription removes it at once,
 /// without waiting for the server; the last one on a query removes the server listen. A stream ends only
-/// when the database closes or its app is deleted (done, with no error event) or when the server cancels
-/// the listen (error, for example `permission-denied`, then done). A lost connection is never a stream
-/// error.
+/// when the database closes or its app is deleted (done, with no error event), when the server
+/// cancels the listen (error, for example `permission-denied`, then done), or when the database
+/// could not start (that error, then done). A lost connection is never a stream error.
+///
+/// Local writes. A write of this client raises events before the server answers; when the server
+/// refuses it, the listeners get events again with the data restored. A transaction with
+/// `applyLocally: false` raises none before the answer.
 ///
 /// Delivery. No listener runs inside the call that caused it: events go through one queue per
 /// database, drained in a microtask. [FirebaseDatabase.close] drops the events still queued for
@@ -100,8 +114,10 @@ base class Query {
   /// With no range and no limit the client asks the server for all the data at this location and
   /// orders it here, as [get] and the `on<Thing>` streams do, so no `.indexOn` rule is needed. With
   /// [startAt], [startAfter], [endAt], [endBefore], [equalTo] or a limit the query is sent as it
-  /// is, and the server fails it with `index-not-defined` when the rules have no `.indexOn` for
-  /// [path].
+  /// is. When the rules have no `.indexOn` for [path], [get] fails with `index-not-defined`, while
+  /// a stream or [once] still works: the server sends all the data at this location, the client
+  /// filters it, and a warning naming the missing `.indexOn` goes to the logger, once per server
+  /// listen.
   ///
   /// ```dart
   /// final Query adults = db.ref('users').orderByChild('age').startAt(18);
@@ -150,7 +166,8 @@ base class Query {
     return _with(params, ordered: true);
   }
 
-  /// Orders by the children's priorities.
+  /// Orders by the children's priorities: children without one first, then numbers, then strings;
+  /// ties go by key. This is also the order of a query with no `orderBy*`.
   Query orderByPriority() {
     _validateNoPreviousOrderByCall('orderByPriority');
     final QueryParams params = spec.params.orderBy(priorityIndex);
@@ -159,8 +176,10 @@ base class Query {
   }
 
   /// Starts the range at [value], included, and at children whose key is at least [key] among those equal
-  /// to [value]. A `null` [value] is a real bound (null priority or value). Throws when a start bound is
-  /// already set or [key] is not allowed by the order.
+  /// to [value]. A `null` [value] is a real bound (null priority or value). With no `orderBy*`,
+  /// [value] is a priority. Throws a [StateError] when a start bound is already set, and an
+  /// [ArgumentError] when [key] or the type of [value] is not allowed by the order (see the class
+  /// documentation).
   Query startAt(Object? value, {String? key}) {
     validateKey('startAt', 'key', key, optional: true);
     final QueryParams params = spec.params.startAt(
@@ -179,7 +198,7 @@ base class Query {
   }
 
   /// Starts the range just after [value] (and after [key] among children equal to [value]). A `null`
-  /// [value] is a real bound.
+  /// [value] is a real bound. Throws as [startAt] does.
   Query startAfter(Object? value, {String? key}) {
     validateKey('startAfter', 'key', key, optional: true);
     final QueryParams params = spec.params.startAfter(
@@ -198,7 +217,8 @@ base class Query {
   }
 
   /// Ends the range at [value], included (and at [key] among children equal to [value]). A `null` [value]
-  /// is a real bound. Throws when an end bound is already set.
+  /// is a real bound. Throws a [StateError] when an end bound is already set, and an
+  /// [ArgumentError] when [key] or the type of [value] is not allowed by the order.
   Query endAt(Object? value, {String? key}) {
     validateKey('endAt', 'key', key, optional: true);
     final QueryParams params = spec.params.endAt(
@@ -217,7 +237,7 @@ base class Query {
   }
 
   /// Ends the range just before [value] (and before [key] among children equal to [value]). A `null` [value]
-  /// is a real bound.
+  /// is a real bound. Throws as [endAt] does.
   Query endBefore(Object? value, {String? key}) {
     validateKey('endBefore', 'key', key, optional: true);
     final QueryParams params = spec.params.endBefore(
@@ -386,7 +406,8 @@ base class Query {
   /// The value of the query: its current data first, then again after every change. An empty
   /// location gives a first event whose snapshot has `exists` false. While offline the first event
   /// comes from data the client already holds, else it waits for the server; the loss of the
-  /// connection is not an error of the stream (see [FirebaseDatabase.onConnected]).
+  /// connection is not an error of the stream (see [FirebaseDatabase.onConnected]). Read the
+  /// children in the query's order from [DataSnapshot.children], not from the `value` map.
   Stream<DatabaseEvent> get onValue => _stream(<EventType>{EventType.value});
 
   /// A [DatabaseEventType.childAdded] event per child, first for each existing child, then for each new

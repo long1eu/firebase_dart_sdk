@@ -17,8 +17,11 @@ import 'package:meta/meta.dart';
 ///
 /// Each Future completes when the server has registered the write. Only registered writes count: when the
 /// connection is lost, the client also applies them locally, raising events after the `.info/connected`
-/// false event, and then forgets them. Registrations are never persisted; after a restart, register them
-/// again when `FirebaseDatabase.onConnected` turns true.
+/// false event, and then forgets them. Applying them overrides running transactions at, above or below
+/// each location as a `DatabaseReference.set` there would (see `DatabaseReference.runTransaction`); a
+/// transaction whose value was sent before the drop has failed with `disconnected` by then. Registrations
+/// are never persisted; after a restart, register them again when `FirebaseDatabase.onConnected` turns
+/// true.
 ///
 /// A Future fails with `permission-denied` when the rules refuse the write, and with `disconnected` when the
 /// connection dropped after the request was sent and before the server answered: the registration may not

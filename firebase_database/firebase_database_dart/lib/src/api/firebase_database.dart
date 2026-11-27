@@ -46,8 +46,11 @@ const String _emulatorHostVariable = 'FIREBASE_DATABASE_EMULATOR_HOST';
 ///
 /// Each constructor call makes its own instance with its own connection: there is no global cache, and two
 /// instances on one URL are two connections. Settings (emulator, persistence, logging) are constructor
-/// parameters; there are no setters. An open instance keeps a CLI or server program alive until [close].
-/// Auth and App Check tokens come from [app].
+/// parameters; there are no setters. Construction opens no connection: the first operation that
+/// needs the server (a read, a listen, `.info` included, a write, a transaction, an onDisconnect
+/// request, `keepSynced(true)`) or [goOnline] starts it. While connected or waiting to reconnect,
+/// its timers keep a CLI or server program alive until [close]. Auth and App Check tokens come
+/// from [app].
 ///
 /// ```dart
 /// final FirebaseDatabase db = FirebaseDatabase(app);
@@ -60,11 +63,14 @@ final class FirebaseDatabase {
   ///
   /// [databaseUrl] defaults to the app's `databaseURL`, then to
   /// `https://<projectId>-default-rtdb.firebaseio.com`; with neither and no project id it throws an
-  /// [ArgumentError]. Without [emulatorHost], the URL must be the root of a database over TLS
+  /// [ArgumentError]. An empty [databaseUrl] also selects that default, even when the app has a
+  /// `databaseURL`. Without [emulatorHost], the URL must be the root of a database over TLS
   /// (`https://` or `wss://`): a plain `http://` URL (the message points to [emulatorHost]), a
   /// path, user info, a port other than 443 on a host that is not loopback, a custom domain
   /// without `?ns=` and an invalid namespace each throw an [ArgumentError] here, with or without
-  /// [persistence]. The message does not quote the URL.
+  /// [persistence]. The message does not quote the URL. A namespace given as `?ns=` is
+  /// lowercased and valid when it is 1 to 63 letters, digits or `-`, in any position: `?ns=-x-` is
+  /// accepted as the namespace `-x-`. The client does not check that the server has it.
   ///
   /// [emulatorHost] (`'host:port'` or `'[ipv6]:port'`) connects to the Database emulator over plain
   /// WebSocket (over TLS for a `*.cloudworkstations.dev` host). The database URL (the argument,
@@ -80,8 +86,9 @@ final class FirebaseDatabase {
   /// and, with four or more parts, not a 32-bit integer; else use `fake-server`. So
   /// `http://my-mac.local:9000` gives `my-mac`, `https://db.example.com` gives `db`,
   /// `http://localhost` gives `localhost`, and `http://localhost:9000`, `http://my-mac:9000` (a
-  /// one-label name with a port) and any IP address give `fake-server`. With no URL at all
-  /// (neither the argument nor the app's `databaseURL`, or an empty argument) the namespace is the
+  /// one-label name with a port) and any IP address give `fake-server`. When the argument is
+  /// null and the app's `databaseURL` is null or empty, or the argument is empty (which skips the
+  /// app's `databaseURL`), the namespace is the
   /// project's default database `<projectId>-default-rtdb`; a production URL of that database or
   /// `?ns=` with that name reach it too. The emulator applies the rules of `firebase.json` only
   /// to the databases `firebase.json` names, by default `<projectId>-default-rtdb`; every other
@@ -94,7 +101,7 @@ final class FirebaseDatabase {
   /// instance (not again on a reconnect). It names the namespace and the emulator host and says
   /// to give `?ns=` when `firebase.json` does not name that namespace; the client cannot read
   /// `firebase.json`, so it also warns when it does. A logger that throws does not stop the
-  /// connection. A URL with `?ns=`, or no URL, logs nothing. User info, a
+  /// connection. A URL with `?ns=`, or a null or empty one as above, logs nothing. User info, a
   /// path, a fragment, a query key other than `ns` and an invalid namespace still throw an
   /// [ArgumentError] whose message does not quote the URL. See
   /// [emulatorHostFromEnvironment]. [mockUserToken] is sent to the emulator as it is: build a
@@ -102,16 +109,19 @@ final class FirebaseDatabase {
   /// included) is an admin credential for the emulator and bypasses the rules. Passing it without
   /// [emulatorHost], or empty, throws an [ArgumentError].
   ///
-  /// [persistence] turns on disk persistence (memory only when null). [logger] receives log messages
-  /// (silent when null).
+  /// [persistence] turns on disk persistence (memory only when null). If the store cannot be
+  /// opened (its opener throws), nothing is thrown: the instance runs memory only, the client logs
+  /// one warning, and [persistenceEnabled] turns false, so writes made then are not kept for a
+  /// restart. [logger] receives log messages (silent when null).
   ///
   /// The constructor is synchronous, also with persistence: opening the store and restoring writes
   /// happen in the background, and calls made meanwhile wait for it, in call order. If the start
   /// fails after the store opened, every waiting and later call fails with that error.
   ///
   /// The persisted cache is keyed by the app name and [databaseUrl], which is normalised: every
-  /// spelling of one URL shares one cache, two namespaces on one host never do, and the same
-  /// emulator named by two hosts (`localhost` and `127.0.0.1`) has two.
+  /// spelling of one URL with a host name shares one cache, and two namespaces on one host never
+  /// do. A loopback host is kept as written (lowercased), so `localhost`, `127.0.0.1` and
+  /// `[::1]` give three caches for one server, production or emulator.
   ///
   /// [clock] and [random] replace the wall clock and the random source (push ids, backoff), for tests.
   FirebaseDatabase(
@@ -467,8 +477,11 @@ final class FirebaseDatabase {
   /// `http://<emulatorHost>?ns=<namespace>` (`https` for `*.cloudworkstations.dev`), whatever host
   /// the constructor's `databaseUrl` argument names: with `emulatorHost: '10.0.2.2:9000'`,
   /// `databaseUrl: 'http://localhost:9000?ns=demo'` gives `http://10.0.2.2:9000?ns=demo`. Every
-  /// spelling of one database gives the same value, two databases never share one, and it keys the
-  /// persisted cache (pass it to `clearSqlitePersistence`).
+  /// spelling of one production URL with a host name gives the same value. A loopback host and an
+  /// emulator host are kept as written (lowercased), so `localhost`, `127.0.0.1`, `[::1]` and
+  /// `[0:0:0:0:0:0:0:1]` give four values for one server. Two databases can share one value on a
+  /// `*.cloudworkstations.dev` host: a production database with `?ns=` and the emulator at port 443
+  /// with that namespace. It keys the persisted cache (pass it to `clearSqlitePersistence`).
   Uri get databaseUrl => _target.databaseUrl;
 
   /// The reference at [path]. `''`, `'a/b'` and `'/a/b'` are accepted and empty segments are
@@ -527,12 +540,14 @@ final class FirebaseDatabase {
   }
 
   /// Disconnects from the server and stays offline until [goOnline]. Writes stay queued and listeners
-  /// keep their data. Synchronous and idempotent, valid before the first operation; a no-op after [close].
+  /// keep their data. Synchronous and idempotent, valid before the first operation (that operation
+  /// then does not connect); a no-op after [close] or after a failed start.
   void goOffline() => _withRepo((Repo repo) => repo.interrupt());
 
-  /// Reconnects after [goOffline]. Synchronous and idempotent, valid before the first operation; a no-op
-  /// after [close]. It does not undo a server kill: once the server has killed the connection the
-  /// instance stays offline until it is recreated.
+  /// Reconnects after [goOffline]. On an instance that has not connected yet it starts the
+  /// connection, as a first read or write would. Synchronous and idempotent; a no-op after [close]
+  /// or after a failed start. It does not undo a server kill: once the server has killed the
+  /// connection the instance stays offline until it is recreated.
   void goOnline() => _withRepo((Repo repo) => repo.resume());
 
   /// Cancels every write the server has not acknowledged, and every running transaction.
@@ -589,7 +604,8 @@ final class FirebaseDatabase {
   /// Whether data written now survives a restart.
   ///
   /// It reports what was asked for (a non-null `persistence`) until the store is open, then whether the
-  /// store is durable. It is false when another owner holds the cache file (after waiting one lease period
+  /// store is durable. It is false when the store could not be opened (its opener threw), and when
+  /// another owner holds the cache file (after waiting one lease period
   /// the instance runs memory only and logs one warning), and it turns false if the store fails or is
   /// fenced later in the session.
   bool get persistenceEnabled {

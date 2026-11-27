@@ -6,9 +6,11 @@ import 'package:firebase_database_dart/src/realtime/emulator_token.dart';
 /// Builds the `mockUserToken` that makes the Database emulator treat the client as the user [uid].
 ///
 /// The result is an unsigned JWT, so it works only with an emulator. [projectId] is the project of the
-/// app. [claims] are added to the token and are visible to the rules as `auth.token.<name>`; it must
-/// not contain `uid`. Throws an [ArgumentError] for an empty [uid] or [projectId] and for a claim
-/// that JSON cannot encode.
+/// app. [claims] are added to the token and are visible to the rules as `auth.token.<name>`. A
+/// claim replaces the standard field of the same name (`aud`, `exp`, `user_id`, `firebase`, ...),
+/// except `sub`, which is always [uid]. Throws an [ArgumentError] for an empty [uid] or
+/// [projectId], a `uid` claim, an `iat` claim that is not a whole number, and a claim that JSON
+/// cannot encode.
 ///
 /// ```dart
 /// final FirebaseDatabase db = FirebaseDatabase(
