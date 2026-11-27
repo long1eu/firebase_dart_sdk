@@ -238,7 +238,7 @@ Dart's `HttpClient` does. Loopback addresses and the emulator are always reached
 API. A proxy that refuses the tunnel fails the connection attempt with an error that names the proxy and the status.
 
 **Shutting down.** An open `FirebaseDatabase` keeps a command line program alive. `close()` ends every stream with
-`database-closed`, fails the Futures of writes that are still pending with `database-closed`, releases the cache lease
+done and no error, fails the Futures of writes that are still pending with `database-closed`, releases the cache lease
 and closes the socket; the server then runs the `onDisconnect` operations you registered. Await your writes before
 `close()` in a server that handles `SIGTERM`; with no SQLite cache an unacknowledged write is lost.
 

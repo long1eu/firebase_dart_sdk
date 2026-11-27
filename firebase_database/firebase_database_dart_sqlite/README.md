@@ -82,11 +82,16 @@ await clearSqlitePersistence(
 
 `clearSqlitePersistence` deletes a cache while no instance holds it: it waits about 7.5 s to see whether an owner is
 alive, throws a `StateError` while one is, and throws a `ClearPersistenceException` that lists the files it could not
-delete. `SqlitePersistence.pathOf(key)` gives the path of the file of an app and database URL. There is one SQLite file
-per app and normalised database URL in the directory you give (every spelling of one URL shares a file, two `?ns=`
-values on one host get two); its name is a hash, never the URL or the user. On macOS and Linux
-the directory is created with mode 0700 and the file gets mode 0600; elsewhere the platform's default permissions
-apply. Tokens, the server host and session ids are never written.
+delete; a retry in the same isolate can start at once. It normalises the URL with `persistenceDatabaseUrl`, which maps a
+URL onto the key the client builds: `database.databaseUrl` always works, and so does any spelling of a production URL
+that the constructor accepts. On a `*.cloudworkstations.dev` host two things differ: a production database written with
+`?ns=` equal to the first label names the emulator's cache (pass `database.databaseUrl` there), and a production
+database with any other `?ns=` shares one cache with the emulator on that host at port 443.
+`SqlitePersistence.pathOf(key)` gives the path of the file of an app and database URL. There is one SQLite file per app
+and normalised database URL in the directory you give (every spelling of one URL shares a file, two `?ns=` values on one
+host get two); its name is a hash, never the URL or the user. On macOS and Linux the directory is created with mode 0700
+and the file gets mode 0600; elsewhere the platform's default permissions apply. Tokens, the server host and session ids
+are never written.
 
 ## How it works
 
@@ -106,8 +111,15 @@ and the tracked queries, restores the writes, and then connects. The layout is A
   can apply twice; a transaction is the exact way to count. Transactions and `onDisconnect` registrations are not
   stored.
 - **A storage error makes the instance memory-only for the session.** Nothing is deleted: the writes committed before
-  the error stay in the file and are sent at the next start. A write made after the error is not durable. The app never
-  receives a `SqliteException`; a row that does not decode is skipped and logged once.
+  the error stay in the file and are sent at the next start. Of those, the writes the server acknowledged or refused
+  before the instance closed are removed at close, when no other instance took the file over and no clear deleted it in
+  the meantime, and the file can be written then. After a crash, or with the file still failing at close, they are sent
+  again at the next start (a `ServerValue.increment` among them is applied twice). When another instance took the file
+  over, that instance sends them; when a clear deleted the file, nothing is sent. A write made after the error is not
+  durable. The store keeps its lease without refreshing it, so another instance takes the file over after one
+  observation period; when the store ran in another process, that takeover first runs `PRAGMA quick_check`, whose time
+  grows with the size of the file. The app never receives a `SqliteException`; a row that does not decode is skipped and
+  logged once.
 - **One moved-aside copy.** A file that cannot be used (damaged, of another program, or written by a newer major
   version of this package) is renamed to `<file>.bad-<time>` and the cache starts empty. Only the newest such copy is
   kept: the next quarantine deletes the previous one, also the file of a newer version after a downgrade and a second
