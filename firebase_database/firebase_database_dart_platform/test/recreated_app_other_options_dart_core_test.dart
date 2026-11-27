@@ -8,14 +8,18 @@ import 'package:firebase_database_dart_platform/src/core.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'harness.dart';
+import 'recreated_app_delete_window_cases.dart';
+import 'recreated_app_invariant.dart';
 import 'recreated_app_other_options_cases.dart';
 
 void main() {
   registerForTests();
+  checkClientsAfterEveryTest();
 
   test('the Dart core is in place', () {
     expect(FirebasePlatform.instance, isA<LinuxFirebaseCore>());
   });
 
   defineRecreatedAppTests();
+  defineDeleteWindowTests(dartCore: true);
 }

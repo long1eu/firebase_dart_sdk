@@ -8,11 +8,14 @@ import 'package:firebase_core_platform_interface/firebase_core_platform_interfac
 import 'package:flutter_test/flutter_test.dart';
 
 import 'harness.dart';
+import 'recreated_app_delete_window_cases.dart';
+import 'recreated_app_invariant.dart';
 import 'recreated_app_other_options_cases.dart';
 import 'recreated_app_pinned_support.dart';
 
 void main() {
   registerForTests();
+  checkClientsAfterEveryTest();
 
   late FirebasePlatform dartCore;
   setUpAll(() {
@@ -34,4 +37,5 @@ void main() {
   });
 
   defineRecreatedAppTests();
+  defineDeleteWindowTests(dartCore: false);
 }
