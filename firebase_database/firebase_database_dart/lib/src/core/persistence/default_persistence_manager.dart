@@ -234,7 +234,12 @@ final class DefaultPersistenceManager implements PersistenceManager {
       _storageLayer.setTransactionSuccessful();
       return result;
     } on Object catch (e) {
-      _logger?.call(DatabaseLogLevel.error, 'Caught Throwable. $e');
+      // The type only: a storage error's text can quote the statement and the values it wrote.
+      // The error itself is rethrown to the caller.
+      _logger?.call(
+        DatabaseLogLevel.error,
+        'Caught Throwable. ${e.runtimeType}',
+      );
       rethrow;
     } finally {
       _storageLayer.endTransaction();

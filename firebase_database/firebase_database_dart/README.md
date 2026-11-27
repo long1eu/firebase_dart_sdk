@@ -277,7 +277,8 @@ where the rules have no `.indexOn` for it. A listener or `once()` has no such li
 downloads the location, filters it itself and logs a warning ("Using an unspecified index", the server's `no_index`
 warning). When the client is not connected, `get()` waits 3 s for a connection and then answers from the cache, only
 when the cache holds the complete value for that query (its limit applied; a cached empty location answers null), or
-fails with `unavailable`; a refusal by the rules is `permission-denied`, never a cached answer.
+fails with `unavailable`; after `goOffline()` there is no wait and the cache answers at once. A refusal by the rules
+is `permission-denied`, never a cached answer.
 
 More: [queries.dart](example/queries.dart).
 
@@ -546,14 +547,14 @@ await logged.close();
 ```
 
 `DatabaseLogger` is the type of the callback, `void Function(DatabaseLogLevel level, String message)`. The levels are
-`debug`, `info`, `warning` and `error`. Warnings include the missing-index one ("Using an unspecified
-index": a query that is filtered on the client because the rules have no `.indexOn`), a cache that runs memory-only and
-failed persisted writes. Requests that carry credentials are logged as `<action> (contents hidden)`, URLs without their
-query, and snapshot data appears at the debug level only; it is your users' data.
+`debug`, `info`, `warning` and `error`. Warnings include the missing-index one ("Using an unspecified index": a query
+filtered on the client because the rules have no `.indexOn`), a memory-only cache and failed persisted writes. Requests
+with credentials are logged as `<action> (contents hidden)`. The client never logs values it holds or sends; a message
+from the server is logged as the server sent it and, with rules debug output on (emulator), may quote data.
 
 ## How it differs from the JS SDK
 
-The 19 you notice are below. The full table, 33 rows with the test that pins each, is section 25 of
+The 19 you notice are below. The full table, 37 rows with the test that pins each, is section 25 of
 [docs/database_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_decisions.md).
 
 | Topic | JS SDK | This client |

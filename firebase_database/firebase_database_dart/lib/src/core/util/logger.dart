@@ -21,6 +21,12 @@ enum DatabaseLogLevel {
   error,
 }
 
-/// Receives log messages. Messages hold database paths and the texts the server sent, never
-/// tokens and never the values you read or write.
+/// Receives log messages. Messages hold database paths, the shape of a query (its index, which
+/// bounds are set, its limit), the type of a client-side error, a fixed reason, and the texts the
+/// server sent (status reasons, shutdown reasons, security debug output), also inside a database
+/// error.
+///
+/// The client never logs values it holds or sends: no token, no value read or written, no query
+/// bound. A message from the server is logged as the server sent it (control characters escaped,
+/// cut at 1 KiB) and, with rules debug output on (emulator), may quote data.
 typedef DatabaseLogger = void Function(DatabaseLogLevel level, String message);
