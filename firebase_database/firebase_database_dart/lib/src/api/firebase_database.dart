@@ -59,9 +59,10 @@ final class FirebaseDatabase {
   /// [databaseUrl] defaults to the app's `databaseURL`, then to
   /// `https://<projectId>-default-rtdb.firebaseio.com`; with neither and no project id it throws an
   /// [ArgumentError]. The URL must be the root of a database over TLS (`https://` or `wss://`): a
-  /// plain `http://` URL, a path, user info, a port other than 443 on a host that is not loopback,
-  /// a custom domain without `?ns=` and an invalid namespace each throw an [ArgumentError] here,
-  /// with or without [persistence]. The message does not quote the URL.
+  /// plain `http://` URL (the message points to [emulatorHost]), a path, user info, a port other
+  /// than 443 on a host that is not loopback, a custom domain without `?ns=` and an invalid
+  /// namespace each throw an [ArgumentError] here, with or without [persistence]. The message does
+  /// not quote the URL.
   ///
   /// [emulatorHost] (`'host:port'` or `'[ipv6]:port'`) connects to the Database emulator over plain
   /// WebSocket (over TLS for a `*.cloudworkstations.dev` host), with the database URL's namespace
@@ -432,23 +433,45 @@ final class FirebaseDatabase {
   }
 
   /// The reference for a full [url] of this database (for example
-  /// `https://my-project-default-rtdb.firebaseio.com/a/b`). Outside an emulator the URL without its
-  /// path must be accepted by the constructor's `databaseUrl` rules and name this database's host,
-  /// else an [ArgumentError] is thrown. With an emulator the host is not compared and only the path
-  /// is used. Path segments are percent-decoded.
+  /// `https://my-project-default-rtdb.firebaseio.com/a/b`). Path segments are percent-decoded.
+  ///
+  /// Outside an emulator the URL without its path must be accepted by the constructor's
+  /// `databaseUrl` rules and name this database: its host, and its namespace (`?ns=` or the first
+  /// label of a `firebaseio.com` / `firebasedatabase.app` host). With an emulator the host and
+  /// port are not compared, but the URL must still be `http`, `https`, `ws` or `wss` with a valid
+  /// host, no user info and no query key but `ns`, and a namespace it names (the same two ways)
+  /// must be this database's. Anything else throws an [ArgumentError], as does a path that is not
+  /// valid percent-encoded UTF-8 or that [ref] refuses.
+  ///
+  /// No message quotes the whole URL, its user info or its query. A message may name the URL's
+  /// host (another host) and, as [ref] does, a decoded path it refuses.
   DatabaseReference refFromUrl(String url) {
     final ({String root, String path}) parts = _splitPath(url);
-    if (!_target.info.isUsingEmulator) {
+    final RepoInfo here = _target.info;
+    final String? namespace;
+    if (here.isUsingEmulator) {
+      namespace = _Target._argument('url', () => namespaceOfUrl(parts.root));
+    } else {
       final RepoInfo info = _Target._argument(
         'url',
         () => parseDatabaseUrl(parts.root),
       );
-      if (info.host != _target.info.host) {
+      if (info.host != here.host) {
         throw ArgumentError(
-          'refFromURL: Host name does not match the current database: '
-          '(found ${info.host} but expected ${_target.info.host})',
+          'refFromUrl: Host name does not match the current database: '
+              '(found ${info.host} but expected ${here.host})',
+          'url',
         );
       }
+      namespace = info.namespace;
+    }
+    if (namespace != null && namespace != here.namespace) {
+      // The URL's ns is not quoted: it is a query value.
+      throw ArgumentError(
+        'refFromUrl: The URL names another database than this one '
+            '(this namespace is ${here.namespace})',
+        'url',
+      );
     }
     return ref(parts.path);
   }
@@ -734,10 +757,10 @@ final class _FunctionRandom implements Random {
     try {
       segments.add(Uri.decodeComponent(segment));
     } on ArgumentError {
-      throw ArgumentError.value(
-        url,
-        'url',
+      // Not quoted: the URL can hold user info, and the path user data.
+      throw ArgumentError(
         'The path is not valid percent-encoded UTF-8.',
+        'url',
       );
     }
   }
@@ -843,7 +866,7 @@ final class _Target {
 
   /// The value of [parse], with a [FormatException] turned into an [ArgumentError] on [name]. The
   /// message never quotes the URL, which can hold a credential by mistake.
-  static RepoInfo _argument(String name, RepoInfo Function() parse) {
+  static T _argument<T>(String name, T Function() parse) {
     try {
       return parse();
     } on FormatException catch (e) {

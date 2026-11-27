@@ -92,15 +92,20 @@ final class DatabaseError {
   /// Creates an error.
   const DatabaseError(this.code, this.message, {this.details, this.rawStatus})
     : isLocal = false,
-      cause = null;
+      cause = null,
+      causeStackTrace = null;
 
   /// Creates an error the client raised itself, with no server status: the public exception has
   /// no `serverStatus`, [message] is a fixed text that says what failed, and [cause] is the error
-  /// that caused it (never part of [message]).
-  const DatabaseError.local(this.code, this.message, {this.cause})
-    : details = null,
-      rawStatus = null,
-      isLocal = true;
+  /// that caused it (never part of [message]), thrown at [causeStackTrace] when known.
+  const DatabaseError.local(
+    this.code,
+    this.message, {
+    this.cause,
+    this.causeStackTrace,
+  }) : details = null,
+       rawStatus = null,
+       isLocal = true;
 
   /// Creates the error for a wire [status] with the server's optional [reason], as Repo does for
   /// a failed request.
@@ -143,6 +148,9 @@ final class DatabaseError {
 
   /// The error that caused a [DatabaseError.local] error; null otherwise.
   final Object? cause;
+
+  /// Where [cause] was thrown, when the client caught it with its stack trace; null otherwise.
+  final StackTrace? causeStackTrace;
 
   /// The code, message and details; never a token (Android `DatabaseError.toString`).
   @override
