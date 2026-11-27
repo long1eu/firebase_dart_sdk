@@ -1372,7 +1372,12 @@ priority 7 until it is online again (pinned by `test/core/persistence/emptied_no
 The SQLite engine clears an emptied node, so it does not show this; for the same reason it shows no priority after a
 refill where the server keeps the priority of an emptied node. Two attempts to store the update in the server's order
 each moved the fault to another case (the SQLite engine kept a priority under an empty node; a value entry skipped for
-an active listen made the priority's node read empty), so the order stays as it was in 0.1.0 (2026-11-28).
+an active listen made the priority's node read empty), so the order stays as it was in 0.1.0 (2026-11-28). Also in
+0.1.0, with the SQLite engine in this order: `update(x, {a: null, b: 5, ".priority": 7})` on a cached `x = {a: 1}`
+while a listen at `x/b`, opened after the update, waits for its data. The `b` entry is not stored (the listen will
+bring it), the priority is stored first and cleared when `a` goes and leaves `x` empty, so the cache ends as
+`x = {b: 5}`, complete and without the priority 7 the server holds, until `x` is loaded from the server again (a
+reviewer's script, 2026-11-28; the in-memory engine keeps the priority).
 
 ## 26. What is not in 0.1
 

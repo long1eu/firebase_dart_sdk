@@ -570,6 +570,8 @@ void main() {
     );
   });
 
+  // The boundaries are leaves of the cache (/a and /z), as a server takes them from the client's
+  // compound hash, and the data is the server's state in the range.
   group('range merges (rm) carry and drop kept priorities', () {
     final Map<String, Object?> server = <String, Object?>{
       'a': 1,
@@ -593,13 +595,14 @@ void main() {
     });
 
     test('a partial range carrying {".priority": 5}', () {
-      // (/a, /y] holds n and its priority (/n/.priority sorts after /n).
+      // (/a, /z] holds n with its priority, and z.
       final Node got = apply(
         <String, Object?>{'a': 1, 'z': 2},
         '/a',
-        '/y',
+        '/z',
         <String, Object?>{
           'n': <String, Object?>{'.priority': 5},
+          'z': 2,
         },
       );
       expect(_children(got).toServerJson(), server);
@@ -607,7 +610,7 @@ void main() {
     });
 
     test('a partial range from a server that dropped the kept priority', () {
-      final Node got = apply(server, '/a', '/y', null);
+      final Node got = apply(server, '/a', '/z', <String, Object?>{'z': 2});
       expect(_children(got).toServerJson(), <String, Object?>{'a': 1, 'z': 2});
       expect(
         got.hash(),
@@ -624,9 +627,10 @@ void main() {
           'z': 2,
         },
         '/a',
-        '/y',
+        '/z',
         <String, Object?>{
           'n': <String, Object?>{'.priority': 5},
+          'z': 2,
         },
       );
       expect(_children(got).toServerJson(), server);
