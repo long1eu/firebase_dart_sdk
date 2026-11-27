@@ -231,8 +231,8 @@ Future<void> clientReadmeLine539() async {
   await logged.close();
 }
 
-// README.md:48
-Future<void> sqliteReadmeLine48() async {
+// README.md:49
+Future<void> sqliteReadmeLine49() async {
   final FirebaseDatabase cached = FirebaseDatabase(
     app,
     persistence: sqlitePersistence('/path/to/app/support/firebase_database'),
@@ -240,8 +240,8 @@ Future<void> sqliteReadmeLine48() async {
   await cached.close();
 }
 
-// README.md:73
-Future<void> sqliteReadmeLine73() async {
+// README.md:74
+Future<void> sqliteReadmeLine74() async {
   await database.close();
   await clearSqlitePersistence(
     '/path/to/app/support/firebase_database',

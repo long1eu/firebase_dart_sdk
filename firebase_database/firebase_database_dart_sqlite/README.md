@@ -13,7 +13,8 @@ app is offline. It is not affiliated with or endorsed by Google or Firebase.
 > - On Windows 11 x64 the disk cache test of the Windows example app passed with an earlier version of the app.
 > - The SQLite engine had an independent review (1 high, 5 medium and 10 low findings), all fixed with a test each.
 > - Nothing ran on Android or iOS or in a release build of a desktop app. Against production one check of the
->   client's verification kit used this cache: it closed and reopened a cache file and listened again (one run).
+>   client's verification kit used this cache: it closed and reopened a cache file and listened again (check 38, in the
+>   run of all 41 checks on 2026-11-27, and in an earlier run).
 > - Cost of the cache, measured on one Mac mini (macOS, AOT, medians of 5, rows of about 100 bytes; see Limits). Not
 >   measured: JSON against a binary codec, `synchronous = FULL` against `NORMAL`, and any write cost on Linux or
 >   Windows.

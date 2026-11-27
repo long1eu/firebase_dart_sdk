@@ -1090,13 +1090,14 @@ server is now asked for finiteness (`server_message_test`, `c_limits_test`, `k_s
 CI runs on GitHub Actions (`.github/workflows/ci.yml`) and passes. Not run: a release build of a desktop app, Safari
 and Firefox, and a real display.
 
-**What was run against production.** A dedicated database instance in europe-west1 of one Firebase project, on
-2026-11-25 and 26. The verification kit has 41 checks. Checks 1 to 39 ran as one run on the trunk client at
-`0f41b078`, and all 39 passed; check 40 (2026-11-26) and check 41 (2026-11-27) each ran alone, once, with the answers
-of the emulator. Checks 22
-and 38 (c), (e) and (f) are informational on that client and record what it does: it drops the priority of an emptied
-node, as the JS SDK does (checks 22, 38 (c) and (f); section 25, rows 2 and 8 of the table "Behaviours shared with the
-JS SDK that are kept"). The kit signs up a throwaway user, writes about 1.1 MB below a path of its own and removes it.
+**What was run against production.** A dedicated database instance in europe-west1 of one Firebase project. The
+verification kit has 41 checks. On 2026-11-27 all 41 ran as one run ("run 15") on the final trunk client at `3d443aea`,
+and all 41 passed; the same day the whole kit ran on the emulator and all 41 passed there too. Earlier runs on the same
+database passed as well: checks 1 to 39 as one run on the trunk client at `0f41b078` (2026-11-25 and 26), check 40
+(2026-11-26) and check 41 (2026-11-27) each alone, once. Run 15 had no `--expect-emptied-node-fix`, so checks 22 and 38
+(c), (e) and (f) are informational and record what the client does: it drops the priority of an emptied node, as the JS
+SDK does (checks 22, 38 (c) and (f); section 25, rows 2 and 8 of the table "Behaviours shared with the JS SDK that are
+kept"). The kit signs up a throwaway user, writes about 1.1 MB below a path of its own and removes it.
 It covers the connection and its TLS, the server's host, every value type, server values, listeners, queries,
 transactions, `onDisconnect`, offline writes, rules with and without a user, a token refresh on a live connection, a
 sign-out, timings, a 1 MB value, pipelined writes, and raw frames for the server's answers about priorities and limit
@@ -1110,7 +1111,6 @@ queries. Earlier runs of the kit, or of its checks 39 to 41 alone, are named whe
 - a 10 MiB string leaf and a 16 MB write;
 - App Check with a real provider;
 - the limit-view race of section 25, row 7;
-- a plain `set` of a null priority on a missing node (only the `update` form ran);
 - the legacy `firebaseio.com` host and a custom domain;
 - the re-send of an `increment` whose answer was lost;
 - three limits with no measurement anywhere: a hung TLS handshake, an increment past the range of a double, and the

@@ -30,9 +30,9 @@ Dart streams. It is not affiliated with or supported by Google or Firebase.
 > - Independent reviews, all findings fixed with a test each: connection (3 high, 8 medium, 7 low), SQLite engine (1, 5,
 >   10), adapter (2, 4, 6), API and core (1, 4, 4).
 >
-> - Production: checks 1 to 39 of the verification kit (41 checks) passed in one run on this client (commit `0f41b078`)
->   against a dedicated database, and checks 40 and 41 each ran alone once; what it covers and what never ran there is
->   in section 23 of the decisions document.
+> - Production: all 41 checks of the verification kit passed in one run on this client on 2026-11-27 against a
+>   dedicated database, and 41 of 41 passed on the emulator; earlier runs passed too. What it covers and what never ran
+>   there is in section 23 of the decisions document.
 > - CI on GitHub Actions passes (`.github/workflows/ci.yml`).
 >
 > What has **not** run: a release build of a desktop app, Safari, Firefox and a real display. One person maintains it.

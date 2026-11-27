@@ -13,8 +13,8 @@
   without the emulator. That suite has not run on Linux or Windows. Not run: a release build of a desktop app, a real
   display, anything on Android, iOS or the web.
 - Verified against production. Not through this adapter. The client underneath, `firebase_database_dart`, ran its
-  verification kit (41 checks; checks 1 to 39 ran once as one run on 2026-11-25 and 26 against a dedicated database
-  instance of one Firebase project, and all 39 passed; checks 40 and 41 each ran alone later).
+  verification kit (41 checks; all 41 ran as one run on 2026-11-27 against a dedicated database instance of one
+  Firebase project, and all 41 passed; earlier runs, checks 1 to 39 and checks 40 and 41 each alone, passed too).
 - Known limits:
   - Settings are captured when the client is created, at the first read, write or listen of an instance. After that
     `useDatabaseEmulator` with another host throws a `StateError`, and `setPersistenceEnabled` and

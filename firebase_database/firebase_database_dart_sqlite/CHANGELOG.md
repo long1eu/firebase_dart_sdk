@@ -8,10 +8,10 @@
   commit), including Android's own persistence suites run on the SQLite engine. Windows 11 x64: the disk cache test
   of the Windows example app, with an earlier version of the app. Not run: Android, iOS, a release build of a desktop
   app. No run of this package is recorded on Linux x64 (the client's own suites ran there).
-- Verified against production. One check of the client's verification kit (checks 1 to 39 ran as one run on
-  2026-11-25 and 26, against a dedicated database instance of one Firebase project) used this cache: it closed and
-  reopened a cache file and listened again. All 39 of that run passed. Checks 40 and 41 of the kit, which ran alone
-  later, do not use this package. Nothing else of this package ran against production.
+- Verified against production. One check (38) of the client's verification kit used this cache: it closed and
+  reopened a cache file and listened again. It ran in the 39-check run of 2026-11-25 and 26 and again in the run of all
+  41 checks on 2026-11-27, both against a dedicated database instance of one Firebase project, and passed each time.
+  Checks 40 and 41 of the kit do not use this package. Nothing else of this package ran against production.
 - Known limits:
   - One owner per cache file, by a lease. A second process or isolate runs memory-only after about 7.5 s with one
     logged warning, and its writes are not durable.

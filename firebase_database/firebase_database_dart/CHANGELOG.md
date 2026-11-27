@@ -9,19 +9,21 @@
   v4.11.2), Linux x64 in a Debian 13 container and Windows 11 x64 (both at an earlier commit). Web: Chrome on macOS, the
   whole test tree, 2,584 tests with dart2js and 2,588 with dart2wasm. Not run: a release build of a desktop app, Safari,
   Firefox and a real display.
-- Verified against production. The verification kit has 41 checks. Checks 1 to 39 ran once as one run against a
-  dedicated database instance of one Firebase project, on 2026-11-25 and 26, on the client at an earlier commit, and all
-  39 passed; check 40 (2026-11-26) and check 41 (2026-11-27) each ran alone, once, and gave the same answers as on the
-  emulator (`tool/verify_production_database/README.md`, "Known results"). "Run" here means one run, not repeated runs.
-  Some checks are informational and record what the client does. The kit signs up a throwaway user, writes about 1.1 MB
+- Verified against production. The verification kit has 41 checks. On 2026-11-27 all 41 ran as one run against a
+  dedicated database instance of one Firebase project, on the final client of this version, and all 41 passed; the
+  same day the kit ran on the emulator and all 41 passed there too. Earlier runs passed as well (2026-11-25 and 26,
+  checks 1 to 39; checks 40 and 41 each alone). The 2026-11-27 run had no `--expect-emptied-node-fix`, so checks 22
+  and 38 (c), (e) and (f) record that the client drops the priority of an emptied node, as the JS SDK does
+  (`tool/verify_production_database/README.md`, "Known results"). "Run" here means one run, not repeated runs. Some
+  checks are informational and record what the client does. The kit signs up a throwaway user, writes about 1.1 MB
   below a path of its own and removes it. It covers the connection and its TLS, the server's host, every value type,
   server values, listeners, queries, transactions, `onDisconnect`, offline writes, rules with and without a user, a
   token refresh on a live connection, a sign-out, timings, a 1 MB value, pipelined writes, and raw frames for the
   server's answers about priorities and limit queries.
 - Never run against production: token expiry after an hour, a rules change during a connection, a 10 MiB string leaf
   and a 16 MB write, App Check with a real provider, the legacy `firebaseio.com` host and a custom domain, the re-send
-  of an `increment` whose answer was lost, the limit-view race of section 25 and a plain `set` of a null priority on a
-  missing node (only the `update` form ran). Section 23 of `docs/database_decisions.md` has the list.
+  of an `increment` whose answer was lost, and the limit-view race of section 25. Section 23 of
+  `docs/database_decisions.md` has the list.
 - Known limits:
   - Writes are delivered at least once. A re-sent `ServerValue.increment` can apply twice; use a transaction to count.
   - A hung TLS handshake cannot be closed on the Dart VM. The client gives up after its 30 s connect timeout and
