@@ -29,7 +29,8 @@ final class SimServer {
   /// Called after [data] changed.
   void Function()? onChange;
 
-  /// Whether the next write is refused with `permission_denied`.
+  /// Whether the next write the server answers, the oldest unanswered one, is refused with
+  /// `permission_denied`.
   bool rejectNext = false;
 
   /// Called after a write was refused because of [rejectNext], which is false again by then.
@@ -86,7 +87,9 @@ final class SimServer {
     }
     final List<String> fresh = requests.sublist(_seen);
     _seen = requests.length;
-    final List<_Intent> writes = <_Intent>[];
+    bool changed = false;
+    // The requests are in the order they left, so answering each write as it comes answers the
+    // oldest one, the order the fake requires.
     for (final String request in fresh) {
       final List<String> parts = request.split(' ');
       final String code = parts[0];
@@ -101,15 +104,9 @@ final class SimServer {
             fake.answerGet(path, _valueAt(path));
             log('answered get /$path');
           case 'p' || 'm':
-            final _Intent? intent = _take(code, path);
-            if (intent == null) {
-              fake.ackLastWrite();
-              log('acknowledged $code /$path (the page did not say its data)');
-            } else {
-              writes.add(intent);
-            }
+            changed = _answerWrite(code, path) || changed;
           case 'o' || 'om' || 'oc':
-            fake.ackLastOnDisconnect();
+            fake.ackNextOnDisconnect();
           case 'n':
             log('unlisten /$path');
           default:
@@ -119,54 +116,53 @@ final class SimServer {
         // The request was withdrawn before the answer, for example an unlisten.
       }
     }
-    _answerWrites(writes);
+    if (changed) {
+      onChange?.call();
+    }
   }
 
+  /// Answers the oldest unanswered write, which is the [code] request at [path], and applies it to
+  /// [data] when the page said its data. Returns whether [data] changed.
+  ///
+  /// The page's data and [rejectNext] are used only once the fake took the answer: when the answer
+  /// throws (the connection dropped since the request left), both are kept for the resent request.
+  bool _answerWrite(String code, String path) {
+    if (rejectNext) {
+      fake.failNextWrite('permission_denied');
+      rejectNext = false;
+      _take(code, path);
+      log('refused ${_actionOf(code)} /$path: permission_denied');
+      onReject?.call();
+      return false;
+    }
+    fake.ackNextWrite();
+    final _Intent? intent = _take(code, path);
+    if (intent == null) {
+      log('acknowledged $code /$path (the page did not say its data)');
+      return false;
+    }
+    if (intent.action == 'set') {
+      _setAt(intent.path, intent.value);
+    } else {
+      (intent.value! as Map<String, Object?>).forEach((String key, Object? v) {
+        _setAt('${intent.path}/$key', v);
+      });
+    }
+    log('applied ${intent.action} /${intent.path}');
+    return true;
+  }
+
+  /// The name the page and the log use for a write request: `p` is a set, `m` an update.
+  static String _actionOf(String code) => code == 'p' ? 'set' : 'update';
+
   _Intent? _take(String code, String path) {
-    final String action = code == 'p' ? 'set' : 'update';
+    final String action = _actionOf(code);
     for (int i = 0; i < _intents.length; i++) {
       if (_intents[i].action == action && _intents[i].path == path) {
         return _intents.removeAt(i);
       }
     }
     return null;
-  }
-
-  /// The fake can only answer the most recent unanswered write, so a batch (the writes that waited
-  /// offline) is answered newest first, then the server's data is rebuilt in the order of the writes and
-  /// pushed, so listeners end on the right value.
-  void _answerWrites(List<_Intent> writes) {
-    if (writes.isEmpty) {
-      return;
-    }
-    final List<_Intent> accepted = <_Intent>[];
-    for (final _Intent write in writes.reversed) {
-      if (rejectNext) {
-        rejectNext = false;
-        fake.failLastWrite('permission_denied');
-        log('refused ${write.action} /${write.path}: permission_denied');
-        onReject?.call();
-      } else {
-        fake.ackLastWrite();
-        accepted.insert(0, write);
-      }
-    }
-    for (final _Intent write in accepted) {
-      if (write.action == 'set') {
-        _setAt(write.path, write.value);
-      } else {
-        (write.value! as Map<String, Object?>).forEach((String key, Object? v) {
-          _setAt('${write.path}/$key', v);
-        });
-      }
-      log('applied ${write.action} /${write.path}');
-    }
-    if (accepted.length > 1) {
-      for (final _Intent write in accepted) {
-        fake.push(write.path, _valueAt(write.path));
-      }
-    }
-    onChange?.call();
   }
 
   Object? _valueAt(String path) {

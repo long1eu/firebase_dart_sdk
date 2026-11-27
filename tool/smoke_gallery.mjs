@@ -690,6 +690,10 @@ async function webAppHiddenBurst(c) {
 // rtdb_playground.
 
 const PG = 'return pg();';
+// The reject button's two labels, as examples/rtdb_playground/web/main.dart writes them.
+// tool/check_gallery.sh reads these two lines and looks for each label in that file.
+const REJECT_OFF = 'Server rejects the oldest unanswered write';
+const REJECT_ON = 'The oldest unanswered write will be rejected (click to cancel)';
 
 async function playground(browser, opts, compiler) {
   const c = await playgroundContext(browser, opts, compiler);
@@ -886,12 +890,11 @@ async function playgroundOffline(c) {
     return `server log: ${JSON.stringify(s.serverLog.slice(logN))}`;
   });
 
-  await step(group, '9 rejection and rollback', 'button "Next write will be rejected (click to ' +
-    'cancel)" pressed; set /todos/z shows z, then "rejected ... permission_denied", z gone, ' +
+  await step(group, '9 rejection and rollback', `button "${REJECT_ON}" ` +
+    'pressed; set /todos/z shows z, then "rejected ... permission_denied", z gone, ' +
     'server log "refused set /todos/z: permission_denied"', async () => {
     await run(`$('reject').click()`);
-    await wait((s) => s.reject === 'Next write will be rejected (click to cancel)' &&
-      s.rejectPressed === 'true');
+    await wait((s) => s.reject === REJECT_ON && s.rejectPressed === 'true');
     const n = (await events()).length;
     await run(`window.__z = false;
       new MutationObserver(() => { if ($('client-tree').textContent.includes('z: '))
@@ -907,10 +910,9 @@ async function playgroundOffline(c) {
   });
 
   await step(group, '9b reject button after the rejection',
-    'button back to "Server rejects next ' +
-    'write", aria-pressed false (the server has reset rejectNext)', async () => {
-    await wait((s) => s.reject === 'Server rejects next write' &&
-      s.rejectPressed === 'false', 2000);
+    `button back to "${REJECT_OFF}", ` +
+    'aria-pressed false (the server has reset rejectNext)', async () => {
+    await wait((s) => s.reject === REJECT_OFF && s.rejectPressed === 'false', 2000);
   });
 
   await step(group, '10 invalid JSON', '#error has a FormatException; cleared on the next submit',

@@ -9,8 +9,9 @@
 // write tree holds instead.
 //
 // The fake server refuses the last write while the earlier one is pending, which a server
-// answering in order does not do. Through the public API the same state comes from a queued
-// transaction aborted while an ancestor transaction is in flight (last test).
+// answering in order does not do: the first four tests pass `outOfOrder: true` for that. They test
+// the write tree's rebuild, not the server. Through the public API the same state comes from a
+// queued transaction aborted while an ancestor transaction is in flight (last test, in order).
 
 import 'package:firebase_database_dart/firebase_database_dart.dart';
 import 'package:test/test.dart';
@@ -54,7 +55,8 @@ void main() {
       h,
       () => h.track('W2', h.ref('r/b').update(<String, Object?>{'c': 2})),
     );
-    h.server.failLastWrite('permission_denied');
+    // Out of order on purpose: the state under test, not a server answer (see the top).
+    h.server.failLastWrite('permission_denied', outOfOrder: true);
     h.settle();
     expect(h.named('W2'), <String>['W2:E(permission-denied)']);
     expectNewListenerSeesNothing(h);
@@ -64,7 +66,8 @@ void main() {
     Harness h,
   ) {
     setUnderPendingSet(h, () => h.track('W2', h.ref('r/b/c').set(2)));
-    h.server.failLastWrite('permission_denied');
+    // Out of order on purpose: the state under test, not a server answer (see the top).
+    h.server.failLastWrite('permission_denied', outOfOrder: true);
     h.settle();
     expect(h.named('W2'), <String>['W2:E(permission-denied)']);
     expectNewListenerSeesNothing(h);
@@ -89,7 +92,8 @@ void main() {
             ),
       ),
     );
-    h.server.failLastWrite('datastale');
+    // Out of order on purpose: the state under test, not a server answer (see the top).
+    h.server.failLastWrite('datastale', outOfOrder: true);
     h.settle();
     expect(h.named('T'), <String>['T:aborted(null)']);
     expectNewListenerSeesNothing(h);
@@ -106,7 +110,8 @@ void main() {
       h,
       () => h.track('W2', h.ref('r/b').update(<String, Object?>{'c': 2})),
     );
-    h.server.failLastWrite('permission_denied');
+    // Out of order on purpose: the state under test, not a server answer (see the top).
+    h.server.failLastWrite('permission_denied', outOfOrder: true);
     h.settle();
     expect(h.named('S'), <String>[
       'S:V(null)',

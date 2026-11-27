@@ -666,8 +666,13 @@ On Linux it registers itself; on Windows when it is a direct dependency; elsewhe
 `package:firebase_database_dart/testing.dart` has a scripted in-memory server (`FakeDatabaseServer`), a database
 connected to it (`databaseWithFakeServer`) and in-memory persistence (`fakePersistence`). It has no stability promise
 beyond the package's contract tests. A test steers the server with `acceptConnections` (set it to false and call
-`dropConnection` to keep the client offline), `serverTime`, `ackLastWrite`, `failLastWrite`, `ackLastOnDisconnect`,
-`answerGet`, `failGet`, `revokeAuth` and `kill`, and reads `connectionAttempts` and `receivedAuthTokens`.
+`dropConnection` to keep the client offline), `serverTime`, `ackNextWrite`, `failNextWrite`, `ackNextOnDisconnect`,
+`ackLastWrite`, `failLastWrite`, `ackLastOnDisconnect`, `answerGet`, `failGet`, `revokeAuth` and `kill`, and reads
+`connectionAttempts` and `receivedAuthTokens`. A test must answer writes and onDisconnect requests in the order they
+left (after a reconnect: puts and merges first, then onDisconnect requests made offline, as the client sends them):
+answering one while an earlier one is unanswered throws a `StateError`, unless the `*Last*` helper is given
+`outOfOrder: true`. That the server answers writes in that order is inferred from an emulator probe that measured
+listens and gets answered in send order. The fake does not check the order of listens and gets.
 
 Events are delivered in batches of 1000, with a turn of the event loop between batches so a long burst does not block
 the page. In a browser that turn is a message task, not a timer (a hidden tab delays timers), so a fake clock such as
