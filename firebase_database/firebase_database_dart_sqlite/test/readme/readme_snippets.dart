@@ -240,8 +240,8 @@ Future<void> sqliteReadmeLine48() async {
   await cached.close();
 }
 
-// README.md:73
-Future<void> sqliteReadmeLine73() async {
+// README.md:76
+Future<void> sqliteReadmeLine76() async {
   await database.close();
   await clearSqlitePersistence(
     '/path/to/app/support/firebase_database',

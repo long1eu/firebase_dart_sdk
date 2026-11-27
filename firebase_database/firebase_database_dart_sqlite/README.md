@@ -56,6 +56,9 @@ final FirebaseDatabase cached = FirebaseDatabase(
 await cached.close();
 ```
 
+A complete program, which writes a value, closes, reopens offline and reads it from the cache, is
+[example/main.dart](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_database/firebase_database_dart_sqlite/example/main.dart).
+
 `sqlitePersistence` returns the client's `DatabasePersistence`. `FirebaseDatabase.persistenceEnabled` tells whether the
 disk is really in use (false for a second instance on the same file, and after a storage error). Persistence is off
 unless you pass it.
