@@ -16,6 +16,8 @@ import 'package:firebase_database_dart/src/api/environment_stub.dart'
 import 'package:firebase_database_dart/src/api/firebase_database_exception.dart';
 import 'package:firebase_database_dart/src/api/query.dart';
 import 'package:firebase_database_dart/src/core/callback_event_registration.dart';
+import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
+import 'package:firebase_database_dart/src/core/connection/wire_range_merge.dart';
 import 'package:firebase_database_dart/src/core/database_error.dart';
 import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:firebase_database_dart/src/core/persistence/database_persistence.dart';
@@ -71,8 +73,11 @@ final class FirebaseDatabase {
   /// label of a name (`http://my-mac.local:9000` gives `my-mac`), and `fake-server` for
   /// `localhost:9000` or an IP address. `fake-server` is not the project's default database
   /// `<projectId>-default-rtdb`, the only one where the emulator applies the rules file; give
-  /// `?ns=`, or no URL at all, to use that one. User info, a path, a fragment, a query key other
-  /// than `ns` and an invalid namespace still throw an [ArgumentError]. See
+  /// `?ns=`, or no URL at all, to use that one. When the namespace came from the host this way and
+  /// is not `<projectId>-default-rtdb`, [logger] receives one warning at the first connection
+  /// (not again on a reconnect) that names the namespace and the emulator host. A URL with `?ns=`,
+  /// or no URL (the project's default database), logs nothing. User info, a path, a fragment, a
+  /// query key other than `ns` and an invalid namespace still throw an [ArgumentError]. See
   /// [emulatorHostFromEnvironment]. [mockUserToken] is sent to the emulator as it is: build a
   /// user's token with `mockUserTokenFor`. A string that is not such a token (the literal `'owner'`
   /// included) is an admin credential for the emulator and bypasses the rules. Passing it without
@@ -125,13 +130,19 @@ final class FirebaseDatabase {
   FirebaseDatabase._withConnection(
     this.app, {
     required ServerActionsFactory connectionFactory,
+    String? databaseUrl,
+    String? emulatorHost,
     DatabasePersistence? persistence,
     DatabaseLogger? logger,
     DateTime Function()? clock,
     double Function()? random,
   }) {
     _setUp(
-      _Target.resolve(app),
+      _Target.resolve(
+        app,
+        databaseUrl: databaseUrl,
+        emulatorHost: emulatorHost,
+      ),
       connectionFactory: connectionFactory,
       persistence: persistence,
       logger: logger,
@@ -187,7 +198,10 @@ final class FirebaseDatabase {
     double Function()? random,
   }) {
     _target = target;
-    _connectionFactory = connectionFactory;
+    final String? warning = target.namespaceWarning;
+    _connectionFactory = warning == null
+        ? connectionFactory
+        : _warnAtFirstConnect(connectionFactory, warning);
     _persistence = persistence;
     _logger = logger;
     _clock = clock;
@@ -594,11 +608,14 @@ extension FirebaseDatabaseInternal on FirebaseDatabase {
 }
 
 /// A [FirebaseDatabase] of [app] whose connection is built by [connectionFactory] (the testing
-/// factories pass a fake server). The database URL comes from the app's options.
+/// factories pass a fake server). [databaseUrl] and [emulatorHost] are resolved as by the
+/// constructor; by default the database URL comes from the app's options.
 @internal
 FirebaseDatabase firebaseDatabaseWithConnection(
   FirebaseApp app, {
   required ServerActionsFactory connectionFactory,
+  String? databaseUrl,
+  String? emulatorHost,
   DatabasePersistence? persistence,
   DatabaseLogger? logger,
   DateTime Function()? clock,
@@ -606,11 +623,78 @@ FirebaseDatabase firebaseDatabaseWithConnection(
 }) => FirebaseDatabase._withConnection(
   app,
   connectionFactory: connectionFactory,
+  databaseUrl: databaseUrl,
+  emulatorHost: emulatorHost,
   persistence: persistence,
   logger: logger,
   clock: clock,
   random: random,
 );
+
+/// [factory] with [message] logged as a warning when its first connection is up; reconnects and
+/// later connections of the same database log nothing.
+ServerActionsFactory _warnAtFirstConnect(
+  ServerActionsFactory factory,
+  String message,
+) {
+  bool warned = false;
+  return (ServerActionsDelegate delegate, DatabaseLogger? logger) => factory(
+    _OnConnectDelegate(delegate, () {
+      if (!warned) {
+        warned = true;
+        logger?.call(DatabaseLogLevel.warning, message);
+      }
+    }),
+    logger,
+  );
+}
+
+/// A [ServerActionsDelegate] that runs [_onConnect] before passing each connect to [_inner].
+final class _OnConnectDelegate implements ServerActionsDelegate {
+  _OnConnectDelegate(this._inner, this._onConnect);
+
+  final ServerActionsDelegate _inner;
+  final void Function() _onConnect;
+
+  @override
+  void onConnect() {
+    _onConnect();
+    _inner.onConnect();
+  }
+
+  @override
+  void onDataUpdate(
+    String path,
+    Object? data, {
+    required bool isMerge,
+    int? tag,
+  }) => _inner.onDataUpdate(path, data, isMerge: isMerge, tag: tag);
+
+  @override
+  void onRangeMergeUpdate(
+    String path,
+    List<WireRangeMerge> merges, {
+    int? tag,
+  }) => _inner.onRangeMergeUpdate(path, merges, tag: tag);
+
+  @override
+  void onDisconnect() => _inner.onDisconnect();
+
+  @override
+  void onAuthStatus(String status, {String? explanation}) =>
+      _inner.onAuthStatus(status, explanation: explanation);
+
+  @override
+  void onAppCheckStatus(String status, {String? explanation}) =>
+      _inner.onAppCheckStatus(status, explanation: explanation);
+
+  @override
+  void onServerShutdown(String reason) => _inner.onServerShutdown(reason);
+
+  @override
+  void onServerInfoUpdate(Map<String, Object?> updates) =>
+      _inner.onServerInfoUpdate(updates);
+}
 
 ServerActionsFactory _realtimeConnectionFactory(
   FirebaseApp app,
@@ -758,7 +842,7 @@ final class _FunctionRandom implements Random {
 
 /// Where an instance connects: its [RepoInfo] and public [databaseUrl].
 final class _Target {
-  _Target(this.info, this.databaseUrl);
+  _Target(this.info, this.databaseUrl, {this.namespaceWarning});
 
   /// The target for [app] and the constructor arguments (contract C27). JS: `api/Database.ts`
   /// (`repoManagerDatabaseFromApp`, `connectDatabaseEmulator`).
@@ -813,6 +897,7 @@ final class _Target {
       );
     }
     final String namespace;
+    bool fromHost = false;
     if (url == null || url.isEmpty) {
       namespace = _defaultDatabase(app).namespace;
     } else {
@@ -821,6 +906,11 @@ final class _Target {
       } on FormatException catch (e) {
         throw ArgumentError(e.message, 'databaseUrl');
       }
+      // The URL is valid here, so it parses; without a scheme it was read as https.
+      final Uri parsed = Uri.parse(url.contains('://') ? url : 'https://$url');
+      fromHost =
+          !parsed.queryParameters.containsKey('ns') &&
+          namespace != '${app.options.projectId?.toLowerCase()}-default-rtdb';
     }
     final RepoInfo info = _argument('emulatorHost', () {
       final ({String host, int port}) address = parseEmulatorHost(emulatorHost);
@@ -831,8 +921,18 @@ final class _Target {
       Uri.parse(
         '${info.secure ? 'https' : 'http'}://${info.host}',
       ).replace(queryParameters: <String, String>{'ns': info.namespace}),
+      namespaceWarning: fromHost
+          ? 'Database emulator at ${info.host}: the database URL has no ?ns=, so the '
+                'namespace is "${info.namespace}", taken from the URL host as the emulator '
+                'does. The emulator applies the firebase.json rules only to the project\'s '
+                'default database; name the namespace with ?ns=<name>.'
+          : null,
     );
   }
+
+  /// The warning to log once at the first connection, or null: set when the emulator namespace
+  /// came from the URL host (no `?ns=`) and is not the project's default database.
+  final String? namespaceWarning;
 
   /// The default database of the app's project id; throws an [ArgumentError] without one.
   static RepoInfo _defaultDatabase(FirebaseApp app) {
