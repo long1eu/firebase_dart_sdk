@@ -1,3 +1,20 @@
+## Unreleased
+
+- One update is applied in two passes, independent of key order, as production does: every value entry first, then
+  every priority entry, parents before children. A node whose last child goes keeps its priority as an emptied node,
+  so `update` with `{'.priority': 2, 'x/v': null, 'x/.priority': null}` on `{x: {v: 1, .priority: 1}}` leaves
+  `{'.priority': 2}` in either key order.
+- Fixes a defect of 0.1.0: when the server patched only part of a cached node and the patched part contained none of
+  that node's children, the client dropped the node's priority even though the server still held it, so listeners saw
+  the priority as null until the data was loaded again.
+- Also in 0.1.0, not fixed: a query window that holds an emptied node is sent again at each listen in 0.1.0, because
+  that client holds no emptied node and the server counts it in the window's hash. This version holds emptied nodes,
+  but a limit or range view can still hold one with a stale priority, and a limit view whose window holds emptied
+  children only drops them; such a window is sent again too.
+- Also in 0.1.0, not fixed: with the SQLite engine, an acknowledged update that removes a child, adds another and sets
+  the node's priority (`update(x, {a: null, b: 5, '.priority': 7})` on `x = {a: 1}`) while a listen on the added child
+  is waiting for its data stores the node without the priority, until the node is loaded from the server again.
+
 ## 0.1.0
 
 - First version. A client of the Firebase Realtime Database in Dart, for the Dart VM and the web. It speaks the

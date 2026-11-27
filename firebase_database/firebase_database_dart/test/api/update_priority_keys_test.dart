@@ -4,8 +4,9 @@
 // server refuses the whole merge, in either key order, with `invalid_parameters` "could not set
 // priority on non-existent node" and writes nothing; the object form
 // `{'x': {'v': 1, '.priority': 3}}` is accepted. These tests pin what a caller sees: the local
-// events, the Future's error and the revert. With the listens answered before the write, the local
-// event shows x without its priority; the emulator showed the same sequence
+// events, the Future's error and the revert. The local event shows x with its priority (the two
+// passes of docs/database_decisions.md section 25); before them it showed x without it when the
+// listens were answered before the write, on the emulator too
 // (rtdb/from_helper/reports/update_priority_keys_emulator.txt, run 1).
 //
 // FakeDatabaseServer.failLastWrite sends a fixed reason, so the tests drive a FakeServerActions
@@ -95,12 +96,12 @@ void main() {
       w.track('W', w.db.ref('r').update(keys));
       w.settle();
       expect(w.server.callsOf('merge').single.data, keys);
-      expect(w.log, <String>['X:{v:1}/null', 'S:{k:1,x:{v:1}}/null']);
+      expect(w.log, <String>['X:{v:1}/3', 'S:{k:1,x:{v:1}}/null']);
 
       w.server.failLastWrite('invalid_parameters', reason: _reason);
       w.settle();
       expect(w.log, <String>[
-        'X:{v:1}/null',
+        'X:{v:1}/3',
         'S:{k:1,x:{v:1}}/null',
         'X:null/null',
         'S:{k:1}/null',

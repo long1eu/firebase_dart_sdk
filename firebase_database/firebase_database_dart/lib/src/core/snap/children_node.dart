@@ -19,30 +19,66 @@ import 'package:firebase_database_dart/src/core/util/hash.dart';
 import 'package:firebase_database_dart/src/core/util/sorted_map.dart';
 
 /// A node with children (or none: the empty node), a priority and lazily built indexes.
+///
+/// Hidden state. The server keeps the priority of a node whose last child is removed by a write
+/// below it, and sends it as `{".priority": p}`, also inside the parent's data; a write at or
+/// above the node (or `.priority: null`) drops it. Such a node has no value: it [isEmpty], its
+/// [priority] reads empty and it is `==` to the empty node, but it keeps the priority in
+/// [keptPriority]. Its parent holds it as a hidden child: not in [children], not counted, not
+/// visited, not indexed, but returned by [getImmediateChild] so that a later write below it
+/// refills it with its priority. [hash] counts the hidden state, as the server's hash does;
+/// [toJson], [value], [priority], `==` and [hashCode] do not.
 class ChildrenNode implements Node {
   /// Creates a node of [children] with [priorityNode] (empty when null) and [indexMap].
+  ///
+  /// With no children, [priorityNode] is kept as [keptPriority].
   factory ChildrenNode(
     SortedMap<ChildKey, Node> children,
     Node? priorityNode,
     IndexMap indexMap,
+  ) => ChildrenNode.withHidden(children, priorityNode, indexMap, null);
+
+  /// As the default constructor, with the [hidden] children (each an empty node that holds
+  /// hidden state, see [holdsHiddenState]); null or empty for none.
+  factory ChildrenNode.withHidden(
+    SortedMap<ChildKey, Node> children,
+    Node? priorityNode,
+    IndexMap indexMap,
+    SortedMap<ChildKey, Node>? hidden,
   ) {
     if (priorityNode != null) {
       validatePriorityNode(priorityNode);
     }
-    if (children.isEmpty && priorityNode != null && !priorityNode.isEmpty) {
-      throw StateError('An empty node cannot have a priority');
-    }
-    return ChildrenNode._(children, priorityNode, indexMap);
+    return ChildrenNode._(
+      children,
+      priorityNode,
+      indexMap,
+      hidden == null || hidden.isEmpty ? null : hidden,
+    );
   }
 
-  ChildrenNode._(this._children, this._priorityNode, this._indexMap);
+  ChildrenNode._(
+    this._children,
+    this._priorityNode,
+    this._indexMap, [
+    this._hidden,
+    this._hiddenOrder,
+  ]);
 
   final SortedMap<ChildKey, Node> _children;
 
-  /// Null only for the empty node (which cannot be its own priority) and the max node.
+  /// Null for the empty node (which cannot be its own priority) and the max node; kept when the
+  /// last child goes.
   final Node? _priorityNode;
 
   final IndexMap _indexMap;
+
+  /// The hidden children by key; null when there are none.
+  final SortedMap<ChildKey, Node>? _hidden;
+
+  /// The hidden children in [hash] order (kept priority, then key), built on the first [hash]
+  /// and then carried to the versions this node makes; null when not built.
+  SortedMap<NamedNode, Node>? _hiddenOrder;
 
   String? _lazyHash;
   Object? _lazyValue;
@@ -67,24 +103,86 @@ class ChildrenNode implements Node {
   @override
   bool get isLeafNode => false;
 
+  /// The priority; empty while the node has no children (see [keptPriority]).
   @override
-  Node get priority => _priorityNode ?? _empty;
+  Node get priority => _children.isEmpty ? _empty : (_priorityNode ?? _empty);
 
+  /// The priority the server holds for this node: [priority], or for a node emptied by a write
+  /// below it the priority it kept.
+  Node get keptPriority => _priorityNode ?? _empty;
+
+  /// The keys of the hidden children, in key order.
+  Iterable<ChildKey> get hiddenKeys =>
+      _hidden?.entries.map((MapEntry<ChildKey, Node> e) => e.key) ??
+      const <ChildKey>[];
+
+  /// Whether this is an empty node that holds hidden state: a kept priority or hidden children.
+  bool get holdsHiddenState =>
+      _children.isEmpty &&
+      (_hidden != null || !(_priorityNode?.isEmpty ?? true));
+
+  /// The node at [path] below [node] as the server holds it: as [Node.getChild], except that a
+  /// path ending in `.priority` gives the [keptPriority] of an empty node. For reading data back
+  /// to apply it again (acks, write tree), never for a reader of the value.
+  static Node storedChild(Node node, Path path) {
+    final ChildKey? back = path.back;
+    if (back == null || !back.isPriorityKey) {
+      return node.getChild(path);
+    }
+    final Node owner = node.getChild(path.parent!);
+    return keepsPriority(owner)
+        ? (owner as ChildrenNode).keptPriority
+        : owner.getImmediateChild(back);
+  }
+
+  /// Whether [node] is an empty node that keeps a priority: a priority written there replaces it.
+  static bool keepsPriority(Node node) =>
+      node is ChildrenNode &&
+      node._children.isEmpty &&
+      !(node._priorityNode?.isEmpty ?? true);
+
+  /// Whether a priority written on [node] lands: it has a value, or it is an empty node that
+  /// holds hidden state (a kept priority, or emptied children: production check 39 Q2).
+  static bool takesPriority(Node node) =>
+      !node.isEmpty || node is ChildrenNode && node.holdsHiddenState;
+
+  /// [newPriority] on a node with children. On an empty node that holds hidden state it becomes
+  /// the kept priority (empty clears it), as the server accepts a priority written there
+  /// (production check 38 (b), check 39 Q2); on the plain empty node it is ignored.
   @override
   Node updatePriority(Node newPriority) {
     if (_children.isEmpty) {
-      // Don't allow priorities on empty nodes.
-      return this;
+      if (!holdsHiddenState) {
+        return this;
+      }
+      if (newPriority.isEmpty) {
+        return ChildrenNode._(
+          _children,
+          null,
+          _indexMap,
+          _hidden,
+          _hiddenOrder,
+        );
+      }
     }
-    return ChildrenNode(_children, newPriority, _indexMap);
+    validatePriorityNode(newPriority);
+    return ChildrenNode._(
+      _children,
+      newPriority,
+      _indexMap,
+      _hidden,
+      _hiddenOrder,
+    );
   }
 
+  /// The child [key]: a visible child, else a hidden one, else the empty node. `.priority` gives
+  /// [priority] (empty for a node without children).
   @override
   Node getImmediateChild(ChildKey key) {
     if (key.isPriorityKey) {
       return priority;
     }
-    return _children[key] ?? _empty;
+    return _children[key] ?? _hidden?[key] ?? _empty;
   }
 
   @override
@@ -113,15 +211,56 @@ class ChildrenNode implements Node {
     final NamedNode namedNode = NamedNode(key, newChild);
     final SortedMap<ChildKey, Node> newChildren;
     final IndexMap newIndexMap;
+    SortedMap<ChildKey, Node>? newHidden = _hidden;
     if (newChild.isEmpty) {
       newChildren = _children.remove(key);
       newIndexMap = _indexMap.removeFromIndexes(namedNode, _children);
+      if (newChild is ChildrenNode && newChild.holdsHiddenState) {
+        newHidden = (newHidden ?? SortedMap<ChildKey, Node>(nameComparator))
+            .insert(key, newChild);
+      } else {
+        newHidden = _withoutHidden(key);
+      }
     } else {
       newChildren = _children.insert(key, newChild);
       newIndexMap = _indexMap.addToIndexes(namedNode, _children);
+      newHidden = _withoutHidden(key);
     }
-    final Node? newPriority = newChildren.isEmpty ? _empty : _priorityNode;
-    return ChildrenNode(newChildren, newPriority, newIndexMap);
+    // The priority stays when the last child goes: the server keeps it.
+    return ChildrenNode._(
+      newChildren,
+      _priorityNode,
+      newIndexMap,
+      newHidden,
+      _hiddenOrderAfter(key, newHidden?[key]),
+    );
+  }
+
+  /// [_hiddenOrder] with the hidden child [key] replaced by [newHidden] (removed when null); null
+  /// when it is not built or nothing is left.
+  SortedMap<NamedNode, Node>? _hiddenOrderAfter(ChildKey key, Node? newHidden) {
+    SortedMap<NamedNode, Node>? order = _hiddenOrder;
+    if (order == null) {
+      return null;
+    }
+    final Node? old = _hidden?[key];
+    if (old != null) {
+      order = order.remove(NamedNode(key, old));
+    }
+    if (newHidden != null) {
+      order = order.insert(NamedNode(key, newHidden), newHidden);
+    }
+    return order.isEmpty ? null : order;
+  }
+
+  /// [_hidden] without [key]; null when nothing is left.
+  SortedMap<ChildKey, Node>? _withoutHidden(ChildKey key) {
+    final SortedMap<ChildKey, Node>? hidden = _hidden;
+    if (hidden == null || !hidden.containsKey(key)) {
+      return hidden;
+    }
+    final SortedMap<ChildKey, Node> rest = hidden.remove(key);
+    return rest.isEmpty ? null : rest;
   }
 
   @override
@@ -253,6 +392,8 @@ class ChildrenNode implements Node {
     return obj;
   }
 
+  /// JS `ChildrenNode.hash` of the node the server holds: the kept priority and the hidden
+  /// children count, the hidden children in priority order among the visible ones.
   @override
   String hash() {
     final String? cached = _lazyHash;
@@ -260,14 +401,14 @@ class ChildrenNode implements Node {
       return cached;
     }
     final StringBuffer toHash = StringBuffer();
-    final Node p = priority;
+    final Node p = keptPriority;
     if (!p.isEmpty) {
       toHash
         ..write('priority:')
         ..write(priorityHashText(p.value!))
         ..write(':');
     }
-    forEachChild(priorityIndex, (ChildKey key, Node child) {
+    void add(ChildKey key, Node child) {
       final String childHash = child.hash();
       if (childHash.isNotEmpty) {
         toHash
@@ -276,10 +417,138 @@ class ChildrenNode implements Node {
           ..write(':')
           ..write(childHash);
       }
-      return false;
-    });
+    }
+
+    if (_hidden == null) {
+      forEachChild(priorityIndex, (ChildKey key, Node child) {
+        add(key, child);
+        return false;
+      });
+    } else {
+      for (final NamedNode n in _childrenWithHidden()) {
+        add(n.name, n.node);
+      }
+    }
     final String text = toHash.toString();
     return _lazyHash = text.isEmpty ? '' : sha1Base64(text);
+  }
+
+  /// The visible and the hidden children in the server's priority order: by priority (kept
+  /// priority for a hidden child), then by key.
+  List<NamedNode> _childrenWithHidden() {
+    final List<NamedNode> hidden = (_hiddenOrder ??= _buildHiddenOrder())
+        .entries
+        .map((MapEntry<NamedNode, Node> e) => e.key)
+        .toList();
+    final List<NamedNode> merged = <NamedNode>[];
+    int h = 0;
+    forEachChild(priorityIndex, (ChildKey key, Node child) {
+      final NamedNode visible = NamedNode(key, child);
+      while (h < hidden.length &&
+          _comparePriorityKept(hidden[h], visible) < 0) {
+        merged.add(hidden[h++]);
+      }
+      merged.add(visible);
+      return false;
+    });
+    merged.addAll(hidden.skip(h));
+    return merged;
+  }
+
+  SortedMap<NamedNode, Node> _buildHiddenOrder() {
+    SortedMap<NamedNode, Node> order = SortedMap<NamedNode, Node>(
+      _comparePriorityKept,
+    );
+    _hidden!.inOrderTraversal((ChildKey key, Node child) {
+      order = order.insert(NamedNode(key, child), child);
+      return false;
+    });
+    return order;
+  }
+
+  /// The priority index order, with the kept priority of an empty node.
+  static int _comparePriorityKept(NamedNode a, NamedNode b) {
+    final int cmp = _sortPriority(a.node).compareTo(_sortPriority(b.node));
+    return cmp == 0 ? a.name.compareTo(b.name) : cmp;
+  }
+
+  static Node _sortPriority(Node node) =>
+      node is ChildrenNode ? node.keptPriority : node.priority;
+
+  /// Whether [a] and [b] hold the same hidden state along [path]: at each node on the path the
+  /// kept priority of an empty node and the hidden children, and the whole subtree at the end
+  /// of [path] (a path ending in `.priority` ends at its node). Meant for nodes that are `==`
+  /// and differ at most along [path], as a write leaves them; identical subtrees are not walked.
+  static bool sameHiddenAlong(Node a, Node b, Path path) {
+    Node x = a;
+    Node y = b;
+    for (final ChildKey key in path.segments) {
+      if (identical(x, y)) {
+        return true;
+      }
+      if (key.isPriorityKey) {
+        break;
+      }
+      if (!_sameOwnHidden(x, y)) {
+        return false;
+      }
+      x = x.getImmediateChild(key);
+      y = y.getImmediateChild(key);
+    }
+    return sameHidden(x, y);
+  }
+
+  /// Whether [a] and [b] hold the same hidden state at every depth. Meant for nodes that are
+  /// `==`; identical subtrees are not walked.
+  static bool sameHidden(Node a, Node b) {
+    if (identical(a, b)) {
+      return true;
+    }
+    if (!_sameOwnHidden(a, b)) {
+      return false;
+    }
+    if (a is! ChildrenNode || b is! ChildrenNode) {
+      return true;
+    }
+    final Iterator<MapEntry<ChildKey, Node>> ai = a._children.entries.iterator;
+    final Iterator<MapEntry<ChildKey, Node>> bi = b._children.entries.iterator;
+    while (ai.moveNext()) {
+      if (!bi.moveNext() || ai.current.key != bi.current.key) {
+        return false;
+      }
+      if (!sameHidden(ai.current.value, bi.current.value)) {
+        return false;
+      }
+    }
+    return !bi.moveNext();
+  }
+
+  /// The kept priority of an empty node and the hidden children of [a] and [b] are the same.
+  static bool _sameOwnHidden(Node a, Node b) {
+    final ChildrenNode? x = a is ChildrenNode ? a : null;
+    final ChildrenNode? y = b is ChildrenNode ? b : null;
+    final Node px = x != null && x._children.isEmpty ? x.keptPriority : _empty;
+    final Node py = y != null && y._children.isEmpty ? y.keptPriority : _empty;
+    if (px != py) {
+      return false;
+    }
+    final SortedMap<ChildKey, Node>? hx = x?._hidden;
+    final SortedMap<ChildKey, Node>? hy = y?._hidden;
+    if (identical(hx, hy)) {
+      return true;
+    }
+    if (hx == null || hy == null || hx.length != hy.length) {
+      return false;
+    }
+    final Iterator<MapEntry<ChildKey, Node>> ix = hx.entries.iterator;
+    final Iterator<MapEntry<ChildKey, Node>> iy = hy.entries.iterator;
+    while (ix.moveNext() && iy.moveNext()) {
+      if (ix.current.key != iy.current.key ||
+          !sameHidden(ix.current.value, iy.current.value)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /// The key of the first child in [index] order, or null.
@@ -382,6 +651,8 @@ class ChildrenNode implements Node {
       _children,
       _priorityNode,
       _indexMap.addIndex(index, _children),
+      _hidden,
+      _hiddenOrder,
     );
   }
 
@@ -434,6 +705,38 @@ class ChildrenNode implements Node {
       return false;
     });
     return _lazyHashCode = h;
+  }
+
+  /// The export JSON of the node the server holds: as [toJson] with `exportFormat`, plus every
+  /// node that keeps hidden state as `{".priority": p}` (or its hidden children), as the server
+  /// sends such a node. Null for a node with no value and no hidden state.
+  Object? toServerJson() {
+    final Map<String, Object?> obj = <String, Object?>{};
+    void add(ChildKey key, Node child) {
+      final Object? json = child is ChildrenNode
+          ? child.toServerJson()
+          : child.toJson(exportFormat: true);
+      if (json != null) {
+        obj[key.name] = json;
+      }
+    }
+
+    forEachChild(priorityIndex, (ChildKey key, Node child) {
+      add(key, child);
+      return false;
+    });
+    _hidden?.inOrderTraversal((ChildKey key, Node child) {
+      add(key, child);
+      return false;
+    });
+    if (obj.isEmpty && keptPriority.isEmpty) {
+      return null;
+    }
+    final Node p = keptPriority;
+    if (!p.isEmpty && !identical(p, this)) {
+      obj['.priority'] = p.toJson(exportFormat: true);
+    }
+    return obj;
   }
 
   @override

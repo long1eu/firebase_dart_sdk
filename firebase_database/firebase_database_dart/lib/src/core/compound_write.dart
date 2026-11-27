@@ -5,6 +5,7 @@ library;
 import 'package:collection/collection.dart';
 import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:firebase_database_dart/src/core/snap/child_key.dart';
+import 'package:firebase_database_dart/src/core/snap/children_node.dart';
 import 'package:firebase_database_dart/src/core/snap/indexes/key_index.dart';
 import 'package:firebase_database_dart/src/core/snap/named_node.dart';
 import 'package:firebase_database_dart/src/core/snap/node.dart';
@@ -76,11 +77,12 @@ final class CompoundWrite {
       final Path relativePath = Path.relative(rootMost.path, path);
       Node value = rootMost.value;
       final ChildKey? back = relativePath.back;
-      if (back != null &&
-          back.isPriorityKey &&
-          value.getChild(relativePath.parent!).isEmpty) {
-        // Ignore priority updates on empty nodes.
-        return this;
+      if (back != null && back.isPriorityKey) {
+        final Node target = value.getChild(relativePath.parent!);
+        if (!ChildrenNode.takesPriority(target)) {
+          // Ignore priority updates on empty nodes, except one that holds hidden state.
+          return this;
+        }
       }
       value = value.updateChild(relativePath, node);
       return CompoundWrite(writeTree.set(rootMost.path, value));
@@ -92,13 +94,15 @@ final class CompoundWrite {
   CompoundWrite addChildWrite(ChildKey key, Node node) =>
       addWrite(Path.fromKeys(<ChildKey>[key]), node);
 
-  /// This write with every write of [updates] added below [path].
-  CompoundWrite addWrites(Path path, CompoundWrite updates) =>
-      updates.writeTree.foldValues<CompoundWrite>(
-        this,
-        (Path relativePath, Node value, CompoundWrite accum) =>
-            accum.addWrite(path.childPath(relativePath), value),
-      );
+  /// This write with every write of [updates] (one update) added below [path], in the server's
+  /// two passes (see [apply]): the values first, then the priorities, parents first.
+  CompoundWrite addWrites(Path path, CompoundWrite updates) {
+    CompoundWrite result = this;
+    for (final MapEntry<Path, Node> write in writesInServerOrder(updates)) {
+      result = result.addWrite(path.childPath(write.key), write.value);
+    }
+    return result;
+  }
 
   /// This write without the writes at and below [path].
   CompoundWrite removeWrite(Path path) {
@@ -122,7 +126,10 @@ final class CompoundWrite {
     if (rootMost == null) {
       return null;
     }
-    return rootMost.value.getChild(Path.relative(rootMost.path, path));
+    return ChildrenNode.storedChild(
+      rootMost.value,
+      Path.relative(rootMost.path, path),
+    );
   }
 
   /// The complete children written directly at the root.
@@ -167,44 +174,21 @@ final class CompoundWrite {
   /// Whether nothing is written.
   bool get isEmpty => writeTree.isEmpty;
 
-  /// [node] with every write applied.
-  Node apply(Node node) => _applySubtreeWrite(Path.empty, writeTree, node);
-
-  static Node _applySubtreeWrite(
-    Path relativePath,
-    ImmutableTree<Node> writeTree,
-    Node node,
-  ) {
-    final Node? value = writeTree.value;
-    if (value != null) {
-      // A write is always complete: done here.
-      return node.updateChild(relativePath, value);
-    }
+  /// [node] with every write applied, as the server applies one update (production check 39,
+  /// Q1, Q6, Q10 and F1 to F9, both key orders): pass 1 writes every value, at any depth (a node
+  /// whose last child goes keeps its priority as an emptied node); pass 2 writes every priority,
+  /// parents before children, each landing only on a node that then has a value or holds
+  /// hidden state ([ChildrenNode.takesPriority]); a null priority removes a kept one.
+  Node apply(Node node) {
     Node result = node;
-    Node? priorityWrite;
-    for (final MapEntry<ChildKey, ImmutableTree<Node>> entry
-        in writeTree.children.entries) {
-      if (entry.key.isPriorityKey) {
-        // Priorities are applied last, so a priority neither lands on an empty node nor is lost
-        // on a node that a later child write fills.
-        assert(
-          entry.value.value != null,
-          'Priority writes must always be leaf nodes',
-        );
-        priorityWrite = entry.value.value;
-      } else {
-        result = _applySubtreeWrite(
-          relativePath.child(entry.key),
-          entry.value,
-          result,
-        );
+    for (final MapEntry<Path, Node> write in writesInServerOrder(this)) {
+      final ChildKey? back = write.key.back;
+      if (back != null &&
+          back.isPriorityKey &&
+          !ChildrenNode.takesPriority(result.getChild(write.key.parent!))) {
+        continue;
       }
-    }
-    if (priorityWrite != null && !result.getChild(relativePath).isEmpty) {
-      result = result.updateChild(
-        relativePath.child(ChildKey.priority),
-        priorityWrite,
-      );
+      result = result.updateChild(write.key, write.value);
     }
     return result;
   }
@@ -238,4 +222,21 @@ final class CompoundWrite {
 
   @override
   String toString() => 'CompoundWrite{${toJson(exportFormat: true)}}';
+}
+
+/// The writes in the order the server applies one update: every value write, then every
+/// priority write by depth, parents first (production check 39 Q10, F1 to F9).
+List<MapEntry<Path, Node>> writesInServerOrder(CompoundWrite write) {
+  final List<MapEntry<Path, Node>> values = <MapEntry<Path, Node>>[];
+  final List<MapEntry<Path, Node>> priorities = <MapEntry<Path, Node>>[];
+  for (final MapEntry<Path, Node> entry in write.writeTree.entries) {
+    ((entry.key.back?.isPriorityKey ?? false) ? priorities : values).add(entry);
+  }
+  // Parents first; a stable sort, and writes of one depth never meet.
+  mergeSort(
+    priorities,
+    compare: (MapEntry<Path, Node> a, MapEntry<Path, Node> b) =>
+        a.key.length - b.key.length,
+  );
+  return <MapEntry<Path, Node>>[...values, ...priorities];
 }

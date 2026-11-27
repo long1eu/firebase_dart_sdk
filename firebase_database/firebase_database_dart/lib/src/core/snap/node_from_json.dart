@@ -27,13 +27,22 @@ import 'package:firebase_database_dart/src/core/util/sorted_map.dart';
 /// [ChildKey] and one string for the whole call. The table lives for this call only: it cannot
 /// grow without bound and nothing is shared between two messages or two databases.
 Node nodeFromJson(Object? json, [Object? priority]) =>
-    _nodeFromJson(json, priority, null);
+    _nodeFromJson(json, priority, null, keepHidden: false);
+
+/// The node of server data [json]: as [nodeFromJson], except that an object holding only
+/// `.priority` (or only such objects) is kept as hidden state, as the server sends a node emptied
+/// by a write below it (`{".priority": p}`, also inside its parent's data). See [ChildrenNode].
+///
+/// For data the server sent, never for a user's value.
+Node nodeFromServerJson(Object? json) =>
+    _nodeFromJson(json, null, null, keepHidden: true);
 
 Node _nodeFromJson(
   Object? json,
   Object? priority,
-  Map<String, ChildKey>? keys,
-) {
+  Map<String, ChildKey>? keys, {
+  required bool keepHidden,
+}) {
   if (json == null) {
     return ChildrenNode.empty;
   }
@@ -66,17 +75,27 @@ Node _nodeFromJson(
 
   final Map<String, ChildKey> keyTable = keys ?? <String, ChildKey>{};
   final List<NamedNode> children = <NamedNode>[];
+  List<NamedNode>? hidden;
   bool childrenHavePriority = false;
   void addChild(String key, Object? childData) {
     // Ignore metadata nodes.
     if (key.startsWith('.')) {
       return;
     }
-    final Node childNode = _nodeFromJson(childData, null, keyTable);
+    final Node childNode = _nodeFromJson(
+      childData,
+      null,
+      keyTable,
+      keepHidden: keepHidden,
+    );
     if (!childNode.isEmpty) {
       childrenHavePriority =
           childrenHavePriority || !childNode.priority.isEmpty;
       children.add(NamedNode(keyTable[key] ??= ChildKey(key), childNode));
+    } else if (childNode is ChildrenNode && childNode.holdsHiddenState) {
+      (hidden ??= <NamedNode>[]).add(
+        NamedNode(keyTable[key] ??= ChildKey(key), childNode),
+      );
     }
   }
 
@@ -91,17 +110,22 @@ Node _nodeFromJson(
     }
   }
 
+  final SortedMap<ChildKey, Node>? hiddenSet = hidden == null
+      ? null
+      : _childSet(hidden!);
   if (children.isEmpty) {
+    if (keepHidden && (priorityValue != null || hiddenSet != null)) {
+      return ChildrenNode.withHidden(
+        _childSet(children),
+        _priorityNode(priorityValue, keyTable),
+        IndexMap.defaultMap,
+        hiddenSet,
+      );
+    }
     return ChildrenNode.empty;
   }
 
-  final SortedMap<ChildKey, Node> childSet = buildChildSet<ChildKey, Node>(
-    children,
-    nameOnlyComparator,
-    keyOf: (NamedNode n) => n.name,
-    valueOf: (NamedNode n) => n.node,
-    keyCompare: nameComparator,
-  );
+  final SortedMap<ChildKey, Node> childSet = _childSet(children);
   final Node priorityNode = _priorityNode(priorityValue, keyTable);
   if (childrenHavePriority) {
     final SortedMap<NamedNode, Node> sortedChildSet =
@@ -111,17 +135,34 @@ Node _nodeFromJson(
           keyOf: (NamedNode n) => n,
           valueOf: (NamedNode n) => n.node,
         );
-    return ChildrenNode(
+    return ChildrenNode.withHidden(
       childSet,
       priorityNode,
       IndexMap(
         <String, SortedMap<NamedNode, Node>?>{'.priority': sortedChildSet},
         const <String, Index>{'.priority': priorityIndex},
       ),
+      hiddenSet,
     );
   }
-  return ChildrenNode(childSet, priorityNode, IndexMap.defaultMap);
+  return ChildrenNode.withHidden(
+    childSet,
+    priorityNode,
+    IndexMap.defaultMap,
+    hiddenSet,
+  );
 }
 
+SortedMap<ChildKey, Node> _childSet(List<NamedNode> children) =>
+    buildChildSet<ChildKey, Node>(
+      children,
+      nameOnlyComparator,
+      keyOf: (NamedNode n) => n.name,
+      valueOf: (NamedNode n) => n.node,
+      keyCompare: nameComparator,
+    );
+
 Node _priorityNode(Object? priority, Map<String, ChildKey>? keys) =>
-    priority == null ? ChildrenNode.empty : _nodeFromJson(priority, null, keys);
+    priority == null
+    ? ChildrenNode.empty
+    : _nodeFromJson(priority, null, keys, keepHidden: false);

@@ -61,9 +61,23 @@ extension _ServerOperations on ViewProcessor {
             oldEventNode,
             viewCache.serverCache.node,
           );
-      newEventCache = updatedPriority != null
-          ? filter.updatePriority(oldEventNode, updatedPriority)
-          : oldEventNode;
+      final Node? completeServer = viewCache.completeServerSnap;
+      if (updatedPriority != null &&
+          ViewProcessor._ignoresPriority(oldEventNode) &&
+          completeServer != null) {
+        // The node is empty here only because of a pending write below it; the server node took
+        // the priority and keeps it when that write empties it. Rebuild from the writes over the
+        // server node.
+        newEventCache = filter.updateFullNode(
+          oldEventNode,
+          writesCache.calcCompleteEventCache(completeServer)!,
+          accumulator,
+        );
+      } else {
+        newEventCache = updatedPriority != null
+            ? filter.updatePriority(oldEventNode, updatedPriority)
+            : oldEventNode;
+      }
     } else {
       final Path childChangePath = changePath.popFront();
       final Node? newEventChild;
@@ -75,9 +89,21 @@ extension _ServerOperations on ViewProcessor {
               viewCache.serverCache.node,
             );
         final Node oldChild = oldEventSnap.node.getImmediateChild(childKey);
-        newEventChild = eventChildUpdate != null
-            ? oldChild.updateChild(childChangePath, eventChildUpdate)
-            : oldChild;
+        if (eventChildUpdate != null &&
+            (childChangePath.back?.isPriorityKey ?? false) &&
+            ViewProcessor._ignoresPriority(
+              oldChild.getChild(childChangePath.parent!),
+            )) {
+          // As for the view's own priority above: the owner is empty only because of a pending
+          // write; rebuild the child from the writes over the server cache.
+          newEventChild =
+              writesCache.calcCompleteChild(childKey, viewCache.serverCache) ??
+              oldChild;
+        } else {
+          newEventChild = eventChildUpdate != null
+              ? oldChild.updateChild(childChangePath, eventChildUpdate)
+              : oldChild;
+        }
       } else {
         newEventChild = writesCache.calcCompleteChild(
           childKey,
@@ -209,16 +235,27 @@ extension _ServerOperations on ViewProcessor {
   /// JS `viewProcessorApplyServerMerge` (Android `applyServerMerge` for the [CompoundWrite]):
   /// the children the server cache has first (a limit window may make room), then the others.
   ///
+  /// The server applies one update in two passes (production check 39): the values first, then
+  /// the priorities, parents first. An unfiltered view does the same, and so does a filtered
+  /// event cache of a merge the server sent: when a priority moves a window child out, it pulls
+  /// the next child from the running cache below, which already holds the merge's values. A
+  /// filtered server cache has no such source (its window is updated without one), and an
+  /// acknowledgement gets none: there a child that a priority moves out must move before the
+  /// children that compete for its place, so each child's writes go together, its priorities
+  /// included (CompoundWrite.apply keeps the two passes inside the child), the children the cache
+  /// has first, and the node's own priority (which a filter ignores) last.
+  ///
   /// With [fromServer] (a merge the server sent), unlike JS and Android, which give every child
   /// the complete server cache from before the merge, each child gets that cache with the
-  /// merge's earlier children and itself applied: a limit window that makes room pulls its next
-  /// child from it, and from the cache before the merge it would pull a child with values this
-  /// merge changed or removed, which no later frame repairs (docs/database_decisions.md section
-  /// 25). A deep entry this view skips (below a child its filtered server cache does not hold) is
-  /// not applied to that cache either, so a child pulled in later can still be the old one; that
-  /// state was wrong before this change too. An acknowledgement calls this with children copied
-  /// from the view's own server cache, not with data the server just sent, so it keeps the
-  /// upstream behaviour: every child gets the complete cache as it is.
+  /// merge's earlier children and itself applied (and each priority of the second pass, with the
+  /// writes before it): a limit window that makes room pulls its next child from it, and from the
+  /// cache before the merge it would pull a child with values this merge changed or removed,
+  /// which no later frame repairs (docs/database_decisions.md section 25). A deep entry this view
+  /// skips (below a child its filtered server cache does not hold) is not applied to that cache
+  /// either, so a child pulled in later can still be the old one; that state was wrong before
+  /// this change too. An acknowledgement calls this with children copied from the view's own
+  /// server cache, not with data the server just sent, so it keeps the upstream behaviour: every
+  /// child gets the complete cache as it is.
   ViewCache _applyServerMerge(
     ViewCache viewCache,
     Path path,
@@ -244,10 +281,23 @@ extension _ServerOperations on ViewProcessor {
         ? changedChildren
         : CompoundWrite.empty.addWrites(path, changedChildren);
     final Node serverNode = viewCache.serverCache.node;
-    final Map<ChildKey, CompoundWrite> childCompoundWrites = actualMerge
-        .childCompoundWrites();
+    bool isPriority(MapEntry<Path, Node> write) =>
+        write.key.back?.isPriorityKey ?? false;
+    final bool perChild =
+        filterServerNode || filter.filtersNodes && !fromServer;
+    final List<MapEntry<Path, Node>> ordered = writesInServerOrder(actualMerge);
+    final List<MapEntry<Path, Node>> priorities = <MapEntry<Path, Node>>[
+      for (final MapEntry<Path, Node> write in ordered)
+        if (isPriority(write) && (!perChild || write.key.length == 1)) write,
+    ];
+    final Map<ChildKey, CompoundWrite> childCompoundWrites =
+        CompoundWrite.fromPathMerge(<Path, Node>{
+          for (final MapEntry<Path, Node> write in ordered)
+            if (!isPriority(write) || perChild && write.key.length > 1)
+              write.key: write.value,
+        }).childCompoundWrites();
     Node? curServerCache = serverCache;
-    void applyToServerCache(ChildKey childKey, CompoundWrite childMerge) {
+    void apply(ChildKey childKey, CompoundWrite childMerge) {
       final Node? before = curServerCache;
       if (fromServer && before != null) {
         curServerCache = before.updateImmediateChild(
@@ -255,24 +305,22 @@ extension _ServerOperations on ViewProcessor {
           childMerge.apply(before.getImmediateChild(childKey)),
         );
       }
+      final Node serverChild = serverNode.getImmediateChild(childKey);
+      curViewCache = _applyServerOverwrite(
+        curViewCache,
+        Path.fromKeys(<ChildKey>[childKey]),
+        childMerge.apply(serverChild),
+        writesCache,
+        curServerCache,
+        filterServerNode,
+        accumulator,
+      );
     }
 
     for (final MapEntry<ChildKey, CompoundWrite> childMerge
         in childCompoundWrites.entries) {
-      final ChildKey childKey = childMerge.key;
-      if (serverNode.hasChild(childKey)) {
-        applyToServerCache(childKey, childMerge.value);
-        final Node serverChild = serverNode.getImmediateChild(childKey);
-        final Node newChild = childMerge.value.apply(serverChild);
-        curViewCache = _applyServerOverwrite(
-          curViewCache,
-          Path.fromKeys(<ChildKey>[childKey]),
-          newChild,
-          writesCache,
-          curServerCache,
-          filterServerNode,
-          accumulator,
-        );
+      if (serverNode.hasChild(childMerge.key)) {
+        apply(childMerge.key, childMerge.value);
       }
     }
     for (final MapEntry<ChildKey, CompoundWrite> childMerge
@@ -282,19 +330,23 @@ extension _ServerOperations on ViewProcessor {
           !viewCache.serverCache.isCompleteForChild(childKey) &&
           childMerge.value.rootWrite() == null;
       if (!serverNode.hasChild(childKey) && !isUnknownDeepMerge) {
-        applyToServerCache(childKey, childMerge.value);
-        final Node serverChild = serverNode.getImmediateChild(childKey);
-        final Node newChild = childMerge.value.apply(serverChild);
-        curViewCache = _applyServerOverwrite(
-          curViewCache,
-          Path.fromKeys(<ChildKey>[childKey]),
-          newChild,
-          writesCache,
-          curServerCache,
-          filterServerNode,
-          accumulator,
-        );
+        apply(childKey, childMerge.value);
       }
+    }
+    for (final MapEntry<Path, Node> write in priorities) {
+      final Node? before = curServerCache;
+      if (fromServer && before != null) {
+        curServerCache = before.updateChild(write.key, write.value);
+      }
+      curViewCache = _applyServerOverwrite(
+        curViewCache,
+        write.key,
+        write.value,
+        writesCache,
+        curServerCache,
+        filterServerNode,
+        accumulator,
+      );
     }
     return curViewCache;
   }
@@ -336,7 +388,7 @@ extension _ServerOperations on ViewProcessor {
         return _applyServerOverwrite(
           viewCache,
           ackPath,
-          serverCache.node.getChild(ackPath),
+          ChildrenNode.storedChild(serverCache.node, ackPath),
           writesCache,
           completeCache,
           filterServerNode,
@@ -369,7 +421,7 @@ extension _ServerOperations on ViewProcessor {
       if (serverCache.isCompleteForPath(serverCachePath)) {
         changedChildren = changedChildren.addWrite(
           mergePath,
-          serverCache.node.getChild(serverCachePath),
+          ChildrenNode.storedChild(serverCache.node, serverCachePath),
         );
       }
     });

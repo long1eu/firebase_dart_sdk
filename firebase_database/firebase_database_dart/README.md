@@ -562,7 +562,7 @@ and cut at 1 KiB, and, with rules debug output on (emulator), may quote data.
 
 ## How it differs from the JS SDK
 
-The 19 you notice are below. The full table, 38 rows with the test that pins each, is section 25 of
+The 19 you notice are below. The full table, 40 rows with the test that pins each, is section 25 of
 [docs/database_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_decisions.md).
 
 | Topic | JS SDK | This client |
@@ -618,10 +618,12 @@ The 19 you notice are below. The full table, 38 rows with the test that pins eac
   directly. There is no option in the API. A proxy that refuses the tunnel fails the connection attempt with an error
   that names the proxy and the status.
 - **Priorities and pending writes.** As in the JS SDK, the local view can differ from the server until the server
-  answers. A node that is emptied and refilled, by one update or by two writes, loses its priority locally (the server
-  keeps it; the JS SDK does the same, [issue 10688](https://github.com/firebase/firebase-js-sdk/issues/10688)). A
-  transaction on a node that holds only a priority, because its last child was removed by a write below it, fails with
-  `max-retries` in the JS SDK too; removing the node itself first drops the priority. A limit query's window is short
+  answers. A node that is emptied and refilled, by one update or by two writes, keeps its priority locally, as the
+  server does, and a transaction on a node that holds only a priority goes through; the JS SDK loses the priority in
+  both cases and fails the transaction with `max-retries`. A defect of 0.1.0 that this version fixes: when the
+  server patched only part of a cached node and the patched part contained none of that node's children, the client
+  dropped the node's priority even though the server still held it, so listeners saw the priority as null until the
+  data was loaded again. A limit query's window is short
   while the client is offline after a local removal, until the server sends it. See "Behaviours shared with the JS
   SDK that are kept" in
   [docs/database_decisions.md](https://github.com/long1eu/firebase_dart_sdk/blob/main/docs/database_decisions.md).
