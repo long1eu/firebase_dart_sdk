@@ -13,7 +13,7 @@ and adding the dependency registers it. On Windows FlutterFire has its own plugi
 app that lists this package as a direct dependency gets this package in its place. On the other platforms it is an
 opt-in through `FirebaseDatabaseDart.use()`. It is not affiliated with or endorsed by Google or Firebase.
 
-> **Status: 0.0.1, not published, work in progress.** What is and is not verified:
+> **Status: 0.1.0, first version** ([differences](#how-it-differs-from-the-official-plugin)). What ran and what did not:
 >
 > - The client underneath, `firebase_database_dart`, passes its own suites (2,645 tests on the Dart VM) and its tests
 >   against the Database emulator.
@@ -37,7 +37,7 @@ opt-in through `FirebaseDatabaseDart.use()`. It is not affiliated with or endors
 dependencies:
   firebase_core: ^5.1.0
   firebase_database: ^13.1.0
-  firebase_database_dart_platform: ^0.0.1
+  firebase_database_dart_platform: ^0.1.0
 ```
 
 **On Linux** nothing else is needed for the emulator or open rules: Flutter calls `FirebaseDatabaseDart.registerWith()`
@@ -286,5 +286,5 @@ working; call `use()` to choose otherwise.
 
 ## Example
 
-[`example/main.dart`](example/main.dart) writes, listens, runs a transaction and registers an `onDisconnect` write
+[`example/main.dart`](https://github.com/long1eu/firebase_dart_sdk/blob/main/firebase_database/firebase_database_dart_platform/example/main.dart) writes, listens, runs a transaction and registers an `onDisconnect` write
 against the Database emulator.

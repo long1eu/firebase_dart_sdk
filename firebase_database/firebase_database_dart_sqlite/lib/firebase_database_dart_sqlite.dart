@@ -9,7 +9,7 @@
 /// );
 /// ```
 ///
-/// Work in progress, not published.
+/// The limits are in the README of the package.
 library;
 
 export 'package:firebase_database_dart_sqlite/src/sqlite_persistence.dart'

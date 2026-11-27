@@ -4,7 +4,8 @@
 /// listen with its `on<Thing>` streams and write with `set`, `update` and transactions. Errors from the
 /// server are [FirebaseDatabaseException]s. This library imports no `dart:io` and no native code.
 ///
-/// Work in progress: tested against the Database emulator, not yet against a production database.
+/// Tested against the Database emulator, and against a production database by a verification kit (41 checks,
+/// 2026-11-27).
 ///
 /// ```dart
 /// import 'package:firebase_app_dart/firebase_app_dart.dart';
