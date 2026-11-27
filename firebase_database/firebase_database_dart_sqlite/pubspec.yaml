@@ -3,7 +3,6 @@ description: >-
   The SQLite offline cache of firebase_database_dart on the Dart VM and in
   Flutter, on top of package:sqlite3. Work in progress.
 version: 0.1.0
-publish_to: none
 homepage: https://github.com/long1eu/firebase_dart_sdk
 repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_database/firebase_database_dart_sqlite
 issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
