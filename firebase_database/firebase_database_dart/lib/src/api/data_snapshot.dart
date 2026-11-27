@@ -59,6 +59,10 @@ final class DataSnapshot {
   ///
   /// It is built once per snapshot and then cached. It is unmodifiable at every depth: changing a map or list
   /// throws [UnsupportedError] where the change is attempted. Copy it to change it.
+  ///
+  /// A map iterates in priority order then key order, and a list by index, whatever the query's
+  /// order: for `orderByChild('n')` the map's keys need not come by `n`. Iterate [children] for
+  /// the query's order.
   Object? get value => _node.value;
 
   /// The priority of the location: null, a `num` or a `String`. Every snapshot has its own, child snapshots
@@ -73,7 +77,9 @@ final class DataSnapshot {
   /// false. Throws an [ArgumentError] when [path] has a key with forbidden characters.
   ///
   /// ```dart
-  /// if (s.hasChild('profile/email')) print(s.child('profile/email').value);
+  /// if (s.hasChild('profile/email')) {
+  ///   print(s.child('profile/email').value);
+  /// }
   /// ```
   DataSnapshot child(String path) => DataSnapshot.internal(
     ref.child(path),
@@ -95,6 +101,8 @@ final class DataSnapshot {
   int get childrenCount => _node.numChildren;
 
   /// The direct children in the query's index order, built lazily, each with its own [ref] and [priority].
+  /// A snapshot made by [child], or taken from [children], has no query: its own children come in
+  /// priority order then key order.
   ///
   /// ```dart
   /// for (final DataSnapshot child in snapshot.children) {

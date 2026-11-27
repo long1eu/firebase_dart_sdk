@@ -45,8 +45,9 @@ database that is created and closed without use opens no socket. The URL is the 
 constructor refuses, with an `ArgumentError` before any connection, a URL with a path, a custom domain without `?ns=`, a
 port other than 443 on a host that is not loopback, an invalid project id, and plain `http://` outside the emulator; a
 start that fails fails every pending and later call. `refFromUrl` refuses user info, plain http, other ports and extra
-query keys. The disk cache is keyed by the app name and the normalised database URL: every spelling of one URL shares
-one cache, and two `?ns=` values on one host are two caches.
+query keys. The disk cache is keyed by the app name and the normalised database URL: every spelling of one URL with a
+host name shares one cache, two `?ns=` values on one host are two caches, and a loopback host is kept as written
+(`localhost`, `127.0.0.1` and `[::1]` are three caches).
 
 After the hello of the server, the client sends the credentials and then the listens and writes, without waiting for
 the answers:
@@ -111,10 +112,10 @@ downloads more than you asked for.
 
 The codes are listed in the [README](../../firebase_database/firebase_database_dart/README.md#errors) and in the
 documentation of `FirebaseDatabaseException`. A bad path, key, value or query is an `ArgumentError` or `StateError` at
-the call, before anything is sent, not an exception through a Future. One limit only the emulator has: in one `set`,
-a value whose longest chain of keys together with the path is longer than 768 bytes is refused there with `unknown`
-(`invalid_parameters` in `serverStatus`), while a flat multi-path `update` is checked path by path. The production
-server accepted the same `set` (measured once on each).
+the call, before anything is sent, not an exception through a Future. That includes a `set` whose longest chain of keys
+together with the path is longer than 768 bytes: the client throws and sends nothing, and a flat multi-path `update` is
+checked path by path. The emulator refused, with `unknown`, a chain of about 765 bytes that the client accepts; the
+production server accepted it (measured once on each).
 
 ## What surprises people from the JS SDK or FlutterFire
 

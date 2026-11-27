@@ -1,9 +1,11 @@
 /// The SQLite offline cache of `firebase_database_dart` on the Dart VM and in Flutter.
 ///
+/// `supportDirectory` below is a directory of the app; `sqlitePersistence` lists one per platform.
+///
 /// ```dart
 /// final FirebaseDatabase database = FirebaseDatabase(
 ///   app,
-///   persistence: sqlitePersistence('/path/to/app/support/firebase_database'),
+///   persistence: sqlitePersistence('$supportDirectory/firebase_database'),
 /// );
 /// ```
 ///
