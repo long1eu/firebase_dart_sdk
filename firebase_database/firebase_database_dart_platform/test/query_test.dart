@@ -367,8 +367,9 @@ void main() {
       final DataSnapshot local = (await ref.once()).snapshot;
       expect(local.priority, 'p');
       await settle();
-      server.ackLastWrite();
-      server.ackLastWrite();
+      // The set, then the priority: the server answers in send order.
+      server.ackNextWrite();
+      server.ackNextWrite();
       await write;
       await priority;
     });
