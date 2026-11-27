@@ -27,7 +27,7 @@ no such feature; "partly" means it has it with a missing piece or in a weaker fo
 
 | Dart | Rows |
 |---|---|
-| Built | 139, of which 2 without a test of their own |
+| Built | 139, of which 1 without a test of their own |
 | Gaps (wanted, not built) | 0 |
 | Won't do or not needed | 17 |
 | Not applicable to Dart | 6 |
@@ -167,7 +167,7 @@ The four SDKs, by row (a row that describes a restriction or an extra of one SDK
 | update throws (`txn.updateThrows`) | partly: If the update function throws on the first run, runTransaction throws synchronously (no promise): the call is not wrapped (J:api/Transaction.ts:134-141, run at ... | handler exceptions are caught and abort with USER_CODE_EXCEPTION (-11), message holds the stack trace A:Repo.java:975-985, DatabaseError.java:186-192 | no @try/@catch in I:Core/FRepo.m (searched): an exception in the block propagates | partly: (inferred) exceptions escape on the scheduler thread. | **built**: the handler's exception fails the Future | The Dart client turns throws into a failed Future with the original error. |
 | local events (`txn.localEvents`) | applyLocally (default true) controls whether intermediate states are visible to listeners (Transaction.ts:110). | fireLocalEvents default true A:DatabaseReference.java:470-480 | withLocalEvents default YES | trigger_local_events (default true). | **built**: applyLocally | Same meaning. Android and iOS: When false the intermediate local result is applied invisibly (A:Repo.java:1028 visible = applyLocally) |
 | listener cleanup (`txn.listenerCleanup`) | The listener added by runTransaction is removed synchronously when the transaction commits (J:core/Repo.ts:1160), but via setTimeout(unwatcher, 0) when it aborts ... | hidden value listener at the path A:Repo.java:945-957 | FRepo startTransactionOnPath: I:Core/FRepo.m:924+ | n/a | **built**: the listen a transaction opens is closed after it finishes | A resource-lifetime detail; the Dart port uses a microtask, not a timer. Android and iOS: runTransaction adds a no-op value listener so the data is synced and kept updated while the transaction is pending. |
-| not persisted (`txn.notPersisted`) | — not applicable: JS has no disk cache | every transaction write is applied with persist=false A:Repo.java:1028-1029, 1135, 1272-1283, 1319-1333; one-time info log "transactions *will not* be persisted across ... | loggedTransactionPersistenceWarning I:Core/FRepo.m:928-934 | — not checked | **built, no test of its own**: transactions stay in memory, also with persistence on | Android and iOS never persist transactions; one pending at exit is lost and its outcome is unknown after restart. |
+| not persisted (`txn.notPersisted`) | — not applicable: JS has no disk cache | every transaction write is applied with persist=false A:Repo.java:1028-1029, 1135, 1272-1283, 1319-1333; one-time info log "transactions *will not* be persisted across ... | loggedTransactionPersistenceWarning I:Core/FRepo.m:928-934 | — not checked | **built**: transactions stay in memory, also with persistence on | Android and iOS never persist transactions; one pending at exit is lost and its outcome is unknown after restart. |
 | priority (`txn.priority`) | partly: the handler receives the value only (J:core/Repo.ts:967); a returned object may carry .priority (:996-1013), otherwise the current priority is kept (:1303-1310) | MutableData A:MutableData.java:62-329: hasChildren, hasChild, child, getChildrenCount, getChildren, getKey, getValue() (+Class and GenericTypeIndicator), setValue, ... | FIRMutableData IH:FIRMutableData.h:51-126: hasChildren, hasChildAtPath:, childDataByAppendingPath:, value, priority, childrenCount, children, key | MutableData::priority() and set_priority() (Ci:mutable_data.h:102,143) | **built**: the handler sees the value only; it may set the priority, and the current one is kept when it gives none | Android MutableData and iOS FIRMutableData expose the priority (A:MutableData.java, IH:FIRMutableData.h). |
 
 ## 9. onDisconnect
@@ -340,9 +340,8 @@ The four SDKs, by row (a row that describes a restriction or an extra of one SDK
 
 ## Built without a test of their own
 
-2 rows.
+1 rows.
 
 | Feature | What is built | Code |
 |---|---|---|
-| not persisted (`txn.notPersisted`) | transactions stay in memory, also with persistence on | firebase_database/firebase_database_dart/lib/src/core/repo_transactions.dart:159,271,398,429 (persist: false); :63-70 (one info log when persistence is on) |
 | model (`thread.model`) | Design property; no test of its own. | single isolate by construction; decisions section 8 |
