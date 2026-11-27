@@ -29,6 +29,9 @@ the wire format and its limits.
 
 **Who it is for.** Windows and Linux desktop apps (FlutterFire's `firebase_analytics` has no
 implementation there), command-line tools, and Dart servers that record events for their own users.
+The C++ SDK does have a Windows implementation, a closed DLL with no consent, no session timeout and no
+instance id; it is not reachable from Dart without FFI, and on Linux the C++ SDK has stubs only
+([parity](analytics_parity.md#the-c-sdk-on-desktop)).
 On Android, iOS, macOS and the web, the official FlutterFire plugin remains the better choice: it
 collects automatic events, attribution and device data that the Measurement Protocol cannot produce.
 The README says this in its first section.
@@ -94,6 +97,7 @@ await analytics.setUserId('user-123');                 // null clears it
 await analytics.setUserProperty(name: 'plan', value: 'pro');
 await analytics.setDefaultEventParameters({'app_version': '1.4.0'});
 await analytics.setConsent(adUserData: false, adPersonalization: false);
+await analytics.setConsent(analyticsStorage: false);  // nothing is queued or sent while denied
 await analytics.setAnalyticsCollectionEnabled(false);  // persisted; queued events are dropped
 await analytics.resetAnalyticsData();                  // new client id, clears the user id, properties and queue
 final String id = await analytics.appInstanceId;       // the client id of this installation
@@ -193,8 +197,9 @@ GA4's pages report. The parity document records it as a difference.
 
 `firebase_analytics_dart_platform` implements `FirebaseAnalyticsPlatform`, registers itself on Windows
 and Linux (`dartPluginClass`), and maps every method. Methods that have no meaning here
-(`setSessionTimeoutDuration` maps; `initiateOnDeviceConversionMeasurementWith…` and similar iOS-only
-calls throw `UnimplementedError` with a clear message) are listed in the parity document. It hooks
+(`initiateOnDeviceConversionMeasurementWith…`, `logTransaction`) throw `UnimplementedError` with a clear
+message. `setSessionTimeoutDuration` reconfigures the client before the first event and throws after it.
+Every method is mapped in [the parity document](analytics_parity.md#the-flutterfire-adapter). It hooks
 `AppLifecycleListener` to `setAppActive`, and it takes the measurement id and transport from a
 `FirebaseAnalyticsDart.configure(...)` call made before `Firebase.initializeApp`. The exact
 registration follows `firebase_storage_dart_platform`.
@@ -206,6 +211,11 @@ registration follows `firebase_storage_dart_platform`.
    documentation only and sends no request to Google.
 2. **The parity document** (`docs/analytics_parity.md`): JS, Android, iOS and C++ public APIs, method
    by method, ranked first release, later, or not applicable.
+2a. **The reporting probe**, the core of step 6 brought forward: one Dart script under `tool/` that sends a
+   few events and a user property with a self-generated `client_id` to `/debug/mp/collect` and then
+   `/mp/collect`, and prints what to look for in DebugView, Realtime and the standard reports. It answers
+   the first question of [protocol §10](analytics_protocol.md#10-what-the-production-kit-must-answer).
+   **Step 3 does not start until the maintainer has run it and the events are reported.**
 3. **The client core:** the model, validation, the stores, sessions, both transports, the queue, unit
    tests with `MockClient` and `fake_async`, security tests (the secret never leaks; tokens only go
    where design rule 5 allows; no redirects), and a web compile with `tool/check_web_imports.dart`.
