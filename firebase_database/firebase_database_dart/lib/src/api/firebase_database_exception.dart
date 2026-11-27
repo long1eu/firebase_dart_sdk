@@ -18,7 +18,7 @@ import 'package:meta/meta.dart';
 /// | `permission-denied` | the security rules refused the read or write |
 /// | `disconnected` | the connection dropped while a sent transaction or onDisconnect request waited for its answer |
 /// | `max-retries` | a transaction ran its handler 25 times and the server still refused the value |
-/// | `overridden-by-set` | a later `set` at the location replaced a running transaction |
+/// | `overridden-by-set` | a write that overlaps a running transaction overrode it (`DatabaseReference.runTransaction` says when) |
 /// | `unavailable` | the server is unavailable, or `Query.get` found no connection and no cache |
 /// | `network-error` | the request failed for a network reason |
 /// | `write-canceled` | `FirebaseDatabase.purgeOutstandingWrites` removed the write or transaction |

@@ -14,8 +14,11 @@ import 'package:meta/meta.dart';
 /// ```
 @immutable
 final class Transaction {
-  /// Commits [value], and [priority] when given, as the location's new data. The value follows the rules of
-  /// `DatabaseReference.set`; it may hold `ServerValue` placeholders.
+  /// Commits [value], and [priority] when given, as the location's new data. Without [priority] the
+  /// location keeps its current priority, unless [value] is a map with a `.priority` key
+  /// (`DatabaseReference.set` removes it). The value follows the rules of `DatabaseReference.set`; it may
+  /// hold `ServerValue` placeholders. An invalid value or priority throws neither here nor at
+  /// `runTransaction`: the transaction aborts and its Future fails with the [ArgumentError].
   const Transaction.success(Object? value, {Object? priority})
     : _aborted = false,
       _value = value,

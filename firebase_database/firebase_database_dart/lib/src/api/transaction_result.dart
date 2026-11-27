@@ -19,6 +19,7 @@ final class TransactionResult {
   final bool committed;
 
   /// The location's data after the transaction: the committed value, or on abort the value the handler
-  /// last saw.
+  /// last saw. In a committed value, `ServerValue` placeholders hold the client's estimate, not the value
+  /// the server stored, and a write made after the transaction may already have replaced the value.
   final DataSnapshot snapshot;
 }

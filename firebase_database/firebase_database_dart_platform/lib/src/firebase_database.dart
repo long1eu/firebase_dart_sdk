@@ -19,9 +19,10 @@ import 'package:flutter/foundation.dart';
 /// `(int cacheSizeBytes) => sqlitePersistence(directory, cacheSizeBytes: cacheSizeBytes)`
 /// of `firebase_database_dart_sqlite`.
 ///
-/// It is called once per instance (app and database URL), when the instance
-/// creates its client, and only when persistence is on (see
-/// `FirebaseDatabaseDart.use`). The client keys the cache by app name and
+/// It is called each time an instance (app and database URL) creates a
+/// client, and only when persistence is on (see `FirebaseDatabaseDart.use`):
+/// at the first use, and again when the instance creates a new client after
+/// the app was deleted. The client keys the cache by app name and
 /// database URL, so one directory serves every app.
 typedef DatabasePersistenceFactory =
     fs.DatabasePersistence Function(int cacheSizeBytes);
@@ -128,9 +129,14 @@ fs.FirebaseDatabase createClient(
 /// | Setter | Before the client | After it |
 /// |---|---|---|
 /// | `useDatabaseEmulator` | stored | same value: nothing; another: [StateError] |
-/// | `setPersistenceEnabled` | stored | same value: nothing; another: ignored, one `debugPrint` (as Android) |
-/// | `setPersistenceCacheSizeBytes` | checked (1 MiB to 100 MiB, else [ArgumentError]), stored | checked, then as `setPersistenceEnabled` |
+/// | `setPersistenceEnabled` | stored | as the client is (on disk or in memory): nothing; else ignored, one `debugPrint` (as Android) |
+/// | `setPersistenceCacheSizeBytes` | checked (1 MiB to 100 MiB, else [ArgumentError]), stored | checked; the stored size (10 MiB when none): nothing; else ignored, one `debugPrint` |
 /// | `setLoggingEnabled` | stored | takes effect at once |
+///
+/// A client is on disk only when `FirebaseDatabaseDart.use` was given a
+/// persistence factory, so without one `setPersistenceEnabled(true)` after
+/// the client is ignored with that line, also when it was called with
+/// `true` before.
 class DartFirebaseDatabase extends DatabasePlatform {
   /// The instance without an app, for [DatabasePlatform.instance].
   DartFirebaseDatabase() : super();
@@ -373,9 +379,9 @@ class DartFirebaseDatabase extends DatabasePlatform {
 
   /// `DatabasePlatform.setPersistenceEnabled`: whether the client gets the
   /// persistence of [DartDatabaseConfig.persistenceFor]. Persistence is on when
-  /// `use` was given a factory and the app did not disable it; `true` without
-  /// a factory prints one warning and stays in memory, never throws. See the
-  /// table of the class.
+  /// `use` was given a factory and the app did not disable it. Before the
+  /// client, each call with `true` without a factory prints a warning and the
+  /// data stays in memory; it never throws. See the table of the class.
   @override
   void setPersistenceEnabled(bool enabled) {
     final DatabaseClientSettings? settings = _settings;
