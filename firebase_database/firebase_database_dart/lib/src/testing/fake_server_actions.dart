@@ -85,6 +85,10 @@ final class ServerCall {
 /// requests with [respond], push data with [deliverDataUpdate] and [deliverRangeMerge], and drop
 /// or restore the connection with [disconnect] and [connect].
 ///
+/// Writes are answered in send order, as a server answers one connection's requests: answering a
+/// put, merge or onDisconnect request while one of those sent before it is still unanswered throws
+/// a [StateError] naming both, unless the call passes `outOfOrder: true` (see [respond]).
+///
 /// It follows the reconnect contract of [ServerActions]: on [disconnect], sent transaction puts
 /// (puts with a hash) are answered with [statusDisconnect] before the delegate hears of it; other
 /// unanswered writes stay pending. Nothing is called back synchronously from inside a
@@ -323,7 +327,21 @@ final class FakeServerActions implements ServerActions {
   ///
   /// Throws a [StateError] for a second answer to one call, except the one revoke of a listen
   /// answered `ok`.
-  void respond(ServerCall call, {String status = statusOk, Object? data}) {
+  ///
+  /// Writes (put, merge, onDisconnectPut, onDisconnectMerge, onDisconnectCancel) are answered in
+  /// send order: a write answered while an earlier one is unanswered throws a [StateError] naming
+  /// both, because the server answers one connection's requests in the order they arrive (emulator
+  /// probe, `rtdb_emulator_probe.md` item 4). Pass [outOfOrder] true only for a test that models
+  /// something a server does not do, and say why next to it. Listens and gets are not ordered.
+  void respond(
+    ServerCall call, {
+    String status = statusOk,
+    Object? data,
+    bool outOfOrder = false,
+  }) {
+    if (!outOfOrder) {
+      _checkSendOrder(call, 'respond');
+    }
     final bool revoke =
         call._answered &&
         call._listenOk &&
@@ -357,13 +375,21 @@ final class FakeServerActions implements ServerActions {
 
   /// Answers the put or merge [call] as a connection that has received the answer but not yet
   /// delivered it: the call counts as answered now (a later [purgeOutstandingWrites] or
-  /// [disconnect] skips it), and the delegate hears [status] in a microtask.
-  void queueResponse(ServerCall call, {String status = statusOk}) {
+  /// [disconnect] skips it), and the delegate hears [status] in a microtask. Ordered as in
+  /// [respond].
+  void queueResponse(
+    ServerCall call, {
+    String status = statusOk,
+    bool outOfOrder = false,
+  }) {
     if (call.action != 'put' && call.action != 'merge') {
       throw ArgumentError.value(call, 'call', 'Not a put or merge.');
     }
     if (call._answered) {
       throw StateError('$call was already answered.');
+    }
+    if (!outOfOrder) {
+      _checkSendOrder(call, 'queueResponse');
     }
     call._answered = true;
     scheduleMicrotask(() => call.onComplete?.call(status, null));
@@ -428,8 +454,15 @@ final class FakeServerActions implements ServerActions {
   Object? dataAt(String path) =>
       _store.getChild(Path(path)).toJson(exportFormat: true);
 
-  /// Acknowledges the most recent unanswered put or merge (see [ackWrite]).
-  void ackLastWrite() => ackWrite(_lastPending(const <String>{'put', 'merge'}));
+  /// Acknowledges the most recent unanswered put or merge (see [ackWrite]). With more than one
+  /// write unanswered this is out of order and throws, unless [outOfOrder] is true.
+  void ackLastWrite({bool outOfOrder = false}) => ackWrite(
+    _lastPending(const <String>{'put', 'merge'}),
+    outOfOrder: outOfOrder,
+  );
+
+  /// Acknowledges the oldest unanswered put or merge (see [ackWrite]).
+  void ackNextWrite() => ackWrite(_nextPending(const <String>{'put', 'merge'}));
 
   /// Acknowledges the put or merge [call] as the measured server does.
   ///
@@ -438,17 +471,26 @@ final class FakeServerActions implements ServerActions {
   /// timestamp from [serverTimeMillis], an increment against the stored value), the data is
   /// stored and pushed once to each overlapping listen (a tagged listen gets the path data with
   /// its tag, unfiltered), and then the write is answered `ok`: the push comes before the ack.
-  void ackWrite(ServerCall call) {
+  /// Ordered as in [respond].
+  void ackWrite(ServerCall call, {bool outOfOrder = false}) {
     if (call.action != 'put' && call.action != 'merge') {
       throw ArgumentError.value(call, 'call', 'Not a put or merge.');
     }
     if (call._answered) {
       throw StateError('$call was already answered.');
     }
+    if (!outOfOrder) {
+      _checkSendOrder(call, 'ackWrite');
+    }
     final String writePath = normalizePath(call.path!);
     final String? hash = call.hash;
     if (hash != null && _store.getChild(Path(writePath)).hash() != hash) {
-      respond(call, status: 'datastale', data: dataAt(writePath));
+      respond(
+        call,
+        status: 'datastale',
+        data: dataAt(writePath),
+        outOfOrder: true,
+      );
       return;
     }
     final Map<String, Object?> serverValues = generateServerValues(
@@ -474,34 +516,73 @@ final class FakeServerActions implements ServerActions {
     }
     _storeUpdate(writePath, resolved, isMerge: call.action == 'merge');
     _pushWrite(writePath, resolved, isMerge: call.action == 'merge');
-    respond(call);
+    respond(call, outOfOrder: true);
   }
 
   /// Refuses the most recent unanswered put or merge with [status] (`permission_denied`,
-  /// `datastale`, ...) and the optional [reason]; pushes and stores nothing.
-  void failLastWrite(String status, [String? reason]) => respond(
+  /// `datastale`, ...) and the optional [reason]; pushes and stores nothing. With more than one
+  /// write unanswered this is out of order and throws, unless [outOfOrder] is true.
+  void failLastWrite(
+    String status, {
+    String? reason,
+    bool outOfOrder = false,
+  }) => respond(
     _lastPending(const <String>{'put', 'merge'}),
+    status: status,
+    data: reason,
+    outOfOrder: outOfOrder,
+  );
+
+  /// Refuses the oldest unanswered put or merge with [status] and the optional [reason], as
+  /// [failLastWrite] does.
+  void failNextWrite(String status, {String? reason}) => respond(
+    _nextPending(const <String>{'put', 'merge'}),
     status: status,
     data: reason,
   );
 
-  /// Acknowledges the most recent unanswered onDisconnect request.
-  void ackLastOnDisconnect() => respond(
-    _lastPending(const <String>{
-      'onDisconnectPut',
-      'onDisconnectMerge',
-      'onDisconnectCancel',
-    }),
-  );
+  /// Acknowledges the most recent unanswered onDisconnect request; ordered as in [respond].
+  void ackLastOnDisconnect({bool outOfOrder = false}) =>
+      respond(_lastPending(_onDisconnectActions), outOfOrder: outOfOrder);
 
-  ServerCall _lastPending(Set<String> actions) {
+  /// Acknowledges the oldest unanswered onDisconnect request.
+  void ackNextOnDisconnect() => respond(_nextPending(_onDisconnectActions));
+
+  static const Set<String> _onDisconnectActions = <String>{
+    'onDisconnectPut',
+    'onDisconnectMerge',
+    'onDisconnectCancel',
+  };
+
+  List<ServerCall> _pendingOf(Set<String> actions) {
     final List<ServerCall> pending = pendingWrites
         .where((ServerCall call) => actions.contains(call.action))
         .toList();
     if (pending.isEmpty) {
       throw StateError('No unanswered request of $actions.');
     }
-    return pending.last;
+    return pending;
+  }
+
+  ServerCall _lastPending(Set<String> actions) => _pendingOf(actions).last;
+
+  ServerCall _nextPending(Set<String> actions) => _pendingOf(actions).first;
+
+  /// Throws when [call] is a write and a write recorded before it is still unanswered.
+  void _checkSendOrder(ServerCall call, String helper) {
+    if (!_writeActions.contains(call.action) || call._answered) {
+      return;
+    }
+    final ServerCall oldest = pendingWrites.first;
+    if (identical(oldest, call)) {
+      return;
+    }
+    throw StateError(
+      '$helper answers $call (call ${calls.indexOf(call)}) while $oldest '
+      '(call ${calls.indexOf(oldest)}), sent before it, is unanswered. A server '
+      'answers writes in send order: answer the earlier one first (ackNextWrite, '
+      'failNextWrite, ackNextOnDisconnect), or pass outOfOrder: true with a reason.',
+    );
   }
 
   void _storeUpdate(String path, Object? data, {required bool isMerge}) {
@@ -588,7 +669,8 @@ final class FakeServerActions implements ServerActions {
       }
       if (call.action == 'put' && call.hash != null ||
           call.action.startsWith('onDisconnect') && call.sent) {
-        respond(call, status: statusDisconnect);
+        // A plain put sent earlier stays pending across the drop, so this is not in send order.
+        respond(call, status: statusDisconnect, outOfOrder: true);
       }
     }
     _delegate.onDisconnect();

@@ -663,8 +663,11 @@ On Linux it registers itself; on Windows when it is a direct dependency; elsewhe
 `package:firebase_database_dart/testing.dart` has a scripted in-memory server (`FakeDatabaseServer`), a database
 connected to it (`databaseWithFakeServer`) and in-memory persistence (`fakePersistence`). It has no stability promise
 beyond the package's contract tests. A test steers the server with `acceptConnections` (set it to false and call
-`dropConnection` to keep the client offline), `serverTime`, `ackLastWrite`, `failLastWrite`, `ackLastOnDisconnect`,
-`answerGet`, `failGet`, `revokeAuth` and `kill`, and reads `connectionAttempts` and `receivedAuthTokens`.
+`dropConnection` to keep the client offline), `serverTime`, `ackNextWrite`, `failNextWrite`, `ackNextOnDisconnect`,
+`ackLastWrite`, `failLastWrite`, `ackLastOnDisconnect`, `answerGet`, `failGet`, `revokeAuth` and `kill`, and reads
+`connectionAttempts` and `receivedAuthTokens`. Writes and onDisconnect requests are answered in the order they were
+sent, as the server does: answering one while an earlier one is unanswered throws a `StateError`, unless the `*Last*`
+helper is given `outOfOrder: true`. Listens and gets may be answered in any order.
 
 Events are delivered in batches of 1000, with a turn of the event loop between batches so a long burst does not block
 the page. In a browser that turn is a message task, not a timer (a hidden tab delays timers), so a fake clock such as
