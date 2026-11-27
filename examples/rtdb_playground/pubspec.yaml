@@ -15,6 +15,7 @@ dependencies:
 
 dev_dependencies:
   lints: ^6.0.0
+  test: ^1.25.0
 
 # firebase_app_dart is not on pub.dev yet: it comes from this repository.
 # Outside the repository, remove this section.
