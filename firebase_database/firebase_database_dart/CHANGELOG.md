@@ -4,6 +4,9 @@
   every priority entry, parents before children. A node whose last child goes keeps its priority as an emptied node,
   so `update` with `{'.priority': 2, 'x/v': null, 'x/.priority': null}` on `{x: {v: 1, .priority: 1}}` leaves
   `{'.priority': 2}` in either key order.
+- Fixes a known limit of 0.1.0: when the server patched only part of a cached node and the patched part contained none
+  of that node's children, the client dropped the node's priority even though the server still held it, so listeners
+  saw the priority as null until the data was loaded again.
 
 ## 0.1.0
 

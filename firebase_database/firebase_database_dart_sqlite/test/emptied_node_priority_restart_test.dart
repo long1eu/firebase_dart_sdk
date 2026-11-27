@@ -20,7 +20,15 @@ import 'package:firebase_database_dart/src/core/connection/server_actions.dart';
 import 'package:firebase_database_dart/src/core/snap/node_from_json.dart';
 import 'package:firebase_database_dart/src/testing/fake_server_actions.dart';
 import 'package:firebase_database_dart_sqlite/firebase_database_dart_sqlite.dart';
+import 'package:firebase_database_dart_sqlite/src/sqlite_connection.dart';
+import 'package:firebase_database_dart_sqlite/src/sqlite_storage_engine.dart';
 import 'package:test/test.dart';
+
+// The contract and the Repo harness are files under the client's test/ directory, which no other
+// package can import by package URI.
+import '../../firebase_database_dart/test/contract/priority_merge_persistence_contract.dart';
+import '../../firebase_database_dart/test/core/repo_harness.dart';
+import 'support/store_fixture.dart';
 
 /// sha1('priority:number:4014000000000000:'): the server's hash of the emptied node with
 /// priority 5 (production accepted it in check 38 (c)).
@@ -165,4 +173,44 @@ void main() {
       'n': <String, Object?>{'b': 1},
     });
   });
+  group('priority merge contract', () {
+    late StoreFixture fixture;
+    late SqliteStorageEngine opened;
+
+    setUp(() async {
+      fixture = StoreFixture();
+      opened = _engine(await fixture.open());
+    });
+    tearDown(() {
+      opened.close();
+      fixture.dispose();
+    });
+
+    runPriorityMergePersistenceContract(
+      () => opened,
+      keepsEmptiedPriority: false,
+    );
+
+    test(
+      'after a restart, a priority acked on an emptied node does not come back '
+      'when the server fills it',
+      () async {
+        await ackPriorityUpdateThenFillChild(opened);
+        opened.close();
+        opened = _engine(await fixture.open());
+        final RepoHarness second = RepoHarness(
+          persistence: priorityContractManager(opened),
+          connected: false,
+        );
+        final Object? Function() shown = listenExport(second, 'x');
+        await settle();
+        expect(shown(), <String, Object?>{'b': 1});
+      },
+    );
+  });
 }
+
+SqliteStorageEngine _engine(SqliteConnection connection) => SqliteStorageEngine(
+  connection,
+  logger: (DatabaseLogLevel level, String message) {},
+);
