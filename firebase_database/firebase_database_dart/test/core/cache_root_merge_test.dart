@@ -1,5 +1,6 @@
-// An update whose only key is the location itself (`update({'': v})`, a merge with a root
-// write) shadows like a set: acknowledging the first of two keeps the second visible.
+// A merge whose only key is the location itself (key `''`, a root write) shadows like a set:
+// acknowledging the first of two keeps the second visible. The public `update` refuses such a key;
+// the repo still gets one from a stored merge replayed from disk, and these tests call it directly.
 import 'package:firebase_database_dart/src/core/compound_write.dart';
 import 'package:firebase_database_dart/src/core/path.dart';
 import 'package:test/test.dart';

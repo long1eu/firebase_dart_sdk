@@ -221,6 +221,30 @@ void main() {
       );
     });
 
+    test('refuses a key that names the location itself', () {
+      for (final String key in <String>['', '/', '//']) {
+        expect(
+          () => validateFirebaseMergeDataArg('update', <String, Object?>{
+            key: 1,
+          }, Path('/x')),
+          _argumentError(
+            'contains the key "$key", which names the location itself',
+          ),
+          reason: key,
+        );
+      }
+      expect(
+        () => validateFirebaseMergeDataArg('update', <String, Object?>{
+          '': null,
+        }, Path('/x')),
+        _argumentError('Use remove() to delete the location'),
+      );
+      validateFirebaseMergeDataArg('update', <String, Object?>{
+        '.priority': 1,
+        'a//b/': 2,
+      }, Path('/x'));
+    });
+
     test('refuses an invalid priority', () {
       expect(
         () => validateFirebaseMergeDataArg('update', <String, Object?>{
