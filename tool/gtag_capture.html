@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gtag capture</title>
+<style>
+  :root { --bg: #ffffff; --fg: #1d1d1f; --muted: #5f6368; --line: #d0d4d9; --button: #f1f3f4; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #16181b; --fg: #e8eaed; --muted: #9aa0a6; --line: #3c4043; --button: #26292d; }
+  }
+  body { background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; margin: 0; padding: 16px; }
+  main { max-width: 720px; margin: 0 auto; }
+  p, li { color: var(--muted); }
+  code { font-family: ui-monospace, monospace; }
+  .steps { display: grid; gap: 8px; margin: 16px 0; }
+  button { background: var(--button); color: var(--fg); border: 1px solid var(--line); border-radius: 6px;
+           padding: 10px 12px; font: inherit; text-align: left; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  #log { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 8px; font: 13px ui-monospace, monospace;
+         white-space: pre-wrap; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>gtag capture</h1>
+<p>Open with <code>?id=G-XXXXXXXXXX</code> (a test stream), the developer tools open on the Network tab and the
+filter set to <code>collect</code>. Press the buttons in order; see <code>tool/gtag_capture.md</code>.</p>
+<p id="status">No measurement id: add <code>?id=G-…</code> to the address.</p>
+<div class="steps">
+  <button data-step="event" disabled>1. A custom event with a text and a number parameter</button>
+  <button data-step="batch" disabled>2. Five events at once (batching)</button>
+  <button data-step="user" disabled>3. A user id and two user properties, then an event</button>
+  <button data-step="consent-denied" disabled>4. Consent: deny ad_user_data and ad_personalization, then an event</button>
+  <button data-step="consent-granted" disabled>5. Consent: grant both again, then an event</button>
+  <button data-step="items" disabled>6. A purchase with two items</button>
+  <button data-step="debug" disabled>7. An event with debug_mode</button>
+  <button data-step="long" disabled>8. A parameter of 150 characters and one with non-ASCII text</button>
+</div>
+<div id="log"></div>
+</main>
+<script>
+(function () {
+  const id = new URLSearchParams(location.search).get('id') || '';
+  const log = (text) => { document.getElementById('log').textContent += text + '\n'; };
+  if (!/^G-[A-Z0-9]{4,20}$/.test(id)) { return; }
+
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = function () { window.dataLayer.push(arguments); };
+  gtag('consent', 'default', {
+    ad_user_data: 'granted', ad_personalization: 'granted', ad_storage: 'granted', analytics_storage: 'granted',
+  });
+  gtag('js', new Date());
+  gtag('config', id);
+
+  const script = document.createElement('script');
+  script.async = true;
+  script.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(id);
+  document.head.appendChild(script);
+
+  document.getElementById('status').textContent = 'Stream ' + id + ': the page view was sent on load.';
+  const steps = {
+    'event': () => gtag('event', 'capture_event', { capture_text: 'hello', capture_number: 42 }),
+    'batch': () => { for (let i = 0; i < 5; i++) gtag('event', 'capture_batch', { capture_index: i }); },
+    'user': () => {
+      gtag('set', 'user_id', 'capture-user-1');
+      gtag('set', 'user_properties', { capture_plan: 'pro', capture_level: 3 });
+      gtag('event', 'capture_after_user');
+    },
+    'consent-denied': () => {
+      gtag('consent', 'update', { ad_user_data: 'denied', ad_personalization: 'denied' });
+      gtag('event', 'capture_after_deny');
+    },
+    'consent-granted': () => {
+      gtag('consent', 'update', { ad_user_data: 'granted', ad_personalization: 'granted' });
+      gtag('event', 'capture_after_grant');
+    },
+    'items': () => gtag('event', 'purchase', {
+      transaction_id: 'capture-t1', currency: 'EUR', value: 30,
+      items: [
+        { item_id: 'sku-1', item_name: 'First', price: 10, quantity: 1 },
+        { item_id: 'sku-2', item_name: 'Second', price: 20, quantity: 1, capture_custom: 'x' },
+      ],
+    }),
+    'debug': () => gtag('event', 'capture_debug', { debug_mode: true }),
+    'long': () => gtag('event', 'capture_long', { capture_long: 'a'.repeat(150), capture_text: 'ăîșț € 日本' }),
+  };
+  for (const button of document.querySelectorAll('button[data-step]')) {
+    button.disabled = false;
+    button.addEventListener('click', () => {
+      steps[button.dataset.step]();
+      log(new Date().toISOString() + '  ' + button.textContent);
+    });
+  }
+})();
+</script>
+</body>
+</html>
