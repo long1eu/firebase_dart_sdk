@@ -11,6 +11,10 @@
 # test/readme_snippets_test.dart, which compiles the README snippets into test/readme (resolved
 # with firebase_auth_providers_dart, cloud_firestore_dart and secure_flow from their sibling
 # directories; that generated folder is not formatter-stable: the format check of CI leaves it out).
+# firebase_installations_dart runs all of test/: its browser tests run only in a browser (the CI job
+# "remote-config-browser", with the fake server of tool/remote_config_fake_server.dart).
+# firebase_remote_config_dart runs all of test/ the same way; test/readme_snippets_test.dart compiles the
+# snippets of docs/guides/remote_config.md and of its README.
 # The example programs in examples/ are analyzed only (their tests need an emulator); select
 # them alone with the name "examples", or one with "examples/<name>". The web builds of the
 # gallery and their smoke test are not run here: tool/build_gallery.sh, tool/check_gallery.sh and
@@ -47,6 +51,8 @@ PACKAGES=(
   "firebase_auth_secure_storage_dart|firebase_auth/firebase_auth_secure_storage_dart|"
   "firebase_database_dart|firebase_database/firebase_database_dart|"
   "firebase_database_dart_sqlite|firebase_database/firebase_database_dart_sqlite|"
+  "firebase_installations_dart|firebase_installations/firebase_installations_dart|"
+  "firebase_remote_config_dart|firebase_remote_config/firebase_remote_config_dart|"
 )
 
 summary=()

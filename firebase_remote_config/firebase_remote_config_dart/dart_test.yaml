@@ -1,0 +1,5 @@
+# Browser tests need a local server: tool/test_browser_remote_config.sh
+tags:
+  browser:
+    test_on: browser
+    timeout: 2x
