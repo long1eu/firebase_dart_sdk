@@ -74,7 +74,7 @@ class ErrorReporter {
        _ownsClient = httpClient == null,
        _clock = clock ?? DateTime.now,
        _random = random ?? math.Random(),
-       _log = onDiagnostic ?? _defaultLog {
+       _logSink = onDiagnostic ?? _defaultLog {
     if (service.trim().isEmpty) {
       throw ArgumentError.value(service, 'service', 'must not be empty');
     }
@@ -136,7 +136,20 @@ class ErrorReporter {
   final bool _ownsClient;
   final DateTime Function() _clock;
   final math.Random _random;
-  final void Function(String message) _log;
+  final void Function(String message) _logSink;
+
+  /// The most attempts at one event that fail with a retryable error before it is dropped: an event the
+  /// server always answers with 5xx would otherwise block the queue for 30 days.
+  static const int maxAttemptsPerEvent = 10;
+
+  /// The longest `context.user` kept, in characters.
+  static const int maxUserLength = 256;
+
+  /// The longest field of an [HttpRequestContext] kept, in characters.
+  static const int maxRequestFieldLength = 2048;
+
+  /// The longest fingerprint kept for the rate limit, in characters.
+  static const int _maxKindLength = 300;
 
   late final Future<void> _ready;
 
@@ -150,6 +163,17 @@ class ErrorReporter {
   Timer? _timer;
   Future<void>? _pumping;
   int _attempt = 0;
+  bool _loaded = false;
+
+  /// No send before this time (the backoff after a failure), except by [flush].
+  DateTime? _notBefore;
+
+  /// The event the last failed attempts were for, and how many there were.
+  ErrorEvent? _failing;
+  int _failingAttempts = 0;
+
+  Future<void> _saveChain = Future<void>.value();
+  bool _saveWanted = false;
 
   final List<DateTime> _recent = <DateTime>[];
   final Map<String, List<DateTime>> _recentByKind = <String, List<DateTime>>{};
@@ -160,6 +184,10 @@ class ErrorReporter {
 
   /// The number of events waiting to be sent.
   int get pendingCount => _queue.length;
+
+  /// The number of error kinds the rate limit keeps track of. For tests.
+  @visibleForTesting
+  int get trackedKinds => _recentByKind.length + _droppedByKind.length;
 
   /// Completes when the saved state is loaded.
   Future<void> get ready => _ready;
@@ -177,8 +205,11 @@ class ErrorReporter {
     _user = state.user;
     _enabledSetting = state.collectionEnabled;
     _queue.addAll(state.queue);
-    if (!isCollectionEnabled) {
+    _loaded = true;
+    if (!isCollectionEnabled && _queue.isNotEmpty) {
+      // Collection was turned off with events still saved: remove them from the store too.
       _queue.clear();
+      await _save();
     }
     _trimQueue();
     if (_queue.isNotEmpty) {
@@ -192,6 +223,9 @@ class ErrorReporter {
   /// was doing; its first line goes into the header. [fatal] means the program is about to end: the event is
   /// sent at once and the header says `[fatal]`. [httpRequest] describes the request a server was handling.
   ///
+  /// [typeName] replaces the runtime type of [error] in the header. Pass it on the web: a release build of
+  /// `dart2js` shortens type names, so the runtime type changes from build to build.
+  ///
   /// Completes when the event is stored. Never throws.
   Future<void> recordError(
     Object error,
@@ -199,10 +233,10 @@ class ErrorReporter {
     Object? reason,
     bool fatal = false,
     HttpRequestContext? httpRequest,
+    String? typeName,
   }) {
-    final String typeName = error.runtimeType.toString();
     return _record(
-      typeName,
+      typeName ?? error.runtimeType.toString(),
       _describe(error),
       stack,
       reason: reason,
@@ -225,6 +259,8 @@ class ErrorReporter {
     StackTrace.fromString(stack),
     reason: reason,
     fatal: fatal,
+    // An isolate may report no stack: do not put the reporter's own in its place.
+    substituteStack: false,
   );
 
   /// Runs [body] in a zone that records what escapes it, and completes with its result, or with null when it
@@ -258,7 +294,7 @@ class ErrorReporter {
   /// The console shows it to everyone with access to the project. Send an opaque id, not an e-mail address.
   Future<void> setUser(String? user) async {
     await _ready;
-    _user = user;
+    _user = user == null ? null : _cut(user, maxUserLength);
     await _save();
   }
 
@@ -283,7 +319,7 @@ class ErrorReporter {
     await _ready;
     _timer?.cancel();
     _timer = null;
-    await _pump();
+    await _pump(ignoreBackoff: true);
   }
 
   /// Sends what it can within [timeout], saves the queue and releases the HTTP client. Events left over are
@@ -302,7 +338,9 @@ class ErrorReporter {
     _closed = true;
     _timer?.cancel();
     _timer = null;
+    // Before the store was read, the state in memory is empty: saving it would erase the saved one.
     await _save();
+    await _saveChain;
     if (_ownsClient) {
       _client.close();
     }
@@ -315,14 +353,16 @@ class ErrorReporter {
     Object? reason,
     bool fatal = false,
     HttpRequestContext? httpRequest,
+    bool substituteStack = true,
   }) async {
     if (_closed) {
       _log('recordError after close: the error is not recorded.');
       return;
     }
     try {
-      final StackTrace trace = stack == null || stack.toString().trim().isEmpty
-          ? StackTrace.current
+      final bool noStack = stack == null || stack.toString().trim().isEmpty;
+      final StackTrace? trace = noStack
+          ? (substituteStack ? StackTrace.current : null)
           : stack;
       await _ready;
       if (!isCollectionEnabled) {
@@ -336,7 +376,7 @@ class ErrorReporter {
         reason: reason == null ? null : _describe(reason),
         fatal: fatal,
       );
-      final String kind = formatted.fingerprint;
+      final String kind = _cut(formatted.fingerprint, _maxKindLength);
       if (!_admit(kind)) {
         _droppedByKind[kind] = (_droppedByKind[kind] ?? 0) + 1;
         return;
@@ -352,7 +392,7 @@ class ErrorReporter {
         fingerprint: kind,
         reportLocation: formatted.reportLocation,
         user: _user,
-        httpRequest: httpRequest,
+        httpRequest: httpRequest == null ? null : _capRequest(httpRequest),
         fatal: fatal,
       );
       final BeforeSend? hook = _beforeSend;
@@ -381,13 +421,19 @@ class ErrorReporter {
     final DateTime now = _clock();
     final DateTime since = now.subtract(const Duration(minutes: 1));
     _recent.removeWhere((DateTime t) => !t.isAfter(since));
+    for (final List<DateTime> times in _recentByKind.values) {
+      times.removeWhere((DateTime t) => !t.isAfter(since));
+    }
+    _recentByKind.removeWhere(
+      (String key, List<DateTime> times) => times.isEmpty && key != kind,
+    );
+    // A kind with dropped events but nothing recent will never get its note: forget it.
+    _droppedByKind.removeWhere(
+      (String key, int _) => key != kind && !_recentByKind.containsKey(key),
+    );
     final List<DateTime> similar = _recentByKind.putIfAbsent(
       kind,
       () => <DateTime>[],
-    );
-    similar.removeWhere((DateTime t) => !t.isAfter(since));
-    _recentByKind.removeWhere(
-      (String key, List<DateTime> times) => times.isEmpty && key != kind,
     );
     if (_recent.length >= maxEventsPerMinute ||
         similar.length >= maxSimilarEventsPerMinute) {
@@ -408,36 +454,55 @@ class ErrorReporter {
     }
   }
 
-  void _schedule(Duration delay) {
+  void _schedule(Duration delay, {bool replace = false}) {
     if (_closed || !isCollectionEnabled) {
       return;
     }
+    Duration wait = delay;
+    final DateTime? notBefore = _notBefore;
+    if (notBefore != null) {
+      final Duration backoff = notBefore.difference(_clock());
+      if (backoff > wait) {
+        wait = backoff;
+      }
+    }
     final Timer? current = _timer;
-    if (current != null && current.isActive && delay > Duration.zero) {
-      // A send is already planned; an error recorded meanwhile goes with it.
+    if (!replace &&
+        current != null &&
+        current.isActive &&
+        wait > Duration.zero) {
+      // A send is already planned; an error recorded meanwhile goes with it. If it fires during a backoff,
+      // the drain waits for the backoff.
       return;
     }
     current?.cancel();
-    _timer = _zone.createTimer(delay, () {
+    _timer = _zone.createTimer(wait, () {
       _timer = null;
       _pump();
     });
   }
 
   /// Sends the queue, one event at a time, until it is empty or a send fails.
-  Future<void> _pump() {
+  Future<void> _pump({bool ignoreBackoff = false}) {
     final Future<void>? running = _pumping;
     if (running != null) {
       return running;
     }
-    final Future<void> pumping = _zone.run(_drain).whenComplete(() {
-      _pumping = null;
-    });
+    final Future<void> pumping = _zone
+        .run(() => _drain(ignoreBackoff))
+        .whenComplete(() {
+          _pumping = null;
+        });
     _pumping = pumping;
     return pumping;
   }
 
-  Future<void> _drain() async {
+  Future<void> _drain(bool ignoreBackoff) async {
+    final DateTime? notBefore = _notBefore;
+    if (!ignoreBackoff && notBefore != null && _clock().isBefore(notBefore)) {
+      _schedule(Duration.zero, replace: true);
+      return;
+    }
     while (!_closed && isCollectionEnabled && _queue.isNotEmpty) {
       _trimQueue();
       if (_queue.isEmpty) {
@@ -450,57 +515,127 @@ class ErrorReporter {
           _client,
           app,
           event.toReportJson(service: service, version: version),
+          proceed: () => !_closed && isCollectionEnabled,
         );
       } on Object catch (error) {
         result = RetryLater('the transport threw ${error.runtimeType}');
       }
       switch (result) {
+        case Cancelled():
+          return;
         case Delivered():
-          _attempt = 0;
+          _succeeded();
           _remove(event);
           await _save();
         case Dropped(:final int status, :final String body):
-          _attempt = 0;
+          _succeeded();
           _remove(event);
           await _save();
           _log(
             'Error Reporting refused an event (HTTP $status); it is dropped: ${_cap(body)}',
           );
         case RetryLater(:final String reason, :final Duration? after):
+          _failingAttempts = identical(_failing, event)
+              ? _failingAttempts + 1
+              : 1;
+          _failing = event;
+          if (_failingAttempts >= maxAttemptsPerEvent) {
+            _log(
+              'Sending an event failed $_failingAttempts times ($reason); it is dropped.',
+            );
+            _failing = null;
+            _failingAttempts = 0;
+            _remove(event);
+            await _save();
+            continue;
+          }
           _attempt++;
-          final Duration wait = after ?? _backoff(_attempt);
+          // A Retry-After of 0 must not turn into a loop: never wait less than the backoff.
+          final Duration backoff = _backoff(_attempt);
+          final Duration wait = after != null && after > backoff
+              ? after
+              : backoff;
+          _notBefore = _clock().add(wait);
           _log(
             'Sending failed ($reason); trying again in ${wait.inSeconds} s.',
           );
-          _schedule(wait);
+          _schedule(wait, replace: true);
           return;
       }
     }
   }
 
+  void _succeeded() {
+    _attempt = 0;
+    _notBefore = null;
+    _failing = null;
+    _failingAttempts = 0;
+  }
+
   void _remove(ErrorEvent event) {
-    if (_queue.isNotEmpty && identical(_queue.first, event)) {
-      _queue.removeAt(0);
-    } else {
-      _queue.remove(event);
+    // By identity only: an equal event recorded in the same millisecond was never sent.
+    final int index = _queue.indexWhere((ErrorEvent e) => identical(e, event));
+    if (index >= 0) {
+      _queue.removeAt(index);
     }
   }
 
   Duration _backoff(int attempt) => backoffFor(attempt, _random.nextDouble());
 
-  Future<void> _save() async {
+  /// Saves the state: one save at a time, each writing the state as it is when it starts, so saves asked for
+  /// while one runs become one. Nothing is saved before the store was read.
+  Future<void> _save() {
+    if (!_loaded) {
+      return Future<void>.value();
+    }
+    _saveWanted = true;
+    return _saveChain = _saveChain.then((_) async {
+      if (!_saveWanted) {
+        return;
+      }
+      _saveWanted = false;
+      try {
+        await _store.save(
+          ErrorReportingState(
+            user: _user,
+            collectionEnabled: _enabledSetting,
+            queue: List<ErrorEvent>.unmodifiable(_queue),
+          ),
+        );
+      } on Object catch (error) {
+        _log('The state could not be saved (${error.runtimeType}).');
+      }
+    });
+  }
+
+  void _log(String message) {
     try {
-      await _store.save(
-        ErrorReportingState(
-          user: _user,
-          collectionEnabled: _enabledSetting,
-          queue: List<ErrorEvent>.unmodifiable(_queue),
-        ),
-      );
-    } on Object catch (error) {
-      _log('The state could not be saved (${error.runtimeType}).');
+      _logSink(message);
+    } on Object {
+      // A diagnostic sink that throws must not break the reporter.
     }
   }
+
+  static HttpRequestContext _capRequest(HttpRequestContext r) =>
+      HttpRequestContext(
+        method: r.method == null
+            ? null
+            : _cut(r.method!, maxRequestFieldLength),
+        url: r.url == null ? null : _cut(r.url!, maxRequestFieldLength),
+        userAgent: r.userAgent == null
+            ? null
+            : _cut(r.userAgent!, maxRequestFieldLength),
+        referrer: r.referrer == null
+            ? null
+            : _cut(r.referrer!, maxRequestFieldLength),
+        responseStatusCode: r.responseStatusCode,
+        remoteIp: r.remoteIp == null
+            ? null
+            : _cut(r.remoteIp!, maxRequestFieldLength),
+      );
+
+  /// [text] cut to [max] UTF-16 units, without splitting a surrogate pair.
+  static String _cut(String text, int max) => cutText(text, max);
 
   static String _describe(Object value) {
     try {
@@ -519,7 +654,7 @@ class ErrorReporter {
 
   static String _cap(String text) {
     final String flat = text.replaceAll(RegExp(r'\s+'), ' ').trim();
-    return flat.length <= 500 ? flat : '${flat.substring(0, 500)}…';
+    return flat.length <= 500 ? flat : '${cutText(flat, 500)}…';
   }
 
   static void _defaultLog(String message) {
