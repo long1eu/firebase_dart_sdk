@@ -1695,6 +1695,7 @@ void _warningTests() {
         rig.app,
         origins: <Uri>[apiOrigin],
         onWarning: second.add,
+        elapsed: () => async.elapsed,
       );
       Probe<RequestTokens>(another.tokensFor(apiUrl));
       async.flushMicrotasks();
