@@ -22,7 +22,7 @@ Future<void> main(List<String> arguments) async {
               'minutes': Schema.integer(description: 'Preparation time.'),
               'vegetarian': Schema.boolean(),
             },
-            optionalProperties: <String>['vegetarian'],
+            optionalProperties: const <String>['vegetarian'],
           ),
         ),
       ),
