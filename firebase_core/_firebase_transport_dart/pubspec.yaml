@@ -1,0 +1,30 @@
+name: _firebase_transport_dart
+description: Internal request helpers shared by the firebase_*_dart packages. Not for application code.
+version: 0.1.0
+homepage: https://github.com/long1eu/firebase_dart_sdk
+repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_core/_firebase_transport_dart
+issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
+topics:
+  - firebase
+
+platforms:
+  android:
+  ios:
+  linux:
+  macos:
+  web:
+  windows:
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  firebase_app_dart: ^0.2.3
+  http: ^1.6.0
+  meta: ^1.11.0
+
+dev_dependencies:
+  analyzer: '>=8.1.0 <14.0.0'
+  fake_async: ^1.3.0
+  lints: ^6.1.0
+  test: ^1.25.0

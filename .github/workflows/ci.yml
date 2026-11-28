@@ -62,6 +62,8 @@ jobs:
       errorreporting: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.errorreporting == 'true' }}
       # Whether the change touches firebase_analytics_dart or what it depends on.
       analytics: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.analytics == 'true' }}
+      # Whether the change touches _firebase_transport_dart, the seam test of firebase_app_dart or the web import check.
+      transport: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.transport == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -86,7 +88,7 @@ jobs:
           # `browser` is true when any changed file is one of these: the library, the SQLite
           # opener package (the web opener and OPFS worker the tests use), the browser tests, and
           # what runs them.
-          # `indexeddb`, `securestorage`, `database`, `remoteconfig` and `gallery` work the same way
+          # `indexeddb`, `securestorage`, `database`, `remoteconfig`, `transport` and `gallery` work the same way
           # for their own jobs.
           filters: |
             browser:
@@ -173,6 +175,14 @@ jobs:
               - 'tool/check_web_imports.dart'
               - '.github/workflows/ci.yml'
               - '.github/actions/**'
+            transport:
+              - 'firebase_core/_firebase_transport_dart/**'
+              - 'firebase_core/firebase_app_dart/lib/**'
+              - 'firebase_core/firebase_app_dart/test/**'
+              - 'firebase_core/firebase_app_dart/pubspec.yaml'
+              - 'tool/check_web_imports.dart'
+              - '.github/workflows/ci.yml'
+              - '.github/actions/**'
 
   # The unit suite (tool/test_all.sh) runs in two parallel legs per SDK: cloud_firestore_dart
   # alone (its tests take about 9 of the 11 minutes) and every other package with the examples.
@@ -196,7 +206,8 @@ jobs:
             packages: cloud_firestore_dart
           - leg: others
             packages: >-
-              secure_flow firebase_app_dart firebase_auth_providers_dart cloud_firestore_dart_sqlite
+              secure_flow firebase_app_dart _firebase_transport_dart firebase_auth_providers_dart
+              cloud_firestore_dart_sqlite
               firebase_admin_dart firebase_storage_dart firebase_auth_secure_storage_dart
               firebase_database_dart firebase_database_dart_sqlite firebase_installations_dart
               firebase_remote_config_dart firebase_error_reporting_dart firebase_analytics_dart
@@ -243,6 +254,11 @@ jobs:
         if: ${{ !cancelled() && matrix.leg == 'others' }}
         working-directory: firebase_core/firebase_app_dart
         run: dart format --output=none --set-exit-if-changed lib example
+      - name: Check formatting (_firebase_transport_dart)
+        # Also when a test failed: test_all.sh has run `dart pub get` by then.
+        if: ${{ !cancelled() && matrix.leg == 'others' }}
+        working-directory: firebase_core/_firebase_transport_dart
+        run: dart format --output=none --set-exit-if-changed lib test
       - name: Check formatting (cloud_firestore_dart)
         if: ${{ !cancelled() && matrix.leg == 'cloud_firestore_dart' }}
         working-directory: cloud_firestore/cloud_firestore_dart
@@ -313,7 +329,8 @@ jobs:
             packages: cloud_firestore_dart
           - leg: others
             packages: >-
-              secure_flow firebase_app_dart firebase_auth_providers_dart cloud_firestore_dart_sqlite
+              secure_flow firebase_app_dart _firebase_transport_dart firebase_auth_providers_dart
+              cloud_firestore_dart_sqlite
               firebase_admin_dart firebase_storage_dart firebase_auth_secure_storage_dart
               firebase_database_dart firebase_database_dart_sqlite firebase_installations_dart
               firebase_remote_config_dart firebase_error_reporting_dart firebase_analytics_dart
@@ -704,6 +721,38 @@ jobs:
         run: |
           dart test -p chrome
           dart test -p chrome -c dart2wasm
+
+  # _firebase_transport_dart in headless Chrome, compiled with dart2js and with dart2wasm, and the seam test of
+  # firebase_app_dart (the only test of that package that runs in a browser), after a check that the transport
+  # library reaches neither dart:io nor dart:ffi.
+  transport-browser:
+    name: Transport and app tests in Chrome (dart2js and dart2wasm)
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' && needs.changes.outputs.transport == 'true' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/dart
+        with:
+          sdk: stable
+      - name: Check that the library imports neither dart:io nor dart:ffi
+        run: |
+          (cd firebase_core/_firebase_transport_dart && dart pub get)
+          dart tool/check_web_imports.dart firebase_core/_firebase_transport_dart
+      - name: Run the transport tests in Chrome
+        working-directory: firebase_core/_firebase_transport_dart
+        run: |
+          dart test -p chrome
+          dart test -p chrome -c dart2wasm
+      - name: Run the seam test of firebase_app_dart in Chrome
+        working-directory: firebase_core/firebase_app_dart
+        run: |
+          dart pub get
+          dart test -p chrome test/app_check_seam_test.dart
+          dart test -p chrome -c dart2wasm test/app_check_seam_test.dart
 
   # The IndexedDB cache engine against the official JS SDK in headless Chrome, both ways, on one database at a time:
   # tool/bench/web_idb/js_import/interop_check.sh (documents, pending writes of two users, indexes, bundles and garbage

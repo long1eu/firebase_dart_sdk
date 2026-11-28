@@ -27,14 +27,16 @@ record the decisions of the Storage and Realtime Database clients.
    `close()`. Inject the clock, randomness and delays so retries are tested without waiting.
 5. **Tokens come from the app.** The user's ID token comes from `app.authProvider` (no dependency
    on the Auth package) and the App Check token from `app.appCheckProvider`. Send them only over
-   https, to the configured emulator, or to a loopback host.
+   https, to the configured emulator, or to a loopback host. New packages get tokens through `TokenSource` of
+   `_firebase_transport_dart`, which applies this rule and the failure rule.
 6. **The web from the first commit.** No `dart:io` in the main library: put file helpers in a
    separate `io.dart` library and use conditional imports. `dart compile js` and
    `dart compile wasm` accept a `dart:io` import, so a compile test proves nothing on its own; run
    `dart tool/check_web_imports.dart <package>`, which follows the web branch of the import graph.
 7. **Fail closed.** Check sizes before reading a whole body, do not follow redirects, check the host
    of every URL the server hands back (a resumable upload URL is a capability), keep tokens and
-   upload ids out of messages, and refuse control characters in header values.
+   upload ids out of messages, and refuse control characters in header values. `_firebase_transport_dart` has the
+   capped send and read, the host rules and the header checks; do not copy them.
 8. **Exceptions:** a subclass of `FirebaseException` with kebab-case codes, the HTTP status, a
    size-capped server response, and the original error as `cause`, never in the message.
 9. **Numbers from a server are untrusted, and the web has its own number rules.** Compiled to

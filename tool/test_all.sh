@@ -18,6 +18,7 @@
 # firebase_error_reporting_dart runs all of test/ (MockClient, no emulator); the CI job
 # "error-reporting-browser" runs it in Chrome as well.
 # firebase_analytics_dart runs all of test/ (MockClient only; nothing reaches Google Analytics).
+# _firebase_transport_dart runs all of test/; its browser run is the CI job transport-browser.
 # The example programs in examples/ are analyzed only (their tests need an emulator), except those with a
 # .test_without_emulator file, whose tests run too; select
 # them alone with the name "examples", or one with "examples/<name>". The web builds of the
@@ -48,6 +49,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PACKAGES=(
   "secure_flow|secure_flow/secure_flow|"
   "firebase_app_dart|firebase_core/firebase_app_dart|"
+  "_firebase_transport_dart|firebase_core/_firebase_transport_dart|"
   "firebase_auth_providers_dart|firebase_auth/firebase_auth_providers_dart|"
   "cloud_firestore_dart|cloud_firestore/cloud_firestore_dart|test/unit"
   "cloud_firestore_dart_sqlite|cloud_firestore/cloud_firestore_dart_sqlite|"

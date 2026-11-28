@@ -11,6 +11,7 @@ Maintained, tested and published (`cloud_firestore_dart` 0.3.2, Dart `^3.8.0`):
 |---|---|
 | `cloud_firestore_dart` | `cloud_firestore/cloud_firestore_dart` |
 | `firebase_app_dart` | `firebase_core/firebase_app_dart` |
+| `_firebase_transport_dart` (0.1.0; internal request helpers; not on pub.dev yet) | `firebase_core/_firebase_transport_dart` |
 | `firebase_auth_providers_dart` | `firebase_auth/firebase_auth_providers_dart` |
 | `secure_flow` (0.2.0; the browser flows of the Auth client) | `secure_flow/secure_flow` |
 | `cloud_firestore_dart_sqlite` (0.1.3) | `cloud_firestore/cloud_firestore_dart_sqlite` |
