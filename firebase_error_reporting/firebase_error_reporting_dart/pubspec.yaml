@@ -1,0 +1,39 @@
+name: firebase_error_reporting_dart
+description: >-
+  Unofficial pure-Dart reporter of Dart errors to Google Cloud Error Reporting,
+  for the project of a Firebase app: desktop, servers, command-line tools and
+  the web.
+version: 0.1.0-dev.1
+homepage: https://github.com/long1eu/firebase_dart_sdk
+repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_error_reporting/firebase_error_reporting_dart
+issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
+publish_to: none
+topics:
+  - firebase
+  - error-reporting
+  - crash-reporting
+  - dart
+
+platforms:
+  android:
+  ios:
+  linux:
+  macos:
+  web:
+  windows:
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  # Local development resolves this from ../../firebase_core/firebase_app_dart
+  # through pubspec_overrides.yaml (not published).
+  firebase_app_dart: ^0.2.0
+  http: ^1.5.0
+  meta: ^1.11.0
+  stack_trace: ^1.11.0
+
+dev_dependencies:
+  fake_async: ^1.3.0
+  lints: ^6.1.0
+  test: ^1.25.0

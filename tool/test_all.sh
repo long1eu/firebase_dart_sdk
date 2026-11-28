@@ -11,6 +11,8 @@
 # test/readme_snippets_test.dart, which compiles the README snippets into test/readme (resolved
 # with firebase_auth_providers_dart, cloud_firestore_dart and secure_flow from their sibling
 # directories; that generated folder is not formatter-stable: the format check of CI leaves it out).
+# firebase_error_reporting_dart runs all of test/ (MockClient, no emulator); the CI job
+# "error-reporting-browser" runs it in Chrome as well.
 # The example programs in examples/ are analyzed only (their tests need an emulator); select
 # them alone with the name "examples", or one with "examples/<name>". The web builds of the
 # gallery and their smoke test are not run here: tool/build_gallery.sh, tool/check_gallery.sh and
@@ -47,6 +49,7 @@ PACKAGES=(
   "firebase_auth_secure_storage_dart|firebase_auth/firebase_auth_secure_storage_dart|"
   "firebase_database_dart|firebase_database/firebase_database_dart|"
   "firebase_database_dart_sqlite|firebase_database/firebase_database_dart_sqlite|"
+  "firebase_error_reporting_dart|firebase_error_reporting/firebase_error_reporting_dart|"
 )
 
 summary=()
