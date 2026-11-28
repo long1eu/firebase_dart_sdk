@@ -93,3 +93,55 @@ final class RemoteConfigUpdate {
   @override
   String toString() => 'RemoteConfigUpdate(${updatedKeys.length} keys)';
 }
+
+/// One rollout assigned to this installation in the active template, as Android's `RolloutAssignment`
+/// gives it to Crashlytics. Events of `FirebaseRemoteConfig.onRolloutsStateChanged` hold a set of them.
+@immutable
+final class RolloutAssignment {
+  /// Creates an assignment; the package creates them.
+  const RolloutAssignment({
+    required this.rolloutId,
+    required this.variantId,
+    required this.parameterKey,
+    required this.parameterValue,
+    required this.templateVersion,
+  });
+
+  /// The id of the rollout.
+  final String rolloutId;
+
+  /// The variant of the rollout this installation is in.
+  final String variantId;
+
+  /// The first parameter key the rollout affects, or `''` when it names none.
+  final String parameterKey;
+
+  /// The value of [parameterKey] as `getString` reads it: active, else default, else `''`.
+  final String parameterValue;
+
+  /// The template version of the active record, or 0 when it has none.
+  final int templateVersion;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RolloutAssignment &&
+      other.rolloutId == rolloutId &&
+      other.variantId == variantId &&
+      other.parameterKey == parameterKey &&
+      other.parameterValue == parameterValue &&
+      other.templateVersion == templateVersion;
+
+  @override
+  int get hashCode => Object.hash(
+    rolloutId,
+    variantId,
+    parameterKey,
+    parameterValue,
+    templateVersion,
+  );
+
+  /// Prints the ids and the version, never the parameter value.
+  @override
+  String toString() =>
+      'RolloutAssignment($rolloutId, $variantId, version: $templateVersion)';
+}

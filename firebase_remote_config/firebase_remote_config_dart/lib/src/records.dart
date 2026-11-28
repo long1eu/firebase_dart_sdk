@@ -203,6 +203,140 @@ final class ThrottleRecord {
   String toString() => 'ThrottleRecord(<redacted>)';
 }
 
+/// How far ahead a stored realtime backoff may end; a later time becomes now plus this.
+const Duration maxStoredRealtimeBackoff = Duration(hours: 24);
+
+/// The `realtime` record: the realtime client's failure counts and the ends of its waits (the JS SDK's
+/// `realtime_backoff_metadata`, `J:storage/storage.ts:59-64`), so a restart keeps backing off.
+@immutable
+final class RealtimeBackoffRecord {
+  /// Creates a record.
+  const RealtimeBackoffRecord({
+    this.serverFailures = 0,
+    this.transportFailures = 0,
+    this.serverUntil,
+    this.transportUntil,
+    this.retryUntil,
+  });
+
+  /// The largest stored count.
+  static const int maxCount = 1000;
+
+  /// Consecutive server failures (408, 429, 502, 503, 504, and Installations' `too-many-requests`).
+  final int serverFailures;
+
+  /// Consecutive transport failures.
+  final int transportFailures;
+
+  /// The end of the server-failure wait.
+  final DateTime? serverUntil;
+
+  /// The end of the transport-failure wait.
+  final DateTime? transportUntil;
+
+  /// The end of the wait the server asked for with `retryIntervalSeconds`.
+  final DateTime? retryUntil;
+
+  /// True when the record holds no count and no wait.
+  bool get isEmpty =>
+      serverFailures == 0 &&
+      transportFailures == 0 &&
+      serverUntil == null &&
+      transportUntil == null &&
+      retryUntil == null;
+
+  /// The stored text.
+  String encode() => jsonEncode(<String, Object?>{
+    'v': 1,
+    'serverFailures': serverFailures,
+    'transportFailures': transportFailures,
+    'serverUntil': ?serverUntil?.millisecondsSinceEpoch,
+    'transportUntil': ?transportUntil?.millisecondsSinceEpoch,
+    'retryUntil': ?retryUntil?.millisecondsSinceEpoch,
+  });
+
+  /// Reads a stored record, or returns null for a bad one. A time that is not after [now] is dropped
+  /// (that wait has passed); a time later than [now] plus [maxStoredRealtimeBackoff] becomes that time.
+  static RealtimeBackoffRecord? tryParse(String? text, DateTime now) {
+    final Map<String, Object?>? json = decodeRecord(text);
+    if (json == null) {
+      return null;
+    }
+    final int? server = parseBoundedInt(
+      json['serverFailures'],
+      min: 0,
+      max: maxCount,
+    );
+    final int? transport = parseBoundedInt(
+      json['transportFailures'],
+      min: 0,
+      max: maxCount,
+    );
+    if (server == null || transport == null) {
+      return null;
+    }
+    final DateTime latest = now.add(maxStoredRealtimeBackoff);
+    final List<DateTime?> times = <DateTime?>[];
+    for (final String name in const <String>[
+      'serverUntil',
+      'transportUntil',
+      'retryUntil',
+    ]) {
+      if (!json.containsKey(name)) {
+        times.add(null);
+        continue;
+      }
+      final int? millis = parseBoundedInt(
+        json[name],
+        min: -maxDateMillis,
+        max: maxDateMillis,
+      );
+      if (millis == null) {
+        return null;
+      }
+      final DateTime time = DateTime.fromMillisecondsSinceEpoch(
+        millis,
+        isUtc: true,
+      );
+      times.add(
+        !time.isAfter(now)
+            ? null
+            : time.isAfter(latest)
+            ? latest
+            : time,
+      );
+    }
+    return RealtimeBackoffRecord(
+      serverFailures: server,
+      transportFailures: transport,
+      serverUntil: times[0],
+      transportUntil: times[1],
+      retryUntil: times[2],
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is RealtimeBackoffRecord &&
+      other.serverFailures == serverFailures &&
+      other.transportFailures == transportFailures &&
+      other.serverUntil == serverUntil &&
+      other.transportUntil == transportUntil &&
+      other.retryUntil == retryUntil;
+
+  @override
+  int get hashCode => Object.hash(
+    serverFailures,
+    transportFailures,
+    serverUntil,
+    transportUntil,
+    retryUntil,
+  );
+
+  @override
+  String toString() => 'RealtimeBackoffRecord(<redacted>)';
+}
+
 /// The `signals` record of 5.10.
 @immutable
 final class SignalsRecord {

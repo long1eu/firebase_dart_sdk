@@ -1,3 +1,18 @@
+## Unreleased
+
+- `reset()` clears the fetched and active templates, the fetch state and the throttle, in memory and in the
+  store; defaults, custom signals and the realtime backoff stay.
+- `onActivated`: a broadcast stream that emits after each `activate()` that returned true.
+- `onRolloutsStateChanged`: the active rollout assignments (`RolloutAssignment`), the current set on
+  listen and a new set after each change.
+- `getKeysByPrefix(prefix)` and `getValueFrom(key, source)`.
+- `RemoteConfigValue.asBytes()` and `RemoteConfigValue.asJson()`.
+- The realtime failure counts and backoff ends are stored in a `realtime` record and restored at start.
+- A/B testing hand-off: an optional `analytics` constructor argument (`RemoteConfigAnalytics`) receives
+  the experiment user properties (`firebase<experimentId>` = variant id, null for an ended experiment)
+  and the `set_firebase_experiment_state` event after each `activate()` that returns true; `reset()`
+  clears them. The ids handed over are kept in an `experiments` record.
+
 ## 0.1.0
 
 - `FirebaseRemoteConfig` for a `FirebaseApp` and a `FirebaseInstallations`, with settings fixed at

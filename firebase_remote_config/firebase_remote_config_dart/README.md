@@ -1,7 +1,8 @@
 # firebase_remote_config_dart
 
-Unofficial pure-Dart client of Firebase Remote Config: fetch, activate, typed reads, custom signals and
-realtime updates, on the Dart VM (macOS, Windows, Linux, servers, command-line tools) and the web
+Unofficial pure-Dart client of Firebase Remote Config: fetch, activate, reset, typed reads (also as bytes
+and JSON, by key prefix and by source), custom signals, realtime updates, an activate stream and a
+rollouts state stream, on the Dart VM (macOS, Windows, Linux, servers, command-line tools) and the web
 (dart2js and dart2wasm). It talks to the Remote Config REST API and gets its installation id and token
 from [`firebase_installations_dart`](../../firebase_installations/firebase_installations_dart).
 
@@ -50,7 +51,7 @@ app type, so desktop and server programs use the same options.
 
 Remote Config needs a `FirebaseInstallations` for the same app, and Installations needs a store. The
 store keeps the installation and the Remote Config records (fetched template, active template, fetch
-state, throttle, custom signals), so the choice decides what survives a restart:
+state, throttle, custom signals, the experiments handed to Analytics), so the choice decides what survives a restart:
 
 | Platform | Store | Notes |
 |---|---|---|
@@ -111,6 +112,25 @@ print('activated: $activated');
 `fetchAndActivate()` does both and returns what `activate()` returns. `activate()` returns false when there
 is nothing new to activate: the fetched record has the same fetch time as the active one, or the active record is kept. It is kept only when both records have a template version, the active one is higher, its fetch time is not in the future, and it was fetched at most 24 hours before the fetched record, so a tampered template version blocks `activate()` for at most a day. Otherwise the fetched record replaces it; a record without a version replaces any other fetch. A `NO_TEMPLATE` or `EMPTY_CONFIG` answer stores a record with no values, keeping the template version and ETag when the server sends them. The fetched record is the newer of the stored one and the one in memory (the higher version when both have one, else the later fetch time), except that a stored record with a fetch time in the future loses to a different template in memory (a different version, or the stored one has none); memory with the same version counts as the same record, clamped to now when it was loaded. Calls made while a fetch is in flight share it, unless custom signals or the installation changed since that request was built; a realtime retry, which sends no `If-None-Match`, never joins a request that sends one.
 
+`onActivated` emits after each `activate()` that returned true:
+
+```dart
+final StreamSubscription<void> activations = remoteConfig.onActivated.listen((_) {
+  print('New values are active.');
+});
+```
+
+`reset()` clears the fetched and active templates, the fetch state in `info` and the throttle, in memory and
+in the store. The defaults, the custom signals and the realtime backoff stay. It waits for a fetch in flight,
+and fetches started meanwhile wait for it. An open realtime stream stays open; its next connect asks
+for the server's current template, which is fetched but not activated. With an `analytics` connector, it
+also clears the experiment user properties it set (see A/B testing).
+
+```dart
+await remoteConfig.reset();
+print(remoteConfig.info.lastFetchStatus); // RemoteConfigFetchStatus.noFetchYet
+```
+
 ## Values
 
 Reads are synchronous and never fail. A key's value comes from the active template, else the defaults,
@@ -123,6 +143,25 @@ final int maxItems = remoteConfig.getInt('max_items');
 final RemoteConfigValue value = remoteConfig.getValue('welcome_message');
 print('$message, $maxItems, from ${value.source.name}');
 ```
+
+```dart
+final List<String> themeKeys = remoteConfig.getKeysByPrefix('theme_');
+final RemoteConfigValue fromDefaults = remoteConfig.getValueFrom(
+  'welcome_message',
+  ValueSource.valueDefault,
+);
+final Object? layout = remoteConfig.getValue('layout').asJson();
+final List<int> bytes = remoteConfig.getValue('welcome_message').asBytes();
+print('$themeKeys, ${fromDefaults.text}, $layout, ${bytes.length}');
+```
+
+- `getKeysByPrefix(prefix)`: the keys of the active template and the defaults that start with the prefix,
+  sorted; an empty prefix gives every key.
+- `getValueFrom(key, source)`: the active value only (`valueRemote`) or the default only (`valueDefault`);
+  the static value when that source lacks the key, and always for `valueStatic`.
+- `asJson()`: the decoded JSON, or null when the text is not JSON, nests deeper than 32 levels or is over
+  16 MiB; it never throws.
+- `asBytes()`: the UTF-8 bytes of the text.
 
 The conversions follow the Android SDK:
 
@@ -188,7 +227,69 @@ final StreamSubscription<RemoteConfigUpdate> subscription = remoteConfig.onConfi
 - After an announcement the client fetches in one chain at a time, until it holds the announced version. An answer
   of "no change" below that version counts as stale. If a chain ends without an up-to-date template (its attempts
   ran out, or a fetch failed or was throttled), the next chain waits 60 seconds. A chain is up to date only when the client holds the announced version.
+- The failure counts and the backoff ends are stored (the `realtime` record), so a restarted process keeps
+  waiting; a connection that stays open for 60 seconds clears them.
 - Realtime needs the project number: an `appId` of the form `1:<number>:...`, or `messagingSenderId`.
+
+## Rollouts state
+
+`onRolloutsStateChanged` gives the rollouts assigned to this installation in the active template, as the
+Android SDK gives them to Crashlytics: the current set when you listen, then a new set after each
+`activate()` or `reset()` that changes it.
+
+```dart
+final StreamSubscription<Set<RolloutAssignment>> rollouts = remoteConfig.onRolloutsStateChanged.listen(
+  (Set<RolloutAssignment> assignments) {
+    for (final RolloutAssignment assignment in assignments) {
+      print('${assignment.rolloutId}: ${assignment.variantId} (${assignment.parameterKey})');
+    }
+  },
+);
+```
+
+Each `RolloutAssignment` holds the rollout id, the variant id, the first parameter key the rollout affects,
+that key's value as `getString` reads it, and the active template version.
+
+## A/B testing
+
+Pass an `analytics` connector to the constructor and each `activate()` that returns true hands the
+experiments of the new active template to it, as the JS SDK hands them to Firebase Analytics: one
+`setUserProperties` call with `firebase<experimentId>` set to the variant id of each experiment, and to
+null for each experiment handed over before that has ended, then `logEvent('set_firebase_experiment_state')`.
+Nothing is sent when there is nothing to set or clear. `reset()` clears every experiment handed over.
+This package depends on no Analytics package; the connector is an implementation of
+`RemoteConfigAnalytics`. With `firebase_analytics_dart` (its `setExperimentProperties`, added in pull request #195):
+
+```dart flutter
+final class AnalyticsConnector implements RemoteConfigAnalytics {
+  AnalyticsConnector(this.analytics);
+
+  final FirebaseAnalytics analytics;
+
+  @override
+  Future<void> setUserProperties(Map<String, String?> properties) =>
+      analytics.setExperimentProperties(properties);
+
+  @override
+  Future<void> logEvent(String name) => analytics.logEvent(name: name);
+}
+
+final FirebaseRemoteConfig remoteConfig = FirebaseRemoteConfig(
+  app,
+  installations: installations,
+  analytics: AnalyticsConnector(analytics),
+);
+```
+
+The hand-off is best effort. Without a connector it is skipped with one warning. A connector that throws
+does not fail `activate()`, which still returns true; nor does one that hangs: the two calls get
+`fetchTimeout` (60 seconds unless you pass another) together, and a timeout counts as a failure. The failure is logged once per kind of error, without
+values, and the next `activate()` sends every current variant again and clears what has ended by then.
+Experiment ids have the form `_exp_<number>`, so the names are `firebase_exp_<number>`.
+`setExperimentProperties` applies all or nothing: it refuses the whole map when a name does not match
+`firebase_exp_` followed by 1-24 letters, digits or underscores, a value is longer than 36 characters, or
+the 25-property limit would be passed. Whether a GA4 web stream keeps these properties is not documented:
+[docs/analytics_protocol.md](../../docs/analytics_protocol.md), section 10, question 7 (probe step 1c).
 
 ## Offline start
 
@@ -256,7 +357,11 @@ Messages never hold tokens, the API key, request bodies or signal values.
 - `fetch()` returns a `FetchResult` (FlutterFire returns nothing).
 - Values follow Android's conversions (FlutterFire's `asBool` knows only `true` and `1`).
 - Realtime works on every platform; on the web no `fetchAndActivate` is needed before listening.
-- `getKeysByPrefix`, `reset()` and `asJson()` are not provided.
+- `getKeysByPrefix`, `reset()`, `asJson()`, `asBytes()`, `getValueFrom`, `onActivated` and
+  `onRolloutsStateChanged` are not in FlutterFire's API; the adapter does not expose them.
+- The A/B testing hand-off goes to the `analytics` connector you pass (see A/B testing), not to a
+  Firebase Analytics found at run time.
+- Not provided: personalization events and the Analytics fields of the fetch body.
 
 A FlutterFire adapter, `firebase_remote_config_dart_platform`, maps this client onto the
 `firebase_remote_config` plugin.

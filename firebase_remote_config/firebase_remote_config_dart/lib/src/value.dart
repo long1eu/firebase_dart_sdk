@@ -1,4 +1,9 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:firebase_remote_config_dart/src/bounded.dart';
+import 'package:firebase_remote_config_dart/src/json_guard.dart';
+import 'package:firebase_remote_config_dart/src/template.dart';
 import 'package:meta/meta.dart';
 
 /// Where a [RemoteConfigValue] comes from.
@@ -32,6 +37,27 @@ final class RemoteConfigValue {
 
   /// The [text].
   String asString() => text;
+
+  /// The UTF-8 bytes of [text] (Android's `getByteArray`); empty for a static value.
+  Uint8List asBytes() => utf8.encode(text);
+
+  /// The JSON value [text] holds (iOS's `jsonValue`), as `jsonDecode` gives it: a
+  /// `Map<String, dynamic>`, `List<dynamic>`, `String`, `num`, `bool` or null.
+  ///
+  /// Returns null when the text is not JSON, nests arrays and objects deeper than 32 levels, is over
+  /// 16 MiB of UTF-8, or the source is [ValueSource.valueStatic]; a text of `null` also gives null.
+  /// Never throws.
+  Object? asJson() {
+    if (source == ValueSource.valueStatic ||
+        utf8Length(text, stopAfter: maxRecordBytes) > maxRecordBytes) {
+      return null;
+    }
+    try {
+      return decodeGuardedText(text);
+    } on FormatException {
+      return null;
+    }
+  }
 
   /// The value as a boolean, or null when the text is not one of the known words or the source is
   /// [ValueSource.valueStatic].
