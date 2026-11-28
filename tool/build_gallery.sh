@@ -15,6 +15,7 @@ examples=(
   "web_app|Firestore web app|A real-time list on Firestore, a Lite page and a Cloud Storage page; needs an emulator or a project."
   "rtdb_web_app|Realtime Database web app|The Realtime Database client in a browser app."
   "rtdb_playground|Realtime Database playground|The real client against a simulated server in the page: offline writes, catch-up and rollback."
+  "remote_config_web|Remote Config|Fetch values and watch realtime updates"
 )
 
 rm -rf "$out"

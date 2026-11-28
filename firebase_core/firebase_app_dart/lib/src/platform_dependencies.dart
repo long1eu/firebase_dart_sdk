@@ -17,8 +17,8 @@ import 'package:rxdart/rxdart.dart';
 ///
 /// | Member | Default | Who reads it |
 /// | --- | --- | --- |
-/// | [onNetworkConnected] | always connected | Firestore and Realtime Database: `true` retries at once |
-/// | [onBackgroundChanged] | never in the background | nobody in this repository |
+/// | [onNetworkConnected] | always connected | Firestore, Realtime Database and Remote Config realtime: `true` retries at once |
+/// | [onBackgroundChanged] | never in the background | Remote Config realtime: `true` closes the stream, `false` reopens it |
 /// | [storage] | this object, in memory | `FirebaseApp.setAutomaticDataCollectionEnabled` |
 /// | [authProvider] | none: requests carry no token | Firestore |
 /// | [appCheckProvider] | none: no App Check header | Firestore, `FirebaseUserAuth` |

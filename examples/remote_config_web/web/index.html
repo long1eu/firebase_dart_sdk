@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src https://firebaseinstallations.googleapis.com https://firebaseremoteconfig.googleapis.com https://firebaseremoteconfigrealtime.googleapis.com">
+  <title>Remote Config: firebase_remote_config_dart</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h1>Remote Config</h1>
+  <p>Fetch and activate the Remote Config values of your project with <code>firebase_remote_config_dart</code>
+    (pure Dart, compiled to WebAssembly or JavaScript), and watch realtime updates arrive. The installation
+    is stored in this browser's IndexedDB.</p>
+
+  <form id="connect">
+    <label>API key <input id="f-key" autocomplete="off" required></label>
+    <label>App id <input id="f-app" placeholder="1:1234567890:web:abc123" autocomplete="off" required></label>
+    <label>Project id <input id="f-project" placeholder="my-project" autocomplete="off" required></label>
+    <button type="submit">Connect</button>
+  </form>
+  <p class="hint">Nothing is stored except the installation record (an id and its tokens) in IndexedDB, and
+    nothing leaves the browser except to <code>firebaseinstallations.googleapis.com</code>,
+    <code>firebaseremoteconfig.googleapis.com</code> and <code>firebaseremoteconfigrealtime.googleapis.com</code>
+    (the page's Content-Security-Policy allows no other host). Your API key, app id and project id are not stored.
+    The values of a Remote Config template are public: do not keep secrets in it.</p>
+  <p id="error" role="alert"></p>
+
+  <dl>
+    <dt>Status</dt><dd id="status">Not connected</dd>
+    <dt>Last fetch</dt><dd id="last-fetch">none</dd>
+    <dt>Template</dt><dd id="template">none</dd>
+    <dt>Compiler</dt><dd><span id="compiler"></span> (other build: <a id="other-compiler" href="?compiler=js">dart2js</a>)</dd>
+  </dl>
+
+  <p><button id="fetch" type="button" disabled>Fetch and activate</button></p>
+
+  <h2>Values</h2>
+  <table>
+    <thead><tr><th>Key</th><th>Value</th><th>Source</th></tr></thead>
+    <tbody id="values"></tbody>
+  </table>
+
+  <h2>Realtime updates</h2>
+  <p class="hint">The page listens as soon as it is connected. Publish a change in the Firebase console and the
+    keys that changed appear here; the page then activates them.</p>
+  <ul id="log"></ul>
+
+  <script src="bootstrap.js" data-app="main"></script>
+</body>
+</html>
