@@ -562,14 +562,30 @@ void main() {
       expect(env.sent.last.names, <String>['b']);
     });
 
-    fakeTest('429 is retried', (_Env env) {
-      env.status = 429;
-      final FirebaseAnalytics analytics = env.create();
-      env.wait(analytics.logEvent(name: 'a'));
-      env.fa.elapse(const Duration(seconds: 10));
-      expect(env.sent.length, greaterThan(1));
-      expect(env.wait(analytics.queuedEventCount), 1);
-    });
+    for (final int status in <int>[401, 403, 408, 429, 503]) {
+      fakeTest('$status keeps the events and retries', (_Env env) {
+        env.status = status;
+        final FirebaseAnalytics analytics = env.create();
+        env.wait(analytics.logEvent(name: 'a'));
+        env.fa.elapse(const Duration(seconds: 10));
+        expect(env.sent.length, greaterThan(1));
+        expect(env.wait(analytics.queuedEventCount), 1);
+        env.status = 204;
+        env.fa.elapse(const Duration(minutes: 5));
+        expect(env.delivered.single.names, <String>['a']);
+      });
+    }
+
+    for (final int status in <int>[404, 413, 422]) {
+      fakeTest('$status drops the batch', (_Env env) {
+        env.status = status;
+        final FirebaseAnalytics analytics = env.create();
+        env.wait(analytics.logEvent(name: 'a'));
+        env.fa.elapse(const Duration(seconds: 5));
+        expect(env.sent, hasLength(1));
+        expect(env.wait(analytics.queuedEventCount), 0);
+      });
+    }
 
     fakeTest('flush after a failure completes and keeps the events', (
       _Env env,

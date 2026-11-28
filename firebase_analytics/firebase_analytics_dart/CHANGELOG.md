@@ -7,7 +7,8 @@ Not released.
   `sessionId`, `setAppActive`, `flush` and `close`.
 - Validation of names, values and limits of the GA4 Measurement Protocol before an event is queued.
 - Sessions and engagement time on every event; batches of up to 25 events and 130,000 bytes; retries with
-  exponential backoff on network errors, 429 and 5xx; events older than 72 hours dropped.
+  exponential backoff on network errors, 401, 403, 408, 429 and 5xx (any other 4xx drops the batch);
+  events older than 72 hours dropped.
 - Two transports: a relay that carries the App Check and ID tokens, and a direct one with the API secret.
 - `AnalyticsStore.memory()` and `FileAnalyticsStore` (`io.dart`).
 - `AnalyticsDevice` and `AnalyticsUserLocation`, sent only when passed to the constructor.

@@ -123,11 +123,14 @@ enum SendOutcome {
   /// A 2xx answer.
   delivered,
 
-  /// An answer that says the request will never be accepted (a 4xx other than 429, or a redirect); the
-  /// documentation says not to retry it.
+  /// An answer that says the request will never be accepted (a 4xx other than those of [retry], or a
+  /// redirect); the documentation says not to retry it.
   rejected,
 
-  /// A network error, a timeout, 429 or 5xx: worth trying again later.
+  /// A network error, a timeout, 401, 403, 408, 429 or 5xx: worth trying again later.
+  ///
+  /// 401 and 403 come from a relay that refused the caller, for example an expired App Check or ID token;
+  /// the events wait until a later attempt carries a valid one.
   retry,
 
   /// Not sent: the batch was no longer wanted when the request was about to leave.
@@ -243,7 +246,14 @@ class AnalyticsSender {
     if (status >= 200 && status < 300) {
       return SendOutcome.delivered;
     }
-    if (status == 429 || status >= 500) {
+    if (status == 401 || status == 403) {
+      warn(
+        'Analytics: the endpoint refused the caller (HTTP $status); the events stay queued and are sent '
+        'when a later attempt is accepted.',
+      );
+      return SendOutcome.retry;
+    }
+    if (status == 408 || status == 429 || status >= 500) {
       warn(
         'Analytics: the endpoint answered HTTP $status; the events stay queued and are sent later.',
       );

@@ -150,9 +150,12 @@ Both transports:
   ([protocol §3](analytics_protocol.md#3-request-body));
 - treat 2xx as delivered. The production endpoint answers 2xx even for invalid events, which is why
   validation lives in the client;
-- retry on network errors and on 5xx and 429, with injected exponential backoff and jitter; drop a
-  batch refused with any other 4xx, as the documentation says not to retry it
-  ([protocol §1](analytics_protocol.md#1-endpoints)); do not follow redirects;
+- retry on network errors and on 5xx, 429 and 408, with injected exponential backoff and jitter; keep
+  the events on 401 and 403 too, which come from a relay that refused the caller (an expired App Check
+  or ID token, say), and retry them the same way; drop a batch refused with any other 4xx (400, 413,
+  422 and the rest), as the documentation says not to retry it
+  ([protocol §1](analytics_protocol.md#1-endpoints)); do not follow redirects. These are the status
+  rules every client of the example relays follows;
 - never send while collection is disabled.
 
 ## 6. What every request carries
