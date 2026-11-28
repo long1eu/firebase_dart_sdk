@@ -8,6 +8,10 @@
 - `getKeysByPrefix(prefix)` and `getValueFrom(key, source)`.
 - `RemoteConfigValue.asBytes()` and `RemoteConfigValue.asJson()`.
 - The realtime failure counts and backoff ends are stored in a `realtime` record and restored at start.
+- A/B testing hand-off: an optional `analytics` constructor argument (`RemoteConfigAnalytics`) receives
+  the experiment user properties (`firebase<experimentId>` = variant id, null for an ended experiment)
+  and the `set_firebase_experiment_state` event after each `activate()` that returns true; `reset()`
+  clears them. The ids handed over are kept in an `experiments` record.
 
 ## 0.1.0
 
