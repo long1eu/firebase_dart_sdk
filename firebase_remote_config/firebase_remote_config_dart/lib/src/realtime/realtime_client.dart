@@ -164,7 +164,10 @@ final class RealtimeClient {
   bool _isReady;
   bool _regainedBeforeReady = false;
   bool _recheckRestored = false;
-  RealtimeBackoffRecord _persisted = const RealtimeBackoffRecord();
+
+  /// The state the store holds, as far as this client knows; null when unknown (a removal that has not
+  /// succeeded yet), so the next hand-over sends whatever the state is.
+  RealtimeBackoffRecord? _persisted = const RealtimeBackoffRecord();
   RealtimeBackoffRecord? _sending;
 
   /// The stream of `onConfigUpdated`. Each listen counts; the connection is open while at least one
@@ -195,10 +198,15 @@ final class RealtimeClient {
     _serverBackoffUntil = record.serverUntil;
     _transportBackoffUntil = record.transportUntil;
     _serverRetryUntil = record.retryUntil;
-    _persisted = record;
-    if (_regainedBeforeReady) {
-      _regainedBeforeReady = false;
+    // A stored record whose waits have all passed reads as empty: it is removed now, and the removal
+    // is handed over again after a failure, because the store state then stays unknown.
+    _persisted = record.isEmpty ? null : record;
+    final bool regained = _regainedBeforeReady;
+    _regainedBeforeReady = false;
+    if (regained) {
       _clearFailureWaits();
+    }
+    if (regained || _persisted == null) {
       _persistBackoff();
     }
     _recheckRestored = _connection != null;
@@ -574,8 +582,8 @@ final class RealtimeClient {
     return false;
   }
 
-  /// Hands the failure counts and waits to [_onBackoffChanged] when they differ from the last stored
-  /// ones and from the ones being stored. Waits that have passed are dropped first, so the record
+  /// Hands the failure counts and waits to [_onBackoffChanged] when they differ from the ones being
+  /// stored, and from the last stored ones when nothing is being stored; nothing after [close]. Waits that have passed are dropped first, so the record
   /// empties (and is removed) once nothing is left to wait for.
   void _persistBackoff() {
     final DateTime now = _clock();
@@ -596,7 +604,12 @@ final class RealtimeClient {
     );
     final Future<bool> Function(RealtimeBackoffRecord record)? store =
         _onBackoffChanged;
-    if (store == null || record == _persisted || record == _sending) {
+    if (store == null || _closed || record == _sending) {
+      return;
+    }
+    // Equal to the stored state only counts while nothing else is being stored: a different state in
+    // flight would otherwise be the last one written.
+    if (_sending == null && record == _persisted) {
       return;
     }
     _sending = record;

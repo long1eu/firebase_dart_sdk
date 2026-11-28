@@ -297,11 +297,15 @@ class FirebaseRemoteConfig {
     // A reset started during the update. When this call wrote the store, its record counts only if
     // the reset failed before removing it; memory then takes it.
     if (generation != _resetGeneration) {
-      if (!wrote || !await _survivedReset(fetchedText)) {
+      if (!wrote) {
+        return false;
+      }
+      final int? survived = await _survivedResets(fetchedText);
+      if (survived == null) {
         return false;
       }
       _checkOpen();
-      generation = _resetGeneration;
+      generation = survived;
       activeText = fetchedText;
     }
     _active = TemplateRecord.tryParse(
@@ -318,9 +322,16 @@ class FirebaseRemoteConfig {
       return false;
     }
     await _handOffExperiments(_active, generation);
-    // A reset that started during the hand-off clears this record unless it fails.
-    if (generation != _resetGeneration && !await _survivedReset(fetchedText)) {
-      return false;
+    // A reset that started during the hand-off clears this record unless it fails. Its start made the
+    // hand-off skip, and a failed reset never cleared the experiments, so the hand-off runs again for
+    // the record that survived (A42).
+    while (generation != _resetGeneration) {
+      final int? survived = await _survivedResets(fetchedText);
+      if (survived == null) {
+        return false;
+      }
+      generation = survived;
+      await _handOffExperiments(_active, generation);
     }
     if (!_closed) {
       _activated.add(null);
@@ -826,9 +837,16 @@ class FirebaseRemoteConfig {
       _updateMeta((MetaRecord meta) => meta.copyWith(lastFetchStatus: status));
 
   Future<void> _updateMeta(MetaRecord Function(MetaRecord meta) change) async {
-    // Checked first, so an update outside a reset keeps its timing (no extra microtask).
+    // Checked first, so an update outside a reset keeps its timing (no extra microtask). The loop is
+    // inline, so no await falls between the last check and the store call; after waiting, a closed
+    // instance writes nothing.
     if (_clearing != null) {
-      await _waitForClearing();
+      while (_clearing != null) {
+        await _clearing;
+      }
+      if (_closed) {
+        return;
+      }
     }
     final DateTime now = _clock();
     try {
@@ -847,9 +865,16 @@ class FirebaseRemoteConfig {
   Future<void> _updateThrottle(
     ThrottleRecord Function(ThrottleRecord record) change,
   ) async {
-    // Checked first, so an update outside a reset keeps its timing (no extra microtask).
+    // Checked first, so an update outside a reset keeps its timing (no extra microtask). The loop is
+    // inline, so no await falls between the last check and the store call; after waiting, a closed
+    // instance writes nothing.
     if (_clearing != null) {
-      await _waitForClearing();
+      while (_clearing != null) {
+        await _clearing;
+      }
+      if (_closed) {
+        return;
+      }
     }
     final DateTime now = _clock();
     try {
@@ -924,10 +949,6 @@ class FirebaseRemoteConfig {
     );
     if (backoff != null) {
       _realtime.restoreBackoff(backoff);
-      // Every wait it held has passed: remove the record instead of keeping it until the next change.
-      if (backoff.isEmpty) {
-        unawaited(_onRealtimeBackoff(backoff));
-      }
     }
     _rollouts = _rolloutsOf(_active);
     _initialized = true;
@@ -953,22 +974,23 @@ class FirebaseRemoteConfig {
     return record;
   }
 
-  /// Waits while a [reset] clears the records, so an update never falls back to the memory the reset
-  /// is about to clear. Fetches the reset waits for run before that phase, so they never wait here.
-  Future<void> _waitForClearing() async {
+  /// After a [reset] started during an [activate]: waits for every reset to end and checks that the
+  /// stored active record is still [text] (each reset failed before removing it). Returns the reset
+  /// generation that held while no reset ran and the record was found, or null when it was removed
+  /// or the read failed (a failed read counts as removed, A38).
+  ///
+  /// The generation is compared again after the caller resumes, a microtask later: a reset that took
+  /// the slot in that gap starts the wait again, so it is never adopted.
+  Future<int?> _survivedResets(String text) async {
     while (true) {
-      final Future<void>? clearing = _clearing;
-      if (clearing == null) {
-        return;
+      final int? generation = await _survivedReset(text);
+      if (generation == null || generation == _resetGeneration) {
+        return generation;
       }
-      await clearing;
     }
   }
 
-  /// After a [reset] started during an [activate]: waits for every reset to end, then tells whether
-  /// the stored active record is still [text] (the reset failed before removing it). A failed read
-  /// counts as removed.
-  Future<bool> _survivedReset(String text) async {
+  Future<int?> _survivedReset(String text) async {
     while (true) {
       final Future<void>? resetting = _resetting;
       if (resetting != null) {
@@ -983,10 +1005,10 @@ class FirebaseRemoteConfig {
           'store-call',
           'A store call failed; the operation changed nothing.',
         );
-        return false;
+        return null;
       }
       if (_resetting == null) {
-        return stored == text;
+        return stored == text ? _resetGeneration : null;
       }
     }
   }
@@ -1007,7 +1029,12 @@ class FirebaseRemoteConfig {
 
   /// Queues a store of the realtime backoff after the ones handed over before it; completes with true
   /// when it was stored.
+  ///
+  /// After [close] nothing is queued; a write that already reached the store may still finish.
   Future<bool> _onRealtimeBackoff(RealtimeBackoffRecord record) {
+    if (_closed) {
+      return Future<bool>.value(false);
+    }
     final Future<bool> result = _backoffTail.then(
       (void _) => _storeRealtimeBackoff(record),
     );
