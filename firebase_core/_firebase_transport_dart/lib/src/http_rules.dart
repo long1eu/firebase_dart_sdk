@@ -337,7 +337,8 @@ TransportException _transportFailure(Object error, http.BaseRequest? request) {
 /// `<redacted>`, then sanitized.
 ///
 /// The secrets are the URLs, their query strings, each query value of four characters or more and
-/// each request header value of four characters or more, as written and percent-decoded. Control
+/// each request header value and each whitespace-separated part of one (the bare token of
+/// `Bearer <token>`) of four characters or more, as written and percent-decoded. Control
 /// characters are removed from the message and from the secrets before matching, so they cannot
 /// split a secret so that it escapes the match.
 ///
@@ -352,7 +353,7 @@ String _redactedDetail(http.ClientException error, http.BaseRequest? request) {
     }
   }
   for (final String value in request?.headers.values ?? const <String>[]) {
-    _addForms(secrets, value, 4);
+    _addHeaderSecrets(secrets, value);
   }
   final String message = _withoutQuotedBody(_withoutControls(error.message));
   return sanitizeServerText(_redact(message, secrets));
@@ -363,6 +364,17 @@ String _withoutQuotedBody(String message) {
   final int start = message.indexOf('. [');
   return start < 0 ? message : message.substring(0, start + 1);
 }
+
+/// Adds the header [value] and each of its whitespace-separated parts to [secrets], each with the
+/// forms and minimum of the header rule.
+void _addHeaderSecrets(Set<String> secrets, String value) {
+  _addForms(secrets, value, 4);
+  for (final String part in value.split(_whitespace)) {
+    _addForms(secrets, part, 4);
+  }
+}
+
+final RegExp _whitespace = RegExp(r'\s+');
 
 void _addUrlSecrets(Set<String> secrets, Uri url) {
   _addForms(secrets, url.toString(), 1);
