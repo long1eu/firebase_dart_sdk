@@ -7,6 +7,11 @@
   8192 bits; `typ`, `alg` RS256, `kid`, the signature, `iss`, `aud`, `sub`, `exp`, `iat`, `nbf`) and returns a `VerifiedAppCheckToken` with the app id.
   Errors are `FirebaseAppCheckAdminException`s: `invalid-argument`, `app-check-token-expired`, `internal-error`.
   Replay protection (`consumeAppCheckToken`) is not implemented yet.
+- `verifyIdToken`: the fetch of Google's keys times out after 10 seconds, is not tried again for 30 seconds after a
+  failure (every check made a request during an outage), and the keys are kept at least five minutes when the
+  answer has no `max-age`.
+- `verifyToken` of App Check: a failed refetch for an unknown `kid` keeps the current key set instead of
+  discarding it.
 
 ## 0.1.2
 

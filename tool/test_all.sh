@@ -13,7 +13,8 @@
 # directories; that generated folder is not formatter-stable: the format check of CI leaves it out).
 # firebase_error_reporting_dart runs all of test/ (MockClient, no emulator); the CI job
 # "error-reporting-browser" runs it in Chrome as well.
-# The example programs in examples/ are analyzed only (their tests need an emulator); select
+# The example programs in examples/ are analyzed only (their tests need an emulator), except those with a
+# .test_without_emulator file, whose tests run too; select
 # them alone with the name "examples", or one with "examples/<name>". The web builds of the
 # gallery and their smoke test are not run here: tool/build_gallery.sh, tool/check_gallery.sh and
 # tool/smoke_gallery.mjs (the CI job "gallery").
@@ -172,7 +173,18 @@ for pubspec in "$ROOT"/examples/*/pubspec.yaml; do
     web=" | build web $js | build web --wasm $wasm"
   fi
   case "$pub$analyze$web" in *FAIL*) failed=1 ;; esac
-  summary+=("$name: pub get $pub | analyze $analyze$web | test not run (needs an emulator)")
+  if [ -f "$dir/.test_without_emulator" ]; then
+    # The example marks itself as testable without an emulator (MockClient only): run its tests.
+    tests=PASS
+    (cd "$dir" && $tool test >"$log.test" 2>&1) || {
+      tests=FAIL
+      tail -20 "$log.test"
+    }
+    case "$tests" in *FAIL*) failed=1 ;; esac
+    summary+=("$name: pub get $pub | analyze $analyze$web | test $tests")
+  else
+    summary+=("$name: pub get $pub | analyze $analyze$web | test not run (needs an emulator)")
+  fi
 done
 
 # The Flutter packages: `dart test` cannot load flutter_test. The emulator tests of

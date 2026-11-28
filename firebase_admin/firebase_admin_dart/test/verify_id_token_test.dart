@@ -259,13 +259,40 @@ void main() {
     );
   });
 
-  test('without max-age nothing is cached', () async {
+  test('without max-age the keys are still kept for five minutes', () async {
     cacheControl = 'no-cache';
     final FirebaseAuthAdmin auth = app.auth();
     await auth.verifyIdToken(token());
     await auth.verifyIdToken(token());
+    expect(backend.to('www.googleapis.com'), hasLength(1));
+    clock.advance(const Duration(minutes: 5, seconds: 1));
+    await auth.verifyIdToken(token());
     expect(backend.to('www.googleapis.com'), hasLength(2));
   });
+
+  test(
+    'after a failed key fetch, checks fail for 30 seconds without fetching again',
+    () async {
+      backend.on(
+        'www.googleapis.com',
+        '/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com',
+        (http.Request request) async => http.Response('unavailable', 503),
+      );
+      for (int i = 0; i < 5; i++) {
+        await expectLater(
+          app.auth().verifyIdToken(token()),
+          throwsAdmin('internal-error'),
+        );
+      }
+      expect(backend.to('www.googleapis.com'), hasLength(1));
+      clock.advance(const Duration(seconds: 31));
+      await expectLater(
+        app.auth().verifyIdToken(token()),
+        throwsAdmin('internal-error'),
+      );
+      expect(backend.to('www.googleapis.com'), hasLength(2));
+    },
+  );
 
   test('a key endpoint that fails is internal-error', () async {
     backend.on(

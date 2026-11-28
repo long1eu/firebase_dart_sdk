@@ -220,7 +220,9 @@ Decisions behind the proposal:
   checks the tokens, applies a size cap and a rate limit per App Check token or user, sets
   `serviceContext` from an allow-list rather than trusting the body, and forwards the event to
   `events:report` with its own service account, which holds `roles/errorreporting.writer` and nothing else.
-  The package ships an example relay in `examples/` on `shelf`, and its README lists these checks.
+  The example relay is `examples/error_reporting_relay`, on the shared checks of `examples/relay_guard`. It
+  answers 204, 400 or 422 (the event is refused; the client drops it), 401 (the tokens; the client pauses) or
+  503 (the relay's or Error Reporting's problem; the client keeps the event).
 - **Direct with credentials** (servers and jobs) calls `events:report` with an OAuth access token from an
   `AuthTokenProvider`: `OAuthTokenProvider.serviceAccount(key, scopes: [cloudPlatformScope])` from
   `firebase_auth_providers_dart`, or Application Default Credentials on Google Cloud. On a 401 it asks for
