@@ -19,7 +19,8 @@ import 'dart:async';
 /// A result without an [error] carries a token the provider vouches for. A
 /// failed request ([AppCheckTokenResult.failure]) carries the
 /// [placeholderToken] together with the [error], like the JS, Android and iOS
-/// SDKs; services send the placeholder, so that the backend can tell a failed
+/// SDKs, unless the provider still holds an unexpired token (S2 of
+/// [AppCheckTokenProvider]); services send the placeholder, so that the backend can tell a failed
 /// attestation from an app without App Check, and the backend rejects it when
 /// App Check is enforced.
 ///
@@ -97,9 +98,12 @@ class AppCheckTokenResult {
 ///   judges validity and never keeps a token beyond the attempt it was
 ///   fetched for.
 /// * S2, failure token. A failed call of either method completes with
-///   [AppCheckTokenResult.failure]: the token is the placeholder. A provider
-///   written before this contract may return an empty token with an error;
-///   services handle both.
+///   [AppCheckTokenResult.failure]: the token is the placeholder. One
+///   exception: when a refresh fails while the cached session token has not
+///   expired yet (but is no longer valid by S1), the result carries that real
+///   token with the error, as the JS SDK does, because the backend still
+///   accepts it. A provider written before this contract may return an empty
+///   token with an error; services handle all three.
 /// * S3, no throw. Both methods report a failure in the result. Services treat
 ///   a throw like an empty token.
 /// * S4, an answer within 8 s. Both methods complete no later than
@@ -118,6 +122,13 @@ class AppCheckTokenResult {
 ///   `AppCheckTokenResult('', error: StateError(...))`, not with the
 ///   placeholder. No header is sent then: a closed App Check is "no App
 ///   Check", not "attestation failed".
+/// * S8, forced refresh. `getToken(forceRefresh: true)` asks for a new token;
+///   the provider, not the caller, limits how often that leads to a new
+///   exchange. When a forced call cannot run (too soon after the last exchange,
+///   or the provider is throttled) and the cached token is valid by S1, the
+///   provider answers with that token and no error. Without a valid cached
+///   token it answers with a failure (S2). Callers never throttle forced
+///   refreshes themselves.
 ///
 /// What a service sends, for session and limited-use tokens alike: a token
 /// without an error is sent; the placeholder of a failure is sent; an empty
@@ -174,6 +185,9 @@ abstract class AppCheckTokenProvider {
 
   /// Fetches a token. [forceRefresh] must only be set when the cached token was
   /// invalidated out of band (for example the backend answered UNAUTHENTICATED).
+  ///
+  /// A forced call that cannot run follows S8 of the class comment; a failure
+  /// follows S2.
   ///
   /// Report a failure with [AppCheckTokenResult.failure], like the App Check
   /// SDKs do; do not throw, and answer within [responseDeadline]. Firestore
