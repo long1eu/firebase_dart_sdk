@@ -1,0 +1,16 @@
+firebase_analytics_dart_platform
+Copyright 2026 Razvan Lung (long1eu) and contributors.
+
+This package is a FlutterFire platform implementation: it implements the
+platform interface of the FlutterFire firebase_analytics plugin
+(firebase_analytics_platform_interface, Copyright 2021 the Chromium project
+authors, BSD 3-Clause license) and the platform interface of firebase_core
+(firebase_core_platform_interface, BSD 3-Clause license). It depends on those
+packages; it does not copy their code. The work is done by
+firebase_analytics_dart, an unofficial client of the Google Analytics 4
+Measurement Protocol.
+
+This package is not affiliated with, endorsed by or supported by Google LLC or
+Firebase. "Firebase" and "Google Analytics" are trademarks of Google LLC.
+
+Licensed under the Apache License, Version 2.0; see the LICENSE file.

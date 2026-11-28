@@ -1156,7 +1156,8 @@ jobs:
   # The Flutter packages, which the unit jobs skip (they install Dart only): flutter analyze and
   # flutter test of cloud_firestore_dart_flutterfire, cloud_firestore_dart_platform,
   # firebase_auth_dart_platform, firebase_storage_dart_platform, firebase_database_dart_platform,
-  # firebase_remote_config_dart_platform (unit tests only, fakes of the two endpoints) and
+  # firebase_remote_config_dart_platform (unit tests only, fakes of the two endpoints),
+  # firebase_analytics_dart_platform (unit tests only, a MockClient relay) and
   # firebase_auth_secure_storage_flutter (unit tests only, against a fake of the plugin's
   # channel), the emulator tests of the three platform packages included
   # (FIRESTORE_EMULATOR_HOST: 15 of the Firestore package's 29 tests skip without it;
@@ -1217,7 +1218,7 @@ jobs:
           ./tool/test_all.sh cloud_firestore_dart_flutterfire cloud_firestore_dart_platform \
             firebase_auth_dart_platform firebase_storage_dart_platform \
             firebase_database_dart_platform firebase_remote_config_dart_platform \
-            firebase_auth_secure_storage_flutter \
+            firebase_analytics_dart_platform firebase_auth_secure_storage_flutter \
             examples/flutter_notes examples/flutter_web_two_users \
             examples/flutterfire_on_linux \
             examples/flutterfire_on_windows \

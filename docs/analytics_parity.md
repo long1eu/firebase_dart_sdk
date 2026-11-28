@@ -2,10 +2,10 @@
 
 This document compares the public API of the official Analytics SDKs with the planned Dart packages:
 
-- **The Dart client**: `firebase_analytics/firebase_analytics_dart`, as planned in
-  [analytics_spec.md](analytics_spec.md). It does not exist yet. Each row says what the first release is meant
-  to do, and the code is checked against this table when it lands (step 3 of the spec).
-- **The FlutterFire adapter**: `firebase_analytics/firebase_analytics_dart_platform`, also planned (step 4).
+- **The Dart client**: `firebase_analytics/firebase_analytics_dart`, specified in
+  [analytics_spec.md](analytics_spec.md) and in development (not released). Each row says what the first
+  release does.
+- **The FlutterFire adapter**: `firebase_analytics/firebase_analytics_dart_platform`, in development too.
   The last section maps every method of FlutterFire's `FirebaseAnalytics`.
 
 Unlike the other parity documents, this one cannot compare behaviour. The Android and iOS SDKs are closed
@@ -127,7 +127,7 @@ binary, and it reports to an app stream through a channel this package cannot us
 ## The FlutterFire adapter
 
 Every public method of FlutterFire's `FirebaseAnalytics` (`FF:firebase_analytics/lib/src/firebase_analytics.dart`)
-and what `firebase_analytics_dart_platform` will do with it. All of it is rank **first release (adapter)**
+and what `firebase_analytics_dart_platform` does with it. The adapter reports every error of the client as `firebase_core`'s `FirebaseException` with plugin `firebase_analytics` and the client's code, like the other adapters of the repository. All of it is rank **first release (adapter)**
 unless the row says otherwise.
 
 | FlutterFire method | Adapter |
@@ -143,9 +143,10 @@ unless the row says otherwise.
 | `setSessionTimeoutDuration(Duration)` | Allowed before the first event of the process (it reconfigures the client); throws `StateError` with a clear message after it. |
 | `logScreenView(screenName:, screenClass:, parameters:)` | `logScreenView` (sends `page_view`). |
 | Typed helpers: `logAddPaymentInfo`, `logAddShippingInfo`, `logAddToCart`, `logAddToWishlist`, `logBeginCheckout`, `logPurchase`, `logRefund`, `logRemoveFromCart`, `logSelectItem`, `logSelectPromotion`, `logViewCart`, `logViewItem`, `logViewItemList`, `logViewPromotion`, `logEarnVirtualCurrency`, `logSpendVirtualCurrency`, `logGenerateLead`, `logJoinGroup`, `logLevelStart`, `logLevelEnd`, `logLevelUp`, `logPostScore`, `logUnlockAchievement`, `logLogin`, `logSignUp`, `logSearch`, `logViewSearchResults`, `logSelectContent`, `logShare`, `logTutorialBegin`, `logTutorialComplete`, `logAppOpen`, `logCampaignDetails` | Nothing to do: FlutterFire's `FirebaseAnalytics` builds the recommended name and parameters itself and calls the platform's `logEvent`. |
-| `logAdImpression`, `logInAppPurchase` | They reach the adapter as `logEvent('ad_impression')` and `logEvent('in_app_purchase')`, which the client refuses with `FirebaseAnalyticsException` `reserved-name`: both events are for app streams only (protocol §4). |
-| `logTransaction(transactionId)` (platform `logTransaction`) | Throws `UnimplementedError`: StoreKit only. |
-| `initiateOnDeviceConversionMeasurementWithEmailAddress`, `…PhoneNumber`, `…HashedEmailAddress`, `…HashedPhoneNumber` (platform `initiateOnDeviceConversionMeasurement`) | Throws `UnimplementedError`: iOS only. |
+| `logAdImpression` | Reaches the adapter as `logEvent('ad_impression')`, which the client refuses: a `FirebaseException` with plugin `firebase_analytics` and code `reserved-name`, since the event is for app streams only (protocol §4). |
+| `logInAppPurchase` | FlutterFire calls the platform only on iOS and throws `UnimplementedError` itself on Windows and Linux. Where the adapter is chosen on iOS, it reaches the adapter as `logEvent('in_app_purchase')` and gets `reserved-name`, as above. |
+| `logTransaction(transactionId)` (platform `logTransaction`) | FlutterFire calls the platform only on iOS and macOS. The adapter throws `UnimplementedError`: StoreKit only. |
+| `initiateOnDeviceConversionMeasurementWithEmailAddress`, `…PhoneNumber`, `…HashedEmailAddress`, `…HashedPhoneNumber` (platform `initiateOnDeviceConversionMeasurement`) | FlutterFire calls the platform only on iOS. The adapter throws `UnimplementedError`. |
 
 ## Deliberate differences, in one list
 
