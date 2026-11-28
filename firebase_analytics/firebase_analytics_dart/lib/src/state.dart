@@ -184,7 +184,7 @@ class AnalyticsState {
       properties.forEach((Object? name, Object? value) {
         if (name is String && value is String) {
           try {
-            checkUserProperty(name, value);
+            checkStoredUserProperty(name, value);
             state.userProperties[name] = value;
             return;
           } on Object {
@@ -264,7 +264,7 @@ class EventContext {
         if (name is! String || value is! String) {
           return null;
         }
-        checkUserProperty(name, value);
+        checkStoredUserProperty(name, value);
         checked[name] = value;
       }
       Map<String, String>? checkedConsent;

@@ -29,7 +29,8 @@ Every event carries `session_id`, `engagement_time_msec`, `probe_run` (the run t
 or `control`). The requests carry no `device` block: in strict mode the validation server refuses one without
 `model` and `browser` (protocol §7), which a program cannot read. Step 1b sends one more body, to the
 validation server only, with all nine `device` fields filled, and prints whether strict mode accepts it; it
-never stops the run. There is no `user_location`, no `ip_override` and no `user_id`. Event timestamps lie within the two minutes before the run, so a clock that runs a little fast still
+never stops the run. Step 1c does the same with the user property `firebase_exp_1`, the name an A/B testing
+experiment sets through Remote Config (protocol §10, question 7). There is no `user_location`, no `ip_override` and no `user_id`. Event timestamps lie within the two minutes before the run, so a clock that runs a little fast still
 dates them in the past.
 
 ## The control
@@ -102,6 +103,7 @@ The probe ends with a checklist. Write the answers into
    24 to 48 hours? And those of the control?
 2. Which country was reported, if any? The probe sends no location and no device block.
 3. What step 1b printed: does strict mode accept a complete `device` block?
+4. What step 1c printed: does strict mode accept the user property `firebase_exp_1`?
 
 A 2xx answer from `/mp/collect` proves only that the request arrived. The endpoint answers 2xx even for data it
 does not process.

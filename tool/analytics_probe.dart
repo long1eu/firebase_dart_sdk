@@ -158,6 +158,7 @@ Analytics reporting probe
 It sends:
   1. the validation server, strict mode: nothing is recorded;
   1b. the validation server again, with a complete device block (informational);
+  1c. the validation server again, with an A/B testing property firebase_exp_1 (informational);
   2. /mp/collect, ${run.debugEventNames.length} events with debug_mode, for DebugView;
   3. /mp/collect, ${run.reportingEventNames.length} events without debug_mode, for Realtime and the reports;$controlStep
 with the user property probe_kind=measurement_protocol.''');
@@ -240,6 +241,33 @@ with the user property probe_kind=measurement_protocol.''');
     } else {
       stdout.writeln('   Refused, with these messages:');
       for (final message in deviceMessages) {
+        stdout.writeln('   - $message');
+      }
+    }
+
+    // Informational, records nothing, and never stops the run.
+    stdout.writeln(
+      '\n1c. Validation server, an A/B testing property firebase_exp_1',
+    );
+    final experimentCheck = await _post(
+      client,
+      endpoint('/debug/mp/collect'),
+      run.experimentCheckBody(),
+      recordsData: false,
+    );
+    final experimentMessages =
+        experimentCheck == null || experimentCheck.status != 200
+        ? null
+        : _validationMessages(experimentCheck.body, redact);
+    if (experimentMessages == null) {
+      stdout.writeln('   No validation answer; continuing.');
+    } else if (experimentMessages.isEmpty) {
+      stdout.writeln(
+        '   Accepted: no validation message for the firebase_ prefix.',
+      );
+    } else {
+      stdout.writeln('   Refused, with these messages:');
+      for (final message in experimentMessages) {
         stdout.writeln('   - $message');
       }
     }
@@ -421,6 +449,22 @@ class _Run {
       'browser_version': '1.0',
     },
   };
+
+  /// One event with the user property an A/B testing experiment sets
+  /// (`firebase_exp_<id>`), for the validation server only: does strict mode
+  /// accept the reserved prefix, which Remote Config's hand-off needs?
+  Map<String, Object?> experimentCheckBody() {
+    final Map<String, Object?> body = _body(clientId, <Map<String, Object?>>[
+      _event('probe_report', 0, 'experiment_check', debug: false),
+    ], validation: true);
+    return <String, Object?>{
+      ...body,
+      'user_properties': <String, Object?>{
+        ...body['user_properties']! as Map<String, Object?>,
+        'firebase_exp_1': <String, Object?>{'value': '1'},
+      },
+    };
+  }
 
   /// The reporting events again, under the client_id from gtag.js.
   Map<String, Object?> controlBody({bool validation = false}) => _body(
@@ -609,6 +653,7 @@ Record for docs/analytics_protocol.md, section 10:
       Realtime? In the standard reports? And those of the control?
    2. Which country, if any, was reported?
    3. The result of step 1b (the complete device block).
+   4. The result of step 1c (the firebase_exp_1 user property).
    Also the date, the run tag ${run.tag}, and whether a data filter was active.''';
 }
 

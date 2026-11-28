@@ -382,6 +382,48 @@ class FirebaseAnalytics {
     });
   }
 
+  /// Sets the A/B testing experiment properties of the user: each name is `firebase_exp_` followed by the
+  /// experiment id, each value the variant id, and a null value removes the property. Kept in the store and
+  /// sent with the other user properties of later events.
+  ///
+  /// **For integrations, not for apps.** Remote Config's A/B testing hand-off calls it on an activate that
+  /// changes the template, then logs `set_firebase_experiment_state`, as the Firebase JS SDK does. These
+  /// names break two rules [setUserProperty] enforces (the `firebase_` prefix and the 24-character limit),
+  /// and whether a GA4 web stream keeps them is not verified (docs/analytics_protocol.md, section 10).
+  ///
+  /// Names match `firebase_exp_[A-Za-z0-9_]{1,24}`; values have 1 to 36 characters. The properties count
+  /// toward the limit of 25 user properties. The whole map is checked before anything changes: a bad entry,
+  /// or more properties than the limit allows, throws [FirebaseAnalyticsException] and changes nothing.
+  Future<void> setExperimentProperties(Map<String, String?> properties) async {
+    final Map<String, String?> copy = Map<String, String?>.of(properties);
+    copy.forEach(checkExperimentProperty);
+    return _locked(() async {
+      final Map<String, String> next = Map<String, String>.of(
+        _state.userProperties,
+      );
+      copy.forEach((String name, String? value) {
+        if (value == null) {
+          next.remove(name);
+        } else {
+          next[name] = value;
+        }
+      });
+      if (next.length > AnalyticsLimits.maxUserProperties &&
+          next.length > _state.userProperties.length) {
+        throw FirebaseAnalyticsException(
+          code: 'too-many-user-properties',
+          message:
+              'A user has at most ${AnalyticsLimits.maxUserProperties} properties; these experiment properties '
+              'would make ${next.length}.',
+        );
+      }
+      _state.userProperties
+        ..clear()
+        ..addAll(next);
+      await _saveState();
+    });
+  }
+
   // ---------------------------------------------------------------------------------------------------------
   // Consent and collection
 
