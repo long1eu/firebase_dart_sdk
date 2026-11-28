@@ -258,8 +258,7 @@ experiments of the new active template to it, as the JS SDK hands them to Fireba
 null for each experiment handed over before that has ended, then `logEvent('set_firebase_experiment_state')`.
 Nothing is sent when there is nothing to set or clear. `reset()` clears every experiment handed over.
 This package depends on no Analytics package; the connector is an implementation of
-`RemoteConfigAnalytics`. With `firebase_analytics_dart` (its `setExperimentProperties` is added by
-pull request #195, not merged yet):
+`RemoteConfigAnalytics`. With `firebase_analytics_dart` (its `setExperimentProperties`, added in pull request #195):
 
 ```dart flutter
 final class AnalyticsConnector implements RemoteConfigAnalytics {
