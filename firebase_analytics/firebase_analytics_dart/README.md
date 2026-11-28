@@ -51,7 +51,9 @@ Future<void> main() async {
 - **No automatic events.** `first_open`, `session_start` and screen tracking are reserved by the protocol.
   Sessions are carried by `session_id` and `engagement_time_msec` on every event, and `logScreenView` sends
   `page_view`.
-- **No location is guessed.** Pass `userLocation` to report one.
+- **No device block by default, and no location is guessed.** Strict validation refused a `device` block
+  without `model` and `browser`, which a program cannot read; pass a complete `device` if you can fill it,
+  and `userLocation` to report a location.
 - **State** (client id, user id, user properties, default parameters, consent, the collection switch and
   unsent events) lives in an `AnalyticsStore`: memory by default, or `FileAnalyticsStore` from
   `package:firebase_analytics_dart/io.dart`.

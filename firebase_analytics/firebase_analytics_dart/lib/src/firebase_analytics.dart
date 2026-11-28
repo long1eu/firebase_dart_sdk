@@ -55,8 +55,10 @@ class FirebaseAnalytics {
   ///   called; the value passed there is kept in the store and wins from then on.
   /// - [batchDelay]: how long the first event of a batch waits for others.
   /// - [maxQueuedEvents]: the most events kept unsent; when it is reached the oldest go first.
-  /// - [device]: added to what [AnalyticsDevice.detect] reads, field by field; `const AnalyticsDevice()`
-  ///   adds nothing.
+  /// - [device]: sent with every request when set; none by default. The validation server in strict mode
+  ///   refused a block without `model` and `browser` (docs/analytics_protocol.md, section 7), which a program
+  ///   cannot read, so pass one only when you can fill it. [AnalyticsDevice.detect] gives what the platform
+  ///   tells.
   /// - [userLocation]: sent with every request when set; the client never guesses a location.
   /// - [onWarning]: receives what the client cannot throw (a store that fails, a refused request); by
   ///   default it goes to `dart:developer`'s `log`.
@@ -71,7 +73,7 @@ class FirebaseAnalytics {
     this.collectionEnabledByDefault = true,
     this.batchDelay = const Duration(seconds: 5),
     this.maxQueuedEvents = 1000,
-    AnalyticsDevice? device,
+    this.device,
     this.userLocation,
     void Function(String message)? onWarning,
     http.Client? httpClient,
@@ -79,9 +81,6 @@ class FirebaseAnalytics {
     Random? random,
   }) : measurementId = measurementId ?? app.options.measurementId ?? '',
        store = store ?? AnalyticsStore.memory(),
-       device = AnalyticsDevice.detect().merge(
-         device ?? const AnalyticsDevice(),
-       ),
        _clock = clock ?? DateTime.now,
        _random = random ?? Random.secure(),
        _warn = onWarning ?? _defaultWarning {
@@ -152,8 +151,8 @@ class FirebaseAnalytics {
   /// The most events kept unsent.
   final int maxQueuedEvents;
 
-  /// The `device` block of every request.
-  final AnalyticsDevice device;
+  /// The `device` block of every request, when set.
+  final AnalyticsDevice? device;
 
   /// The `user_location` block of every request, when set.
   final AnalyticsUserLocation? userLocation;
@@ -817,7 +816,7 @@ class FirebaseAnalytics {
             e.key: <String, String>{'value': e.value},
         },
       'consent': ?ctx.consent,
-      'device': ?device.toRequest(),
+      'device': ?device?.toRequest(),
       'user_location': ?userLocation?.toRequest(),
       'events': <Object>[for (final QueuedEvent e in events) e.toRequest()],
     };

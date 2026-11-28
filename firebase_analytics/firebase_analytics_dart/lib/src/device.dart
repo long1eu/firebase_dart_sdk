@@ -4,13 +4,13 @@ import 'device_stub.dart'
     if (dart.library.io) 'device_io.dart'
     if (dart.library.js_interop) 'device_web.dart';
 
-/// The `device` block of every request: what Google Analytics reports in its Tech reports.
+/// The `device` block of a request: what Google Analytics reports in its Tech reports.
 ///
-/// Without it, Google Analytics would derive device data from earlier gtag.js events of the same client,
-/// which a program outside a browser never sends, so the client sends what it can read from the platform
-/// ([AnalyticsDevice.detect]). Every field is optional; a null field is not sent. Pass your own to the
-/// `FirebaseAnalytics` constructor to add what the platform does not tell a Dart program (the screen size of
-/// a Flutter window, a device model), or `const AnalyticsDevice()` to send none.
+/// The client sends none unless one is passed to the `FirebaseAnalytics` constructor. The reference calls
+/// every field optional, but the validation server in strict mode refused a block without `model` and
+/// `browser` (measured on 2026-11-28; docs/analytics_protocol.md, section 7), and what the production
+/// endpoint does with such a block is not documented. Pass one only when you can fill it. A null field is
+/// not sent. [AnalyticsDevice.detect] gives what the platform tells a Dart program, to start from.
 @immutable
 class AnalyticsDevice {
   /// A device block with the given fields.

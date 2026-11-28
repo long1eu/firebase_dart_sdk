@@ -10,3 +10,4 @@ Not released.
   exponential backoff on network errors, 429 and 5xx; events older than 72 hours dropped.
 - Two transports: a relay that carries the App Check and ID tokens, and a direct one with the API secret.
 - `AnalyticsStore.memory()` and `FileAnalyticsStore` (`io.dart`).
+- `AnalyticsDevice` and `AnalyticsUserLocation`, sent only when passed to the constructor.
