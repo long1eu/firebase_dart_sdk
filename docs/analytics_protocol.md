@@ -206,6 +206,21 @@ documentation does not say what happens to them. This is the first thing the pro
 events with a fresh `client_id` must appear in Realtime and in DebugView. If they do not, the package cannot
 work as designed, and the spec goes back for a decision before step 3 ships.
 
+**Measured, 2026-11-28 at 00:52 UTC** (the maintainer's run of `tool/analytics_probe.dart`, run tag 22tjj8, on a
+GA4 web stream, with a gtag.js `client_id` as the control, the `device` block left out, and the property's data
+filters not checked):
+
+- **Validation:** the server answered 200 with no messages, and all three `/mp/collect` requests got 204.
+- **DebugView:** within a minute it showed `probe_start`, `page_view` and `level_up` from the generated
+  `client_id`, and the user property `probe_kind`.
+- **Realtime:** about a minute and a half later it showed 2 active users, the page "Probe home" with 2 views,
+  and the events `page_view` 3, `probe_report` 2, `select_content` 2, `level_up` 1, `probe_start` 1 and
+  `session_start` 1. Google Analytics derived `session_start` itself; the probe never sends it. The two
+  `probe_report` and two `select_content` events are one from each arm, generated and control.
+
+So events from a `client_id` that gtag.js never used are processed in DebugView and Realtime, despite the
+sentence in [VERIFY]. Whether they reach the standard reports after 24 to 48 hours is not checked yet.
+
 ## 6. Sessions, engagement and consent
 
 - `session_id` [REF]: "a positive numeric value representing a timestamp, provided as a number or a string",
@@ -226,6 +241,15 @@ work as designed, and the spec goes back for a decision before step 3 ships.
 `operating_system_version`, `model`, `brand`, `browser`, `browser_version`. Every sub-field is an optional
 string. Both variants document it.
 
+**Measured, 2026-11-28 (the maintainer's run of `tool/analytics_probe.dart`, run tag 22tjj8, on a GA4 web
+stream).** The validation server in strict mode (`ENFORCE_RECOMMENDATIONS`) refused a `device` block with
+`category`, `operating_system` and `language` only: `VALUE_REQUIRED at device.model`; with `model` added,
+`VALUE_REQUIRED at device.browser`. So strict mode treats fields the reference calls optional as required, and
+a partial `device` fails it. Whether every field is required is not known yet; step 1b of the probe checks a
+block with all nine. What the production endpoint (`RELAXED`) does with a partial block, drop the field,
+drop the request or keep it, is not documented and not measured. Without `device`, the same run validated
+cleanly.
+
 `user_location` [REF]: `city`, `region_id` (ISO 3166-2, `US-CA`), `country_id` (ISO 3166-1 alpha-2),
 `subcontinent_id` and `continent_id` (UN M49). `country_id` and `region_id` are recommended at a minimum.
 
@@ -234,9 +258,10 @@ Without `device` or `user_agent`, Google Analytics derives device data "from tag
 gtag.js has no tagging events, so anything it does not send is not reported. The property's granular
 location and device settings apply in every case.
 
-**Decision.** The client sends `device` with `category`, `language`, `operating_system`,
-`operating_system_version` and `screen_resolution` where the platform exposes them. It sends no `user_agent`
-(the structured field wins anyway) and no `ip_override`. It sends `user_location` only if the developer
+**Decision.** The client sends **no `device` block by default**: a block built from what the platform tells a
+Dart program lacks `model` and `browser`, which strict validation requires, and nothing documents that the
+production endpoint keeps a partial block. A developer who can fill it may pass one, at their own risk until
+the probe's step 1b answers. The client sends no `user_agent` and no `ip_override`. It sends `user_location` only if the developer
 supplies it: guessing a country from the locale would report the wrong country for travellers and
 expatriates. Without it, geography is reported from the IP address of the request if the protocol does
 that at all, which the documentation does not say; the kit records what appears.
@@ -264,7 +289,8 @@ The documentation leaves these open. The kit (spec section 10, step 6) records e
 the property's settings:
 
 1. Do events with a `client_id` that gtag.js never used appear in Realtime and DebugView? (Section 5. This
-   decides whether the package works at all.) `tool/analytics_probe.dart` asks it, with a `client_id` from
+   decides whether the package works at all.) **Yes for DebugView and Realtime** (2026-11-28, run 22tjj8;
+   section 5). The standard reports are still to be checked. `tool/analytics_probe.dart` asks it, with a `client_id` from
    gtag.js as a control: without the control, a negative answer could also mean a wrong secret or stream,
    which neither endpoint reports.
 2. Is geography reported for such a client without `user_location`? (Section 7.)
@@ -272,3 +298,5 @@ the property's settings:
    (Section 4.)
 4. Does it count a non-ASCII value by code points or by its percent-encoded length? (Section 4.)
 5. Is a body of 130,000 bytes accepted, and one of 133,120? (Section 3.)
+6. Which `device` fields does strict mode require, and does it accept a block with all nine? (Section 7;
+   step 1b of the probe.)

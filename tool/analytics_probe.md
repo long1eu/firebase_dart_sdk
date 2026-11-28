@@ -26,9 +26,10 @@ repository.
    prints this after a failed step, whenever `/mp/collect` may already have recorded something.
 
 Every event carries `session_id`, `engagement_time_msec`, `probe_run` (the run tag) and `probe_arm` (`generated`
-or `control`). Each request carries a `device` block with category `desktop`, the operating system, and the
-two-letter language of the locale without its region. There is no `user_location`, no `ip_override` and no
-`user_id`. Event timestamps lie within the two minutes before the run, so a clock that runs a little fast still
+or `control`). The requests carry no `device` block: in strict mode the validation server refuses one without
+`model` and `browser` (protocol §7), which a program cannot read. Step 1b sends one more body, to the
+validation server only, with all nine `device` fields filled, and prints whether strict mode accepts it; it
+never stops the run. There is no `user_location`, no `ip_override` and no `user_id`. Event timestamps lie within the two minutes before the run, so a clock that runs a little fast still
 dates them in the past.
 
 ## The control
@@ -99,7 +100,8 @@ The probe ends with a checklist. Write the answers into
 
 1. Did the events of the generated `client_id` appear in DebugView? In Realtime? In the standard reports after
    24 to 48 hours? And those of the control?
-2. Which country was reported, if any? The probe sends no location, and its language carries no region.
+2. Which country was reported, if any? The probe sends no location and no device block.
+3. What step 1b printed: does strict mode accept a complete `device` block?
 
 A 2xx answer from `/mp/collect` proves only that the request arrived. The endpoint answers 2xx even for data it
 does not process.

@@ -170,10 +170,11 @@ Both transports:
   is active: a CLI or a server never goes inactive, and its sessions would otherwise never end. Engagement
   time is the time the app was active since the previous event, at least 1 ms and at most
   `sessionTimeout`. Without `setAppActive` calls (a CLI or a server) the app counts as active.
-- **Device and location fields** ([protocol §7](analytics_protocol.md#7-device-and-geography)): `device`
-  with `category`, the operating system and its version, the language and the screen size where the
-  platform exposes them. No `user_agent` and no `ip_override`. `user_location` only when the developer
-  supplies it; the client does not guess a country from the locale. No IP address is collected or sent.
+- **Device and location fields** ([protocol §7](analytics_protocol.md#7-device-and-geography)): no
+  `device` block by default. Strict validation refused a partial one (it required `model`, then `browser`,
+  measured on 2026-11-28), and a program cannot read those fields; a developer may pass a complete block.
+  No `user_agent` and no `ip_override`. `user_location` only when the developer supplies it; the client
+  does not guess a country from the locale. No IP address is collected or sent.
 
 ## 7. Screen views
 

@@ -80,6 +80,9 @@ READMEs are short landing pages; the API reference is on pub.dev.
 31. [Realtime Database in a FlutterFire app](database_flutter.md): moving a FlutterFire `firebase_database` app to
     Linux, Windows or pure Dart: keep `package:firebase_database` with the `firebase_database_dart_platform` adapter,
     or move to the `firebase_database_dart` API, with the differences, what has run and troubleshooting.
+32. [Crash and error reporting](crash_reporting.md): which tool reports crashes and errors on each
+    platform: the official Crashlytics plugin on Android, iOS and macOS, and Cloud Error Reporting or a
+    Sentry-protocol tracker on Windows, Linux, servers and the web.
 
 Every Dart snippet in these guides is compiled against the current API by
 `cloud_firestore/cloud_firestore_dart/test/unit/api/readme_snippets_test.dart`, except the blocks
