@@ -61,13 +61,15 @@ sealed class ErrorReportingTransport {
     return DirectTransport(credentials: credentials, apiKey: apiKey);
   }
 
-  /// Sends [body] once. Never throws.
+  /// Sends [body] once. Never throws. [proceed] is asked right before the request goes out (after the tokens
+  /// were fetched); when it answers false nothing is sent and the result is [Cancelled].
   @internal
   Future<SendResult> send(
     http.Client client,
     FirebaseApp app,
-    Map<String, Object?> body,
-  );
+    Map<String, Object?> body, {
+    bool Function()? proceed,
+  });
 }
 
 /// The outcome of one attempt.
@@ -92,30 +94,45 @@ final class RetryLater extends SendResult {
   /// What happened, without tokens or keys.
   final String reason;
 
-  /// The `Retry-After` of the answer, capped at an hour.
+  /// The `Retry-After` of the answer, or the pause the transport asks for, capped at an hour.
   final Duration? after;
 }
 
 /// The server refused the event: sending it again would fail the same way.
 @internal
 final class Dropped extends SendResult {
-  /// A refusal with its [status] and the start of the answer ([body]).
+  /// A refusal with its [status] (0 when the event never left) and the start of the answer ([body]).
   const Dropped(this.status, this.body);
 
-  /// The HTTP status.
+  /// The HTTP status, or 0.
   final int status;
 
-  /// At most [maxResponseBytes] of the answer.
+  /// At most [maxResponseBytes] of the answer, with the credentials of the request removed.
   final String body;
+}
+
+/// Nothing was sent: the reporter no longer wanted the event when the request was about to go out.
+@internal
+final class Cancelled extends SendResult {
+  /// The result when `proceed` answered false.
+  const Cancelled();
 }
 
 /// The most of an answer that is read.
 @internal
 const int maxResponseBytes = 64 * 1024;
 
-/// How long one request may take.
+/// How long one request may take, from sending to the end of the answer.
 @internal
 const Duration requestTimeout = Duration(seconds: 30);
+
+/// How long a token provider may take.
+@internal
+const Duration tokenTimeout = Duration(seconds: 10);
+
+/// How long the queue pauses when the relay refuses the tokens (401 or 403).
+@internal
+const Duration relayRefusalPause = Duration(minutes: 5);
 
 /// Whether tokens may travel to [url]: over https, or to a loopback host.
 @internal
@@ -123,12 +140,31 @@ bool mayCarryTokens(Uri url) {
   if (url.scheme == 'https') {
     return true;
   }
+  if (url.scheme != 'http') {
+    return false;
+  }
   final String host = url.host.toLowerCase();
-  return url.scheme == 'http' &&
-      (host == 'localhost' ||
-          host == '::1' ||
-          RegExp(r'^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$').hasMatch(host));
+  if (host == 'localhost' || host == '::1') {
+    return true;
+  }
+  final RegExpMatch? match = RegExp(
+    r'^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$',
+  ).firstMatch(host);
+  return match != null &&
+      <String?>[
+        match.group(1),
+        match.group(2),
+        match.group(3),
+      ].every((String? octet) => int.parse(octet!) <= 255);
 }
+
+/// Whether [value] may go into a header: printable ASCII without spaces (tokens and keys have none).
+bool _isHeaderSafe(String value) =>
+    value.isNotEmpty && RegExp(r'^[\x21-\x7e]+$').hasMatch(value);
+
+/// A token from a provider: the token, null when there is none to send, or a [RetryLater] when the provider
+/// failed.
+typedef _Token = ({String? token, RetryLater? failure});
 
 /// The relay transport.
 @internal
@@ -149,52 +185,96 @@ final class RelayTransport extends ErrorReportingTransport {
   Future<SendResult> send(
     http.Client client,
     FirebaseApp app,
-    Map<String, Object?> body,
-  ) async {
+    Map<String, Object?> body, {
+    bool Function()? proceed,
+  }) async {
     final Map<String, String> headers = <String, String>{};
-    final String? appCheck = await _appCheckToken(app);
-    if (appCheck != null) {
-      headers['x-firebase-appcheck'] = appCheck;
+    final _Token appCheck = await _appCheckToken(app);
+    if (appCheck.failure != null) {
+      return appCheck.failure!;
     }
-    final String? idToken = await _idToken(app);
-    if (idToken != null) {
-      headers['authorization'] = 'Bearer $idToken';
+    if (appCheck.token != null) {
+      headers['x-firebase-appcheck'] = appCheck.token!;
     }
-    final _Answer answer = await _post(client, url, headers, body);
-    return answer.result;
+    final _Token idToken = await _idToken(app);
+    if (idToken.failure != null) {
+      return idToken.failure!;
+    }
+    if (idToken.token != null) {
+      headers['authorization'] = 'Bearer ${idToken.token}';
+    }
+    if (proceed != null && !proceed()) {
+      return const Cancelled();
+    }
+    final SendResult result = await _post(client, url, headers, body);
+    if (result is Dropped && (result.status == 401 || result.status == 403)) {
+      // The relay refused the tokens: that may pass (a provider that recovers, a relay being fixed), so the
+      // queue pauses instead of dropping every event in turn.
+      return RetryLater(
+        'the relay refused the request (HTTP ${result.status})',
+        after: relayRefusalPause,
+      );
+    }
+    return result;
   }
 
-  static Future<String?> _appCheckToken(FirebaseApp app) async {
+  static Future<_Token> _appCheckToken(FirebaseApp app) async {
     final AppCheckTokenProvider? provider = app.appCheckProvider;
     if (provider == null) {
-      return null;
+      return (token: null, failure: null);
     }
     try {
-      final AppCheckTokenResult result = await provider.getToken(
-        forceRefresh: false,
+      final AppCheckTokenResult result = await provider
+          .getToken(forceRefresh: false)
+          .timeout(tokenTimeout);
+      return _checked(result.token, 'App Check');
+    } on Object catch (error) {
+      // A configured App Check that fails: the relay would refuse the request, so try again later.
+      return (
+        token: null,
+        failure: RetryLater(
+          'the App Check token failed (${error.runtimeType})',
+        ),
       );
-      return result.token.isEmpty ? null : result.token;
-    } on Object {
-      // As in the other packages: the request goes out without the header and the relay decides.
-      return null;
     }
   }
 
-  static Future<String?> _idToken(FirebaseApp app) async {
+  static Future<_Token> _idToken(FirebaseApp app) async {
     final AuthTokenProvider provider = app.authProvider;
     if (identical(provider, app)) {
       // The app is its own provider when none was set: nobody can be signed in.
-      return null;
+      return (token: null, failure: null);
     }
     try {
-      final GetTokenResult result = await provider.getAccessToken(
-        forceRefresh: false,
+      final GetTokenResult result = await provider
+          .getAccessToken(forceRefresh: false)
+          .timeout(tokenTimeout);
+      return _checked(result.token, 'ID');
+    } on FirebaseNoSignedInUserException {
+      return (token: null, failure: null);
+    } on FirebaseApiNotAvailableException {
+      return (token: null, failure: null);
+    } on Object catch (error) {
+      return (
+        token: null,
+        failure: RetryLater('the ID token failed (${error.runtimeType})'),
       );
-      return result.token.isEmpty ? null : result.token;
-    } on Object {
-      // Nobody signed in, or the provider failed: the error is reported without a user.
-      return null;
     }
+  }
+
+  static _Token _checked(String token, String kind) {
+    if (token.isEmpty) {
+      return (token: null, failure: null);
+    }
+    if (!_isHeaderSafe(token)) {
+      return (
+        token: null,
+        failure: RetryLater(
+          'the $kind token has characters a header cannot hold',
+        ),
+      );
+    }
+    return (token: token, failure: null);
   }
 }
 
@@ -221,83 +301,138 @@ final class DirectTransport extends ErrorReportingTransport {
   Future<SendResult> send(
     http.Client client,
     FirebaseApp app,
-    Map<String, Object?> body,
-  ) async {
+    Map<String, Object?> body, {
+    bool Function()? proceed,
+  }) async {
     final String projectId = app.options.projectId ?? '';
     final Uri url = endpoint(projectId);
     final AuthTokenProvider? provider = credentials;
     if (provider == null) {
-      return (await _post(client, url, const <String, String>{}, body)).result;
+      if (proceed != null && !proceed()) {
+        return const Cancelled();
+      }
+      return _post(
+        client,
+        url,
+        const <String, String>{},
+        body,
+        secrets: <String>[apiKey!],
+      );
     }
     for (bool refresh = false; ; refresh = true) {
       final String token;
       try {
-        token = (await provider.getAccessToken(forceRefresh: refresh)).token;
+        token =
+            (await provider
+                    .getAccessToken(forceRefresh: refresh)
+                    .timeout(tokenTimeout))
+                .token;
       } on Object catch (error) {
         // The provider's message may quote what it was given; only the type.
         return RetryLater('the credentials failed (${error.runtimeType})');
       }
-      if (token.isEmpty) {
-        return const RetryLater('the credentials gave an empty token');
+      if (!_isHeaderSafe(token)) {
+        return const RetryLater(
+          'the credentials gave an empty token, or one a header cannot hold',
+        );
       }
-      final _Answer answer = await _post(client, url, <String, String>{
+      if (proceed != null && !proceed()) {
+        return const Cancelled();
+      }
+      final SendResult result = await _post(client, url, <String, String>{
         'authorization': 'Bearer $token',
       }, body);
-      if (answer.status == 401 && !refresh) {
+      if (result is Dropped && result.status == 401 && !refresh) {
         continue;
       }
-      return answer.result;
+      return result;
     }
   }
 }
 
-final class _Answer {
-  _Answer(this.result, [this.status]);
-
-  final SendResult result;
-  final int? status;
-}
-
-Future<_Answer> _post(
+/// Posts [body] to [url] with [headers], within [requestTimeout] from the start to the end of the answer. The
+/// request is aborted at the deadline. The values of [headers] and [secrets] are removed from the body of a
+/// refusal before it is returned.
+Future<SendResult> _post(
   http.Client client,
   Uri url,
   Map<String, String> headers,
-  Map<String, Object?> body,
-) async {
-  final http.Request request = http.Request('POST', url)
-    ..followRedirects = false
-    ..headers.addAll(headers)
-    ..headers['content-type'] = 'application/json; charset=utf-8'
-    ..bodyBytes = utf8.encode(jsonEncode(body));
-  final http.StreamedResponse response;
+  Map<String, Object?> body, {
+  List<String> secrets = const <String>[],
+}) async {
+  final List<int> bytes;
   try {
-    response = await client.send(request).timeout(requestTimeout);
-  } on TimeoutException {
-    return _Answer(const RetryLater('no answer in time'));
+    bytes = utf8.encode(jsonEncode(body));
   } on Object catch (error) {
-    // The message of a client error can quote the URL, which may hold the key.
-    return _Answer(RetryLater('the request failed (${error.runtimeType})'));
+    // A value JSON cannot hold (a non-finite number from a store, say): it can never be sent.
+    return Dropped(0, 'the event could not be encoded (${error.runtimeType})');
   }
-  final String text = await _read(response);
-  final int status = response.statusCode;
-  if (status >= 200 && status < 300) {
-    return _Answer(const Delivered(), status);
-  }
-  if (status == 408 || status == 429 || status >= 500) {
-    return _Answer(
-      RetryLater(
+  final Completer<void> abort = Completer<void>();
+  final Timer deadline = Timer(requestTimeout, () {
+    if (!abort.isCompleted) {
+      abort.complete();
+    }
+  });
+  try {
+    final http.AbortableRequest request =
+        http.AbortableRequest('POST', url, abortTrigger: abort.future)
+          ..followRedirects = false
+          ..headers.addAll(headers)
+          ..headers['content-type'] = 'application/json; charset=utf-8'
+          ..bodyBytes = bytes;
+    final http.StreamedResponse response;
+    try {
+      response = await client.send(request).timeout(requestTimeout);
+    } on TimeoutException {
+      return const RetryLater('no answer in time');
+    } on Object catch (error) {
+      // The message of a client error can quote the URL, which may hold the key.
+      return RetryLater('the request failed (${error.runtimeType})');
+    }
+    final String text = await _read(response, abort.future);
+    final int status = response.statusCode;
+    if (status >= 200 && status < 300) {
+      return const Delivered();
+    }
+    if (status == 408 || status == 429 || status >= 500) {
+      return RetryLater(
         'HTTP $status',
         after: _retryAfter(response.headers['retry-after']),
-      ),
+      );
+    }
+    return Dropped(
       status,
+      _redact(text, <String>[...headers.values, ...secrets]),
     );
+  } finally {
+    deadline.cancel();
   }
-  return _Answer(Dropped(status, text), status);
 }
 
-Future<String> _read(http.StreamedResponse response) async {
+String _redact(String text, List<String> secrets) {
+  String out = text;
+  for (final String secret in secrets) {
+    for (final String value in <String>{
+      secret,
+      if (secret.startsWith('Bearer ')) secret.substring(7),
+    }) {
+      if (value.length >= 8) {
+        out = out.replaceAll(value, '<redacted>');
+      }
+    }
+  }
+  return out;
+}
+
+Future<String> _read(http.StreamedResponse response, Future<void> abort) async {
   final BytesBuilder builder = BytesBuilder(copy: false);
   final Completer<void> done = Completer<void>();
+  void finish() {
+    if (!done.isCompleted) {
+      done.complete();
+    }
+  }
+
   late final StreamSubscription<List<int>> subscription;
   subscription = response.stream.listen(
     (List<int> chunk) {
@@ -305,31 +440,23 @@ Future<String> _read(http.StreamedResponse response) async {
       if (chunk.length >= room) {
         builder.add(chunk.sublist(0, room));
         subscription.cancel();
-        if (!done.isCompleted) {
-          done.complete();
-        }
+        finish();
         return;
       }
       builder.add(chunk);
     },
-    onDone: () {
-      if (!done.isCompleted) {
-        done.complete();
-      }
-    },
-    onError: (Object _) {
-      // Keep what arrived: the status is what matters.
-      if (!done.isCompleted) {
-        done.complete();
-      }
-    },
+    onDone: finish,
+    // Keep what arrived: the status is what matters.
+    onError: (Object _) => finish(),
     cancelOnError: true,
   );
-  try {
-    await done.future.timeout(requestTimeout);
-  } on TimeoutException {
-    await subscription.cancel();
-  }
+  unawaited(
+    abort.then((_) {
+      subscription.cancel();
+      finish();
+    }),
+  );
+  await done.future;
   return utf8.decode(builder.takeBytes(), allowMalformed: true);
 }
 

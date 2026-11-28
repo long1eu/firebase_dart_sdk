@@ -56,6 +56,51 @@ final RegExp _obfuscatedFrame = RegExp(
   multiLine: true,
 );
 
+/// The virtual address of the first frame of an obfuscated stack trace.
+final RegExp _obfuscatedVirt = RegExp(
+  r'^\s*#\d+\s+abs\s+[0-9a-f]+\s+virt\s+([0-9a-f]+)',
+  multiLine: true,
+);
+
+/// The most of a stack trace read; longer ones are cut before parsing.
+const int _maxStackChars = 1024 * 1024;
+
+/// The longest part of the description in the fingerprint.
+const int _maxDescriptionInKind = 100;
+
+/// Bytes kept free under the size cap for the notes the reporter adds to the header.
+const int _headerNoteReserve = 96;
+
+/// Line breaks and other control characters, which in a header could start lines that look like stack frames.
+final RegExp _controlCharacters = RegExp(
+  '[\x00-\x08\x0a-\x1f\x7f\u2028\u2029]',
+);
+
+/// [text] cut to at most [max] UTF-16 code units, without splitting a surrogate pair.
+@internal
+String cutText(String text, int max) {
+  if (text.length <= max) {
+    return text;
+  }
+  int end = max;
+  if (end > 0 &&
+      end < text.length &&
+      _isLeadSurrogate(text.codeUnitAt(end - 1)) &&
+      _isTrailSurrogate(text.codeUnitAt(end))) {
+    end--;
+  }
+  return text.substring(0, end);
+}
+
+bool _isLeadSurrogate(int unit) => unit >= 0xd800 && unit <= 0xdbff;
+bool _isTrailSurrogate(int unit) => unit >= 0xdc00 && unit <= 0xdfff;
+
+/// [text] on one line: line breaks become a visible `\n`, other control characters a space.
+String _oneLine(String text) => text
+    .replaceAll('\r\n', '\\n')
+    .replaceAll(RegExp('[\r\n\u2028\u2029]'), '\\n')
+    .replaceAll(_controlCharacters, ' ');
+
 /// Formats an error of the type [typeName] whose description is [description] (its `toString()`), with the
 /// [stack] where it was thrown, as [format] says.
 ///
@@ -73,9 +118,12 @@ FormattedError formatError({
   bool fatal = false,
   int maxBytes = 32 * 1024,
 }) {
-  final String raw = stack?.toString().trimRight() ?? '';
+  String raw = stack?.toString().trimRight() ?? '';
+  if (raw.length > _maxStackChars) {
+    raw = cutText(raw, _maxStackChars);
+  }
   final bool obfuscated = _obfuscatedFrame.hasMatch(raw);
-  final List<Frame> frames = obfuscated ? const <Frame>[] : _frames(stack);
+  final List<Frame> frames = obfuscated ? const <Frame>[] : _frames(raw);
   final Frame? own = _ownFrame(frames);
   final SourceLocation? location = own == null
       ? (obfuscated
@@ -91,11 +139,18 @@ FormattedError formatError({
           functionName: own.member ?? '<fn>',
         );
   final Frame? top = frames.isEmpty ? null : frames.first;
-  final String fingerprint = top == null
-      ? '$typeName|${_firstLine(raw)}'
-      : '$typeName|${top.uri}:${top.line ?? 0}';
+  final String type = _oneLine(typeName);
+  // The type, the start of the description and the top frame: on the web every error of a type can share
+  // the top frame (the throw helper of dart2js), so the description keeps different errors apart.
+  final String place = top != null
+      ? '${top.uri}:${top.line ?? 0}'
+      : obfuscated
+      ? 'virt ${_obfuscatedVirt.firstMatch(raw)?.group(1) ?? '?'}'
+      : cutText(_firstLine(raw), 200);
+  final String fingerprint =
+      '$type|${cutText(_oneLine(_firstLine(description)), _maxDescriptionInKind)}|$place';
 
-  final String header = _header(typeName, description, reason, fatal);
+  final String header = _header(type, description, reason, fatal);
   final List<String> lines = obfuscated || format == MessageFormat.dart
       ? (raw.isEmpty ? const <String>[] : raw.split('\n'))
       : <String>[for (final Frame frame in frames) _v8Frame(frame)];
@@ -111,17 +166,19 @@ String _header(String type, String description, String? reason, bool fatal) {
   if (fatal) {
     out.write('[fatal] ');
   }
-  out.write(text);
-  final String? firstLine = reason == null ? null : _firstLine(reason).trim();
+  out.write(_oneLine(text));
+  final String? firstLine = reason == null
+      ? null
+      : _oneLine(_firstLine(reason)).trim();
   if (firstLine != null && firstLine.isNotEmpty) {
     out.write(
-      ' (${firstLine.length <= _maxReasonLength ? firstLine : '${firstLine.substring(0, _maxReasonLength)}…'})',
+      ' (${firstLine.length <= _maxReasonLength ? firstLine : '${cutText(firstLine, _maxReasonLength)}…'})',
     );
   }
   final String header = out.toString();
   return header.length <= maxHeaderLength
       ? header
-      : '${header.substring(0, maxHeaderLength)}…';
+      : '${cutText(header, maxHeaderLength)}…';
 }
 
 /// The header and as many [lines] as fit in [maxBytes].
@@ -131,7 +188,7 @@ String _fit(String header, List<String> lines, int maxBytes) {
   for (final String line in lines) {
     final int next = size + 1 + utf8.encode(line).length;
     // Room for the note in the header.
-    if (next > maxBytes - 32) {
+    if (next > maxBytes - _headerNoteReserve) {
       break;
     }
     size = next;
@@ -144,13 +201,13 @@ String _fit(String header, List<String> lines, int maxBytes) {
   return <String>[first, ...lines.take(kept)].join('\n');
 }
 
-List<Frame> _frames(StackTrace? stack) {
-  if (stack == null || stack.toString().trim().isEmpty) {
+List<Frame> _frames(String raw) {
+  if (raw.trim().isEmpty) {
     return const <Frame>[];
   }
   try {
     final List<Frame> frames = <Frame>[
-      for (final Frame frame in Trace.from(stack).frames)
+      for (final Frame frame in Trace.parse(raw).frames)
         if (frame is! UnparsedFrame) frame,
     ];
     // A stack taken inside the reporter (`StackTrace.current` for an error

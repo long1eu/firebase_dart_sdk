@@ -67,7 +67,10 @@ void main() {
       expect(result.message.split('\n').skip(1), <String>[
         '    at main (package:notes/main.dart:5:3)',
       ]);
-      expect(result.fingerprint, 'StateError|package:notes/main.dart:5');
+      expect(
+        result.fingerprint,
+        'StateError|Bad state: no element|package:notes/main.dart:5',
+      );
     });
 
     test('a browser stack trace is rewritten too', () {
@@ -187,10 +190,10 @@ build_id: '8deece9b0e5bf1aa541b5a91e171282e'
     expect(result.reportLocation, isNull);
   });
 
-  test('the fingerprint is the type and the top frame', () {
+  test('the fingerprint is the type, the description and the top frame', () {
     expect(
       _format(appStack).fingerprint,
-      'StateError|dart:collection/list.dart:79',
+      'StateError|Bad state: no element|dart:collection/list.dart:79',
     );
   });
 }

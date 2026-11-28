@@ -29,8 +29,9 @@ final class ErrorReportingState {
     }
     final Object? queue = json['queue'];
     final Object? enabled = json['collectionEnabled'];
+    final Object? user = json['user'];
     return ErrorReportingState(
-      user: json['user'] as String?,
+      user: user is String ? user : null,
       collectionEnabled: enabled is bool ? enabled : null,
       queue: <ErrorEvent>[
         if (queue is List)

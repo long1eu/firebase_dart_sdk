@@ -58,10 +58,10 @@ void main() {
       expect(FileErrorReportingStore(directory).load(), throwsFormatException);
     });
 
-    test('a file over 4 MiB is not read', () async {
-      File(
-        '${directory.path}/firebase_error_reporting.json',
-      ).writeAsBytesSync(List<int>.filled(4 * 1024 * 1024 + 1, 32));
+    test('a file over 8 MiB is not read', () async {
+      File('${directory.path}/firebase_error_reporting.json').writeAsBytesSync(
+        List<int>.filled(FileErrorReportingStore.maxFileBytes + 1, 32),
+      );
       expect(
         FileErrorReportingStore(directory).load(),
         throwsA(isA<FileSystemException>()),
@@ -95,6 +95,79 @@ void main() {
       await second.close();
     });
   });
+
+  test(
+    'C2: concurrent saves leave a readable file holding every event',
+    () async {
+      final List<String> diagnostics = <String>[];
+      final ErrorReporter reporter = ErrorReporter(
+        newApp(),
+        service: 's',
+        transport: ErrorReportingTransport.direct(apiKey: 'k'),
+        store: FileErrorReportingStore(directory),
+        httpClient: Server(<int>[503]).client,
+        sendDelay: const Duration(hours: 1),
+        maxQueueLength: 1000,
+        maxEventsPerMinute: 1000,
+        maxSimilarEventsPerMinute: 1000,
+        onDiagnostic: diagnostics.add,
+      );
+      for (int round = 0; round < 30; round++) {
+        await Future.wait(<Future<void>>[
+          for (int i = 0; i < 10; i++)
+            reporter.recordError(
+              StateError('e$round-$i'),
+              StackTrace.fromString(
+                '#0      f (package:a/a.dart:${i + 1}:1)\n',
+              ),
+            ),
+        ]);
+        final ErrorReportingState saved = await FileErrorReportingStore(
+          directory,
+        ).load();
+        expect(
+          saved.queue,
+          hasLength((round + 1) * 10),
+          reason: 'round $round',
+        );
+      }
+      expect(
+        directory.listSync().where(
+          (FileSystemEntity e) => e.path.endsWith('.tmp'),
+        ),
+        isEmpty,
+      );
+      expect(diagnostics, isEmpty);
+    },
+  );
+
+  test(
+    'C4: a state over the limit is saved without its oldest events, and can be read back',
+    () async {
+      final FileErrorReportingStore store = FileErrorReportingStore(directory);
+      final String big = '"\\' * (40 * 1024);
+      await store.save(
+        ErrorReportingState(
+          queue: <ErrorEvent>[
+            for (int i = 0; i < 100; i++)
+              ErrorEvent(
+                eventTime: DateTime.utc(2026, 11, 28, 0, 0, i),
+                message: '$i $big',
+                fingerprint: 'f',
+              ),
+          ],
+        ),
+      );
+      final File file = File('${directory.path}/firebase_error_reporting.json');
+      expect(
+        file.lengthSync(),
+        lessThanOrEqualTo(FileErrorReportingStore.maxFileBytes),
+      );
+      final ErrorReportingState back = await store.load();
+      expect(back.queue, isNotEmpty);
+      expect(back.queue.last.message, startsWith('99 '));
+    },
+  );
 
   test('watchIsolate records the uncaught errors of another isolate', () async {
     final Server server = Server();

@@ -1,11 +1,18 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
+import '../model.dart';
 import '../store.dart';
 
 /// A store in a JSON file in [directory], `firebase_error_reporting.json` by default.
 ///
-/// It writes a temporary file next to it and renames it over the old one, so a crash during a write leaves
-/// the previous state. A file larger than 4 MiB is not read: the reporter starts empty.
+/// Each save writes a temporary file of its own next to it and renames it over the old one, so a crash during a
+/// write leaves the previous state. A state larger than [maxFileBytes] is saved without its oldest events, so
+/// the store never writes a file it would refuse to read; a file larger than that is not read (the reporter
+/// then starts empty).
+///
+/// One reporter per file: two processes on one file overwrite each other's queue.
 final class FileErrorReportingStore implements ErrorReportingStore {
   /// A store in [directory], which must exist. [fileName] names the file.
   FileErrorReportingStore(
@@ -19,7 +26,11 @@ final class FileErrorReportingStore implements ErrorReportingStore {
   /// The name of the file.
   final String fileName;
 
-  static const int _maxFileBytes = 4 * 1024 * 1024;
+  /// The largest file written or read: 8 MiB.
+  static const int maxFileBytes = 8 * 1024 * 1024;
+
+  static final Random _random = Random();
+  static int _counter = 0;
 
   File get _file => File('${directory.path}${Platform.pathSeparator}$fileName');
 
@@ -29,17 +40,52 @@ final class FileErrorReportingStore implements ErrorReportingStore {
     if (!file.existsSync()) {
       return ErrorReportingState.empty;
     }
-    if (file.lengthSync() > _maxFileBytes) {
-      throw FileSystemException('The state file is too large.', file.path);
+    final RandomAccessFile handle = await file.open();
+    try {
+      final int length = await handle.length();
+      if (length > maxFileBytes) {
+        throw FileSystemException('The state file is too large.', file.path);
+      }
+      return decodeState(utf8.decode(await handle.read(length)));
+    } finally {
+      await handle.close();
     }
-    return decodeState(await file.readAsString());
   }
 
   @override
   Future<void> save(ErrorReportingState state) async {
+    List<int> bytes = utf8.encode(encodeState(state));
+    if (bytes.length > maxFileBytes) {
+      final List<ErrorEvent> queue = <ErrorEvent>[...state.queue];
+      while (bytes.length > maxFileBytes && queue.isNotEmpty) {
+        queue.removeAt(0);
+        bytes = utf8.encode(
+          encodeState(
+            ErrorReportingState(
+              user: state.user,
+              collectionEnabled: state.collectionEnabled,
+              queue: queue,
+            ),
+          ),
+        );
+      }
+    }
     final File file = _file;
-    final File temporary = File('${file.path}.tmp');
-    await temporary.writeAsString(encodeState(state), flush: true);
-    await temporary.rename(file.path);
+    final File temporary = File(
+      '${file.path}.$pid.${_counter++}.${_random.nextInt(1 << 32)}.tmp',
+    );
+    try {
+      await temporary.writeAsBytes(bytes, flush: true);
+      await temporary.rename(file.path);
+    } on Object {
+      try {
+        if (temporary.existsSync()) {
+          await temporary.delete();
+        }
+      } on Object {
+        // Leave it; the next save uses another name.
+      }
+      rethrow;
+    }
   }
 }
