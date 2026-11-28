@@ -240,7 +240,9 @@ registration follows `firebase_storage_dart_platform`.
 6. **The production verification kit** under `tool/verify_production` style: it sends a few events to
    `/debug/mp/collect` and then to DebugView, and answers the open questions in
    [protocol §10](analytics_protocol.md#10-what-the-production-kit-must-answer). The maintainer runs it
-   with a GA4 property and secret they create. Nothing in this repository creates them.
+   with a GA4 property and secret they create. Nothing in this repository creates them. Built into the probe
+   of step 2a: its steps 1b to 1j ask questions 3 to 7 of the validation server, and its checklist covers 1
+   and 2 ([tool/analytics_probe.md](../tool/analytics_probe.md)).
 7. **Independent review** of the transport, the store and the security tests by a reviewer who did not
    write them.
 
