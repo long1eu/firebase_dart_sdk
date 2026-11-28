@@ -1,3 +1,12 @@
+## Unreleased
+
+- `package:firebase_admin_dart/app_check.dart`: `FirebaseAppCheckAdmin` (`app.appCheck()`) with
+  `verifyToken(token, {projectNumber, clockSkew})`, which checks a Firebase App Check token as the Node and
+  Python Admin SDKs do (the JWKS of `firebaseappcheck.googleapis.com`, kept for six hours; `typ`, `alg` RS256,
+  `kid`, the signature, `iss`, `aud`, `sub`, `exp`, `iat`) and returns a `VerifiedAppCheckToken` with the app id.
+  Errors are `FirebaseAppCheckAdminException`s: `invalid-argument`, `app-check-token-expired`, `internal-error`.
+  Replay protection (`consumeAppCheckToken`) is not implemented yet.
+
 ## 0.1.2
 
 No code change. The constraint on `firebase_auth_providers_dart` is `>=0.2.0 <0.5.0` instead of
