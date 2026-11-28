@@ -143,7 +143,7 @@ packages:
     source: path
     version: "0.4.0"
   firebase_error_reporting_dart:
-    dependency: "direct dev"
+    dependency: "direct main"
     description:
       path: "../../firebase_error_reporting/firebase_error_reporting_dart"
       relative: true

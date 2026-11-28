@@ -383,7 +383,7 @@ and the README marks them as unverified.
    guide updated to the published API.
 5. **The example relay** in `examples/` on `shelf`, with its own tests (token checks, size cap, rate
    limit, the service allow-list).
-6. **The production kit** in its final form, covering the transports of step 3.
+6. **The production kit** in its final form, covering the transports of step 3: `examples/error_reporting_relay/tool/verify_production.dart`, which runs the real client directly (API key, access token, both message formats, a fatal report) and through the relay, and checks that a key for another API is refused.
 7. **Independent review** of the transport, the relay and the security tests, by a reviewer who did not
    write them.
 
