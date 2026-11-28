@@ -1,0 +1,13 @@
+firebase_analytics_dart
+Copyright 2018 Razvan Lung (long1eu) and contributors.
+
+This package is an unofficial client of the Google Analytics 4 Measurement
+Protocol with the API shape of Firebase Analytics. Its wire format follows
+Google's Measurement Protocol documentation and its public API follows the
+Firebase JavaScript SDK (https://github.com/firebase/firebase-js-sdk, Apache
+License 2.0); it is not a port of a Firebase SDK.
+
+This package is not affiliated with, endorsed by or supported by Google LLC or
+Firebase. "Firebase" and "Google Analytics" are trademarks of Google LLC.
+
+Licensed under the Apache License, Version 2.0; see the LICENSE file.
