@@ -41,8 +41,8 @@ sealed class AnalyticsTransport {
   /// `app.appCheckProvider` in `X-Firebase-AppCheck` when the app has one, and the ID token of the signed-in
   /// user of `app.authProvider` as `Authorization: Bearer <token>` when someone is signed in. The relay
   /// checks the tokens, adds `api_secret` and forwards the body unchanged to
-  /// `https://www.google-analytics.com/mp/collect`. A 2xx answer means delivered, 429 and 5xx are retried,
-  /// and any other answer drops the request.
+  /// `https://www.google-analytics.com/mp/collect`. A 2xx answer means delivered; 401, 403, 408, 429 and
+  /// 5xx keep the events queued for a later attempt; any other answer drops the request.
   ///
   /// [endpoint] must be `https`, or `http` to a loopback host (`localhost`, `127.x.x.x`, `::1`) for local
   /// development; otherwise this throws an [ArgumentError]. Tokens never travel in clear text to anybody

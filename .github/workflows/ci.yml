@@ -992,8 +992,8 @@ jobs:
       - name: Check the built files
         run: ./tool/check_gallery.sh
       - name: Test the examples whose tests need no emulator
-        # The tests of the two playgrounds run on the VM with no backend; no other job runs an
-        # example's tests (tool/test_all.sh only analyzes the examples).
+        # The tests of the two playgrounds run on the VM with no backend. tool/test_all.sh analyzes the
+        # examples and runs the tests of those with a .test_without_emulator file.
         run: |
           for example in playground rtdb_playground; do
             echo "::group::examples/$example"

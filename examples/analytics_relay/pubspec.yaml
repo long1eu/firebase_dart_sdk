@@ -1,0 +1,44 @@
+name: analytics_relay
+description: >-
+  A relay for firebase_analytics_dart on package:shelf: it checks the App
+  Check token (and the ID token, when one is sent or required) of each
+  request, checks the shape of the Measurement Protocol body, and forwards it
+  to Google Analytics with the API secret that only the server holds.
+publish_to: none
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  firebase_admin_dart:
+    path: ../../firebase_admin/firebase_admin_dart
+  firebase_auth_providers_dart:
+    path: ../../firebase_auth/firebase_auth_providers_dart
+  http: ^1.5.0
+  relay_guard:
+    path: ../relay_guard
+  shelf: ^1.4.0
+
+dev_dependencies:
+  fake_async: ^1.3.0
+  # The contract test runs the client against the relay.
+  firebase_analytics_dart:
+    path: ../../firebase_analytics/firebase_analytics_dart
+  firebase_app_dart:
+    path: ../../firebase_core/firebase_app_dart
+  lints: ^6.0.0
+  test: ^1.25.0
+
+# The examples run against the code of this repository. Outside the repository, remove this section and depend
+# on the versions on pub.dev.
+dependency_overrides:
+  firebase_admin_dart:
+    path: ../../firebase_admin/firebase_admin_dart
+  firebase_analytics_dart:
+    path: ../../firebase_analytics/firebase_analytics_dart
+  firebase_app_dart:
+    path: ../../firebase_core/firebase_app_dart
+  firebase_auth_providers_dart:
+    path: ../../firebase_auth/firebase_auth_providers_dart
+  secure_flow:
+    path: ../../secure_flow/secure_flow
