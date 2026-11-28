@@ -51,7 +51,7 @@ app type, so desktop and server programs use the same options.
 
 Remote Config needs a `FirebaseInstallations` for the same app, and Installations needs a store. The
 store keeps the installation and the Remote Config records (fetched template, active template, fetch
-state, throttle, custom signals), so the choice decides what survives a restart:
+state, throttle, custom signals, the experiments handed to Analytics), so the choice decides what survives a restart:
 
 | Platform | Store | Notes |
 |---|---|---|
@@ -123,7 +123,8 @@ final StreamSubscription<void> activations = remoteConfig.onActivated.listen((_)
 `reset()` clears the fetched and active templates, the fetch state in `info` and the throttle, in memory and
 in the store. The defaults, the custom signals and the realtime backoff stay. It waits for a fetch in flight,
 and fetches started meanwhile wait for it. An open realtime stream stays open; its next connect asks
-for the server's current template, which is fetched but not activated.
+for the server's current template, which is fetched but not activated. With an `analytics` connector, it
+also clears the experiment user properties it set (see A/B testing).
 
 ```dart
 await remoteConfig.reset();
@@ -249,6 +250,48 @@ final StreamSubscription<Set<RolloutAssignment>> rollouts = remoteConfig.onRollo
 Each `RolloutAssignment` holds the rollout id, the variant id, the first parameter key the rollout affects,
 that key's value as `getString` reads it, and the active template version.
 
+## A/B testing
+
+Pass an `analytics` connector to the constructor and each `activate()` that returns true hands the
+experiments of the new active template to it, as the JS SDK hands them to Firebase Analytics: one
+`setUserProperties` call with `firebase<experimentId>` set to the variant id of each experiment, and to
+null for each experiment handed over before that has ended, then `logEvent('set_firebase_experiment_state')`.
+Nothing is sent when there is nothing to set or clear. `reset()` clears every experiment handed over.
+This package depends on no Analytics package; the connector is an implementation of
+`RemoteConfigAnalytics`. With `firebase_analytics_dart` (its `setExperimentProperties` is added by
+pull request #195, not merged yet):
+
+```dart flutter
+final class AnalyticsConnector implements RemoteConfigAnalytics {
+  AnalyticsConnector(this.analytics);
+
+  final FirebaseAnalytics analytics;
+
+  @override
+  Future<void> setUserProperties(Map<String, String?> properties) =>
+      analytics.setExperimentProperties(properties);
+
+  @override
+  Future<void> logEvent(String name) => analytics.logEvent(name: name);
+}
+
+final FirebaseRemoteConfig remoteConfig = FirebaseRemoteConfig(
+  app,
+  installations: installations,
+  analytics: AnalyticsConnector(analytics),
+);
+```
+
+The hand-off is best effort. Without a connector it is skipped with one warning. A connector that throws
+does not fail `activate()`, which still returns true; nor does one that hangs: the two calls get
+`fetchTimeout` (60 seconds unless you pass another) together, and a timeout counts as a failure. The failure is logged once per kind of error, without
+values, and the next `activate()` sends every current variant again and clears what has ended by then.
+Experiment ids have the form `_exp_<number>`, so the names are `firebase_exp_<number>`.
+`setExperimentProperties` applies all or nothing: it refuses the whole map when a name does not match
+`firebase_exp_` followed by 1-24 letters, digits or underscores, a value is longer than 36 characters, or
+the 25-property limit would be passed. Whether a GA4 web stream keeps these properties is not documented:
+[docs/analytics_protocol.md](../../docs/analytics_protocol.md), section 10, question 7 (probe step 1c).
+
 ## Offline start
 
 Reads return the defaults until a fetch has succeeded once. `getId()` on the Installations instance works
@@ -317,8 +360,9 @@ Messages never hold tokens, the API key, request bodies or signal values.
 - Realtime works on every platform; on the web no `fetchAndActivate` is needed before listening.
 - `getKeysByPrefix`, `reset()`, `asJson()`, `asBytes()`, `getValueFrom`, `onActivated` and
   `onRolloutsStateChanged` are not in FlutterFire's API; the adapter does not expose them.
-- Not provided: the A/B testing hand-off on activate, personalization events and the Analytics fields of
-  the fetch body (this SDK has no Analytics).
+- The A/B testing hand-off goes to the `analytics` connector you pass (see A/B testing), not to a
+  Firebase Analytics found at run time.
+- Not provided: personalization events and the Analytics fields of the fetch body.
 
 A FlutterFire adapter, `firebase_remote_config_dart_platform`, maps this client onto the
 `firebase_remote_config` plugin.

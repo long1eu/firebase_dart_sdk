@@ -626,6 +626,7 @@ See the [package README](../../firebase_remote_config/firebase_remote_config_dar
   fetches (the official C++ desktop SDK sends a new random id with every fetch).
 - Realtime works on desktop. `onConfigUpdated` needs no first fetch, and the stream is yours to activate.
 - The value rules are Android's, not FlutterFire's.
-- No emulator support, no Analytics, no A/B testing hand-off. `getKeysByPrefix`, `reset()`, `asJson()`, `asBytes()`,
+- No emulator support. The A/B testing hand-off goes to the `analytics` connector passed to the constructor
+  (see the package README), which the adapter does not set. `getKeysByPrefix`, `reset()`, `asJson()`, `asBytes()`,
   `getValueFrom`, `onActivated` and `onRolloutsStateChanged` are in the Dart API but not in FlutterFire's, so the
   adapter does not expose them.

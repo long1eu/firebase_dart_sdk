@@ -45,6 +45,8 @@ export 'package:firebase_installations_dart/firebase_installations_dart.dart'
         MemoryKeyValueStore;
 export 'package:firebase_remote_config_dart/src/exception.dart'
     show FirebaseRemoteConfigException, firebaseRemoteConfigExceptionCodes;
+export 'package:firebase_remote_config_dart/src/experiments.dart'
+    show RemoteConfigAnalytics;
 export 'package:firebase_remote_config_dart/src/firebase_remote_config.dart'
     show FirebaseRemoteConfig;
 export 'package:firebase_remote_config_dart/src/logger.dart'

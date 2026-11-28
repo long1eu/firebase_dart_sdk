@@ -6,6 +6,7 @@ import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_installations_dart/firebase_installations_dart.dart';
 import 'package:firebase_remote_config_dart/src/custom_signals.dart';
 import 'package:firebase_remote_config_dart/src/exception.dart';
+import 'package:firebase_remote_config_dart/src/experiments.dart';
 import 'package:firebase_remote_config_dart/src/fetch_client.dart';
 import 'package:firebase_remote_config_dart/src/http_rules.dart';
 import 'package:firebase_remote_config_dart/src/log_once.dart';
@@ -49,6 +50,8 @@ class FirebaseRemoteConfig {
   ///
   /// [httpClient] is closed by [close] only when this instance created it. [languageCode] overrides the
   /// language of the process (5.6); an empty or blank one sends `en`. [logger] receives messages without values or tokens.
+  /// [analytics] receives the experiments of each template [activate] makes active (A42); without it
+  /// the A/B testing hand-off is skipped with one warning.
   FirebaseRemoteConfig(
     this.app, {
     required this.installations,
@@ -58,6 +61,7 @@ class FirebaseRemoteConfig {
     String? languageCode,
     http.Client? httpClient,
     RemoteConfigLogger? logger,
+    RemoteConfigAnalytics? analytics,
     @visibleForTesting Uri? serverOrigin,
     @visibleForTesting Uri? realtimeOrigin,
     @visibleForTesting DateTime Function()? clock,
@@ -67,6 +71,7 @@ class FirebaseRemoteConfig {
        _ownsClient = httpClient == null,
        _client = httpClient ?? http.Client(),
        _logger = logger,
+       _analytics = analytics,
        _clock = clock ?? DateTime.now,
        _random = random ?? math.Random().nextDouble,
        _languageCode = _language(languageCode),
@@ -142,6 +147,7 @@ class FirebaseRemoteConfig {
   final bool _ownsClient;
   final http.Client _client;
   final RemoteConfigLogger? _logger;
+  final RemoteConfigAnalytics? _analytics;
   final DateTime Function() _clock;
   final double Function() _random;
   final String _languageCode;
@@ -171,6 +177,8 @@ class FirebaseRemoteConfig {
   Future<void>? _resetting;
   int _resetGeneration = 0;
   Set<RolloutAssignment> _rollouts = const <RolloutAssignment>{};
+  // The A/B testing hand-offs of activate and reset run one at a time, in call order.
+  Future<void> _experimentsTail = Future<void>.value();
 
   /// Completes when the stored records are loaded. Started by the constructor and memoized; it fails
   /// only when the store cannot start (`storage-error`).
@@ -216,6 +224,13 @@ class FirebaseRemoteConfig {
   ///
   /// A [reset] that starts while this call runs wins: the call then stores and applies nothing and
   /// returns false.
+  ///
+  /// When it returns true, it first hands the experiments of the new active template to the
+  /// `analytics` constructor argument (A42): one `setUserProperties` call with `firebase<experimentId>`
+  /// set to the variant id for each experiment and to null for each experiment handed over before that
+  /// is gone, then `logEvent('set_firebase_experiment_state')`; nothing when that map is empty. A
+  /// failure of the hand-off, including the two calls taking longer than [fetchTimeout] together, is
+  /// logged and never fails this call; the next activate retries it.
   ///
   /// Throws `storage-error` when the store fails; memory is then unchanged.
   Future<bool> activate() async {
@@ -283,6 +298,9 @@ class FirebaseRemoteConfig {
       _activated.add(null);
     }
     _updateRollouts();
+    if (wrote) {
+      await _handOffExperiments(_active, resetGeneration);
+    }
     return wrote;
   }
 
@@ -296,6 +314,11 @@ class FirebaseRemoteConfig {
   /// `If-None-Match`, and an open realtime stream stays open: its next connect announces version 0, so
   /// the server's current template is fetched (not activated). [onActivated] does not emit;
   /// [onRolloutsStateChanged] emits an empty set when rollouts were active.
+  ///
+  /// It also clears the experiments handed to `analytics` (A42): after a hand-off of an [activate] in
+  /// progress, it sends `firebase<experimentId>` = null for each of them and logs
+  /// `set_firebase_experiment_state`, then removes the stored set. When that hand-off fails, the set
+  /// stays stored, so the next [activate] clears what is gone.
   ///
   /// Throws `storage-error` when the store fails; memory is then unchanged, and the records cleared
   /// before the failure stay cleared in the store.
@@ -320,6 +343,7 @@ class FirebaseRemoteConfig {
           return null;
         });
       }
+      await _clearExperiments();
       _checkOpen();
       _fetched = null;
       _active = null;
@@ -923,6 +947,164 @@ class FirebaseRemoteConfig {
       );
     } catch (error) {
       _writeFailed('realtime');
+    }
+  }
+
+  /// Runs [task] after the hand-offs queued before it.
+  Future<void> _serialExperiments(Future<void> Function() task) {
+    final Future<void> result = _experimentsTail.then((void _) => task());
+    _experimentsTail = result.then<void>((void _) {}, onError: (Object _) {});
+    return result;
+  }
+
+  /// The A/B testing hand-off of an [activate] that made [active] the active record (A42). It never
+  /// throws: a store or connector failure is logged. After a connector failure the stored set is the
+  /// union of the current and the previous ids, so the next activate sends every current variant again
+  /// and clears every id that is gone by then, and a connector that always fails (an id Analytics
+  /// refuses) costs one attempt per activate, not a growing backlog. Nothing is sent or stored once the
+  /// instance is closed or a reset has started since the activate began.
+  Future<void> _handOffExperiments(
+    TemplateRecord? active,
+    int resetGeneration,
+  ) {
+    return _serialExperiments(() async {
+      final Map<String, String> current = activeExperiments(
+        active,
+        _reportDrop,
+      );
+      final Set<String>? previous = await _readExperiments();
+      if (previous == null || _closed || resetGeneration != _resetGeneration) {
+        return;
+      }
+      final Map<String, String?> properties = experimentProperties(
+        current,
+        previous,
+      );
+      final bool sent =
+          properties.isEmpty || await _sendExperiments(properties);
+      if (_closed) {
+        return;
+      }
+      final Set<String> ids = sent
+          ? current.keys.toSet()
+          : _keptExperiments(current.keys, previous);
+      if (const SetEquality<String>().equals(ids, previous)) {
+        return;
+      }
+      try {
+        await _store.write(
+          _key('experiments'),
+          ids.isEmpty ? null : ExperimentsRecord(ids).encode(),
+        );
+      } catch (error) {
+        _writeFailed('experiments');
+      }
+    });
+  }
+
+  /// [current] followed by the ids of [previous], up to [maxStoredExperiments].
+  static Set<String> _keptExperiments(
+    Iterable<String> current,
+    Set<String> previous,
+  ) {
+    final Set<String> result = <String>{};
+    for (final String id in <String>[...current, ...previous]) {
+      if (result.length >= maxStoredExperiments) {
+        break;
+      }
+      result.add(id);
+    }
+    return result;
+  }
+
+  /// The reset step of A42: clears the experiments handed over before, then removes the stored set.
+  /// A failed hand-off keeps the set. Throws `storage-error` when the store fails, and
+  /// `remote-config-closed` when the instance closed.
+  Future<void> _clearExperiments() {
+    return _serialExperiments(() async {
+      final Set<String> previous = _parseExperiments(
+        await _storeCall(() => _store.read(_key('experiments'))),
+      );
+      _checkOpen();
+      if (previous.isNotEmpty &&
+          !await _sendExperiments(
+            experimentProperties(const <String, String>{}, previous),
+          )) {
+        return;
+      }
+      _checkOpen();
+      await _storeCall(() async {
+        await _store.write(_key('experiments'), null);
+        return null;
+      });
+    });
+  }
+
+  /// The stored experiment ids; an empty set for a missing or bad record, and null when the store
+  /// fails.
+  Future<Set<String>?> _readExperiments() async {
+    final String? text;
+    try {
+      text = await _store.read(_key('experiments'));
+    } catch (error) {
+      _logOnce(
+        'read-experiments',
+        'The experiments record could not be read; the A/B testing hand-off is skipped.',
+      );
+      return null;
+    }
+    return _parseExperiments(text);
+  }
+
+  Set<String> _parseExperiments(String? text) {
+    if (text == null) {
+      return const <String>{};
+    }
+    final ExperimentsRecord? record = ExperimentsRecord.tryParse(text);
+    if (record == null) {
+      _logOnce(
+        'load-experiments',
+        'The stored experiments record could not be read; it is ignored.',
+      );
+      return const <String>{};
+    }
+    return record.ids;
+  }
+
+  /// Sends [properties] and the experiment state event to the connector. Returns false when the
+  /// connector failed, the two calls together took longer than [fetchTimeout] (`fetch-timeout`, the
+  /// connector's futures are then abandoned) or the instance closed meanwhile; true when both calls completed, and when there
+  /// is no connector (a warning is logged once).
+  Future<bool> _sendExperiments(Map<String, String?> properties) async {
+    final RemoteConfigAnalytics? analytics = _analytics;
+    if (analytics == null) {
+      _logOnce(
+        'no-analytics',
+        'Experiments are active but no analytics was given; the A/B testing hand-off is skipped.',
+      );
+      return true;
+    }
+    // One deadline for both calls: a hung connector holds activate and reset for at most fetchTimeout.
+    final DateTime deadline = _clock().add(fetchTimeout);
+    try {
+      await _guard(
+        analytics.setUserProperties(
+          Map<String, String?>.unmodifiable(properties),
+        ),
+        deadline,
+      );
+      await _guard(analytics.logEvent(experimentStateEvent), deadline);
+      return true;
+    } catch (error) {
+      // Once per kind of failure: a connector that always refuses must not log on every activate.
+      if (!_closed) {
+        _logOnce(
+          'analytics-${error.runtimeType}',
+          'The A/B testing hand-off to analytics failed (${error.runtimeType}); '
+              'the next activate sends it again.',
+        );
+      }
+      return false;
     }
   }
 
