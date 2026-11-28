@@ -1,7 +1,10 @@
 // Shared specification v3, 5.8, with the lead's readings 7 to 10, 16 and 19: rule L (loopback),
 // rule E (emulator host), rule T (tokens), rule O (origin), the token origin and the host label.
 import 'package:_firebase_transport_dart/_firebase_transport_dart.dart';
+import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
+
+import '../support/fake_http.dart';
 
 const String _expectedHostAndPort = 'emulator host: expected host:port';
 const String _portOutOfRange = 'emulator host: the port must be 1 to 65535';
@@ -48,6 +51,7 @@ void main() {
   _mayCarryTokensTests();
   _originTests();
   _hostLabelTests();
+  _nonCanonicalIpv4Tests();
 }
 
 void _loopbackTests() {
@@ -88,6 +92,8 @@ void _loopbackTests() {
       '[0:0:0:0:0:0:0:1]',
       '0000:0000:0000:0000:0000:0000:0000:0001',
       '::0001',
+      '::0.0.0.1',
+      '0:0:0:0:0:0:0.0.0.1',
       '[::1]',
     ];
     for (final String host in loopback) {
@@ -110,6 +116,12 @@ void _loopbackTests() {
       '1::1',
       '::127.0.0.1',
       '::ffff:7f00:1',
+      '::1.2.3',
+      '::0.0.1',
+      '::0.0.0.256',
+      '::0.0.0.01',
+      '::0.0.1.0',
+      '::0.0.0.1.',
       '[::1',
       '::1]',
       '[[::1]]',
@@ -231,6 +243,10 @@ void _emulatorHostTests() {
       'localhost:8080?x=1': _expectedHostAndPort,
       'localhost:8080#f': _expectedHostAndPort,
       'local_host:8080': _expectedHostAndPort,
+      'firestore.googleapis.com:443': _productionHost,
+      'googleapis.com:443': _productionHost,
+      'demo-project.web.app:443': _productionHost,
+      'GoogleAPIs.com:8080': _productionHost,
     };
     refused.forEach((String input, String message) {
       expect(
@@ -562,10 +578,8 @@ void _mayCarryTokensTests() {
         reason: '$text with the emulator',
       );
     });
-  });
 
-  test('mayCarryTokens: user info; empty host', () {
-    final EmulatorHost emulator = EmulatorHost('10.0.2.2', 9099);
+    // User info; empty host.
     const List<String> never = <String>[
       'https://user@api.example.test/x',
       'https://user:pw@api.example.test/x',
@@ -662,6 +676,9 @@ void _originTests() {
     );
     expect(clearText, isNot(contains('zzuser')));
     expect(clearText, isNot(contains('zzpass')));
+    // The scheme and the host are named.
+    expect(text, contains('https://api.example.test'));
+    expect(clearText, contains('http://remote.example.test'));
   });
 
   test('reading 16: checkOrigin and tokenOrigin canonicalise an IPv6 host', () {
@@ -826,5 +843,54 @@ void _hostLabelTests() {
       path: '/fn',
     );
     expect(url.host, 'us-central1-demo-project.cloudfunctions.net');
+  });
+}
+
+/// A client whose response says it came from [responseUrl].
+final class _UrlClient extends http.BaseClient {
+  _UrlClient(this.responseUrl);
+
+  final Uri responseUrl;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async =>
+      FakeResponse(
+        const Stream<List<int>>.empty(),
+        200,
+        url: responseUrl,
+        request: request,
+      );
+}
+
+void _nonCanonicalIpv4Tests() {
+  test('reading 24: a non-canonical IPv4 host is another origin', () async {
+    final Uri canonical = Uri.parse('http://127.0.0.1:8080/v1/call');
+    final Uri short = Uri.parse('http://127.1:8080/v1/call');
+    expect(isLoopbackHost('127.1'), isFalse);
+    expect(mayCarryTokens(short), isFalse);
+    expect(tokenOrigin(short), isNot(tokenOrigin(canonical)));
+    expect(EmulatorHost('127.0.0.1', 8080).owns(short), isFalse);
+    expect(EmulatorHost('127.1', 8080), isNot(EmulatorHost('127.0.0.1', 8080)));
+
+    Future<CappedResponse> send(Uri responseUrl) => sendCapped(
+      _UrlClient(responseUrl),
+      (Future<void> abort) =>
+          http.AbortableRequest('GET', canonical, abortTrigger: abort),
+      successCap: 16,
+      errorCap: 16,
+      deadline: const Duration(seconds: 5),
+    );
+    // A response that says it came from the other spelling fails closed, as a redirect.
+    await expectLater(
+      send(short),
+      throwsA(
+        isA<TransportException>().having(
+          (TransportException e) => e.failure,
+          'failure',
+          TransportFailure.redirected,
+        ),
+      ),
+    );
+    expect((await send(canonical)).statusCode, 200);
   });
 }

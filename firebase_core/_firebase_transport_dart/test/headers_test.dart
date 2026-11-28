@@ -8,6 +8,14 @@ import 'package:test/test.dart';
 
 final RegExp _clientPart = RegExp(r'^[A-Za-z0-9._/-]+$');
 
+/// True under dart2js and dart2wasm, false on the VM.
+const bool _isWeb = bool.fromEnvironment('dart.library.js_interop');
+
+/// A Dart SDK version, such as `3.8.0` or `3.12.0-113.2.beta`.
+final RegExp _vmVersion = RegExp(
+  r'^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$',
+);
+
 /// The text of the [ArgumentError] that [call] throws.
 String _errorTextOf(void Function() call) {
   try {
@@ -138,7 +146,12 @@ void _valueTests() {
 
 void _apiClientTests() {
   test('apiClientHeader forms and its ArgumentError', () {
-    expect(dartRuntimeVersion, isNotEmpty);
+    if (_isWeb) {
+      expect(dartRuntimeVersion, 'web');
+    } else {
+      // The first word of Platform.version: a version number, with no channel, date or platform.
+      expect(dartRuntimeVersion, matches(_vmVersion));
+    }
     expect(_clientPart.hasMatch(dartRuntimeVersion), isTrue);
     expect(
       apiClientHeader(sdkVersion: '0.1.0'),

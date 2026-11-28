@@ -1,4 +1,4 @@
-// Shared specification v3, 5.6 and 5.9, with the lead's readings 1 to 20: the one failure rule for
+// Shared specification v3, 5.6 and 5.9, with the lead's readings 1 to 28: the one failure rule for
 // Auth and App Check tokens, the destination rule, the waits, sharing, the pause of a stuck
 // provider, forced refreshes, the warnings, and the single-use RequestTokens.
 //
@@ -19,7 +19,14 @@ const String _sentWithout = 'the request was sent without an App Check token.';
 
 /// A test whose body runs in a `fakeAsync` zone.
 void _fakeTest(String name, void Function(FakeAsync async) body) {
-  test(name, () => fakeAsync(body));
+  test(
+    name,
+    () => fakeAsync((FakeAsync async) {
+      body(async);
+      // An error left in a microtask must fail the test that caused it.
+      async.flushMicrotasks();
+    }),
+  );
 }
 
 /// The headers of a request that carries both tokens in the `bearer` style.
@@ -54,6 +61,7 @@ void main() {
   _requestTokensTests();
   _limitedUseTests();
   _warningTests();
+  _reviewTests();
 }
 
 void _failureRuleTable() {
@@ -1796,37 +1804,17 @@ void _warningTests() {
   });
 
   _fakeTest('no warning without a sink', (FakeAsync async) {
-    final EmulatorHost remote = EmulatorHost('10.0.2.2', 9099);
-    final FakeAppCheckProvider provider = FakeAppCheckProvider.answering(
-      (bool _) async => AppCheckTokenResult.failure(StateError('down')),
+    // Nothing falls back to print when the application gave no logger.
+    final List<String> printed = <String>[];
+    runZoned(
+      () => _everyWarningWithoutSink(async),
+      zoneSpecification: ZoneSpecification(
+        print: (Zone _, ZoneDelegate _, Zone _, String line) {
+          printed.add(line);
+        },
+      ),
     );
-    final TokenRig rig = TokenRig(
-      async,
-      auth: FakeAuthProvider(),
-      appCheck: provider,
-      emulator: remote,
-      sink: false,
-    );
-    final Uri emulatorUrl = Uri.parse('http://10.0.2.2:9099/v1/call');
-    // Behaviour is the same as with a sink, and nothing throws for the lack of one: every
-    // outcome that warns, and the clear-text emulator.
-    expect(
-      rig.ask(url: emulatorUrl).value.appCheck,
-      AppCheckOutcome.sentPlaceholder,
-    );
-    expect(
-      rig.ask(limitedUse: true).value.appCheck,
-      AppCheckOutcome.unsupported,
-    );
-    provider.answer = (bool _) async => const AppCheckTokenResult('');
-    expect(rig.ask().value.appCheck, AppCheckOutcome.empty);
-    provider.answer = (bool _) async => throw StateError('broken');
-    expect(rig.ask().value.appCheck, AppCheckOutcome.providerFailed);
-    provider.holdCalls();
-    final Probe<RequestTokens> slow = rig.ask();
-    async.elapse(TokenSource.providerWait);
-    expect(slow.value.appCheck, AppCheckOutcome.timedOut);
-    expect(rig.ask().value.appCheck, AppCheckOutcome.skipped);
+    expect(printed, isEmpty);
   });
 
   _fakeTest('remote emulator warns once', (FakeAsync async) {
@@ -1893,5 +1881,159 @@ void _warningTests() {
     expect(rig.warnings, <String>[
       'App Check: ${_typeOf(appCheck)} gave no usable token; $_sentWithout',
     ]);
+  });
+}
+
+/// Drives every outcome that warns, and the clear-text emulator, on a source without a sink.
+void _everyWarningWithoutSink(FakeAsync async) {
+  final EmulatorHost remote = EmulatorHost('10.0.2.2', 9099);
+  final FakeAppCheckProvider provider = FakeAppCheckProvider.answering(
+    (bool _) async => AppCheckTokenResult.failure(StateError('down')),
+  );
+  final TokenRig rig = TokenRig(
+    async,
+    auth: FakeAuthProvider(),
+    appCheck: provider,
+    emulator: remote,
+    sink: false,
+  );
+  final Uri emulatorUrl = Uri.parse('http://10.0.2.2:9099/v1/call');
+  // Behaviour is the same as with a sink, and nothing throws for the lack of one: every
+  // outcome that warns, and the clear-text emulator.
+  expect(
+    rig.ask(url: emulatorUrl).value.appCheck,
+    AppCheckOutcome.sentPlaceholder,
+  );
+  expect(rig.ask(limitedUse: true).value.appCheck, AppCheckOutcome.unsupported);
+  provider.answer = (bool _) async => const AppCheckTokenResult('');
+  expect(rig.ask().value.appCheck, AppCheckOutcome.empty);
+  provider.answer = (bool _) async => throw StateError('broken');
+  expect(rig.ask().value.appCheck, AppCheckOutcome.providerFailed);
+  provider.holdCalls();
+  final Probe<RequestTokens> slow = rig.ask();
+  async.elapse(TokenSource.providerWait);
+  expect(slow.value.appCheck, AppCheckOutcome.timedOut);
+  expect(rig.ask().value.appCheck, AppCheckOutcome.skipped);
+}
+
+/// Cases asked for by test review 1, part 2.
+void _reviewTests() {
+  _fakeTest('reading 22: the sentPlaceholder warning is logged also when Auth '
+      'fails the call', (FakeAsync async) {
+    final StateError down = StateError('down');
+    final FakeAppCheckProvider appCheck = FakeAppCheckProvider.answering(
+      (bool _) async => AppCheckTokenResult.failure(down),
+    );
+    final TokenRig rig = TokenRig(
+      async,
+      auth: FakeAuthProvider.answering(
+        (bool _) async => throw StateError('token server said no'),
+      ),
+      appCheck: appCheck,
+    );
+    expect(rig.ask().error, isTokenFailure(TokenFailure.authProviderFailed));
+    expect(rig.warnings, <String>[
+      'App Check: ${_typeOf(appCheck)} reported ${_typeOf(down)} together with '
+          'a token; that token was sent.',
+    ]);
+  });
+
+  for (final bool limited in <bool>[false, true]) {
+    final String kind = limited ? 'limited-use' : 'session';
+    _fakeTest('an App Check result with an error and a token that is not token '
+        'text gives empty ($kind)', (FakeAsync async) {
+      for (final String bad in <String>['has space', 'line\nbreak', '']) {
+        final FakeLimitedUseProvider appCheck = _giving(
+          AppCheckTokenResult(bad, error: StateError('refresh failed')),
+        );
+        final TokenRig rig = TokenRig(
+          async,
+          auth: FakeAuthProvider(),
+          appCheck: appCheck,
+        );
+        final RequestTokens tokens = rig.ask(limitedUse: limited).value;
+        expect(tokens.appCheck, AppCheckOutcome.empty, reason: '"$bad"');
+        expect(headersOf(tokens), _authOnly(), reason: '"$bad"');
+        expect(rig.warnings, <String>[
+          'App Check: ${_typeOf(appCheck)} gave no usable token; $_sentWithout',
+        ]);
+      }
+    });
+  }
+
+  _fakeTest('a limited-use call that times out starts the pause', (
+    FakeAsync async,
+  ) {
+    final FakeLimitedUseProvider appCheck = FakeLimitedUseProvider()
+      ..holdLimitedCalls();
+    final TokenRig rig = TokenRig(async, appCheck: appCheck);
+    final Probe<RequestTokens> first = rig.ask(limitedUse: true);
+    async.elapse(TokenSource.providerWait - _tick);
+    expect(first.isDone, isFalse);
+    async.elapse(_tick);
+    expect(first.value.appCheck, AppCheckOutcome.timedOut);
+
+    // The pause covers session and limited-use requests alike.
+    expect(rig.ask(limitedUse: true).value.appCheck, AppCheckOutcome.skipped);
+    expect(rig.ask().value.appCheck, AppCheckOutcome.skipped);
+    async.elapse(TokenSource.stuckProviderPause - _tick);
+    expect(rig.ask(limitedUse: true).value.appCheck, AppCheckOutcome.skipped);
+    expect(appCheck.limitedCalls, 1);
+    expect(appCheck.calls, isEmpty);
+
+    async.elapse(_tick);
+    final Probe<RequestTokens> probe = rig.ask(limitedUse: true);
+    expect(appCheck.limitedCalls, 2);
+    appCheck.limitedWaiting.last.complete(
+      const AppCheckTokenResult(fakeLimitedUseToken),
+    );
+    async.flushMicrotasks();
+    expect(probe.value.appCheck, AppCheckOutcome.sent);
+    // The answer ended the pause.
+    expect(rig.ask().value.appCheck, AppCheckOutcome.sent);
+  });
+
+  _fakeTest('two sources of one app keep their own pause and their own forced '
+      'refresh guard', (FakeAsync async) {
+    final FakeAuthProvider auth = FakeAuthProvider();
+    final FakeAppCheckProvider appCheck = FakeAppCheckProvider()..holdCalls();
+    final TokenRig rig = TokenRig(async, auth: auth, appCheck: appCheck);
+    final TokenSource other = TokenSource(
+      rig.app,
+      origins: <Uri>[apiOrigin],
+      elapsed: () => async.elapsed,
+    );
+    Probe<RequestTokens> askOther() {
+      final Probe<RequestTokens> probe = Probe<RequestTokens>(
+        other.tokensFor(apiUrl),
+      );
+      async.flushMicrotasks();
+      return probe;
+    }
+
+    final Probe<RequestTokens> stuck = rig.ask();
+    async.elapse(TokenSource.providerWait);
+    expect(stuck.value.appCheck, AppCheckOutcome.timedOut);
+    expect(rig.ask().value.appCheck, AppCheckOutcome.skipped);
+    expect(appCheck.calls, hasLength(1));
+    // The other source is not paused: it asks the provider itself.
+    final Probe<RequestTokens> fromOther = askOther();
+    expect(appCheck.calls, hasLength(2));
+    appCheck.waiting.last.complete(
+      const AppCheckTokenResult(fakeAppCheckToken),
+    );
+    async.flushMicrotasks();
+    expect(fromOther.value.appCheck, AppCheckOutcome.sent);
+
+    // Each source may force one Auth refresh within the same minute.
+    auth.calls.clear();
+    rig.source.invalidate(TokenKind.auth);
+    other.invalidate(TokenKind.auth);
+    rig.ask();
+    askOther();
+    expect(auth.calls, <bool>[true, true]);
+    rig.source.invalidate(TokenKind.auth);
+    rig.ask();
+    expect(auth.calls.last, isFalse);
   });
 }

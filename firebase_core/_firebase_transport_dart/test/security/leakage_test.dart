@@ -345,7 +345,10 @@ void _headersForMisuse(FakeAsync async) {
     ),
   );
   expect(userInfo, isStateError);
-  final http.Request sent = http.Request('GET', apiUrl)..finalize();
+  final http.Request sent = http.Request(
+    'GET',
+    Uri.parse('https://api.example.test/$_marker?key=$_marker'),
+  )..finalize();
   final Object finalised = _thrownBy(
     () => applyTokens(sent, tokens, auth: AuthHeaderStyle.bearer),
   );
@@ -407,6 +410,12 @@ void _rejectedInputs() {
       ),
     ),
     _thrownBy(() => apiClientHeader(sdkVersion: '$_marker not a version')),
+    _thrownBy(
+      () => apiClientHeader(
+        sdkVersion: '0.1.0',
+        extra: <String>['$_marker not a part'],
+      ),
+    ),
   ];
   for (final Object error in errors) {
     expect(error, isArgumentError);
@@ -599,9 +608,13 @@ void _expectNoQuery(
   expect('$failure', 'TransportException: network', reason: scenario);
   expect(failure.causeType, '${cause.runtimeType}', reason: scenario);
   expect(failure.detail, isNotNull, reason: scenario);
-  if (cause.message == 'refused') {
-    expect(failure.detail, 'refused', reason: scenario);
-  }
+  expect(
+    failure.detail,
+    cause.message == 'refused'
+        ? 'refused'
+        : 'Connection refused: GET <redacted> (key=<redacted>, x=<redacted>)',
+    reason: scenario,
+  );
   _expectClean(scenario, <Object?>[failure, trace]);
 }
 
@@ -746,36 +759,90 @@ Future<void> _quotedBody() async {
   }
 }
 
-/// The `detail` of the failure [sendCapped] throws when the client fails a request to [url] with
-/// an `http.ClientException` of [message], after checking that nothing printable of the failure
-/// or of its stack trace holds the marker.
+/// Where the client's exception reaches the package.
+enum _Path {
+  /// `sendCapped`, before the headers.
+  sendCapped,
+
+  /// `sendCapped`, from the body stream.
+  sendCappedBody,
+
+  /// `sendStreaming`, before the headers.
+  streamingHeaders,
+
+  /// `sendStreaming`, from the body stream.
+  streamingBody,
+
+  /// `readCapped` on a client's own response, which names its request.
+  readCapped,
+}
+
+/// The `detail` of the failure thrown on [path] when the client fails a request to [url] with an
+/// `http.ClientException` of [message], after checking that nothing printable of the failure or
+/// of its stack trace holds the marker.
 Future<String?> _detailFor(
   Uri url,
   String message, {
   Uri? errorUri,
   Map<String, String> headers = const <String, String>{},
+  _Path path = _Path.sendCapped,
 }) async {
   final http.ClientException cause = http.ClientException(message, errorUri);
-  final _FakeClient client = _FakeClient(
+  http.BaseRequest build(Future<void> abort) =>
+      http.AbortableRequest('GET', url, abortTrigger: abort)
+        ..headers.addAll(headers);
+  final _FakeClient failing = _FakeClient(
     (http.BaseRequest _) =>
         Future<http.StreamedResponse>.error(cause, _clientTrace()),
   );
-  final (Object error, StackTrace trace) = await _failureOf(
-    sendCapped(
-      client,
-      (Future<void> abort) =>
-          http.AbortableRequest('GET', url, abortTrigger: abort)
-            ..headers.addAll(headers),
+  final _FakeClient failingBody = _FakeClient(
+    (http.BaseRequest request) async =>
+        http.StreamedResponse(_failingBody(cause), 200, request: request),
+  );
+  final Future<Object?> attempt = switch (path) {
+    _Path.sendCapped => sendCapped(
+      failing,
+      build,
       successCap: 1024,
       errorCap: 1024,
       deadline: _deadline,
     ),
-  );
-  expect(error, isA<TransportException>());
+    _Path.sendCappedBody => sendCapped(
+      failingBody,
+      build,
+      successCap: 1024,
+      errorCap: 1024,
+      deadline: _deadline,
+    ),
+    _Path.streamingHeaders => sendStreaming(
+      failing,
+      build,
+      headersDeadline: _deadline,
+    ),
+    _Path.streamingBody => sendStreaming(
+      failingBody,
+      build,
+      headersDeadline: _deadline,
+    ).then((http.StreamedResponse response) => response.stream.drain<void>()),
+    _Path.readCapped => readCapped(
+      http.StreamedResponse(
+        _failingBody(cause),
+        200,
+        request: build(Completer<void>().future),
+      ),
+      cap: 1024,
+      deadline: _deadline,
+    ),
+  };
+  final (Object error, StackTrace trace) = await _failureOf(attempt);
+  expect(error, isA<TransportException>(), reason: path.name);
   final TransportException failure = error as TransportException;
-  expect('$failure', 'TransportException: network');
-  expect(failure.causeType, '${cause.runtimeType}');
-  _expectClean('redaction of "$message"', <Object?>[failure, trace]);
+  expect('$failure', 'TransportException: network', reason: path.name);
+  expect(failure.causeType, '${cause.runtimeType}', reason: path.name);
+  _expectClean('redaction of "$message" on ${path.name}', <Object?>[
+    failure,
+    trace,
+  ]);
   return failure.detail;
 }
 
@@ -891,6 +958,96 @@ void _redactionRuleTests() {
       );
       // A message without the bracketed chunk is kept whole.
       expect(await _detailFor(plainUrl, 'refused. Retry'), 'refused. Retry');
+    });
+
+    test('the cut is at the first ". ["', () async {
+      // A request body that itself holds ". [" stays cut at the first one.
+      expect(
+        await _detailFor(
+          plainUrl,
+          'Content size exceeds specified contentLength. 9 bytes written '
+          'while expected 4. [$_marker-BODY one. [two] three. [$_marker]',
+        ),
+        'Content size exceeds specified contentLength. 9 bytes written '
+        'while expected 4.',
+      );
+    });
+
+    test('the request reaches the redactor on every path', () async {
+      // The exception has no uri, as IOClient's often has none: the URL and the header value
+      // are known only from the request.
+      final Uri url = Uri.parse('$plainUrl?key=$_marker-QUERY');
+      for (final _Path path in _Path.values) {
+        expect(
+          await _detailFor(
+            url,
+            'GET $url with key $_marker-QUERY and header $_marker-HEADER failed',
+            headers: <String, String>{'X-Goog-Api-Key': '$_marker-HEADER'},
+            path: path,
+          ),
+          'GET <redacted> with key <redacted> and header <redacted> failed',
+          reason: path.name,
+        );
+      }
+    });
+
+    test('redaction comes before the 1 KiB cut', () async {
+      // The secret straddles the cut: cutting first would leave its first 14 characters.
+      final String filler = 'x' * 1010;
+      expect(
+        await _detailFor(
+          plainUrl,
+          '$filler$_marker-STRADDLING-KEY',
+          headers: <String, String>{
+            'X-Goog-Api-Key': '$_marker-STRADDLING-KEY',
+          },
+        ),
+        '$filler<redacted>',
+      );
+    });
+
+    test('a header value with a bare % is redacted as written', () async {
+      // Percent-decoding it throws an ArgumentError, which must not drop the value.
+      expect(
+        await _detailFor(
+          plainUrl,
+          'bad header $_marker-100% here',
+          headers: <String, String>{'X-Custom': '$_marker-100%'},
+        ),
+        'bad header <redacted> here',
+      );
+    });
+
+    test('a query value with %FF is redacted as written', () async {
+      // Percent-decoding it throws a FormatException: the bytes are not UTF-8.
+      final Uri url = Uri.parse('$plainUrl?key=$_marker-%FF-RAW');
+      expect(
+        await _detailFor(url, 'bad value $_marker-%FF-RAW here'),
+        'bad value <redacted> here',
+      );
+      expect(await _detailFor(url, 'GET $url failed'), 'GET <redacted> failed');
+    });
+
+    test('a query value containing = is redacted whole', () async {
+      final Uri url = Uri.parse('$plainUrl?token=$_marker-abc==&x=1');
+      expect(
+        await _detailFor(url, 'token $_marker-abc== was refused'),
+        'token <redacted> was refused',
+      );
+    });
+
+    test('the bare token of an Authorization header value', () async {
+      for (final String scheme in <String>['Bearer', 'Firebase']) {
+        expect(
+          await _detailFor(
+            plainUrl,
+            'the token $_authToken was refused',
+            headers: <String, String>{'Authorization': '$scheme $_authToken'},
+          ),
+          'the token <redacted> was refused',
+          reason: scheme,
+        );
+      }
     });
   });
 }
