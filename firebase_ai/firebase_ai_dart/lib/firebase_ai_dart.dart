@@ -2,9 +2,12 @@
 /// with `FirebaseAI.googleAI` or `FirebaseAI.agentPlatform`.
 library;
 
+export 'src/chat.dart' show ChatSession;
 export 'src/config.dart';
 export 'src/content.dart';
 export 'src/exception.dart' hide aiClosedException;
+export 'src/firebase_ai.dart' show FirebaseAI;
+export 'src/generative_model.dart' show GenerativeModel;
 export 'src/logger.dart';
 export 'src/response.dart';
 export 'src/schema.dart';
