@@ -31,6 +31,18 @@ class _LimitedUseProvider extends _SessionOnlyProvider
   }
 }
 
+/// Only implements the interface: exactly its two instance members.
+class _ImplementsOnlyProvider implements AppCheckTokenProvider {
+  @override
+  Future<AppCheckTokenResult> getToken({required bool forceRefresh}) async {
+    return const AppCheckTokenResult('implemented-token');
+  }
+
+  @override
+  Stream<AppCheckTokenResult> get onTokenChanged =>
+      const Stream<AppCheckTokenResult>.empty();
+}
+
 class _SecretError implements Exception {
   @override
   String toString() => 'failed with $_sentinel';
@@ -67,6 +79,26 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(events, isEmpty);
+    });
+  });
+
+  group('5.2 AppCheckTokenProvider contract', () {
+    test('5.2 S4 responseDeadline is 8 seconds', () {
+      expect(
+        AppCheckTokenProvider.responseDeadline,
+        const Duration(seconds: 8),
+      );
+    });
+
+    test('5.2 a class that only implements the base keeps compiling', () async {
+      final AppCheckTokenProvider provider = _ImplementsOnlyProvider();
+
+      expect(provider, isNot(isA<LimitedUseAppCheckTokenProvider>()));
+      expect(
+        (await provider.getToken(forceRefresh: false)).token,
+        'implemented-token',
+      );
+      expect(await provider.onTokenChanged.isEmpty, isTrue);
     });
   });
 

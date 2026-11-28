@@ -109,6 +109,108 @@ void main() {
     });
   });
 
+  group('5.5 FlutterFireLimitedUseAppCheckProvider as the base class', () {
+    FlutterFireLimitedUseAppCheckProvider build(
+      Future<String?> Function(bool forceRefresh) session, {
+      Stream<String?> changes = const Stream<String?>.empty(),
+      void Function()? onLimitedCall,
+    }) {
+      return FlutterFireLimitedUseAppCheckProvider(
+        getToken: session,
+        onTokenChange: changes,
+        getLimitedUseToken: () async {
+          onLimitedCall?.call();
+          return 'limited';
+        },
+      );
+    }
+
+    test('5.5 getToken: a throw gives the placeholder and the error', () async {
+      final Exception thrown = Exception('plugin failed');
+
+      final AppCheckTokenResult result = await build(
+        (bool forceRefresh) async => throw thrown,
+      ).getToken(forceRefresh: false);
+
+      expect(result.token, AppCheckTokenResult.placeholderToken);
+      expect(result.error, same(thrown));
+    });
+
+    test('5.5 getToken: null gives the placeholder and an error', () async {
+      _expectNoTokenFailure(
+        await build(
+          (bool forceRefresh) async => null,
+        ).getToken(forceRefresh: false),
+      );
+    });
+
+    test('5.5 getToken: empty gives the placeholder and an error', () async {
+      _expectNoTokenFailure(
+        await build(
+          (bool forceRefresh) async => '',
+        ).getToken(forceRefresh: true),
+      );
+    });
+
+    test('5.5 onTokenChanged drops null and empty events', () async {
+      final StreamController<String?> source = StreamController<String?>();
+      addTearDown(source.close);
+      final FlutterFireLimitedUseAppCheckProvider provider = build(
+        (bool forceRefresh) async => 'session',
+        changes: source.stream,
+      );
+      final List<AppCheckTokenResult> events = <AppCheckTokenResult>[];
+      final StreamSubscription<AppCheckTokenResult> sub = provider
+          .onTokenChanged
+          .listen(events.add);
+      addTearDown(sub.cancel);
+
+      source
+        ..add('a')
+        ..add(null)
+        ..add('')
+        ..add('b');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(events.map((AppCheckTokenResult e) => e.token), <String>[
+        'a',
+        'b',
+      ]);
+    });
+
+    test('5.5 getLimitedUseToken never calls the session getToken', () async {
+      int sessionCalls = 0;
+      int limitedCalls = 0;
+      final FlutterFireLimitedUseAppCheckProvider provider = build((
+        bool forceRefresh,
+      ) async {
+        sessionCalls++;
+        return 'session';
+      }, onLimitedCall: () => limitedCalls++);
+
+      final AppCheckTokenResult result = await provider.getLimitedUseToken();
+
+      expect(result.token, 'limited');
+      expect(limitedCalls, 1);
+      expect(sessionCalls, 0);
+    });
+
+    test('5.5 getToken never calls the limited-use callback', () async {
+      int limitedCalls = 0;
+      final FlutterFireLimitedUseAppCheckProvider provider = build(
+        (bool forceRefresh) async => 'session',
+        onLimitedCall: () => limitedCalls++,
+      );
+
+      final AppCheckTokenResult result = await provider.getToken(
+        forceRefresh: false,
+      );
+
+      expect(result.token, 'session');
+      expect(limitedCalls, 0);
+    });
+  });
+
   group('5.5 getToken failures', () {
     FlutterFireAppCheckProvider build(Future<String?> Function() session) {
       return FlutterFireAppCheckProvider(
