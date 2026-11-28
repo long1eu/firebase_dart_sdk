@@ -239,6 +239,7 @@ void main() {
         rig.async.elapse(_second);
 
         expect(signals.done, isTrue);
+        expect(signals.error, _rcCode('remote-config-closed'));
         expect(rig.store.count(StoreOp.update, metaKey), metaUpdates);
         expect(rig.store.calls.length, callsAtClose);
         expect(rig.record('meta'), metaBefore);

@@ -180,6 +180,9 @@ class FirebaseRemoteConfig {
   Set<RolloutAssignment> _rollouts = const <RolloutAssignment>{};
   // The A/B testing hand-offs of activate and reset run one at a time, in call order.
   Future<void> _experimentsTail = Future<void>.value();
+  // Counts the clear steps of reset that reached the connector, so an activate can tell whether its
+  // completed hand-off was undone.
+  int _experimentsCleared = 0;
   Future<void> _backoffTail = Future<void>.value();
 
   /// Completes when the stored records are loaded. Started by the constructor and memoized; it fails
@@ -234,9 +237,12 @@ class FirebaseRemoteConfig {
   /// set to the variant id for each experiment and to null for each experiment handed over before that
   /// is gone, then `logEvent('set_firebase_experiment_state')`; nothing when that map is empty. A
   /// failure of the hand-off, including the two calls not completing within [fetchTimeout] of the
-  /// hand-off being queued, is logged and never fails this call; the next activate retries it.
+  /// hand-off being queued, is logged and never fails this call; the next activate retries it. After a
+  /// failed [reset] that this call's record survives, the hand-off runs again when the first one was
+  /// skipped or cleared, with a deadline of its own.
   ///
-  /// Throws `storage-error` when the store fails; memory is then unchanged.
+  /// Throws `storage-error` when the store fails; memory is then unchanged. Throws
+  /// `remote-config-closed` when [close] runs before it returns, including during the hand-off.
   Future<bool> activate() async {
     _checkOpen();
     await _guard(_initialization, null);
@@ -295,8 +301,10 @@ class FirebaseRemoteConfig {
     int generation = resetGeneration;
     String? activeText = result;
     // A reset started during the update. When this call wrote the store, its record counts only if
-    // the reset failed before removing it; memory then takes it.
-    if (generation != _resetGeneration) {
+    // the reset failed before removing it; memory then takes it. Checked again after each wait: a
+    // reset that took the slot while this call resumed is waited for before memory and the rollouts
+    // change, so a listener never sees this record's rollouts and then the reset's empty set (A40).
+    while (generation != _resetGeneration) {
       if (!wrote) {
         return false;
       }
@@ -321,21 +329,25 @@ class FirebaseRemoteConfig {
     if (!wrote) {
       return false;
     }
-    await _handOffExperiments(_active, generation);
-    // A reset that started during the hand-off clears this record unless it fails. Its start made the
-    // hand-off skip, and a failed reset never cleared the experiments, so the hand-off runs again for
-    // the record that survived (A42).
+    int? handedOff = await _handOffExperiments(_active, generation);
+    // A reset that started during the hand-off clears this record unless it fails. The hand-off runs
+    // again for the record that survived when the first one skipped (the reset had started) or a
+    // reset's clear step sent nulls since; a hand-off that completed and was not cleared since is not
+    // sent twice (A42).
     while (generation != _resetGeneration) {
       final int? survived = await _survivedResets(fetchedText);
       if (survived == null) {
         return false;
       }
       generation = survived;
-      await _handOffExperiments(_active, generation);
+      if (handedOff == null || handedOff != _experimentsCleared) {
+        handedOff = await _handOffExperiments(_active, generation);
+      }
     }
-    if (!_closed) {
-      _activated.add(null);
-    }
+    // As after the update: a close during the hand-off fails the call, so it never returns true
+    // without onActivated emitting (A38).
+    _checkOpen();
+    _activated.add(null);
     return true;
   }
 
@@ -838,15 +850,14 @@ class FirebaseRemoteConfig {
 
   Future<void> _updateMeta(MetaRecord Function(MetaRecord meta) change) async {
     // Checked first, so an update outside a reset keeps its timing (no extra microtask). The loop is
-    // inline, so no await falls between the last check and the store call; after waiting, a closed
-    // instance writes nothing.
+    // inline, so no await falls between the last check and the store call. After waiting, a closed
+    // instance writes nothing and fails the caller: a custom-signals update that did not store its
+    // stale bump must not report success. Fetches never wait here: a reset waits for them first.
     if (_clearing != null) {
       while (_clearing != null) {
         await _clearing;
       }
-      if (_closed) {
-        return;
-      }
+      _checkOpen();
     }
     final DateTime now = _clock();
     try {
@@ -866,15 +877,14 @@ class FirebaseRemoteConfig {
     ThrottleRecord Function(ThrottleRecord record) change,
   ) async {
     // Checked first, so an update outside a reset keeps its timing (no extra microtask). The loop is
-    // inline, so no await falls between the last check and the store call; after waiting, a closed
-    // instance writes nothing.
+    // inline, so no await falls between the last check and the store call. After waiting, a closed
+    // instance writes nothing and fails the caller: a custom-signals update that did not store its
+    // stale bump must not report success. Fetches never wait here: a reset waits for them first.
     if (_clearing != null) {
       while (_clearing != null) {
         await _clearing;
       }
-      if (_closed) {
-        return;
-      }
+      _checkOpen();
     }
     final DateTime now = _clock();
     try {
@@ -1063,9 +1073,9 @@ class FirebaseRemoteConfig {
   }
 
   /// Runs [task] after the hand-offs queued before it.
-  Future<void> _serialExperiments(Future<void> Function() task) {
-    final Future<void> result = _experimentsTail.then((void _) => task());
-    _experimentsTail = result.then<void>((void _) {}, onError: (Object _) {});
+  Future<T> _serialExperiments<T>(Future<T> Function() task) {
+    final Future<T> result = _experimentsTail.then((void _) => task());
+    _experimentsTail = result.then<void>((T _) {}, onError: (Object _) {});
     return result;
   }
 
@@ -1075,7 +1085,10 @@ class FirebaseRemoteConfig {
   /// and clears every id that is gone by then, and a connector that always fails (an id Analytics
   /// refuses) costs one attempt per activate, not a growing backlog. Nothing is sent or stored once the
   /// instance is closed or a reset has started since the activate began.
-  Future<void> _handOffExperiments(
+  ///
+  /// Returns the [_experimentsCleared] count it ran at, or null when it skipped (closed, a reset
+  /// started, or the stored set could not be read).
+  Future<int?> _handOffExperiments(
     TemplateRecord? active,
     int resetGeneration,
   ) {
@@ -1090,8 +1103,9 @@ class FirebaseRemoteConfig {
       final ({Set<String> ids, bool corrupt})? stored =
           await _readExperiments();
       if (stored == null || _closed || resetGeneration != _resetGeneration) {
-        return;
+        return null;
       }
+      final int cleared = _experimentsCleared;
       final Set<String> previous = stored.ids;
       final Map<String, String?> properties = experimentProperties(
         current,
@@ -1100,7 +1114,7 @@ class FirebaseRemoteConfig {
       final bool sent =
           properties.isEmpty || await _sendExperiments(properties, deadline);
       if (_closed) {
-        return;
+        return null;
       }
       final Set<String> ids = sent
           ? current.keys.toSet()
@@ -1108,7 +1122,7 @@ class FirebaseRemoteConfig {
       // A corrupt record is rewritten even when the set did not change, so it is repaired.
       if (!stored.corrupt &&
           const SetEquality<String>().equals(ids, previous)) {
-        return;
+        return cleared;
       }
       try {
         await _store.write(
@@ -1118,6 +1132,7 @@ class FirebaseRemoteConfig {
       } catch (error) {
         _writeFailed('experiments');
       }
+      return cleared;
     });
   }
 
@@ -1149,6 +1164,10 @@ class FirebaseRemoteConfig {
           ) ??
           const <String>{};
       _checkOpen();
+      if (previous.isNotEmpty) {
+        // Counted before the calls: one that fails may still have reached Analytics.
+        _experimentsCleared++;
+      }
       if (previous.isNotEmpty &&
           !await _sendExperiments(
             experimentProperties(const <String, String>{}, previous),
@@ -1339,10 +1358,17 @@ class FirebaseRemoteConfig {
       _staleIfRequestFails = _isOtherFid(_meta, fid);
       return;
     }
-    await _updateMeta(
-      (MetaRecord meta) =>
-          _isOtherFid(meta, fid) ? meta.incrementStale() : meta,
-    );
+    try {
+      await _updateMeta(
+        (MetaRecord meta) =>
+            _isOtherFid(meta, fid) ? meta.incrementStale() : meta,
+      );
+    } on FirebaseRemoteConfigException catch (error) {
+      // Closed while a reset cleared the records: nothing was written, and no caller waits for this.
+      if (error.code != 'remote-config-closed') {
+        rethrow;
+      }
+    }
   }
 
   /// True when the last successful fetch was made with an installation id other than [fid]. A record
