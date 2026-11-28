@@ -4,46 +4,36 @@ import 'package:cloud_firestore_dart_flutterfire/cloud_firestore_dart_flutterfir
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-void _expectNoTokenFailure(AppCheckTokenResult result) {
+void _expectNoTokenFailure(
+  AppCheckTokenResult result, {
+  String message = 'firebase_app_check returned no token.',
+}) {
   expect(result.token, AppCheckTokenResult.placeholderToken);
   expect(result.error, isA<StateError>());
-  expect(
-    (result.error! as StateError).message,
-    'firebase_app_check returned no token.',
-  );
+  expect((result.error! as StateError).message, message);
 }
 
+const String _noLimitedUseToken =
+    'firebase_app_check returned no limited-use token.';
+
 void main() {
-  group('5.5 getLimitedUseToken without the callback', () {
-    test('5.5 gives the inherited default and never calls getToken', () async {
-      int getTokenCalls = 0;
+  group('5.5 the base class', () {
+    test('5.5 is not a LimitedUseAppCheckTokenProvider', () {
       final FlutterFireAppCheckProvider provider = FlutterFireAppCheckProvider(
-        getToken: (bool forceRefresh) async {
-          getTokenCalls++;
-          return 'session';
-        },
+        getToken: (bool forceRefresh) async => 'session',
         onTokenChange: const Stream<String?>.empty(),
       );
 
-      final AppCheckTokenResult result = await provider.getLimitedUseToken();
-
-      expect(result.token, isEmpty);
-      expect(result.error, isA<UnsupportedError>());
-      expect(
-        (result.error! as UnsupportedError).message,
-        'This App Check provider does not give limited-use tokens. '
-        'Override getLimitedUseToken().',
-      );
-      expect(getTokenCalls, 0);
+      expect(provider, isNot(isA<LimitedUseAppCheckTokenProvider>()));
     });
   });
 
-  group('5.5 getLimitedUseToken with the callback', () {
-    FlutterFireAppCheckProvider build(
+  group('5.5 FlutterFireLimitedUseAppCheckProvider.getLimitedUseToken', () {
+    FlutterFireLimitedUseAppCheckProvider build(
       Future<String?> Function() limited, {
       Stream<String?> changes = const Stream<String?>.empty(),
     }) {
-      return FlutterFireAppCheckProvider(
+      return FlutterFireLimitedUseAppCheckProvider(
         getToken: (bool forceRefresh) async => 'session',
         onTokenChange: changes,
         getLimitedUseToken: limited,
@@ -60,11 +50,17 @@ void main() {
     });
 
     test('5.5 null gives the placeholder and a StateError', () async {
-      _expectNoTokenFailure(await build(() async => null).getLimitedUseToken());
+      _expectNoTokenFailure(
+        await build(() async => null).getLimitedUseToken(),
+        message: _noLimitedUseToken,
+      );
     });
 
     test('5.5 empty gives the placeholder and a StateError', () async {
-      _expectNoTokenFailure(await build(() async => '').getLimitedUseToken());
+      _expectNoTokenFailure(
+        await build(() async => '').getLimitedUseToken(),
+        message: _noLimitedUseToken,
+      );
     });
 
     test('5.5 a throw gives the placeholder and the thrown error', () async {
@@ -80,7 +76,7 @@ void main() {
 
     test('5.5 two calls call the callback twice, nothing cached', () async {
       int calls = 0;
-      final FlutterFireAppCheckProvider provider = build(
+      final FlutterFireLimitedUseAppCheckProvider provider = build(
         () async => 'limited-${++calls}',
       );
 
@@ -96,7 +92,7 @@ void main() {
       final StreamController<String?> source =
           StreamController<String?>.broadcast();
       addTearDown(source.close);
-      final FlutterFireAppCheckProvider provider = build(
+      final FlutterFireLimitedUseAppCheckProvider provider = build(
         () async => 'limited',
         changes: source.stream,
       );

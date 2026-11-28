@@ -1,16 +1,14 @@
 ## 0.1.3
 
-- Behaviour change: when the plugin throws or returns no token, `FlutterFireAppCheckProvider.getToken` returns
-  `AppCheckTokenResult.failure(...)`, the placeholder token with the error, where it returned an empty token.
-  Firestore and the other clients then send the request with the placeholder in the App Check header, where they
-  sent no header. A backend that enforces App Check rejects both; one that does not accepts both.
-- Behaviour change: `FlutterFireAppCheckProvider.onTokenChanged` drops an event of the plugin without a token
-  (null or empty), where it emitted an empty token. The stream carries new tokens only.
-- `FlutterFireAppCheckProvider` takes an optional `getLimitedUseToken` (pass
-  `FirebaseAppCheck.instance.getLimitedUseToken`) and overrides `AppCheckTokenProvider.getLimitedUseToken()` with
-  it. A null or empty answer, or a throw, is an `AppCheckTokenResult.failure(...)`. Without the
-  argument the provider gives no limited-use token (an empty token with an `UnsupportedError`); it never returns
-  the session token instead. Firestore does not ask for limited-use tokens; the method is for packages that do.
+- `FlutterFireLimitedUseAppCheckProvider`: the bridge with `getLimitedUseToken`. It extends
+  `FlutterFireAppCheckProvider`, implements `LimitedUseAppCheckTokenProvider` of `firebase_app_dart` and takes
+  `FirebaseAppCheck.instance.getLimitedUseToken` as a third argument. A null or empty answer, or a throw, is
+  reported with the placeholder token. `FlutterFireAppCheckProvider` itself gives no limited-use token, and
+  nothing sends the session token in its place.
+- Changed: when the plugin throws or returns no token, `getToken` reports the failure with the placeholder token,
+  so the request carries the placeholder in `X-Firebase-AppCheck` where it carried no header before. A backend
+  that enforces App Check rejects both; one that does not accepts both.
+- Changed: a null (or empty) token on `onTokenChange` is no longer forwarded. The stream carries new tokens only.
 - Requires `firebase_app_dart` 0.2.3.
 
 ## 0.1.2

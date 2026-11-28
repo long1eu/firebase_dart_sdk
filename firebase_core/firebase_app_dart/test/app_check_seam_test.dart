@@ -6,7 +6,7 @@ import 'package:test/test.dart';
 
 const String _sentinel = 'SENTINEL-secret-token-123';
 
-/// Extends the base class and overrides only the two abstract members.
+/// Extends the base class with its two abstract members; no limited-use tokens.
 class _SessionOnlyProvider extends AppCheckTokenProvider {
   int getTokenCalls = 0;
   final StreamController<AppCheckTokenResult> changes =
@@ -22,40 +22,40 @@ class _SessionOnlyProvider extends AppCheckTokenProvider {
   Stream<AppCheckTokenResult> get onTokenChanged => changes.stream;
 }
 
+/// Extends the session-only provider and adds the limited-use interface.
+class _LimitedUseProvider extends _SessionOnlyProvider
+    implements LimitedUseAppCheckTokenProvider {
+  @override
+  Future<AppCheckTokenResult> getLimitedUseToken() async {
+    return const AppCheckTokenResult('limited-token');
+  }
+}
+
 class _SecretError implements Exception {
   @override
   String toString() => 'failed with $_sentinel';
 }
 
 void main() {
-  group('5.2 default getLimitedUseToken', () {
-    test('5.2 gives an empty token and an UnsupportedError', () async {
+  group('5.2 LimitedUseAppCheckTokenProvider', () {
+    test('5.2 a session-only provider is not one', () {
       final _SessionOnlyProvider provider = _SessionOnlyProvider();
       addTearDown(provider.changes.close);
 
-      final AppCheckTokenResult result = await provider.getLimitedUseToken();
-
-      expect(result.token, isEmpty);
-      expect(result.error, isA<UnsupportedError>());
-      expect(
-        (result.error! as UnsupportedError).message,
-        'This App Check provider does not give limited-use tokens. '
-        'Override getLimitedUseToken().',
-      );
+      expect(provider, isNot(isA<LimitedUseAppCheckTokenProvider>()));
     });
 
-    test('5.2 never falls back to getToken', () async {
-      final _SessionOnlyProvider provider = _SessionOnlyProvider();
+    test('5.2 a provider that also implements the interface is one', () async {
+      final _LimitedUseProvider provider = _LimitedUseProvider();
       addTearDown(provider.changes.close);
 
-      await provider.getLimitedUseToken();
-      await provider.getLimitedUseToken();
-
+      expect(provider, isA<LimitedUseAppCheckTokenProvider>());
+      expect((await provider.getLimitedUseToken()).token, 'limited-token');
       expect(provider.getTokenCalls, 0);
     });
 
-    test('5.2 emits nothing on onTokenChanged', () async {
-      final _SessionOnlyProvider provider = _SessionOnlyProvider();
+    test('5.2 getLimitedUseToken emits nothing on onTokenChanged', () async {
+      final _LimitedUseProvider provider = _LimitedUseProvider();
       addTearDown(provider.changes.close);
       final List<AppCheckTokenResult> events = <AppCheckTokenResult>[];
       final StreamSubscription<AppCheckTokenResult> sub = provider

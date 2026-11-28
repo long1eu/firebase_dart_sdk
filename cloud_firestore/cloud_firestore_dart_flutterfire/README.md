@@ -113,7 +113,8 @@ A failed App Check request does not fail the Firestore request: it goes out with
 token of the App Check SDKs in the header and a warning is logged.
 
 Firestore uses session tokens only. For a package that asks the provider for limited-use tokens,
-also pass `getLimitedUseToken: appCheck.getLimitedUseToken`; without it the provider gives no
+use `FlutterFireLimitedUseAppCheckProvider`, which takes `getLimitedUseToken:
+appCheck.getLimitedUseToken` as a third argument. `FlutterFireAppCheckProvider` gives no
 limited-use token, and never the session token in its place.
 
 ## What is not covered

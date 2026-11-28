@@ -21,7 +21,8 @@ import 'src/auth_token_provider.dart';
 import 'src/bridge.dart';
 import 'src/options.dart';
 
-export 'src/app_check_provider.dart' show FlutterFireAppCheckProvider;
+export 'src/app_check_provider.dart'
+    show FlutterFireAppCheckProvider, FlutterFireLimitedUseAppCheckProvider;
 export 'src/auth_token_provider.dart'
     show FlutterFireAuthTokenProvider, IdTokenUser;
 export 'src/bridge.dart' show FlutterFireBridge;

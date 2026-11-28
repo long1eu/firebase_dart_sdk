@@ -238,14 +238,6 @@ class _AppCheck implements AppCheckTokenProvider {
       const AppCheckTokenResult('app-check-token');
 
   @override
-  Future<AppCheckTokenResult> getLimitedUseToken() async {
-    return AppCheckTokenResult(
-      '',
-      error: UnsupportedError('This fake gives no limited-use tokens.'),
-    );
-  }
-
-  @override
   Stream<AppCheckTokenResult> get onTokenChanged =>
       const Stream<AppCheckTokenResult>.empty();
 }

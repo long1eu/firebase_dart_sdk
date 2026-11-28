@@ -495,8 +495,9 @@ mixin _PlatformDependenciesMixin
   @override
   AppCheckTokenProvider? get appCheckProvider => _appCheckProvider;
 
-  /// Replaces the App Check token source; null removes it. Set it before the Firestore instance of
-  /// this app (and a `FirebaseUserAuth.forApp`) is created: they read it once.
+  /// Replaces the App Check token source; null removes it. Firestore, `FirebaseUserAuth` and the
+  /// Realtime Database read it once, when they are created: set it before. The other services read
+  /// it at each request.
   set appCheckProvider(AppCheckTokenProvider? provider) {
     _appCheckProvider = provider;
   }

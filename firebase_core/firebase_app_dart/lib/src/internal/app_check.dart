@@ -36,8 +36,7 @@ class AppCheckTokenResult {
   ///
   /// For a failed request use [AppCheckTokenResult.failure]. An empty [token]
   /// with an [error] means that no header is sent; it is what a provider
-  /// without limited-use tokens returns from
-  /// [AppCheckTokenProvider.getLimitedUseToken].
+  /// answers after its owner closed it.
   const AppCheckTokenResult(this.token, {this.error});
 
   /// A failed request: the [token] is the [placeholderToken] and [error] says
@@ -78,36 +77,54 @@ class AppCheckTokenResult {
 /// FirebaseApp; services that find none simply send no App Check header.
 ///
 /// Set it with `FirebaseApp.appCheckProvider` or
-/// `PlatformDependencies.appCheckProvider`, before the Firestore instance (and a
-/// `FirebaseUserAuth`) of the app is created. These packages do not attest a
+/// `PlatformDependencies.appCheckProvider`. Firestore, `FirebaseUserAuth` and
+/// the Realtime Database read it once, when they are created: set it before.
+/// The other services read it at each request. These packages do not attest a
 /// device: you supply the tokens, for example from your own backend.
 ///
-/// The contract of every provider, so that a service sees the same thing
-/// whichever provider is installed:
+/// A provider that can also mint a token for one request implements
+/// [LimitedUseAppCheckTokenProvider] in addition.
 ///
-/// 1. Validity. A result without an error carries a token the provider vouches
-///    for: not expired and, when the provider knows the expiry, with at least 5
-///    minutes of life left, or half of the token's lifetime when the lifetime
-///    is under 10 minutes. A provider that cannot know the expiry (a bridge to
-///    another SDK) returns what its source gives. Services never judge
-///    validity, never read the token and never keep it.
-/// 2. Failure token. A failed [getToken], and a failed [getLimitedUseToken] of
-///    a provider that can mint limited-use tokens, completes with
-///    [AppCheckTokenResult.failure].
-/// 3. No throw. Both methods report a failure in the result. Services treat a
-///    throw like an empty token.
-/// 4. Bounded. Both methods complete within a deadline the provider sets for
-///    its own work. Services add their own deadline.
-/// 5. [onTokenChanged] is a broadcast stream of successes, without replay.
-/// 6. Error object. Services never print [AppCheckTokenResult.error]; keep
-///    tokens and secrets out of its text all the same.
+/// The contract of every provider, so that a service sees the same thing
+/// whichever provider is installed. "Both methods" are [getToken] and
+/// [LimitedUseAppCheckTokenProvider.getLimitedUseToken].
+///
+/// * S1, validity. A result without an error carries a token the provider
+///   vouches for: not expired and, when the provider knows the expiry, with at
+///   least 5 minutes of life left, or half of the token's lifetime when the
+///   lifetime is under 10 minutes. A provider that cannot know the expiry (a
+///   bridge to another SDK) returns what its source gives. A service never
+///   judges validity and never keeps a token beyond the attempt it was
+///   fetched for.
+/// * S2, failure token. A failed call of either method completes with
+///   [AppCheckTokenResult.failure]: the token is the placeholder. A provider
+///   written before this contract may return an empty token with an error;
+///   services handle both.
+/// * S3, no throw. Both methods report a failure in the result. Services treat
+///   a throw like an empty token.
+/// * S4, an answer within 8 s. Both methods complete no later than
+///   [responseDeadline] after the call, with a token or with a failure. The
+///   time covers everything the call waits for: loading a stored token,
+///   joining an exchange already in flight, the exchange, a custom callback. A
+///   provider may let that work continue after it answered and use the result
+///   for the next call; only the answer is bounded.
+/// * S5, [onTokenChanged]. A broadcast stream. It emits a result each time the
+///   session token is replaced by a new one, and only results without an
+///   error. No replay to a new listener. Never a limited-use token.
+/// * S6, error object. Services never print [AppCheckTokenResult.error]; keep
+///   tokens and secrets out of its text all the same.
+/// * S7, closed. After its owner closed it, a provider still answers and never
+///   throws: both methods complete with an empty token and a [StateError],
+///   `AppCheckTokenResult('', error: StateError(...))`, not with the
+///   placeholder. No header is sent then: a closed App Check is "no App
+///   Check", not "attestation failed".
 ///
 /// What a service sends, for session and limited-use tokens alike: a token
-/// without an error is sent; the placeholder of a failure is sent, and the
-/// failure is logged once; an empty token, a throw or a timeout sends the
-/// request without the App Check header, logged once. A token failure never
-/// fails the request on the client: enforcement is the backend's setting. A
-/// log line names the runtime type of the error, never its text.
+/// without an error is sent; the placeholder of a failure is sent; an empty
+/// token, a throw or no answer in time sends the request without the App Check
+/// header. A token failure never fails the request on the client: enforcement
+/// is the backend's setting. A log line about a failure names the runtime type
+/// of the error, never its text.
 ///
 /// ```dart
 /// import 'dart:async';
@@ -123,13 +140,19 @@ class AppCheckTokenResult {
 ///   final StreamController<AppCheckTokenResult> _changes =
 ///       StreamController<AppCheckTokenResult>.broadcast();
 ///
+///   String? _lastToken;
+///
 ///   @override
 ///   Future<AppCheckTokenResult> getToken({required bool forceRefresh}) async {
 ///     try {
-///       final AppCheckTokenResult result = AppCheckTokenResult(
-///         await fetchToken(),
+///       final String token = await fetchToken().timeout(
+///         AppCheckTokenProvider.responseDeadline,
 ///       );
-///       _changes.add(result);
+///       final AppCheckTokenResult result = AppCheckTokenResult(token);
+///       if (token != _lastToken) {
+///         _lastToken = token;
+///         _changes.add(result);
+///       }
 ///       return result;
 ///     } on Object catch (e) {
 ///       return AppCheckTokenResult.failure(e);
@@ -144,61 +167,19 @@ abstract class AppCheckTokenProvider {
   /// Constructor for subclasses.
   AppCheckTokenProvider();
 
+  /// How long [getToken] and
+  /// [LimitedUseAppCheckTokenProvider.getLimitedUseToken] may take to answer,
+  /// with a token or with a failure (S4 of the class comment).
+  static const Duration responseDeadline = Duration(seconds: 8);
+
   /// Fetches a token. [forceRefresh] must only be set when the cached token was
   /// invalidated out of band (for example the backend answered UNAUTHENTICATED).
   ///
   /// Report a failure with [AppCheckTokenResult.failure], like the App Check
-  /// SDKs do; do not throw. Firestore sends its requests anyway: with the
-  /// placeholder, or without the header when the token is empty or when this
-  /// method throws, and logs a warning.
+  /// SDKs do; do not throw, and answer within [responseDeadline]. Firestore
+  /// sends its requests anyway: with the placeholder, or without the header
+  /// when the token is empty or when this method throws, and logs a warning.
   Future<AppCheckTokenResult> getToken({required bool forceRefresh});
-
-  /// Fetches a limited-use token: a token for one request to a backend that
-  /// consumes App Check tokens (replay protection).
-  ///
-  /// The default gives no token: it completes with an empty token and an
-  /// [UnsupportedError] in [AppCheckTokenResult.error]. It does not fall back
-  /// to [getToken], because a backend that consumes tokens would consume the
-  /// cached session token, and later requests with that token would be
-  /// refused with nothing on the client saying why. A provider that can mint
-  /// limited-use tokens overrides this method. A provider declared with
-  /// `implements` instead of `extends` must define it.
-  ///
-  /// For implementers:
-  ///
-  /// 1. Each call returns a token minted for that call. Never return the
-  ///    cached session token of [getToken], never store the token you return,
-  ///    and never emit it on [onTokenChanged].
-  /// 2. There is no `forceRefresh`: nothing is cached, so nothing can be
-  ///    refreshed.
-  /// 3. Calls may overlap; each call gets its own token.
-  /// 4. "Cannot mint limited-use tokens" is an empty token with an
-  ///    [UnsupportedError], as the default gives. "Minting failed" is
-  ///    [AppCheckTokenResult.failure]. A caller tells them apart by the type
-  ///    of the error. Do not throw.
-  ///
-  /// For callers:
-  ///
-  /// 1. Call once for each attempt that carries the token. A retry, and each
-  ///    reconnect of a stream, asks again. Do not keep the token after the
-  ///    attempt.
-  /// 2. Send a token that is not empty, the placeholder of a failure
-  ///    included. When the token is empty, or the call throws or times out,
-  ///    send the request without the App Check header and let the backend
-  ///    decide. Log the failure once per provider type, naming only the
-  ///    runtime type of the error, never its text.
-  /// 3. Never send a session token of [getToken] in place of a missing
-  ///    limited-use token.
-  Future<AppCheckTokenResult> getLimitedUseToken() =>
-      Future<AppCheckTokenResult>.value(
-        AppCheckTokenResult(
-          '',
-          error: UnsupportedError(
-            'This App Check provider does not give limited-use tokens. '
-            'Override getLimitedUseToken().',
-          ),
-        ),
-      );
 
   /// Emits a result each time the session token of [getToken] is replaced by
   /// a new one.
@@ -208,4 +189,94 @@ abstract class AppCheckTokenProvider {
   /// token. A listener must still tolerate a result with an error: a provider
   /// written before this contract may emit one.
   Stream<AppCheckTokenResult> get onTokenChanged;
+}
+
+/// Implemented, in addition to extending [AppCheckTokenProvider], by a provider
+/// that can mint limited-use tokens: a token for one request to a backend that
+/// consumes App Check tokens (replay protection).
+///
+/// A provider that cannot mint them does not implement this interface, and a
+/// limited-use request then carries no App Check header. Nothing falls back to
+/// [AppCheckTokenProvider.getToken]: a backend that consumes tokens would
+/// consume the cached session token, and later requests with that token would
+/// be refused with nothing on the client saying why.
+///
+/// For implementers, in addition to S2, S3, S4 and S7 of
+/// [AppCheckTokenProvider]:
+///
+/// * L1. Each call returns a token minted for that call. Never return the
+///   cached session token, never store the token you return, and never emit it
+///   on [AppCheckTokenProvider.onTokenChanged].
+/// * L2. There is no `forceRefresh`: nothing is cached, so nothing can be
+///   refreshed.
+/// * L3. Calls may overlap; each call gets its own token. "Cannot mint
+///   limited-use tokens" is not a result: such a provider does not implement
+///   this interface.
+///
+/// For callers:
+///
+/// * C1. Call once for each attempt that carries the token. A retry, and each
+///   reconnect of a stream, asks again. Do not keep the token after the
+///   attempt, and never read its content.
+/// * C2. Send a token that is not empty, the placeholder of a failed mint
+///   included. When the token is empty, or the call throws or does not answer
+///   in time, send the request without the App Check header and let the
+///   backend decide. A log line names the runtime type of the error, never its
+///   text.
+/// * C3. Never send a session token of [AppCheckTokenProvider.getToken] in
+///   place of a missing limited-use token. For a provider that does not
+///   implement this interface, send no App Check header on a limited-use
+///   request.
+///
+/// ```dart
+/// import 'dart:async';
+///
+/// import 'package:firebase_app_dart/firebase_app_dart.dart';
+///
+/// class BackendAppCheck extends AppCheckTokenProvider
+///     implements LimitedUseAppCheckTokenProvider {
+///   BackendAppCheck(this.fetchToken, this.fetchLimitedUseToken);
+///
+///   /// Asks your backend for a session token.
+///   final Future<String> Function() fetchToken;
+///
+///   /// Asks your backend for a new token for one request.
+///   final Future<String> Function() fetchLimitedUseToken;
+///
+///   @override
+///   Future<AppCheckTokenResult> getToken({required bool forceRefresh}) async {
+///     try {
+///       return AppCheckTokenResult(
+///         await fetchToken().timeout(AppCheckTokenProvider.responseDeadline),
+///       );
+///     } on Object catch (e) {
+///       return AppCheckTokenResult.failure(e);
+///     }
+///   }
+///
+///   @override
+///   Future<AppCheckTokenResult> getLimitedUseToken() async {
+///     try {
+///       return AppCheckTokenResult(
+///         await fetchLimitedUseToken().timeout(
+///           AppCheckTokenProvider.responseDeadline,
+///         ),
+///       );
+///     } on Object catch (e) {
+///       return AppCheckTokenResult.failure(e);
+///     }
+///   }
+///
+///   @override
+///   Stream<AppCheckTokenResult> get onTokenChanged =>
+///       const Stream<AppCheckTokenResult>.empty();
+/// }
+/// ```
+abstract interface class LimitedUseAppCheckTokenProvider {
+  /// Fetches a limited-use token, minted for this call (L1 to L3 of the class
+  /// comment).
+  ///
+  /// Report a failure with [AppCheckTokenResult.failure]; do not throw, and
+  /// answer within [AppCheckTokenProvider.responseDeadline].
+  Future<AppCheckTokenResult> getLimitedUseToken();
 }
