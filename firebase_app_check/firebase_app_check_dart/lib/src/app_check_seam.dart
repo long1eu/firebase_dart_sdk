@@ -8,6 +8,10 @@ import 'package:firebase_app_check_dart/src/token_manager.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:meta/meta.dart';
 
+/// How long a call may wait before it is answered: a little under the 8 s within which every
+/// provider must answer, so the answer is out before that limit.
+const Duration _answerMargin = Duration(milliseconds: 250);
+
 /// What the seam object forwards to while it is bound.
 final class _Binding {
   _Binding({required this.manager, required this.clocks, required this.events});
@@ -27,6 +31,14 @@ final class _Binding {
 /// Bound, it forwards to the instance's [TokenManager] and never throws. Unbound, both methods
 /// answer with an empty token and a [StateError], so services send no App Check header: a closed
 /// App Check is "no App Check", not "attestation failed".
+///
+/// Every call is answered within [AppCheckTokenProvider.responseDeadline]. The manager's own
+/// waits add up to less (500 ms for the stored record, 7 s for an exchange), with one exception:
+/// a forced call that joined an exchange and then has to run its own. So each call has a timer of
+/// its own, 250 ms under the deadline. When it fires, [getToken] answers with the cached token and
+/// the error while that token has not expired, otherwise with the placeholder, and
+/// [getLimitedUseToken] with the placeholder. The work goes on in the background: a session token
+/// it brings is cached for the next call, and a limited-use token is dropped.
 ///
 /// [onTokenChanged] is one broadcast stream across bindings; it ends when the app is deleted.
 @internal
@@ -100,7 +112,10 @@ final class AppCheckSeam extends AppCheckTokenProvider
     }
     final Outcome outcome;
     try {
-      outcome = await binding.manager.obtain(forceRefresh: forceRefresh);
+      outcome = await _answeredInTime(
+        binding.manager.obtain(forceRefresh: forceRefresh),
+        () => _overdue(binding),
+      );
     } on Object catch (error) {
       // A missing option of the app (a StateError); the seam never throws.
       return _isCurrent(binding)
@@ -120,10 +135,13 @@ final class AppCheckSeam extends AppCheckTokenProvider
       return _closedResult();
     }
     try {
-      final SessionToken token = await binding.manager.limitedUse();
-      return _isCurrent(binding)
-          ? AppCheckTokenResult(token.token)
-          : _closedResult();
+      final AppCheckTokenResult result = await _answeredInTime(
+        binding.manager.limitedUse().then(
+          (SessionToken token) => AppCheckTokenResult(token.token),
+        ),
+        () => AppCheckTokenResult.failure(fetchTimeout()),
+      );
+      return _isCurrent(binding) ? result : _closedResult();
     } on Object catch (error) {
       return _isCurrent(binding) && !_isClosedFailure(error)
           ? AppCheckTokenResult.failure(error)
@@ -136,6 +154,46 @@ final class AppCheckSeam extends AppCheckTokenProvider
 
   @override
   String toString() => 'AppCheckSeam(${isBound ? 'bound' : 'unbound'})';
+
+  /// Completes like [work], or with [onDeadline]'s value when [work] is still running 250 ms
+  /// before the response deadline. [work] is not cancelled, and what it brings later is not
+  /// reported here.
+  Future<T> _answeredInTime<T>(Future<T> work, T Function() onDeadline) {
+    final Completer<T> done = Completer<T>();
+    final Timer timer = Timer(
+      AppCheckTokenProvider.responseDeadline - _answerMargin,
+      () {
+        if (!done.isCompleted) {
+          done.complete(onDeadline());
+        }
+      },
+    );
+    unawaited(
+      work.then<void>(
+        (T value) {
+          timer.cancel();
+          if (!done.isCompleted) {
+            done.complete(value);
+          }
+        },
+        onError: (Object error, StackTrace stack) {
+          timer.cancel();
+          if (!done.isCompleted) {
+            done.completeError(error, stack);
+          }
+        },
+      ),
+    );
+    return done.future;
+  }
+
+  /// The outcome of a session call that ran out of time: a timeout, with the cached token while
+  /// it has not expired.
+  Outcome _overdue(_Binding binding) {
+    final SessionToken? cached = binding.manager.current;
+    final bool unexpired = cached != null && cached.isUnexpired(binding.clocks);
+    return Outcome.failed(fetchTimeout(), token: unexpired ? cached : null);
+  }
 
   bool _isCurrent(_Binding binding) => identical(_binding, binding);
 
