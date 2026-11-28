@@ -18,4 +18,12 @@ void main() {
     final ProcessResult result = _check(<String>[]);
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
   });
+
+  test('negative control: an entry that imports dart:io is reported', () {
+    final ProcessResult result = _check(<String>[
+      'lib/src/environment_io.dart',
+    ]);
+    expect(result.exitCode, 1, reason: '${result.stdout}\n${result.stderr}');
+    expect(result.stdout, contains('dart:io'));
+  });
 }

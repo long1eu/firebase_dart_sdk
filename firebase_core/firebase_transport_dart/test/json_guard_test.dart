@@ -51,6 +51,18 @@ void main() {
       );
     });
 
+    test(
+      'sibling containers do not add up: the depth falls back after each',
+      () {
+        final String siblings = '[${_nested(31)},${_nested(31)}]';
+        expect(exceedsJsonDepth(siblings.codeUnits), isFalse);
+        expect(decodeGuardedText(siblings), isA<List<Object?>>());
+        expect(decodeGuardedBytes(_bytes(siblings)), isA<List<Object?>>());
+        final String tooDeepSibling = '[${_nested(31)},${_nested(32)}]';
+        expect(exceedsJsonDepth(tooDeepSibling.codeUnits), isTrue);
+      },
+    );
+
     test('objects count as levels, mixed with arrays', () {
       final String mixed32 = '{"a":' * 16 + '[' * 16 + ']' * 16 + '}' * 16;
       final String mixed33 = '{"a":' * 17 + '[' * 16 + ']' * 16 + '}' * 17;

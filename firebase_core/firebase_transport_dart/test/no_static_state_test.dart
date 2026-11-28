@@ -97,9 +97,7 @@ bool _isConstant(Expression expression) {
 
 bool _allLiteral(ArgumentList arguments) =>
     arguments.arguments.isNotEmpty &&
-    arguments.arguments.every(
-      (Argument a) => a is Expression && _isConstant(a),
-    );
+    arguments.arguments.every((Object a) => a is Expression && _isConstant(a));
 
 void main() {
   test('no file under lib/ holds mutable top-level or static state', () {

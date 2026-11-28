@@ -59,6 +59,21 @@ void main() {
     expect(logged, <String>['first', 'second']);
   });
 
+  test(
+    'reset of an id never seen does nothing, even when the helper is full',
+    () {
+      final List<String> logged = <String>[];
+      final LogOnce once = LogOnce(logged.add);
+      for (int i = 0; i < 256; i++) {
+        once('id$i', 'message $i');
+      }
+      once.reset('never');
+      once('never', 'first');
+      expect(logged, hasLength(256));
+      expect(logged, isNot(contains('first')));
+    },
+  );
+
   test('reset of an id never seen does nothing', () {
     final List<String> logged = <String>[];
     final LogOnce once = LogOnce(logged.add);

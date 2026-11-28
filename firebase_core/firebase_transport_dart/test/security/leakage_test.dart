@@ -119,6 +119,8 @@ void main() {
     'reading 23: the request body dart:io quotes never reaches detail',
     _quotedBody,
   );
+
+  _redactionRuleTests();
 }
 
 void _authThrows(FakeAsync async) {
@@ -742,4 +744,153 @@ Future<void> _quotedBody() async {
     expect('$failure', 'TransportException: network');
     _expectClean('a quoted request body', <Object?>[failure, trace]);
   }
+}
+
+/// The `detail` of the failure [sendCapped] throws when the client fails a request to [url] with
+/// an `http.ClientException` of [message], after checking that nothing printable of the failure
+/// or of its stack trace holds the marker.
+Future<String?> _detailFor(
+  Uri url,
+  String message, {
+  Uri? errorUri,
+  Map<String, String> headers = const <String, String>{},
+}) async {
+  final http.ClientException cause = http.ClientException(message, errorUri);
+  final _FakeClient client = _FakeClient(
+    (http.BaseRequest _) =>
+        Future<http.StreamedResponse>.error(cause, _clientTrace()),
+  );
+  final (Object error, StackTrace trace) = await _failureOf(
+    sendCapped(
+      client,
+      (Future<void> abort) =>
+          http.AbortableRequest('GET', url, abortTrigger: abort)
+            ..headers.addAll(headers),
+      successCap: 1024,
+      errorCap: 1024,
+      deadline: _deadline,
+    ),
+  );
+  expect(error, isA<TransportException>());
+  final TransportException failure = error as TransportException;
+  expect('$failure', 'TransportException: network');
+  expect(failure.causeType, '${cause.runtimeType}');
+  _expectClean('redaction of "$message"', <Object?>[failure, trace]);
+  return failure.detail;
+}
+
+/// One test per redaction rule of `TransportException.detail` (5.13): each message holds a
+/// secret in a form that only the rule under test covers, so the test fails when that rule goes.
+void _redactionRuleTests() {
+  final Uri plainUrl = Uri.parse('https://api.example.test/v1/call');
+
+  group('redaction rules', () {
+    test('the URL itself', () async {
+      final Uri url = Uri.parse('https://api.example.test/$_marker-PATH/call');
+      expect(
+        await _detailFor(url, 'Connection refused: GET $url failed'),
+        'Connection refused: GET <redacted> failed',
+      );
+    });
+
+    test('the query', () async {
+      // The marker is a query key: keys are covered only by the query as a whole.
+      final Uri url = Uri.parse('$plainUrl?${_marker}KEY=1&x=2');
+      expect(
+        await _detailFor(url, 'bad query ${_marker}KEY=1&x=2 in the request'),
+        'bad query <redacted> in the request',
+      );
+    });
+
+    test('a query value as written', () async {
+      final Uri url = Uri.parse('$plainUrl?key=$_marker%20a+b%2Fc');
+      expect(
+        await _detailFor(url, 'bad value $_marker%20a+b%2Fc here'),
+        'bad value <redacted> here',
+      );
+    });
+
+    test('a query value percent-decoded', () async {
+      final Uri url = Uri.parse('$plainUrl?key=$_marker%20a+b%2Fc');
+      expect(
+        await _detailFor(url, 'bad value $_marker a+b/c here'),
+        'bad value <redacted> here',
+      );
+    });
+
+    test('a query value query-decoded', () async {
+      final Uri url = Uri.parse('$plainUrl?key=$_marker%20a+b%2Fc');
+      expect(
+        await _detailFor(url, 'bad value $_marker a b/c here'),
+        'bad value <redacted> here',
+      );
+    });
+
+    test('each query value, not only the first', () async {
+      final Uri url = Uri.parse('$plainUrl?a=$_marker-ONE&b=$_marker-TWO');
+      expect(
+        await _detailFor(url, 'saw $_marker-TWO then $_marker-ONE'),
+        'saw <redacted> then <redacted>',
+      );
+    });
+
+    test('the uri of the ClientException', () async {
+      final Uri elsewhere = Uri.parse(
+        'https://other.example.test/$_marker-PATH?token=$_marker-URI',
+      );
+      expect(
+        await _detailFor(
+          plainUrl,
+          'redirected to $elsewhere',
+          errorUri: elsewhere,
+        ),
+        'redirected to <redacted>',
+      );
+      expect(
+        await _detailFor(
+          plainUrl,
+          'the token $_marker-URI was refused',
+          errorUri: elsewhere,
+        ),
+        'the token <redacted> was refused',
+      );
+    });
+
+    test('a request header value of 4 or more characters', () async {
+      expect(
+        await _detailFor(
+          plainUrl,
+          'Invalid header value $_marker-KEY for the request',
+          headers: <String, String>{'X-Goog-Api-Key': '$_marker-KEY'},
+        ),
+        'Invalid header value <redacted> for the request',
+      );
+    });
+
+    test('a value of 4 characters is redacted, one of 3 is not', () async {
+      final Uri url = Uri.parse('$plainUrl?a=zq9&b=zq84');
+      expect(
+        await _detailFor(
+          url,
+          'values zq9 | zq84 | hx7 | hx64',
+          headers: <String, String>{'X-Short': 'hx7', 'X-Long': 'hx64'},
+        ),
+        'values zq9 | <redacted> | hx7 | <redacted>',
+      );
+    });
+
+    test('the ". [" cut', () async {
+      expect(
+        await _detailFor(
+          plainUrl,
+          'Content size exceeds specified contentLength. 9 bytes written '
+          'while expected 4. [$_marker-BODY]',
+        ),
+        'Content size exceeds specified contentLength. 9 bytes written '
+        'while expected 4.',
+      );
+      // A message without the bracketed chunk is kept whole.
+      expect(await _detailFor(plainUrl, 'refused. Retry'), 'refused. Retry');
+    });
+  });
 }
