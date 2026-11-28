@@ -58,6 +58,8 @@ jobs:
       remoteconfig: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.remoteconfig == 'true' }}
       # Whether the change touches the examples or the gallery scripts.
       gallery: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.gallery == 'true' }}
+      # Whether the change touches firebase_error_reporting_dart or what it depends on.
+      errorreporting: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.errorreporting == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -156,6 +158,12 @@ jobs:
               - 'firebase_remote_config/firebase_remote_config_dart/pubspec.yaml'
               - 'firebase_core/firebase_app_dart/lib/**'
               - 'firebase_core/firebase_app_dart/pubspec.yaml'
+            errorreporting:
+              - 'firebase_error_reporting/**'
+              - 'firebase_core/firebase_app_dart/lib/**'
+              - 'firebase_core/firebase_app_dart/pubspec.yaml'
+              - '.github/workflows/ci.yml'
+              - '.github/actions/**'
 
   # The unit suite (tool/test_all.sh) runs in two parallel legs per SDK: cloud_firestore_dart
   # alone (its tests take about 9 of the 11 minutes) and every other package with the examples.
@@ -182,7 +190,7 @@ jobs:
               secure_flow firebase_app_dart firebase_auth_providers_dart cloud_firestore_dart_sqlite
               firebase_admin_dart firebase_storage_dart firebase_auth_secure_storage_dart
               firebase_database_dart firebase_database_dart_sqlite firebase_installations_dart
-              firebase_remote_config_dart examples
+              firebase_remote_config_dart firebase_error_reporting_dart examples
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -245,6 +253,13 @@ jobs:
         if: ${{ !cancelled() && matrix.leg == 'others' }}
         working-directory: firebase_database/firebase_database_dart
         run: dart format --output=none --set-exit-if-changed lib test example
+      - name: Check formatting (firebase_error_reporting_dart)
+        if: ${{ !cancelled() && matrix.leg == 'others' }}
+        working-directory: firebase_error_reporting/firebase_error_reporting_dart
+        # Without test/readme: readme_snippets_test.dart generates it and the formatter does not leave it unchanged.
+        run: |
+          find lib test -name '*.dart' -not -path 'test/readme/*' -print0 \
+            | xargs -0 dart format --output=none --set-exit-if-changed
       - name: Check formatting (firebase_database_dart_sqlite)
         if: ${{ !cancelled() && matrix.leg == 'others' }}
         working-directory: firebase_database/firebase_database_dart_sqlite
@@ -281,7 +296,7 @@ jobs:
               secure_flow firebase_app_dart firebase_auth_providers_dart cloud_firestore_dart_sqlite
               firebase_admin_dart firebase_storage_dart firebase_auth_secure_storage_dart
               firebase_database_dart firebase_database_dart_sqlite firebase_installations_dart
-              firebase_remote_config_dart examples
+              firebase_remote_config_dart firebase_error_reporting_dart examples
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -619,6 +634,28 @@ jobs:
         with:
           name: browser-log
           path: ${{ runner.temp }}/emulator/*.log
+
+  # The whole test tree of firebase_error_reporting_dart in Chrome, with dart2js and with dart2wasm (the VM-only
+  # files are marked @TestOn('vm')). No emulator: the tests use MockClient.
+  error-reporting-browser:
+    name: Error Reporting tests in Chrome (dart2js and dart2wasm)
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' && needs.changes.outputs.errorreporting == 'true' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/dart
+        with:
+          sdk: stable
+      - name: Run the tests in Chrome
+        working-directory: firebase_error_reporting/firebase_error_reporting_dart
+        run: |
+          dart pub get
+          dart test -p chrome
+          dart test -p chrome -c dart2wasm
 
   # The IndexedDB cache engine against the official JS SDK in headless Chrome, both ways, on one database at a time:
   # tool/bench/web_idb/js_import/interop_check.sh (documents, pending writes of two users, indexes, bundles and garbage

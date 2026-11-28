@@ -132,6 +132,15 @@ that binary: never pass the key to `flutter build` of an app you ship, and never
 `assets/`. The README of the package has a complete test and
 `example/integration_test_helper.dart` a helper to copy.
 
+## Checking App Check tokens
+
+A backend of your own (an API, or the relay of an error reporter or of Analytics) can refuse requests that do
+not come from your app: `app.appCheck().verifyToken(token)` from `package:firebase_admin_dart/app_check.dart`
+checks the `X-Firebase-AppCheck` header as the Node and Python Admin SDKs do, and returns the app id of the
+caller. It needs no credential: the keys are public, fetched from the App Check JWKS and kept for six hours.
+It throws `app-check-token-expired` for an expired token and `invalid-argument` for anything else wrong with it.
+Replay protection (`consumeAppCheckToken` of the Node SDK) is not implemented.
+
 ## Pitfalls
 
 - `revokeRefreshTokens` ends sessions at their next token refresh. ID tokens already issued stay

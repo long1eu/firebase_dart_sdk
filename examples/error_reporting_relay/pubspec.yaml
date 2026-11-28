@@ -1,0 +1,43 @@
+name: error_reporting_relay
+description: >-
+  A relay for firebase_error_reporting_dart on package:shelf: it checks the App
+  Check and ID tokens of each report, caps and cleans it, and forwards it to
+  Cloud Error Reporting with the server's own service account.
+publish_to: none
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  firebase_admin_dart:
+    path: ../../firebase_admin/firebase_admin_dart
+  firebase_app_dart:
+    path: ../../firebase_core/firebase_app_dart
+  firebase_auth_providers_dart:
+    path: ../../firebase_auth/firebase_auth_providers_dart
+  # The production kit (lib/verify_production.dart) runs the client.
+  firebase_error_reporting_dart:
+    path: ../../firebase_error_reporting/firebase_error_reporting_dart
+  http: ^1.5.0
+  relay_guard:
+    path: ../relay_guard
+  shelf: ^1.4.0
+
+dev_dependencies:
+  fake_async: ^1.3.0
+  lints: ^6.0.0
+  test: ^1.25.0
+
+# The examples run against the code of this repository. Outside the repository, remove this section and depend
+# on the versions on pub.dev.
+dependency_overrides:
+  firebase_admin_dart:
+    path: ../../firebase_admin/firebase_admin_dart
+  firebase_app_dart:
+    path: ../../firebase_core/firebase_app_dart
+  firebase_auth_providers_dart:
+    path: ../../firebase_auth/firebase_auth_providers_dart
+  firebase_error_reporting_dart:
+    path: ../../firebase_error_reporting/firebase_error_reporting_dart
+  secure_flow:
+    path: ../../secure_flow/secure_flow
