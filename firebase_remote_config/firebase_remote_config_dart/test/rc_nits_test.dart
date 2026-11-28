@@ -34,6 +34,70 @@ void _afterMicrotasks(int count, void Function() action) {
   scheduleMicrotask(() => _afterMicrotasks(count - 1, action));
 }
 
+/// An instance with defaults and a fetched template that has one rollout of the key `a`.
+FirebaseRemoteConfig _rolloutRc(Review198Rig rig) {
+  final FirebaseRemoteConfig rc = rig.instance(
+    defaults: <String, Object>{'a': 'default'},
+  );
+  rig.backend.enqueue(
+    FakeRoute.fetch,
+    FakeAnswer.fetch(
+      entries: <String, String>{'a': 'remote'},
+      templateVersion: '5',
+      extra: <String, Object?>{
+        'rolloutMetadata': <Map<String, Object?>>[
+          <String, Object?>{
+            'rolloutId': 'r1',
+            'variantId': 'v1',
+            'affectedParameterKeys': <String>['a'],
+          },
+        ],
+      },
+    ),
+  );
+  rig.async.elapse(_second);
+  expect(rig.settle(rc.fetch()), FetchResult.updated);
+  return rc;
+}
+
+/// Listens to the rollouts and checks that the first set is the empty one.
+List<Set<RolloutAssignment>> _listen(
+  Review198Rig rig,
+  FirebaseRemoteConfig rc,
+) {
+  final List<Set<RolloutAssignment>> events = <Set<RolloutAssignment>>[];
+  rc.onRolloutsStateChanged.listen(events.add);
+  rig.pump();
+  expect(events, hasLength(1));
+  expect(events.single, isEmpty);
+  return events;
+}
+
+/// The end state after a reset that removed everything, and the sets the listeners saw: with the
+/// record in memory when the reset started, the record's set then the empty one; without it, no
+/// set of the record and activate returned false (A40).
+void _expectResetOutcome(
+  Review198Rig rig,
+  FirebaseRemoteConfig rc,
+  List<Set<RolloutAssignment>> events,
+  Pending<bool> activate, {
+  required bool inMemory,
+}) {
+  expect(activate.done, isTrue);
+  expect(activate.error, isNull);
+  expect(rig.raw('active'), isNull);
+  expect(rc.info.activeTemplateVersion, isNull);
+  expect(rc.getString('a'), 'default');
+  if (inMemory) {
+    expect(events, hasLength(3));
+    expect(events[1].single.rolloutId, 'r1');
+    expect(events[2], isEmpty);
+  } else {
+    expect(events, hasLength(1), reason: 'only the first, empty set');
+    expect(activate.value, isFalse);
+  }
+}
+
 void main() {
   group('A38 F1 meta updates waiting for a reset, then close()', () {
     rigTest(
@@ -208,73 +272,81 @@ void main() {
     );
   });
 
-  group('A40 F4 a reset in the resume gap of an activate', () {
+  group('A40 F4 a reset around the resume of an activate', () {
     for (int k = 0; k < 24; k++) {
       rigTest(
-        'A40 F4 an activate resumes after its write, and a reset called $k microtasks later '
-        'succeeds: when it started before the record reached memory, the rollouts listeners '
-        'get no set of that record, and activate returns false',
+        'A40 F4 an activate resumes after its write, and a reset is called $k microtasks later '
+        'and succeeds: rollouts listeners get {record} then {} only when memory held the record '
+        'once the reset had started; otherwise they get no set of it and activate returns false',
         (Review198Rig rig) {
-          final FirebaseRemoteConfig rc = rig.instance(
-            defaults: <String, Object>{'a': 'default'},
-          );
-          rig.backend.enqueue(
-            FakeRoute.fetch,
-            FakeAnswer.fetch(
-              entries: <String, String>{'a': 'remote'},
-              templateVersion: '5',
-              extra: <String, Object?>{
-                'rolloutMetadata': <Map<String, Object?>>[
-                  <String, Object?>{
-                    'rolloutId': 'r1',
-                    'variantId': 'v1',
-                    'affectedParameterKeys': <String>['a'],
-                  },
-                ],
-              },
-            ),
-          );
-          rig.async.elapse(_second);
-          expect(rig.settle(rc.fetch()), FetchResult.updated);
-          final List<Set<RolloutAssignment>> events =
-              <Set<RolloutAssignment>>[];
-          rc.onRolloutsStateChanged.listen(events.add);
-          rig.pump();
-          expect(events, hasLength(1));
-          expect(events.single, isEmpty);
+          final FirebaseRemoteConfig rc = _rolloutRc(rig);
+          final List<Set<RolloutAssignment>> events = _listen(rig, rc);
           final StorePause wrote = rig.store.pauseAfter(
             StoreOp.update,
             rig.key('active'),
+          );
+          // The first store call of a reset: it has certainly started when it gets here.
+          final StorePause started = rig.store.pauseBefore(
+            StoreOp.update,
+            rig.key('fetched'),
           );
 
           final Pending<bool> activate = Pending<bool>(rc.activate());
           rig.pump();
           expect(wrote.reached, isTrue);
           Pending<void>? reset;
-          bool? inMemory;
           wrote.open();
-          _afterMicrotasks(k, () {
-            inMemory = rc.info.activeTemplateVersion != null;
-            reset = Pending<void>(rc.reset());
-          });
+          _afterMicrotasks(k, () => reset = Pending<void>(rc.reset()));
           rig.pump();
+          expect(started.reached, isTrue);
+          final bool inMemory = rc.info.activeTemplateVersion != null;
+          started.open();
           rig.settle(reset!.future);
           rig.pump();
 
-          expect(activate.done, isTrue);
-          expect(activate.error, isNull);
+          _expectResetOutcome(rig, rc, events, activate, inMemory: inMemory);
           expect(reset!.error, isNull);
-          expect(rig.raw('active'), isNull);
-          expect(rc.info.activeTemplateVersion, isNull);
-          expect(rc.getString('a'), 'default');
-          if (inMemory!) {
-            expect(events, hasLength(3));
-            expect(events[1].single.rolloutId, 'r1');
-            expect(events[2], isEmpty);
-          } else {
-            expect(events, hasLength(1), reason: 'only the first, empty set');
-            expect(activate.value, isFalse);
-          }
+        },
+      );
+    }
+
+    for (int k = 0; k < 24; k++) {
+      rigTest(
+        'A40 F4 an activate whose record survived a failed reset, and a second reset called $k '
+        'microtasks after the first failed that succeeds: no set of the record is followed by '
+        'the empty set unless memory held it when the second reset started',
+        (Review198Rig rig) {
+          final FirebaseRemoteConfig rc = _rolloutRc(rig);
+          final List<Set<RolloutAssignment>> events = _listen(rig, rc);
+          final String fetchedKey = rig.key('fetched');
+          final StorePause wrote = rig.store.pauseAfter(
+            StoreOp.update,
+            rig.key('active'),
+          );
+          // The second reset's removal of the fetched record; the first reset's call is skipped.
+          final StorePause started = rig.store.pauseBefore(
+            StoreOp.update,
+            fetchedKey,
+            skip: 1,
+          );
+          rig.store.failOnce(StoreOp.update, fetchedKey);
+
+          final Pending<bool> activate = Pending<bool>(rc.activate());
+          rig.pump();
+          expect(wrote.reached, isTrue);
+          expect(rig.rcError(rc.reset()).code, 'storage-error');
+          Pending<void>? second;
+          wrote.open();
+          _afterMicrotasks(k, () => second = Pending<void>(rc.reset()));
+          rig.pump();
+          expect(started.reached, isTrue);
+          final bool inMemory = rc.info.activeTemplateVersion != null;
+          started.open();
+          rig.settle(second!.future);
+          rig.pump();
+
+          _expectResetOutcome(rig, rc, events, activate, inMemory: inMemory);
+          expect(second!.error, isNull);
         },
       );
     }
