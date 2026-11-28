@@ -76,7 +76,7 @@ bool _isIpv6Loopback(String text) {
 /// The 16 bytes of the IPv6 address [text], or null when it is not one. A zone (`%eth0`) is not
 /// part of an address here.
 List<int>? _parseIpv6(String text) {
-  if (!_ipv6Text.hasMatch(text)) {
+  if (!_ipv6Text.hasMatch(text) || !_hasValidIpv4Tail(text)) {
     return null;
   }
   try {
@@ -84,6 +84,28 @@ List<int>? _parseIpv6(String text) {
   } on FormatException {
     return null;
   }
+}
+
+/// Whether an embedded IPv4 tail (`::ffff:127.0.0.1`) follows rule L's parts: each `0` or 1 to 3
+/// digits starting with 1 to 9, at most 255. Checked here because SDK versions differ: Dart 3.8's
+/// `Uri.parseIPv6Address` accepts `::0.0.0.01`, later versions refuse it. Text without a dot has no
+/// tail and passes.
+bool _hasValidIpv4Tail(String text) {
+  if (!text.contains('.')) {
+    return true;
+  }
+  final List<String> parts = text
+      .substring(text.lastIndexOf(':') + 1)
+      .split('.');
+  if (parts.length != 4) {
+    return false;
+  }
+  for (final String part in parts) {
+    if (!_decimalPart.hasMatch(part) || int.parse(part) > 255) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /// [host] in the one form hosts are compared in: lowercase, and an IPv6 address (with or without
