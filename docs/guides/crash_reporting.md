@@ -55,8 +55,11 @@ Things to know before you choose it:
   `reportLocation` (file, line, function) taken from the top frame.
 - **No symbolication** of obfuscated builds, and no native crashes.
 
-A Dart client for it, `firebase_error_reporting_dart`, is specified in
-[error_reporting_spec.md](../error_reporting_spec.md) and is not published yet.
+[`firebase_error_reporting_dart`](../../firebase_error_reporting/firebase_error_reporting_dart/) is a Dart
+client for it in this repository, not published yet: it captures errors (`runGuarded`, `recordError`, Flutter's
+hooks, other isolates), rewrites Dart frames into a format Error Reporting parses, queues reports on disk, and
+sends them through a relay (for apps; [`examples/error_reporting_relay`](../../examples/error_reporting_relay/)) or
+directly with a service account (for servers). Its README has the setup.
 
 ### A Sentry-protocol tracker
 
