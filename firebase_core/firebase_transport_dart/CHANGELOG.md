@@ -6,8 +6,8 @@ application code.
 - Hosts: `isLoopbackHost` (rule L), `isHostLabel` and `EmulatorHost` (rule E). Rule L: a host is loopback only when it is
   `localhost`, a `127.x.x.x` address or the IPv6 `::1`; rule E: an emulator host is `host:port` and never a production
   domain.
-- Tokens: `TokenSource`, `RequestTokens` and the token rules (rule T: tokens go only over `https` or `wss`, to a loopback
-  host or to the configured emulator); one failure rule for Auth and App Check tokens.
+- Tokens: `TokenSource`, `RequestTokens` and the token rules (rule T: tokens go only to `https` or `wss` hosts, which
+  includes production, to the configured emulator, or to a loopback host); one failure rule for Auth and App Check tokens.
 - Headers: `FirebaseHeaders`, `AuthHeaderStyle` and the header value checks.
 - Status mapping: `RpcStatus` and `RpcErrorBody`.
 - Capped send and read: `sendCapped`, `sendStreaming` and `readCapped` with `CappedResponse`, `TransportException` and

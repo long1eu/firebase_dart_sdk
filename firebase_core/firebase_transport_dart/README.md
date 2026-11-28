@@ -21,7 +21,7 @@ The package works on every platform, in the browser too. It is not published on 
 ## Rules
 
 **Rule L (loopback).** After lowercasing and removing one pair of surrounding brackets, a host is loopback when it is
-`localhost`; or four dot-separated parts, each 1 to 3 ASCII digits with value at most 255, the first being `127`; or it
+`localhost`; or four dot-separated parts, each 1 to 3 ASCII digits with value at most 255 and either `0` or starting with 1 to 9 (so `127.0.0.09` is not loopback), the first being `127`; or it
 contains `:` and parses as the IPv6 address `::1`. Nothing else is loopback: not `*.localhost`, not `0.0.0.0`, not
 `::ffff:127.0.0.1`, not a name that resolves to a loopback address, not a name with a trailing dot.
 
