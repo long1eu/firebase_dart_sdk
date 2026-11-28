@@ -1142,6 +1142,7 @@ class FirebaseRemoteConfig {
   Future<void> _clearExperiments() {
     final DateTime deadline = _clock().add(fetchTimeout);
     return _serialExperiments(() async {
+      _checkOpen();
       final Set<String> previous =
           _parseExperiments(
             await _storeCall(() => _store.read(_key('experiments'))),
