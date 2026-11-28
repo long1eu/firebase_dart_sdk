@@ -3,7 +3,7 @@ library;
 
 import 'dart:io';
 
-import 'package:firebase_transport_dart/src/version.dart';
+import 'package:_firebase_transport_dart/src/version.dart';
 import 'package:test/test.dart';
 
 void main() {

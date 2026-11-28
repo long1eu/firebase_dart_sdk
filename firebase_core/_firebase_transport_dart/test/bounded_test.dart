@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:firebase_transport_dart/firebase_transport_dart.dart';
+import 'package:_firebase_transport_dart/_firebase_transport_dart.dart';
 import 'package:test/test.dart';
 
 /// One row of the `parseBoundedInt` table.

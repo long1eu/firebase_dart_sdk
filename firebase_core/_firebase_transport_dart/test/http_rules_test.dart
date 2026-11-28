@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:fake_async/fake_async.dart';
-import 'package:firebase_transport_dart/firebase_transport_dart.dart';
+import 'package:_firebase_transport_dart/_firebase_transport_dart.dart';
 import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
 

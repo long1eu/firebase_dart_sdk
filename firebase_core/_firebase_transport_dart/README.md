@@ -1,4 +1,4 @@
-# firebase_transport_dart
+# _firebase_transport_dart
 
 Internal request helpers shared by the `firebase_*_dart` packages of this repository. This package is shared by those
 packages, not for application code: it can change between versions, and the products that use it do not expose its types

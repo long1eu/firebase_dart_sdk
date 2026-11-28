@@ -62,7 +62,7 @@ jobs:
       errorreporting: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.errorreporting == 'true' }}
       # Whether the change touches firebase_analytics_dart or what it depends on.
       analytics: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.analytics == 'true' }}
-      # Whether the change touches firebase_transport_dart, the seam test of firebase_app_dart or the web import check.
+      # Whether the change touches _firebase_transport_dart, the seam test of firebase_app_dart or the web import check.
       transport: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.transport == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -176,7 +176,7 @@ jobs:
               - '.github/workflows/ci.yml'
               - '.github/actions/**'
             transport:
-              - 'firebase_core/firebase_transport_dart/**'
+              - 'firebase_core/_firebase_transport_dart/**'
               - 'firebase_core/firebase_app_dart/lib/**'
               - 'firebase_core/firebase_app_dart/test/**'
               - 'firebase_core/firebase_app_dart/pubspec.yaml'
@@ -206,7 +206,7 @@ jobs:
             packages: cloud_firestore_dart
           - leg: others
             packages: >-
-              secure_flow firebase_app_dart firebase_transport_dart firebase_auth_providers_dart
+              secure_flow firebase_app_dart _firebase_transport_dart firebase_auth_providers_dart
               cloud_firestore_dart_sqlite
               firebase_admin_dart firebase_storage_dart firebase_auth_secure_storage_dart
               firebase_database_dart firebase_database_dart_sqlite firebase_installations_dart
@@ -254,10 +254,10 @@ jobs:
         if: ${{ !cancelled() && matrix.leg == 'others' }}
         working-directory: firebase_core/firebase_app_dart
         run: dart format --output=none --set-exit-if-changed lib example
-      - name: Check formatting (firebase_transport_dart)
+      - name: Check formatting (_firebase_transport_dart)
         # Also when a test failed: test_all.sh has run `dart pub get` by then.
         if: ${{ !cancelled() && matrix.leg == 'others' }}
-        working-directory: firebase_core/firebase_transport_dart
+        working-directory: firebase_core/_firebase_transport_dart
         run: dart format --output=none --set-exit-if-changed lib test
       - name: Check formatting (cloud_firestore_dart)
         if: ${{ !cancelled() && matrix.leg == 'cloud_firestore_dart' }}
@@ -329,7 +329,7 @@ jobs:
             packages: cloud_firestore_dart
           - leg: others
             packages: >-
-              secure_flow firebase_app_dart firebase_transport_dart firebase_auth_providers_dart
+              secure_flow firebase_app_dart _firebase_transport_dart firebase_auth_providers_dart
               cloud_firestore_dart_sqlite
               firebase_admin_dart firebase_storage_dart firebase_auth_secure_storage_dart
               firebase_database_dart firebase_database_dart_sqlite firebase_installations_dart
@@ -722,7 +722,7 @@ jobs:
           dart test -p chrome
           dart test -p chrome -c dart2wasm
 
-  # firebase_transport_dart in headless Chrome, compiled with dart2js and with dart2wasm, and the seam test of
+  # _firebase_transport_dart in headless Chrome, compiled with dart2js and with dart2wasm, and the seam test of
   # firebase_app_dart (the only test of that package that runs in a browser), after a check that the transport
   # library reaches neither dart:io nor dart:ffi.
   transport-browser:
@@ -740,10 +740,10 @@ jobs:
           sdk: stable
       - name: Check that the library imports neither dart:io nor dart:ffi
         run: |
-          (cd firebase_core/firebase_transport_dart && dart pub get)
-          dart tool/check_web_imports.dart firebase_core/firebase_transport_dart
+          (cd firebase_core/_firebase_transport_dart && dart pub get)
+          dart tool/check_web_imports.dart firebase_core/_firebase_transport_dart
       - name: Run the transport tests in Chrome
-        working-directory: firebase_core/firebase_transport_dart
+        working-directory: firebase_core/_firebase_transport_dart
         run: |
           dart test -p chrome
           dart test -p chrome -c dart2wasm

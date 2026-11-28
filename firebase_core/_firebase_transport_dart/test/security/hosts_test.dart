@@ -1,6 +1,6 @@
 // Shared specification v3, 5.8, with the lead's readings 7 to 10, 16 and 19: rule L (loopback),
 // rule E (emulator host), rule T (tokens), rule O (origin), the token origin and the host label.
-import 'package:firebase_transport_dart/firebase_transport_dart.dart';
+import 'package:_firebase_transport_dart/_firebase_transport_dart.dart';
 import 'package:test/test.dart';
 
 const String _expectedHostAndPort = 'emulator host: expected host:port';

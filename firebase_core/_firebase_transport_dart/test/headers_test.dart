@@ -3,7 +3,7 @@
 //
 // The "refusal names the header only" case of 11.4 is dropped by ruling M8 of code review 1: the
 // package has no function that refuses a header; products and GrpcCaller test their own.
-import 'package:firebase_transport_dart/firebase_transport_dart.dart';
+import 'package:_firebase_transport_dart/_firebase_transport_dart.dart';
 import 'package:test/test.dart';
 
 final RegExp _clientPart = RegExp(r'^[A-Za-z0-9._/-]+$');

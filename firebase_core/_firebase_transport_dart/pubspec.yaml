@@ -1,8 +1,8 @@
-name: firebase_transport_dart
+name: _firebase_transport_dart
 description: Internal request helpers shared by the firebase_*_dart packages. Not for application code.
 version: 0.1.0
 homepage: https://github.com/long1eu/firebase_dart_sdk
-repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_core/firebase_transport_dart
+repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_core/_firebase_transport_dart
 issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
 topics:
   - firebase

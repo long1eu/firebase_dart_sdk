@@ -1,4 +1,4 @@
-import 'package:firebase_transport_dart/src/runtime_version.dart';
+import 'package:_firebase_transport_dart/src/runtime_version.dart';
 
 /// The names of the headers the Firebase backends read.
 ///

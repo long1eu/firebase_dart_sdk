@@ -5,5 +5,5 @@
 /// `emulatorHostFromEnvironment` getter, which the application passes on explicitly.
 library;
 
-export 'package:firebase_transport_dart/src/environment_stub.dart'
-    if (dart.library.io) 'package:firebase_transport_dart/src/environment_io.dart';
+export 'package:_firebase_transport_dart/src/environment_stub.dart'
+    if (dart.library.io) 'package:_firebase_transport_dart/src/environment_io.dart';

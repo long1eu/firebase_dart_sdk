@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:firebase_app_dart/firebase_app_dart.dart';
-import 'package:firebase_transport_dart/src/headers.dart';
-import 'package:firebase_transport_dart/src/hosts.dart';
-import 'package:firebase_transport_dart/src/log_once.dart';
+import 'package:_firebase_transport_dart/src/headers.dart';
+import 'package:_firebase_transport_dart/src/hosts.dart';
+import 'package:_firebase_transport_dart/src/log_once.dart';
 import 'package:http/http.dart' as http;
 import 'package:meta/meta.dart';
 

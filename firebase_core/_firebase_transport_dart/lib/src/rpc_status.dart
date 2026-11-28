@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:firebase_transport_dart/src/http_rules.dart';
-import 'package:firebase_transport_dart/src/json_guard.dart';
-import 'package:firebase_transport_dart/src/tokens.dart';
+import 'package:_firebase_transport_dart/src/http_rules.dart';
+import 'package:_firebase_transport_dart/src/json_guard.dart';
+import 'package:_firebase_transport_dart/src/tokens.dart';
 import 'package:http/http.dart' as http;
 
 /// The gRPC status codes, in order: `RpcStatus.values[n]` is code n.

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:firebase_transport_dart/src/hosts.dart' show canonicalHost;
+import 'package:_firebase_transport_dart/src/hosts.dart' show canonicalHost;
 import 'package:http/http.dart' as http;
 
 /// A response read with a cap on its body.

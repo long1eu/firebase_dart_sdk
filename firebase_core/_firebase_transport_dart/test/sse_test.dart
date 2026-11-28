@@ -1,4 +1,4 @@
-import 'package:firebase_transport_dart/firebase_transport_dart.dart';
+import 'package:_firebase_transport_dart/_firebase_transport_dart.dart';
 import 'package:test/test.dart';
 
 import 'sse_cases.dart';

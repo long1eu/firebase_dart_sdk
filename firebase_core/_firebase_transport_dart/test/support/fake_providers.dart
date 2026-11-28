@@ -18,7 +18,7 @@ import 'dart:async';
 
 import 'package:fake_async/fake_async.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
-import 'package:firebase_transport_dart/firebase_transport_dart.dart';
+import 'package:_firebase_transport_dart/_firebase_transport_dart.dart';
 import 'package:test/test.dart';
 
 /// The origin every [TokenRig] declares unless told otherwise.
