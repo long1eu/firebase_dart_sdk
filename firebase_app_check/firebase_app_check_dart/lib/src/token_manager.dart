@@ -25,6 +25,41 @@ const Duration _maxCustomLife = Duration(days: 7);
 const String _sessionPause = 'session';
 const String _limitedUsePause = 'limited-use';
 
+/// The rules for the [answer] of a custom provider's callback; returns the token it becomes.
+///
+/// The issue time is now on [clocks], the moment the callback returned; the JWT is not parsed,
+/// because this package cannot verify it. An expiry later than 7 days from now counts as 7 days.
+/// [replacing] is the cached token's text for the answer to a forced session request, and null
+/// otherwise: that token was rejected, so the same string again is not a refresh.
+///
+/// Throws `provider-error` when the token is not 1 to 8192 characters in U+0021 to U+007E, when
+/// it expires less than 60 s from now, or when it is [replacing].
+@internal
+SessionToken checkCustomResult(
+  AppCheckToken answer,
+  Clocks clocks, {
+  String? replacing,
+}) {
+  final DateTime issuedWall = clocks.wallNow();
+  final Duration issuedMono = clocks.monoNow();
+  if (!isTokenText(answer.token)) {
+    throw providerError(ProviderProblem.invalidToken);
+  }
+  final Duration life = answer.expireTime.difference(issuedWall);
+  if (life < _minCustomLife) {
+    throw providerError(ProviderProblem.expiresTooSoon);
+  }
+  if (answer.token == replacing) {
+    throw providerError(ProviderProblem.sameToken);
+  }
+  return SessionToken(
+    token: answer.token,
+    issuedWall: issuedWall,
+    issuedMono: issuedMono,
+    ttl: life > _maxCustomLife ? _maxCustomLife : life,
+  );
+}
+
 /// How a request for the session token ended: a [token], a [token] together with a [failure], or
 /// a [failure].
 ///
@@ -457,9 +492,10 @@ final class TokenManager {
     }
     final bool late = done.isCompleted;
     try {
-      final SessionToken token = _accepted(
+      final SessionToken token = checkCustomResult(
         answer,
-        replacing: forceRefresh && !limitedUse,
+        _clocks,
+        replacing: forceRefresh && !limitedUse ? _current?.token : null,
       );
       if (!late) {
         done.complete(token);
@@ -472,32 +508,6 @@ final class TokenManager {
         done.completeError(error, stack);
       }
     }
-  }
-
-  /// The rules for a custom provider's [answer]. The issue time is now, the moment the callback
-  /// returned; the JWT is not parsed, because this package cannot verify it.
-  ///
-  /// [replacing] is true for the answer to a forced session request: the cached token was
-  /// rejected, so the same string again is not a refresh.
-  SessionToken _accepted(AppCheckToken answer, {required bool replacing}) {
-    final DateTime issuedWall = _clocks.wallNow();
-    final Duration issuedMono = _clocks.monoNow();
-    if (!isTokenText(answer.token)) {
-      throw providerError(ProviderProblem.invalidToken);
-    }
-    final Duration life = answer.expireTime.difference(issuedWall);
-    if (life < _minCustomLife) {
-      throw providerError(ProviderProblem.expiresTooSoon);
-    }
-    if (replacing && answer.token == _current?.token) {
-      throw providerError(ProviderProblem.sameToken);
-    }
-    return SessionToken(
-      token: answer.token,
-      issuedWall: issuedWall,
-      issuedMono: issuedMono,
-      ttl: life > _maxCustomLife ? _maxCustomLife : life,
-    );
   }
 
   /// Completes like [work], or with `app-check-closed` when [close] runs first; [timer] is
