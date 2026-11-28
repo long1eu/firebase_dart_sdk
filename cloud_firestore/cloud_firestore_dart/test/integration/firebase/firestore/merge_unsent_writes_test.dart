@@ -280,5 +280,11 @@ void main() {
       }
     },
     timeout: const Timeout(Duration(minutes: 30)),
+    // The merging is client logic, checked against the Standard edition. Its ~31,000 documents stay in the shared
+    // emulator, and the Enterprise emulator copies every document of the database for each aggregation: the
+    // aggregations of the other test files then run out of heap and fail with an empty `unknown` error.
+    skip: IntegrationTestUtil.skipOnEnterprise(
+      'the ~31,000 documents it leaves make the aggregations of the rest of the suite exhaust the heap of the emulator',
+    ),
   );
 }

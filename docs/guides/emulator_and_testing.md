@@ -198,6 +198,12 @@ Enterprise database.
   on the document id fails with "`__key__` filter value must be a Key" on the Enterprise
   emulator. The request is correct: the same query succeeds through RunQuery on that emulator
   and through Listen on the Standard one.
+- **Emulator memory:** the Enterprise emulator copies every document of the database for each
+  aggregation. With some tens of thousands of documents in the emulator, aggregations run out
+  of heap and fail with `unknown` and an empty message (the emulator log shows
+  `OutOfMemoryError`). Clear the emulator between runs or give it a larger heap
+  (`ENTERPRISE_EMULATOR_JAVA_OPTS=-Xmx8g` for `tool/start_enterprise_emulator.sh`). The
+  standard suite skips `merge_unsent_writes_test.dart` on Enterprise for this reason.
 
 No test failed because of index requirements, result ordering or size limits: the emulator
 does not require indexes in either edition, and it orders document ids the same way in both.

@@ -584,7 +584,8 @@ jobs:
       - uses: ./.github/actions/emulators
       - name: Start Enterprise Firestore emulator
         # The whole suite fills the emulator's default heap (a quarter of the runner's memory): aggregation and
-        # vector queries then fail with an empty `unknown` error.
+        # vector queries then fail with an empty `unknown` error. Each aggregation copies every document of the
+        # database, so merge_unsent_writes_test (~31,000 documents) is skipped on this edition.
         env:
           ENTERPRISE_EMULATOR_JAVA_OPTS: -Xmx8g
         run: |
