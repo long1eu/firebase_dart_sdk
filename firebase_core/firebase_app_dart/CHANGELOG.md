@@ -1,5 +1,9 @@
 ## 0.2.3
 
+- Documentation: point S8 of the provider contract: a `getToken(forceRefresh: true)` that cannot run answers with
+  the cached token when it is still valid, with no error; callers never throttle forced refreshes themselves. S2
+  gains one exception: a refresh that fails while the cached token has not expired yet answers with that token and
+  the error, as the JS SDK does.
 - `LimitedUseAppCheckTokenProvider`: a second interface, with `getLimitedUseToken()`, for a provider that can mint
   a token for one request to a backend that consumes App Check tokens. `AppCheckTokenProvider` itself is
   unchanged, so every existing provider compiles as before. A provider that does not implement it gives no App
