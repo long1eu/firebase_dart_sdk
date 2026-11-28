@@ -152,6 +152,7 @@ final class CallableStream {
         cancel: call.aborted,
       );
     } on TimeoutException {
+      _call?.abort(AbortReason.deadline);
       throw deadlineError(
         'No response arrived within ${describeDuration(_request.timeout)}.',
       );
@@ -190,6 +191,7 @@ final class CallableStream {
     try {
       return await readCapped(response, cap: cap, deadline: _request.timeout);
     } on TimeoutException {
+      _call?.abort(AbortReason.deadline);
       throw deadlineError(_idleMessage);
     }
   }
@@ -326,6 +328,9 @@ final class CallableStream {
   void _fail(Object error, {required String deadlineMessage}) {
     if (_finished) {
       return;
+    }
+    if (error is TimeoutException) {
+      _call?.abort(AbortReason.deadline);
     }
     final FirebaseFunctionsException? mapped = exceptionOfFailure(
       error,
