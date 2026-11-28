@@ -13,8 +13,8 @@ final class SseEvent extends SseItem {
   final String data;
 }
 
-/// From [SseDecoder.add]: invalid UTF-8. From [SseDecoder.close]: the body ended inside a line or
-/// inside an event.
+/// From [SseDecoder.add]: invalid UTF-8, or a chunk value outside 0 to 255 (not a byte). From
+/// [SseDecoder.close]: the body ended inside a line or inside an event.
 final class SseMalformed extends SseItem {
   /// The body is malformed.
   const SseMalformed();
@@ -22,6 +22,10 @@ final class SseMalformed extends SseItem {
 
 /// From [SseDecoder.add]: the bytes of the current line plus the event's accumulated data passed
 /// `maxEventBytes`.
+///
+/// The line counts every byte of its text, field name and colon included (`data: x` is 7 bytes),
+/// without its line end; the accumulated data counts each value with its line feed (`x` gives 2
+/// bytes). Comment lines count while they are read.
 final class SseEventTooLarge extends SseItem {
   /// The event is too large.
   const SseEventTooLarge();
@@ -83,6 +87,9 @@ final class SseDecoder {
   bool _finished = false;
 
   /// Takes the next bytes of the body and returns the items they complete, in order.
+  ///
+  /// The byte that takes the total past `maxStreamBytes` gives [SseStreamTooLarge] and is not
+  /// decoded, even when it would complete an event.
   List<SseItem> add(List<int> chunk) {
     final List<SseItem> items = <SseItem>[];
     for (final int byte in chunk) {

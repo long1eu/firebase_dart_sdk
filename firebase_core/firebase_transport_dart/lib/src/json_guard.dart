@@ -7,8 +7,10 @@ const int maxJsonDepth = 32;
 ///
 /// [units] are the bytes of UTF-8 JSON, or the UTF-16 code units of a JSON string: the scan looks
 /// only at ASCII brackets, quotes and backslashes, which are the same in both. It runs before
-/// decoding, so a hostile body cannot make the decoder recurse deeply.
+/// decoding, so a hostile body cannot make the decoder recurse deeply. [maxDepth] must not be
+/// negative.
 bool exceedsJsonDepth(List<int> units, {int maxDepth = maxJsonDepth}) {
+  assert(maxDepth >= 0, 'maxDepth must not be negative');
   int depth = 0;
   bool inString = false;
   bool escaped = false;
