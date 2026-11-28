@@ -332,11 +332,11 @@ Uri _normalOrigin(String scheme, Uri url) {
 /// same token origin, and so have two spellings of one IPv6 address.
 ///
 /// Throws an [ArgumentError] for a `ws` or `wss` URL without an explicit port: Dart knows no
-/// default port for those schemes.
+/// default port for those schemes. A port of 0 is no port: `Uri` reports it as absent.
 Uri tokenOrigin(Uri url) {
   final String scheme = url.scheme.toLowerCase();
   final bool isSocket = scheme == 'ws' || scheme == 'wss';
-  if (isSocket && (!url.hasPort || url.port == 0)) {
+  if (isSocket && !url.hasPort) {
     throw ArgumentError.value(
       '$scheme://${url.host}',
       'url',
