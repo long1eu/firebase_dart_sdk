@@ -1145,4 +1145,136 @@ void main() {
       unawaited(bad.delete());
     });
   });
+
+  group('experiment properties', () {
+    fakeTest('are sent with the user properties and cleared with null', (
+      _Env env,
+    ) {
+      final FirebaseAnalytics analytics = env.create();
+      env.wait(analytics.setUserProperty(name: 'plan', value: 'pro'));
+      env.wait(
+        analytics.setExperimentProperties(<String, String?>{
+          'firebase_exp_1': '2',
+          'firebase_exp_42': '0',
+        }),
+      );
+      env.wait(analytics.logEvent(name: 'set_firebase_experiment_state'));
+      env.wait(analytics.flush());
+      expect(env.sent.single.body['user_properties'], <String, Object?>{
+        'plan': <String, Object?>{'value': 'pro'},
+        'firebase_exp_1': <String, Object?>{'value': '2'},
+        'firebase_exp_42': <String, Object?>{'value': '0'},
+      });
+
+      env.wait(
+        analytics.setExperimentProperties(<String, String?>{
+          'firebase_exp_1': null,
+        }),
+      );
+      env.wait(analytics.logEvent(name: 'b'));
+      env.wait(analytics.flush());
+      expect(env.sent.last.body['user_properties'], <String, Object?>{
+        'plan': <String, Object?>{'value': 'pro'},
+        'firebase_exp_42': <String, Object?>{'value': '0'},
+      });
+    });
+
+    fakeTest('are kept in the store', (_Env env) {
+      final AnalyticsStore store = AnalyticsStore.memory();
+      final FirebaseAnalytics first = env.create(store: store);
+      env.wait(
+        first.setExperimentProperties(<String, String?>{
+          'firebase_exp_${'a' * 24}': 'v' * 36,
+        }),
+      );
+      env.wait(first.close());
+      final FirebaseAnalytics second = env.create(store: store, seed: 7);
+      env.wait(second.logEvent(name: 'a'));
+      env.wait(second.flush());
+      expect(env.sent.single.body['user_properties'], <String, Object?>{
+        'firebase_exp_${'a' * 24}': <String, Object?>{'value': 'v' * 36},
+      });
+      expect(env.warnings, isEmpty);
+    });
+
+    fakeTest('a bad entry throws and changes nothing', (_Env env) {
+      final FirebaseAnalytics analytics = env.create();
+      for (final MapEntry<String, String?> bad in <MapEntry<String, String?>>[
+        const MapEntry<String, String?>('plan', 'x'),
+        const MapEntry<String, String?>('firebase_exp_', 'x'),
+        MapEntry<String, String?>('firebase_exp_${'a' * 25}', 'x'),
+        const MapEntry<String, String?>('firebase_exp_a-b', 'x'),
+        const MapEntry<String, String?>('firebase_exp_1', ''),
+        MapEntry<String, String?>('firebase_exp_1', 'v' * 37),
+      ]) {
+        final Object error = env.error(
+          analytics.setExperimentProperties(<String, String?>{
+            'firebase_exp_9': '1',
+            bad.key: bad.value,
+          }),
+        );
+        expect(
+          error,
+          isA<FirebaseAnalyticsException>().having(
+            (FirebaseAnalyticsException e) => e.code,
+            'code',
+            'invalid-user-property',
+          ),
+          reason: bad.toString(),
+        );
+      }
+      env.wait(analytics.logEvent(name: 'a'));
+      env.wait(analytics.flush());
+      expect(env.sent.single.body.containsKey('user_properties'), isFalse);
+    });
+
+    fakeTest('setUserProperty still refuses the experiment names', (_Env env) {
+      final FirebaseAnalytics analytics = env.create();
+      expect(
+        env.error(
+          analytics.setUserProperty(name: 'firebase_exp_1', value: '1'),
+        ),
+        isA<FirebaseAnalyticsException>(),
+      );
+    });
+
+    fakeTest('count toward the limit of 25, all or nothing', (_Env env) {
+      final FirebaseAnalytics analytics = env.create();
+      for (int i = 0; i < 24; i++) {
+        env.wait(analytics.setUserProperty(name: 'p$i', value: 'v'));
+      }
+      final Object error = env.error(
+        analytics.setExperimentProperties(<String, String?>{
+          'firebase_exp_1': '1',
+          'firebase_exp_2': '1',
+        }),
+      );
+      expect(
+        error,
+        isA<FirebaseAnalyticsException>().having(
+          (FirebaseAnalyticsException e) => e.code,
+          'code',
+          'too-many-user-properties',
+        ),
+      );
+      env.wait(analytics.logEvent(name: 'a'));
+      env.wait(analytics.flush());
+      final Map<String, Object?> sent =
+          env.sent.single.body['user_properties']! as Map<String, Object?>;
+      expect(sent, hasLength(24));
+
+      // Replacing one and adding one in the same call fits.
+      env.wait(
+        analytics.setExperimentProperties(<String, String?>{
+          'firebase_exp_1': '1',
+        }),
+      );
+      env.wait(
+        analytics.setExperimentProperties(<String, String?>{
+          'firebase_exp_1': null,
+          'firebase_exp_2': '2',
+        }),
+      );
+    });
+  });
 }

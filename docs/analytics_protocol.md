@@ -300,3 +300,8 @@ the property's settings:
 5. Is a body of 130,000 bytes accepted, and one of 133,120? (Section 3.)
 6. Which `device` fields does strict mode require, and does it accept a block with all nine? (Section 7;
    step 1b of the probe.)
+7. Does a web stream keep the A/B testing user properties `firebase_exp_<id>` that Remote Config's hand-off
+   sets through `setExperimentProperties`? Their names use the reserved `firebase_` prefix and can pass 24
+   characters (section 4), so the stream may drop them without saying so. Step 1c of the probe asks the
+   validation server; whether they reach the reports is a separate check. Until it is answered, the
+   hand-off is best effort.

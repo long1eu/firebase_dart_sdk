@@ -204,6 +204,43 @@ void checkParameterCount(int count) {
   }
 }
 
+final RegExp _experimentPropertyPattern = RegExp(
+  r'^firebase_exp_[A-Za-z0-9_]{1,24}$',
+);
+
+/// Whether [name] is the name of an A/B testing experiment property, `firebase_exp_<id>`, which only
+/// `FirebaseAnalytics.setExperimentProperties` sets.
+bool isExperimentPropertyName(String name) =>
+    _experimentPropertyPattern.hasMatch(name);
+
+/// Checks an experiment property set by `FirebaseAnalytics.setExperimentProperties`; a null [value]
+/// removes the property and is always allowed.
+void checkExperimentProperty(String name, String? value) {
+  if (!isExperimentPropertyName(name)) {
+    throw _error(
+      'invalid-user-property',
+      'Experiment property name "${_shown(name)}" must be "firebase_exp_" followed by 1 to 24 letters, '
+          'digits or underscores.',
+    );
+  }
+  if (value != null &&
+      (value.isEmpty ||
+          measuredLength(value) > AnalyticsLimits.maxUserPropertyValueLength)) {
+    throw _error(
+      'invalid-user-property',
+      'The value of experiment property "$name" must be 1 to ${AnalyticsLimits.maxUserPropertyValueLength} '
+          'characters, counted in its percent-encoded form.',
+    );
+  }
+}
+
+/// Checks a user property read back from the store: either one [checkUserProperty] accepts or an
+/// experiment property.
+void checkStoredUserProperty(String name, String value) =>
+    isExperimentPropertyName(name)
+    ? checkExperimentProperty(name, value)
+    : checkUserProperty(name, value);
+
 /// Checks a user property name and value; a null [value] removes the property and is always allowed.
 void checkUserProperty(String name, String? value) {
   if (name.isEmpty ||

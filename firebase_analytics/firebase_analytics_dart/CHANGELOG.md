@@ -11,4 +11,7 @@ Not released.
   events older than 72 hours dropped.
 - Two transports: a relay that carries the App Check and ID tokens, and a direct one with the API secret.
 - `AnalyticsStore.memory()` and `FileAnalyticsStore` (`io.dart`).
+- `setExperimentProperties`, for integrations: the `firebase_exp_<id>` user properties of Remote Config's
+  A/B testing hand-off, outside the rules of `setUserProperty`. Whether a web stream keeps them is not
+  verified yet.
 - `AnalyticsDevice` and `AnalyticsUserLocation`, sent only when passed to the constructor.
