@@ -18,9 +18,11 @@ final RegExp _serverStatusPattern = RegExp(r'^[A-Z_]{1,64}$');
 /// The cap on a 2xx body, and the bytes kept of any other body.
 const int _bodyCap = 16384;
 
-/// The deadline of one exchange, from the send to the end of the body. With the 8 s of the seam
-/// and the 10 s of the callers it is one set that changes together.
-const Duration _exchangeDeadline = Duration(seconds: 7);
+/// The provider deadline: the time one exchange may take, from the send to the end of the body,
+/// and the time a custom provider's callback may take. With the 8 s of the seam and the 10 s of
+/// the callers it is one set that changes together.
+@internal
+const Duration providerDeadline = Duration(seconds: 7);
 
 /// Sends the debug-token exchange: one HTTPS POST that trades a debug token for an App Check
 /// token.
@@ -148,7 +150,7 @@ final class ExchangeClient {
               ..bodyBytes = body,
         successCap: _bodyCap,
         errorCap: _bodyCap,
-        deadline: _exchangeDeadline,
+        deadline: providerDeadline,
         cancel: _closed,
       );
     } on TransportException catch (error) {
