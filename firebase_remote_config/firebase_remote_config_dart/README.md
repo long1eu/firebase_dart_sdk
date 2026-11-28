@@ -257,3 +257,6 @@ Messages never hold tokens, the API key, request bodies or signal values.
 - Values follow Android's conversions (FlutterFire's `asBool` knows only `true` and `1`).
 - Realtime works on every platform; on the web no `fetchAndActivate` is needed before listening.
 - `getKeysByPrefix`, `reset()` and `asJson()` are not provided.
+
+A FlutterFire adapter, `firebase_remote_config_dart_platform`, maps this client onto the
+`firebase_remote_config` plugin.

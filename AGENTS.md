@@ -25,6 +25,7 @@ Maintained, tested and published (`cloud_firestore_dart` 0.3.2, Dart `^3.8.0`):
 | `firebase_database_dart_platform` (0.1.0, Flutter) | `firebase_database/firebase_database_dart_platform` |
 | `firebase_installations_dart` (0.1.0; not on pub.dev yet) | `firebase_installations/firebase_installations_dart` |
 | `firebase_remote_config_dart` (0.1.0; not on pub.dev yet) | `firebase_remote_config/firebase_remote_config_dart` |
+| `firebase_remote_config_dart_platform` (0.1.0, Flutter; not on pub.dev yet) | `firebase_remote_config/firebase_remote_config_dart_platform` |
 
 - `examples/`: complete example packages (`server_shelf`, `cli`, `storage_cli`, `cloud_run_job`).
 - `docs/`: guides (`docs/guides/`), parity, support policy, how we test, upstream sync records.

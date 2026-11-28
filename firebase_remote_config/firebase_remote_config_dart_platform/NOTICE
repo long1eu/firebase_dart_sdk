@@ -1,0 +1,16 @@
+firebase_remote_config_dart_platform
+Copyright 2026 Razvan Lung (long1eu) and contributors.
+
+This package is a FlutterFire platform implementation: it implements the
+platform interface of the FlutterFire firebase_remote_config plugin
+(firebase_remote_config_platform_interface, Copyright 2022 the Chromium project
+authors, BSD 3-Clause license) and the platform interface of firebase_core
+(firebase_core_platform_interface, BSD 3-Clause license). It depends on those
+packages; it does not copy their code. The work is done by
+firebase_remote_config_dart and firebase_installations_dart, unofficial clients
+of the Firebase Remote Config and Firebase Installations REST APIs.
+
+This package is not affiliated with, endorsed by or supported by Google LLC or
+Firebase. "Firebase" is a trademark of Google LLC.
+
+Licensed under the Apache License, Version 2.0; see the LICENSE file.
