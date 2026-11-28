@@ -14,22 +14,59 @@ String _describe(SseItem item) {
 }
 
 void main() {
-  group('cases', () {
-    for (final SseCase sseCase in sseCases) {
-      test(sseCase.name, () {
-        final SseDecoder decoder = SseDecoder(
-          maxEventBytes: sseCaseMaxEventBytes,
-          maxStreamBytes: sseCaseMaxStreamBytes,
-        );
-        final List<String> items = <String>[
-          for (final List<int> chunk in sseCase.chunks)
-            ...decoder.add(chunk).map(_describe),
-          if (sseCase.close) ...decoder.close().map(_describe),
-        ];
+  for (final SseCase sseCase in sseCases) {
+    test(sseCase.name, () {
+      final SseDecoder decoder = SseDecoder(
+        maxEventBytes: sseCaseMaxEventBytes,
+        maxStreamBytes: sseCaseMaxStreamBytes,
+      );
+      final List<String> items = <String>[
+        for (final List<int> chunk in sseCase.chunks)
+          ...decoder.add(chunk).map(_describe),
+        if (sseCase.close) ...decoder.close().map(_describe),
+      ];
 
-        expect(items, sseCase.expected);
-      });
+      expect(items, sseCase.expected);
+    });
+  }
+
+  // The names §8.1 row 7 cites.
+  test('caps stop the decoder', () {
+    final SseDecoder events = SseDecoder(maxEventBytes: 8, maxStreamBytes: 64);
+    expect(
+      events.add('data: ab\n\ndata: abc'.codeUnits).map(_describe),
+      <String>['event:ab', 'event-too-large'],
+    );
+    expect(events.add('\n\ndata: x\n\n'.codeUnits), isEmpty);
+    expect(events.close(), isEmpty);
+
+    final SseDecoder stream = SseDecoder(maxEventBytes: 64, maxStreamBytes: 12);
+    expect(
+      stream.add('data: a\n\ndata: b\n\n'.codeUnits).map(_describe),
+      <String>['event:a', 'stream-too-large'],
+    );
+    expect(stream.add('data: c\n\n'.codeUnits), isEmpty);
+    expect(stream.close(), isEmpty);
+  });
+
+  test('cut body is malformed', () {
+    for (final String body in <String>[
+      'data: a',
+      'data: a\n',
+      'data: a\ndata: b',
+    ]) {
+      final SseDecoder decoder = SseDecoder(
+        maxEventBytes: 64,
+        maxStreamBytes: 128,
+      );
+      expect(decoder.add(body.codeUnits), isEmpty, reason: body);
+      expect(decoder.close().map(_describe), <String>[
+        'malformed',
+      ], reason: body);
     }
+    final SseDecoder split = SseDecoder(maxEventBytes: 64, maxStreamBytes: 128);
+    expect(split.add(<int>[...'data: '.codeUnits, 0xe2, 0x82]), isEmpty);
+    expect(split.close().map(_describe), <String>['malformed']);
   });
 
   test('ArgumentError for maxEventBytes of 0 or less', () {

@@ -52,15 +52,19 @@ final List<SseCase> sseCases = <SseCase>[
   ),
   (
     name: 'CR LF line ends',
-    chunks: <List<int>>[_text('data: a\r\n\r\ndata: b\r\n\r\n')],
+    chunks: <List<int>>[_text('data: a\r\ndata: b\r\n\r\ndata: c\r\n\r\n')],
     close: true,
-    expected: <String>['event:a', 'event:b'],
+    expected: <String>['event:a\nb', 'event:c'],
   ),
   (
     name: 'CR and LF split across chunks are one line end',
-    chunks: <List<int>>[_text('data: a\r'), _text('\n\r'), _text('\n')],
+    chunks: <List<int>>[
+      _text('data: a\r'),
+      _text('\ndata: b\r'),
+      _text('\n\r\n'),
+    ],
     close: true,
-    expected: <String>['event:a'],
+    expected: <String>['event:a\nb'],
   ),
   (
     name: 'a multi-byte character split across chunks',
@@ -184,9 +188,9 @@ final List<SseCase> sseCases = <SseCase>[
   // Beyond the list of §11.4.
   (
     name: 'mixed line ends in one event',
-    chunks: <List<int>>[_text('data: a\rdata: b\ndata: c\r\n\n')],
+    chunks: <List<int>>[_text('data: a\rdata: b\ndata: c\r\ndata: d\n\n')],
     close: true,
-    expected: <String>['event:a\nb\nc'],
+    expected: <String>['event:a\nb\nc\nd'],
   ),
   (
     name: 'a CR at the end of a chunk followed by text',
@@ -232,11 +236,14 @@ final List<SseCase> sseCases = <SseCase>[
         ...<int>[0xe0, 0xa0, 0x80],
         ...<int>[0xed, 0x9f, 0xbf],
         ...<int>[0xee, 0x80, 0x80],
+        ...<int>[0xf0, 0x90, 0x80, 0x80],
         ...<int>[0xf4, 0x8f, 0xbf, 0xbf],
       ], '\n\n'),
     ],
     close: true,
-    expected: <String>['event:\u{80}\u{800}\u{d7ff}\u{e000}\u{10ffff}'],
+    expected: <String>[
+      'event:\u{80}\u{800}\u{d7ff}\u{e000}\u{10000}\u{10ffff}',
+    ],
   ),
   (
     name: 'invalid UTF-8: a stray continuation byte after an event',
@@ -353,5 +360,61 @@ final List<SseCase> sseCases = <SseCase>[
     ],
     close: true,
     expected: <String>['event:a', 'malformed'],
+  ),
+  (
+    name: 'CR LF split across chunks inside one event',
+    chunks: <List<int>>[
+      _text('data: a\r'),
+      _text('\n'),
+      _text('data: b\r'),
+      _text('\n'),
+      _text('\r'),
+      _text('\n'),
+    ],
+    close: true,
+    expected: <String>['event:a\nb'],
+  ),
+  (
+    name: 'invalid UTF-8: an overlong four-byte form',
+    chunks: <List<int>>[
+      _bytes('data: ', <int>[0xf0, 0x8f, 0xbf, 0xbf]),
+    ],
+    close: true,
+    expected: <String>['malformed'],
+  ),
+  (
+    name: 'invalid UTF-8: the lead byte F5',
+    chunks: <List<int>>[
+      _bytes('data: ', <int>[0xf5, 0x80, 0x80, 0x80]),
+    ],
+    close: true,
+    expected: <String>['malformed'],
+  ),
+  (
+    name: 'maxEventBytes counts bytes: 32 bytes of é are accepted',
+    chunks: <List<int>>[_text('data: ${'é' * 13}\n\n')],
+    close: true,
+    expected: <String>['event:${'é' * 13}'],
+  ),
+  (
+    name: 'maxEventBytes counts bytes: 33 bytes of é are refused',
+    chunks: <List<int>>[_text('data: a${'é' * 13}\n\n')],
+    close: true,
+    expected: <String>['event-too-large'],
+  ),
+  (
+    name: 'maxEventBytes counts the bytes of multi-line data',
+    chunks: <List<int>>[
+      _text('${'data: €€\n' * 3}\n'),
+      _text('data: €€\n' * 4),
+    ],
+    close: true,
+    expected: <String>['event:€€\n€€\n€€', 'event-too-large'],
+  ),
+  (
+    name: 'maxEventBytes fires mid-line, before a line end',
+    chunks: <List<int>>[_text('data: ${'y' * 27}')],
+    close: false,
+    expected: <String>['event-too-large'],
   ),
 ];
