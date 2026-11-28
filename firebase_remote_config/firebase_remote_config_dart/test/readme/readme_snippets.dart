@@ -74,22 +74,22 @@ Future<void> remoteConfigReadmeLine117() async {
   });
 }
 
-// README.md:128
-Future<void> remoteConfigReadmeLine128() async {
+// README.md:129
+Future<void> remoteConfigReadmeLine129() async {
   await remoteConfig.reset();
   print(remoteConfig.info.lastFetchStatus); // RemoteConfigFetchStatus.noFetchYet
 }
 
-// README.md:139
-Future<void> remoteConfigReadmeLine139() async {
+// README.md:140
+Future<void> remoteConfigReadmeLine140() async {
   final String message = remoteConfig.getString('welcome_message');
   final int maxItems = remoteConfig.getInt('max_items');
   final RemoteConfigValue value = remoteConfig.getValue('welcome_message');
   print('$message, $maxItems, from ${value.source.name}');
 }
 
-// README.md:146
-Future<void> remoteConfigReadmeLine146() async {
+// README.md:147
+Future<void> remoteConfigReadmeLine147() async {
   final List<String> themeKeys = remoteConfig.getKeysByPrefix('theme_');
   final RemoteConfigValue fromDefaults = remoteConfig.getValueFrom(
     'welcome_message',
@@ -100,8 +100,8 @@ Future<void> remoteConfigReadmeLine146() async {
   print('$themeKeys, ${fromDefaults.text}, $layout, ${bytes.length}');
 }
 
-// README.md:182
-Future<void> remoteConfigReadmeLine182() async {
+// README.md:183
+Future<void> remoteConfigReadmeLine183() async {
   await remoteConfig.setCustomSignals(<String, Object?>{
     'subscription_tier': 'pro',
     'app_build': 412,
@@ -109,8 +109,8 @@ Future<void> remoteConfigReadmeLine182() async {
   });
 }
 
-// README.md:205
-Future<void> remoteConfigReadmeLine205() async {
+// README.md:206
+Future<void> remoteConfigReadmeLine206() async {
   final StreamSubscription<RemoteConfigUpdate> subscription = remoteConfig.onConfigUpdated.listen(
     (RemoteConfigUpdate update) async {
       print('Updated: ${update.updatedKeys}');
@@ -120,8 +120,8 @@ Future<void> remoteConfigReadmeLine205() async {
   );
 }
 
-// README.md:239
-Future<void> remoteConfigReadmeLine239() async {
+// README.md:240
+Future<void> remoteConfigReadmeLine240() async {
   final StreamSubscription<Set<RolloutAssignment>> rollouts = remoteConfig.onRolloutsStateChanged.listen(
     (Set<RolloutAssignment> assignments) {
       for (final RolloutAssignment assignment in assignments) {
