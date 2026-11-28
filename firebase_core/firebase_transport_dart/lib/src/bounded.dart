@@ -11,6 +11,10 @@ const int maxSafeInteger = 9007199254740991;
 /// `1` and `1000` on the web, so they are accepted on every platform. [min] and [max] must be
 /// within ±[maxSafeInteger].
 int? parseBoundedInt(Object? value, {required int min, required int max}) {
+  assert(
+    min >= -maxSafeInteger && max <= maxSafeInteger,
+    'min and max must be within ±maxSafeInteger',
+  );
   if (value is String) {
     return _parseDigits(value, min, max);
   }

@@ -9,66 +9,63 @@ import 'package:http/http.dart' as http;
 /// The gRPC status codes, in order: `RpcStatus.values[n]` is code n.
 enum RpcStatus {
   /// Code 0.
-  ok,
+  ok('ok', 'OK'),
 
   /// Code 1.
-  cancelled,
+  cancelled('cancelled', 'CANCELLED'),
 
   /// Code 2.
-  unknown,
+  unknown('unknown', 'UNKNOWN'),
 
   /// Code 3.
-  invalidArgument,
+  invalidArgument('invalid-argument', 'INVALID_ARGUMENT'),
 
   /// Code 4.
-  deadlineExceeded,
+  deadlineExceeded('deadline-exceeded', 'DEADLINE_EXCEEDED'),
 
   /// Code 5.
-  notFound,
+  notFound('not-found', 'NOT_FOUND'),
 
   /// Code 6.
-  alreadyExists,
+  alreadyExists('already-exists', 'ALREADY_EXISTS'),
 
   /// Code 7.
-  permissionDenied,
+  permissionDenied('permission-denied', 'PERMISSION_DENIED'),
 
   /// Code 8.
-  resourceExhausted,
+  resourceExhausted('resource-exhausted', 'RESOURCE_EXHAUSTED'),
 
   /// Code 9.
-  failedPrecondition,
+  failedPrecondition('failed-precondition', 'FAILED_PRECONDITION'),
 
   /// Code 10.
-  aborted,
+  aborted('aborted', 'ABORTED'),
 
   /// Code 11.
-  outOfRange,
+  outOfRange('out-of-range', 'OUT_OF_RANGE'),
 
   /// Code 12.
-  unimplemented,
+  unimplemented('unimplemented', 'UNIMPLEMENTED'),
 
   /// Code 13.
-  internal,
+  internal('internal', 'INTERNAL'),
 
   /// Code 14.
-  unavailable,
+  unavailable('unavailable', 'UNAVAILABLE'),
 
   /// Code 15.
-  dataLoss,
+  dataLoss('data-loss', 'DATA_LOSS'),
 
   /// Code 16.
-  unauthenticated;
+  unauthenticated('unauthenticated', 'UNAUTHENTICATED');
+
+  const RpcStatus(this.kebab, this._wireName);
 
   /// The `FirebaseException` code: `ok`, `invalid-argument`, `deadline-exceeded` and so on.
-  String get kebab => name.replaceAllMapped(
-    _capital,
-    (Match match) => '-${match[0]!.toLowerCase()}',
-  );
+  final String kebab;
 
   /// The name on the wire: `OK`, `INVALID_ARGUMENT`, `DEADLINE_EXCEEDED` and so on.
-  String get _wireName => name
-      .replaceAllMapped(_capital, (Match match) => '_${match[0]}')
-      .toUpperCase();
+  final String _wireName;
 
   /// The status of gRPC code [code]; a code outside 0 to 16 is [unknown].
   static RpcStatus fromCode(int code) {
@@ -120,8 +117,6 @@ enum RpcStatus {
     504: deadlineExceeded,
   };
 }
-
-final RegExp _capital = RegExp('[A-Z]');
 
 /// The error object of a Google API error body, read without trusting it.
 final class RpcErrorBody {
@@ -183,11 +178,16 @@ Map<Object?, Object?>? _errorObjectOf(Object? decoded) {
   return error is Map ? error.cast<Object?, Object?>() : null;
 }
 
+/// [code] when it is a whole number from 100 to 599, read by value so that `404` and `404.0` give
+/// the same result on the VM and on the web.
 int? _httpCodeOf(Object? code) {
-  if (code is int && code >= 100 && code <= 599) {
-    return code;
+  if (code is! num || !code.isFinite || code != code.truncateToDouble()) {
+    return null;
   }
-  return null;
+  if (code < 100 || code > 599) {
+    return null;
+  }
+  return code.toInt();
 }
 
 /// The status a product reports for [error], a failure of this package or of a send.

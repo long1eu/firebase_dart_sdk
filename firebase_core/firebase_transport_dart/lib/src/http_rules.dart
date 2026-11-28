@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 
 /// A response read with a cap on its body.
 final class CappedResponse {
-  /// A response with [statusCode], [headers] (lowercase names) and [body].
+  /// A response with [statusCode], [headers] and [body].
   const CappedResponse({
     required this.statusCode,
     required this.headers,
@@ -17,7 +17,8 @@ final class CappedResponse {
   /// The HTTP status.
   final int statusCode;
 
-  /// The response headers, names in lowercase.
+  /// The response headers as the client gave them (the clients of `package:http` give lowercase
+  /// names).
   final Map<String, String> headers;
 
   /// The body bytes, at most the cap they were read with.
@@ -44,8 +45,9 @@ enum TransportFailure {
 
 /// A failure of the transport, with nothing of the request's URL in it.
 ///
-/// The client's exception object is not kept: only its type name in [causeType] and, for an
-/// `http.ClientException`, its message with the URL redacted in [detail].
+/// The client's exception object and its stack trace are not kept: only its type name in
+/// [causeType] and, for an `http.ClientException`, its message in [detail] with the request URL,
+/// its query, its query values and its header values redacted.
 final class TransportException implements Exception {
   /// A failure of kind [failure].
   const TransportException(this.failure, {this.causeType, this.detail});
@@ -53,10 +55,13 @@ final class TransportException implements Exception {
   /// What failed.
   final TransportFailure failure;
 
-  /// The runtime type name of the client's exception.
+  /// The runtime type name of the client's exception. Under dart2js it may be a minified name.
   final String? causeType;
 
   /// An `http.ClientException`'s message, redacted and sanitized; null for any other cause.
+  ///
+  /// It can still name the host (a failed lookup) or quote text the server sent, such as a
+  /// response header value in a browser's message.
   final String? detail;
 
   @override
@@ -78,7 +83,8 @@ final class CapExceededException implements Exception {
 
 /// Sends the request [build] makes and reads its body with caps.
 ///
-/// [build] receives the future that aborts the request and must give it to `http.AbortableRequest`.
+/// [build] receives the future that aborts the request and must give it to `http.AbortableRequest`
+/// (or another `http.Abortable` request); a request without it cannot be aborted.
 /// Redirects are not followed: a 3xx answer, or a response from another origin than the request,
 /// aborts and throws [TransportException] with [TransportFailure.redirected], and its body is not
 /// read. A 2xx body past [successCap] aborts and throws [CapExceededException]. A non-2xx body is
@@ -98,42 +104,45 @@ Future<CappedResponse> sendCapped(
   final http.BaseRequest request = build(abort.future)..followRedirects = false;
   final _CappedReader reader = _CappedReader(
     abort,
-    request.url,
+    request,
     successCap: successCap,
     errorCap: errorCap,
   );
   final Timer timer = Timer(deadline, () {
     reader.fail(
       TimeoutException('The request took longer than its deadline', deadline),
-      StackTrace.current,
     );
   });
-  _watchCancel(cancel, reader.onCancel);
+  final _CancelHook hook = _CancelHook.watch(cancel, reader.onCancel);
   try {
     unawaited(
       Future<http.StreamedResponse>.sync(
         () => client.send(request),
-      ).then(reader.start, onError: reader.failClient),
+      ).then(reader.start).catchError(reader.failClient),
     );
     return await reader.result.future;
   } finally {
     timer.cancel();
-    reader.close();
+    hook.clear();
   }
 }
 
 /// Sends the request [build] makes and returns its response with a watched body stream.
 ///
-/// [build] receives the future that aborts the request and must give it to `http.AbortableRequest`.
-/// Waits for the response headers at most [headersDeadline]; past it, aborts and throws
-/// [TimeoutException]. Redirects are refused as in [sendCapped]. The returned response has the
-/// status, headers and other fields of the client's response and a single-subscription body stream
-/// that aborts the request when its subscription is cancelled or when [cancel] completes (it then
-/// ends with a [TransportException] with [TransportFailure.cancelled]). With [idleTimeout], the
-/// body stream ends with a [TimeoutException] and aborts when no bytes arrive for that long; the
-/// idle timer starts when the body is listened to, restarts on every chunk and stops while the
-/// subscription is paused. It checks no status and applies no cap. Every exception of the client,
-/// before the headers or from the body stream, becomes a [TransportException].
+/// [build] receives the future that aborts the request and must give it to `http.AbortableRequest`
+/// (or another `http.Abortable` request). Waits for the response headers at most
+/// [headersDeadline]; past it, aborts and throws [TimeoutException]. Redirects are refused as in
+/// [sendCapped]. The returned response has the status, headers, request and other fields of the
+/// client's response, and a single-subscription body stream that aborts the request when its
+/// subscription is cancelled or when [cancel] completes (it then ends with a [TransportException]
+/// with [TransportFailure.cancelled]). With [idleTimeout], the body stream ends with a
+/// [TimeoutException] and aborts when no bytes arrive for that long; the idle timer starts when the
+/// body is listened to, restarts on every chunk and stops while the subscription is paused. It
+/// checks no status and applies no cap. Every exception of the client, before the headers or from
+/// the body stream, becomes a [TransportException].
+///
+/// The response's `request` is the request [build] made, with its headers: a product must not
+/// print it, since the headers carry tokens.
 Future<http.StreamedResponse> sendStreaming(
   http.Client client,
   http.BaseRequest Function(Future<void> abort) build, {
@@ -143,35 +152,40 @@ Future<http.StreamedResponse> sendStreaming(
 }) async {
   final Completer<void> abort = Completer<void>();
   final http.BaseRequest request = build(abort.future)..followRedirects = false;
-  final _StreamingSend send = _StreamingSend(abort, request.url, idleTimeout);
+  final _StreamingSend send = _StreamingSend(abort, request, idleTimeout);
   final Timer timer = Timer(headersDeadline, () {
     send.fail(
       TimeoutException(
         'The response headers took longer than their deadline',
         headersDeadline,
       ),
-      StackTrace.current,
     );
   });
-  _watchCancel(cancel, send.onCancel);
+  final _CancelHook hook = _CancelHook.watch(cancel, send.onCancel);
+  send.hook = hook;
   try {
     unawaited(
       Future<http.StreamedResponse>.sync(
         () => client.send(request),
-      ).then(send.start, onError: send.failClient),
+      ).then(send.start).catchError(send.failClient),
     );
     return await send.result.future;
   } finally {
     timer.cancel();
+    if (!send.hasBody) {
+      hook.clear();
+    }
   }
 }
 
 /// Reads the body of [response] up to [cap] bytes, within [deadline].
 ///
 /// A longer body is cut: the subscription is cancelled at once and the result has
-/// [CappedResponse.truncated] true; it never throws for size. A stream error completes the future
-/// with a [TransportException]. Past [deadline] the subscription is cancelled and
-/// [TimeoutException] is thrown.
+/// [CappedResponse.truncated] true; it never throws for size. A [TransportException], a
+/// [TimeoutException] or a [CapExceededException] from the body stream (the stream [sendStreaming]
+/// returns) is thrown unchanged; any other stream error completes the future with a
+/// [TransportException]. Past [deadline] the subscription is cancelled and [TimeoutException] is
+/// thrown.
 Future<CappedResponse> readCapped(
   http.StreamedResponse response, {
   required int cap,
@@ -184,7 +198,6 @@ Future<CappedResponse> readCapped(
         'Reading the body took longer than its deadline',
         deadline,
       ),
-      StackTrace.current,
     );
   });
   try {
@@ -223,6 +236,9 @@ String decodeUtf8Lenient(Uint8List bytes) =>
 
 bool _isControl(int rune) => rune < 0x20 || (rune >= 0x7f && rune <= 0x9f);
 
+String _withoutControls(String text) =>
+    String.fromCharCodes(text.runes.where((int rune) => !_isControl(rune)));
+
 int _utf8Length(int rune) {
   if (rune < 0x80) {
     return 1;
@@ -233,17 +249,36 @@ int _utf8Length(int rune) {
   return rune < 0x10000 ? 3 : 4;
 }
 
-/// Calls [onCancel] when [cancel] completes, with a value or an error.
-void _watchCancel(Future<void>? cancel, void Function() onCancel) {
-  if (cancel == null) {
-    return;
+/// The listener on a caller's `cancel` future. [clear] drops the callback, so a long-lived
+/// `cancel` future does not keep a finished call alive.
+final class _CancelHook {
+  _CancelHook._(this._onCancel);
+
+  /// Calls [onCancel] when [cancel] completes, with a value or an error, until [clear].
+  factory _CancelHook.watch(Future<void>? cancel, void Function() onCancel) {
+    final _CancelHook hook = _CancelHook._(onCancel);
+    if (cancel != null) {
+      unawaited(
+        cancel.then(
+          (_) => hook._fire(),
+          onError: (Object _, StackTrace _) => hook._fire(),
+        ),
+      );
+    }
+    return hook;
   }
-  unawaited(
-    cancel.then(
-      (_) => onCancel(),
-      onError: (Object _, StackTrace _) => onCancel(),
-    ),
-  );
+
+  void Function()? _onCancel;
+
+  void _fire() {
+    final void Function()? onCancel = _onCancel;
+    _onCancel = null;
+    onCancel?.call();
+  }
+
+  void clear() {
+    _onCancel = null;
+  }
 }
 
 /// True when [response] is a redirect: a 3xx status, or a response URL of another origin than
@@ -256,10 +291,25 @@ bool _isRedirect(http.BaseResponse response, Uri requestUrl) {
       !_sameOrigin(response.url, requestUrl);
 }
 
+/// Same scheme, host and port. Hosts are compared by [_canonicalHost]; an internationalized name
+/// is compared as given, so its Unicode and its punycode spellings are different origins.
 bool _sameOrigin(Uri a, Uri b) =>
     a.scheme.toLowerCase() == b.scheme.toLowerCase() &&
-    a.host.toLowerCase() == b.host.toLowerCase() &&
+    _canonicalHost(a.host) == _canonicalHost(b.host) &&
     a.port == b.port;
+
+/// [host] in a form for comparison: an IPv6 address by its parsed bytes, anything else lowercased.
+String _canonicalHost(String host) {
+  final String lowercase = host.toLowerCase();
+  if (!lowercase.contains(':')) {
+    return lowercase;
+  }
+  try {
+    return Uri.parseIPv6Address(lowercase).join('.');
+  } on FormatException {
+    return lowercase;
+  }
+}
 
 /// Stops listening to a body that is abandoned.
 ///
@@ -270,45 +320,47 @@ void _cancelQuietly(StreamSubscription<List<int>> subscription) {
   subscription.cancel().ignore();
 }
 
-/// Listens to the body of a response that is not returned and stops at once, so its connection is
-/// released; no byte of it is read.
-void _discard(http.StreamedResponse response) {
-  _cancelQuietly(response.stream.listen(null, onError: (Object _) {}));
+/// Listens to a body that is not read and stops at once, so its connection is released; no byte
+/// of it is read.
+void _discard(Stream<List<int>> body) {
+  _cancelQuietly(body.listen(null, onError: (Object _) {}));
 }
 
 /// The [TransportException] for [error], an exception of the client or of its body stream.
 ///
-/// [error] is not kept. [url] (the request URL, when known) and the exception's own URL are
-/// redacted from the message of an `http.ClientException`.
-TransportException _transportFailure(Object error, Uri? url) {
+/// [error] is not kept. The URL of [request] (when known), its header values and the exception's
+/// own URL are redacted from the message of an `http.ClientException`.
+TransportException _transportFailure(Object error, http.BaseRequest? request) {
   final TransportFailure failure = error is http.RequestAbortedException
       ? TransportFailure.cancelled
       : TransportFailure.network;
   return TransportException(
     failure,
     causeType: error.runtimeType.toString(),
-    detail: error is http.ClientException ? _redactedDetail(error, url) : null,
+    detail: error is http.ClientException
+        ? _redactedDetail(error, request)
+        : null,
   );
 }
 
-/// The message of [error] with the URLs, their query strings and each query value of four
-/// characters or more replaced by `<redacted>`, as written and percent-decoded, then sanitized.
+/// The message of [error] with every secret of [request] and of the exception's URL replaced by
+/// `<redacted>`, then sanitized.
 ///
-/// Control characters are removed before the replacement too, so they cannot split a URL so that it
-/// escapes the match.
-String _redactedDetail(http.ClientException error, Uri? url) {
+/// The secrets are the URLs, their query strings, each query value of four characters or more and
+/// each request header value of four characters or more, as written and percent-decoded. Control
+/// characters are removed from the message and from the secrets before matching, so they cannot
+/// split a secret so that it escapes the match.
+String _redactedDetail(http.ClientException error, http.BaseRequest? request) {
   final Set<String> secrets = <String>{};
-  for (final Uri? each in <Uri?>[url, error.uri]) {
-    if (each != null) {
-      _addUrlSecrets(secrets, each);
+  for (final Uri? url in <Uri?>[request?.url, error.uri]) {
+    if (url != null) {
+      _addUrlSecrets(secrets, url);
     }
   }
-  final List<String> longestFirst = secrets.toList()
-    ..sort((String a, String b) => b.length.compareTo(a.length));
-  final String plain = String.fromCharCodes(
-    error.message.runes.where((int rune) => !_isControl(rune)),
-  );
-  return sanitizeServerText(_replaceEach(plain, longestFirst));
+  for (final String value in request?.headers.values ?? const <String>[]) {
+    _addForms(secrets, value, 4);
+  }
+  return sanitizeServerText(_redact(_withoutControls(error.message), secrets));
 }
 
 void _addUrlSecrets(Set<String> secrets, Uri url) {
@@ -324,8 +376,8 @@ void _addUrlSecrets(Set<String> secrets, Uri url) {
   }
 }
 
-/// Adds [text] as written and percent-decoded to [secrets], each form only when it has at least
-/// [minLength] characters.
+/// Adds [text] as written and percent-decoded, without control characters, to [secrets]; each
+/// form only when it has at least [minLength] characters.
 void _addForms(Set<String> secrets, String text, int minLength) {
   final List<String> forms = <String>[text];
   try {
@@ -333,71 +385,80 @@ void _addForms(Set<String> secrets, String text, int minLength) {
       ..add(Uri.decodeFull(text))
       ..add(Uri.decodeQueryComponent(text));
   } on ArgumentError {
-    // Malformed percent-encoding: only the written form can appear.
+    // Malformed percent-encoding: only the forms decoded so far can appear.
   } on FormatException {
-    // Percent-encoding of bytes that are not UTF-8: only the written form can appear.
+    // Percent-encoding of bytes that are not UTF-8: only the forms decoded so far can appear.
   }
   for (final String form in forms) {
-    if (form.length >= minLength) {
-      secrets.add(form);
+    final String plain = _withoutControls(form);
+    if (plain.length >= minLength) {
+      secrets.add(plain);
     }
   }
 }
 
-/// [text] with every occurrence of each of [longestFirst] replaced by `<redacted>`, in one pass; at
-/// each position the longest match wins.
-String _replaceEach(String text, List<String> longestFirst) {
+/// [text] with each run of code units covered by an occurrence of any of [secrets] replaced by one
+/// `<redacted>`. Every occurrence of every secret is covered, also where occurrences overlap.
+String _redact(String text, Set<String> secrets) {
+  final List<bool> covered = List<bool>.filled(text.length, false);
+  for (final String secret in secrets) {
+    int start = text.indexOf(secret);
+    while (start >= 0) {
+      covered.fillRange(start, start + secret.length, true);
+      start = text.indexOf(secret, start + 1);
+    }
+  }
   final StringBuffer buffer = StringBuffer();
-  int index = 0;
-  while (index < text.length) {
-    final String? match = _matchAt(text, index, longestFirst);
-    if (match == null) {
+  for (int index = 0; index < text.length; index++) {
+    if (!covered[index]) {
       buffer.writeCharCode(text.codeUnitAt(index));
-      index++;
-    } else {
+    } else if (index == 0 || !covered[index - 1]) {
       buffer.write('<redacted>');
-      index += match.length;
     }
   }
   return buffer.toString();
 }
 
-String? _matchAt(String text, int index, List<String> longestFirst) {
-  for (final String candidate in longestFirst) {
-    if (text.startsWith(candidate, index)) {
-      return candidate;
-    }
-  }
-  return null;
+/// The [CappedResponse] of [response] with the bytes in [builder].
+CappedResponse _cappedOf(
+  http.StreamedResponse response,
+  BytesBuilder builder, {
+  required bool truncated,
+}) {
+  return CappedResponse(
+    statusCode: response.statusCode,
+    headers: response.headers,
+    body: builder.takeBytes(),
+    truncated: truncated,
+  );
 }
 
 /// Reads one response body against the caps of [sendCapped] and completes [result] once.
 final class _CappedReader {
   _CappedReader(
     this._abort,
-    this._url, {
+    this._request, {
     required this.successCap,
     required this.errorCap,
   });
 
   final Completer<void> _abort;
-  final Uri _url;
+  final http.BaseRequest _request;
   final int successCap;
   final int errorCap;
   final Completer<CappedResponse> result = Completer<CappedResponse>();
-  final BytesBuilder _builder = BytesBuilder(copy: false);
+  final BytesBuilder _builder = BytesBuilder();
   StreamSubscription<List<int>>? _subscription;
   http.StreamedResponse? _response;
-  bool _closed = false;
 
   void start(http.StreamedResponse response) {
     if (result.isCompleted) {
-      _discard(response);
+      _discard(response.stream);
       return;
     }
-    if (_isRedirect(response, _url)) {
+    if (_isRedirect(response, _request.url)) {
       fail(const TransportException(TransportFailure.redirected));
-      _discard(response);
+      _discard(response.stream);
       return;
     }
     _response = response;
@@ -409,16 +470,9 @@ final class _CappedReader {
     );
   }
 
-  /// The `cancel` future completed: aborts unless [sendCapped] has returned.
+  /// The `cancel` future completed.
   void onCancel() {
-    if (!_closed) {
-      fail(const TransportException(TransportFailure.cancelled));
-    }
-  }
-
-  /// [sendCapped] has returned; a later cancel does nothing.
-  void close() {
-    _closed = true;
+    fail(const TransportException(TransportFailure.cancelled));
   }
 
   bool get _success {
@@ -437,7 +491,7 @@ final class _CappedReader {
       return;
     }
     if (_success) {
-      fail(CapExceededException(successCap), StackTrace.current);
+      fail(CapExceededException(successCap));
       return;
     }
     _builder.add(chunk.sublist(0, room));
@@ -449,29 +503,22 @@ final class _CappedReader {
     if (result.isCompleted) {
       return;
     }
-    final http.StreamedResponse response = _response!;
-    result.complete(
-      CappedResponse(
-        statusCode: response.statusCode,
-        headers: response.headers,
-        body: _builder.takeBytes(),
-        truncated: truncated,
-      ),
-    );
+    result.complete(_cappedOf(_response!, _builder, truncated: truncated));
   }
 
-  /// An exception of the client or of the body stream, as a [TransportException].
-  void failClient(Object error, StackTrace stackTrace) {
+  /// An exception of the client or of the body stream, as a [TransportException]. The client's
+  /// stack trace is not kept: it can reference the client's exception.
+  void failClient(Object error, StackTrace _) {
     _subscription = null;
-    fail(_transportFailure(error, _url), stackTrace);
+    fail(_transportFailure(error, _request));
   }
 
   /// Completes [result] with [error] unless it is already complete, then aborts the request. The
   /// first failure wins: the deadline's timeout is recorded before the abort, so the failure the
   /// abort causes later is ignored.
-  void fail(Object error, [StackTrace? stackTrace]) {
+  void fail(Object error) {
     if (!result.isCompleted) {
-      result.completeError(error, stackTrace ?? StackTrace.current);
+      result.completeError(error, StackTrace.current);
     }
     _stop();
   }
@@ -491,30 +538,37 @@ final class _CappedReader {
 /// The headers phase of [sendStreaming]: completes [result] once, then hands the body to a
 /// [_StreamingBody].
 final class _StreamingSend {
-  _StreamingSend(this._abort, this._url, this._idleTimeout);
+  _StreamingSend(this._abort, this._request, this._idleTimeout);
 
   final Completer<void> _abort;
-  final Uri _url;
+  final http.BaseRequest _request;
   final Duration? _idleTimeout;
   final Completer<http.StreamedResponse> result =
       Completer<http.StreamedResponse>();
+
+  /// The listener on the `cancel` future; the body clears it when it ends.
+  _CancelHook? hook;
   _StreamingBody? _body;
+
+  /// True once the response was returned with its body.
+  bool get hasBody => _body != null;
 
   void start(http.StreamedResponse response) {
     if (result.isCompleted) {
-      _discard(response);
+      _discard(response.stream);
       return;
     }
-    if (_isRedirect(response, _url)) {
+    if (_isRedirect(response, _request.url)) {
       fail(const TransportException(TransportFailure.redirected));
-      _discard(response);
+      _discard(response.stream);
       return;
     }
     final _StreamingBody body = _StreamingBody(
       response.stream,
       _abort,
-      _url,
+      _request,
       _idleTimeout,
+      onEnd: () => hook?.clear(),
     );
     _body = body;
     result.complete(_withBody(response, body.stream));
@@ -530,17 +584,18 @@ final class _StreamingSend {
     fail(const TransportException(TransportFailure.cancelled));
   }
 
-  /// An exception of the client before the headers, as a [TransportException].
-  void failClient(Object error, StackTrace stackTrace) {
-    fail(_transportFailure(error, _url), stackTrace);
+  /// An exception of the client before the headers, as a [TransportException]. The client's stack
+  /// trace is not kept: it can reference the client's exception.
+  void failClient(Object error, StackTrace _) {
+    fail(_transportFailure(error, _request));
   }
 
   /// Completes [result] with [error] unless it is complete, then aborts the request.
-  void fail(Object error, [StackTrace? stackTrace]) {
+  void fail(Object error) {
     if (result.isCompleted) {
       return;
     }
-    result.completeError(error, stackTrace ?? StackTrace.current);
+    result.completeError(error, StackTrace.current);
     if (!_abort.isCompleted) {
       _abort.complete();
     }
@@ -550,11 +605,11 @@ final class _StreamingSend {
     http.StreamedResponse response,
     Stream<List<int>> stream,
   ) {
-    if (response is http.BaseResponseWithUrl) {
+    if (response case final http.BaseResponseWithUrl withUrl) {
       return _StreamedResponseWithUrl(
         stream,
         response.statusCode,
-        url: (response as http.BaseResponseWithUrl).url,
+        url: withUrl.url,
         contentLength: response.contentLength,
         request: response.request,
         headers: response.headers,
@@ -598,12 +653,19 @@ final class _StreamedResponseWithUrl extends http.StreamedResponse
 /// The body stream [sendStreaming] returns: wraps the client's body with the abort, the cancel
 /// signal and the idle timer.
 final class _StreamingBody {
-  _StreamingBody(this._source, this._abort, this._url, this._idleTimeout);
+  _StreamingBody(
+    this._source,
+    this._abort,
+    this._request,
+    this._idleTimeout, {
+    required void Function() onEnd,
+  }) : _onEnd = onEnd;
 
   final Stream<List<int>> _source;
   final Completer<void> _abort;
-  final Uri _url;
+  final http.BaseRequest _request;
   final Duration? _idleTimeout;
+  final void Function() _onEnd;
   late final StreamController<List<int>> _controller =
       StreamController<List<int>>(
         onListen: _onListen,
@@ -613,22 +675,21 @@ final class _StreamingBody {
       );
   StreamSubscription<List<int>>? _subscription;
   Timer? _idle;
+  bool _listened = false;
   bool _done = false;
 
   Stream<List<int>> get stream => _controller.stream;
 
   /// The `cancel` future of [sendStreaming] completed.
   void onCancel() {
-    _finish(
-      const TransportException(TransportFailure.cancelled),
-      StackTrace.current,
-    );
+    _finish(const TransportException(TransportFailure.cancelled));
   }
 
   void _onListen() {
     if (_done) {
       return;
     }
+    _listened = true;
     _subscription = _source.listen(
       _onData,
       onError: _onSourceError,
@@ -643,15 +704,15 @@ final class _StreamingBody {
     _controller.add(chunk);
   }
 
-  void _onSourceError(Object error, StackTrace stackTrace) {
+  /// The client's stack trace is not kept: it can reference the client's exception.
+  void _onSourceError(Object error, StackTrace _) {
     _subscription = null;
-    _finish(_transportFailure(error, _url), stackTrace);
+    _finish(_transportFailure(error, _request));
   }
 
   void _onSourceDone() {
     _subscription = null;
-    _done = true;
-    _idle?.cancel();
+    _markDone();
     unawaited(_controller.close());
   }
 
@@ -668,8 +729,7 @@ final class _StreamingBody {
   /// The listener cancelled its subscription: aborts the request unless the body had ended.
   Future<void> _onCancel() async {
     final bool ended = _done;
-    _done = true;
-    _idle?.cancel();
+    _markDone();
     if (!ended) {
       _abortRequest();
     }
@@ -681,7 +741,7 @@ final class _StreamingBody {
     try {
       await subscription.cancel();
     } on Object catch (error) {
-      throw _transportFailure(error, _url);
+      throw _transportFailure(error, _request);
     }
   }
 
@@ -694,26 +754,33 @@ final class _StreamingBody {
     _idle = Timer(idleTimeout, () {
       _finish(
         TimeoutException('No bytes arrived for the idle timeout', idleTimeout),
-        StackTrace.current,
       );
     });
   }
 
-  /// Ends the body with [error] unless it has ended: aborts the request and stops the source.
-  void _finish(Object error, StackTrace stackTrace) {
+  /// Ends the body with [error] unless it has ended: aborts the request and stops the source (or
+  /// listens to it and stops at once, when nobody listened yet, so its connection is released).
+  void _finish(Object error) {
     if (_done) {
       return;
     }
-    _done = true;
-    _idle?.cancel();
+    _markDone();
     _abortRequest();
     final StreamSubscription<List<int>>? subscription = _subscription;
     _subscription = null;
     if (subscription != null) {
       _cancelQuietly(subscription);
+    } else if (!_listened) {
+      _discard(_source);
     }
-    _controller.addError(error, stackTrace);
+    _controller.addError(error, StackTrace.current);
     unawaited(_controller.close());
+  }
+
+  void _markDone() {
+    _done = true;
+    _idle?.cancel();
+    _onEnd();
   }
 
   void _abortRequest() {
@@ -730,7 +797,7 @@ final class _LimitedReader {
   final http.StreamedResponse _response;
   final int _cap;
   final Completer<CappedResponse> result = Completer<CappedResponse>();
-  final BytesBuilder _builder = BytesBuilder(copy: false);
+  final BytesBuilder _builder = BytesBuilder();
   StreamSubscription<List<int>>? _subscription;
 
   void start() {
@@ -756,29 +823,29 @@ final class _LimitedReader {
     _complete(truncated: true);
   }
 
-  void _onError(Object error, StackTrace stackTrace) {
+  /// The failures of this package (from a [sendStreaming] body) pass through unchanged; anything
+  /// else is the client's and becomes a [TransportException]. The stream's stack trace is not kept:
+  /// it can reference the client's exception.
+  void _onError(Object error, StackTrace _) {
     _subscription = null;
-    fail(_transportFailure(error, _response.request?.url), stackTrace);
+    final bool ours =
+        error is TransportException ||
+        error is TimeoutException ||
+        error is CapExceededException;
+    fail(ours ? error : _transportFailure(error, _response.request));
   }
 
   void _complete({required bool truncated}) {
     if (result.isCompleted) {
       return;
     }
-    result.complete(
-      CappedResponse(
-        statusCode: _response.statusCode,
-        headers: _response.headers,
-        body: _builder.takeBytes(),
-        truncated: truncated,
-      ),
-    );
+    result.complete(_cappedOf(_response, _builder, truncated: truncated));
   }
 
   /// Completes [result] with [error] unless it is complete, and stops reading.
-  void fail(Object error, StackTrace stackTrace) {
+  void fail(Object error) {
     if (!result.isCompleted) {
-      result.completeError(error, stackTrace);
+      result.completeError(error, StackTrace.current);
     }
     _stop();
   }
