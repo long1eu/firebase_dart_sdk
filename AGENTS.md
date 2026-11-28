@@ -65,8 +65,8 @@ In `cloud_firestore/cloud_firestore_dart`:
   Fix what the analyzer reports in the Markdown, not in the generated file. Blocks fenced as
   `dart lite` are checked against `lite.dart`; other info strings are not compiled. The Realtime
   Database guides (`database.md`, `database_flutter.md`) are compiled by the snippet tests of the
-  database packages, and `remote_config.md` by the snippet test of `firebase_remote_config_dart`
-  (`_guidesCheckedElsewhere` in the test).
+  database packages, `remote_config.md` by the snippet test of `firebase_remote_config_dart` and
+  `app_check.md` by that of `firebase_app_check_dart` (`_guidesCheckedElsewhere` in the test).
 - `test/unit/api/public_api.golden.txt` lists the public API. A failing
   `public_api_golden_test.dart` means the public surface changed; if intended, regenerate with
   `UPDATE_GOLDEN=1 dart test test/unit/api/public_api_golden_test.dart` and review the diff.
