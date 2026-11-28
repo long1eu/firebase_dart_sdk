@@ -293,7 +293,9 @@ bool _isRedirect(http.BaseResponse response, Uri requestUrl) {
 }
 
 /// Same scheme, host and port. Hosts are compared by [canonicalHost]; an internationalized name
-/// is compared as given, so its Unicode and its punycode spellings are different origins.
+/// is compared as given, so its Unicode and its punycode spellings are different origins. An IPv4
+/// address is compared as given too, so a non-canonical spelling such as `127.1` is another origin
+/// than `127.0.0.1` (the check fails closed, as `redirected`).
 bool _sameOrigin(Uri a, Uri b) =>
     a.scheme.toLowerCase() == b.scheme.toLowerCase() &&
     canonicalHost(a.host) == canonicalHost(b.host) &&
@@ -338,6 +340,10 @@ TransportException _transportFailure(Object error, http.BaseRequest? request) {
 /// each request header value of four characters or more, as written and percent-decoded. Control
 /// characters are removed from the message and from the secrets before matching, so they cannot
 /// split a secret so that it escapes the match.
+///
+/// The message is cut at its first `. [` (after the control characters are removed) before
+/// anything else: `dart:io`'s "Content size exceeds specified contentLength. N bytes written while
+/// expected M. [<chunk>]" quotes up to 1 KiB of the request body, which can hold a token.
 String _redactedDetail(http.ClientException error, http.BaseRequest? request) {
   final Set<String> secrets = <String>{};
   for (final Uri? url in <Uri?>[request?.url, error.uri]) {
@@ -348,7 +354,14 @@ String _redactedDetail(http.ClientException error, http.BaseRequest? request) {
   for (final String value in request?.headers.values ?? const <String>[]) {
     _addForms(secrets, value, 4);
   }
-  return sanitizeServerText(_redact(_withoutControls(error.message), secrets));
+  final String message = _withoutQuotedBody(_withoutControls(error.message));
+  return sanitizeServerText(_redact(message, secrets));
+}
+
+/// [message] up to its first `. [`, keeping the full stop; the whole [message] when it has none.
+String _withoutQuotedBody(String message) {
+  final int start = message.indexOf('. [');
+  return start < 0 ? message : message.substring(0, start + 1);
 }
 
 void _addUrlSecrets(Set<String> secrets, Uri url) {
