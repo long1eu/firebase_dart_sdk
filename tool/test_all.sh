@@ -19,6 +19,10 @@
 # "error-reporting-browser" runs it in Chrome as well.
 # firebase_analytics_dart runs all of test/ (MockClient only; nothing reaches Google Analytics).
 # _firebase_transport_dart runs all of test/; its browser run is the CI job transport-browser.
+# _firebase_transport_grpc_dart runs all of test/ (VM only).
+# firebase_data_connect_dart runs all of test/: its emulator tests skip themselves without
+# FIREBASE_DATA_CONNECT_EMULATOR_HOST (the CI job "data-connect" sets it) and its browser tests run
+# only in a browser (the CI job "data-connect-browser").
 # The example programs in examples/ are analyzed only (their tests need an emulator), except those with a
 # .test_without_emulator file, whose tests run too; select
 # them alone with the name "examples", or one with "examples/<name>". The web builds of the
@@ -50,6 +54,7 @@ PACKAGES=(
   "secure_flow|secure_flow/secure_flow|"
   "firebase_app_dart|firebase_core/firebase_app_dart|"
   "_firebase_transport_dart|firebase_core/_firebase_transport_dart|"
+  "_firebase_transport_grpc_dart|firebase_core/_firebase_transport_grpc_dart|"
   "firebase_auth_providers_dart|firebase_auth/firebase_auth_providers_dart|"
   "cloud_firestore_dart|cloud_firestore/cloud_firestore_dart|test/unit"
   "cloud_firestore_dart_sqlite|cloud_firestore/cloud_firestore_dart_sqlite|"
@@ -62,6 +67,7 @@ PACKAGES=(
   "firebase_remote_config_dart|firebase_remote_config/firebase_remote_config_dart|"
   "firebase_error_reporting_dart|firebase_error_reporting/firebase_error_reporting_dart|"
   "firebase_analytics_dart|firebase_analytics/firebase_analytics_dart|"
+  "firebase_data_connect_dart|firebase_data_connect/firebase_data_connect_dart|"
 )
 
 summary=()

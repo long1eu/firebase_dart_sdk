@@ -1,0 +1,7 @@
+mutation CreateItem($name: String!) @auth(level: PUBLIC) {
+  item_insert(data: { name: $name })
+}
+
+mutation DeleteItem($id: UUID!) @auth(level: PUBLIC) {
+  item_delete(id: $id)
+}

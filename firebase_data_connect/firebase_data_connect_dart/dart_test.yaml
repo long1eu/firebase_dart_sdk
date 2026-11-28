@@ -1,0 +1,7 @@
+# Browser tests: tool/test_browser_data_connect.sh. Emulator tests need
+# FIREBASE_DATA_CONNECT_EMULATOR_HOST and skip themselves without it.
+tags:
+  browser:
+    test_on: browser
+    timeout: 2x
+  emulator:

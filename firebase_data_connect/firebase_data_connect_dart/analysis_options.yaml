@@ -1,0 +1,21 @@
+# The options of the repository, plus the documentation lints (this package
+# passes both). Not published (see .pubignore): it includes a file outside the
+# package.
+include: ../../analysis_options.yaml
+
+# The root's generated-file globs are repeated so that nothing depends on how
+# the two exclude lists merge. fixtures/ and example/generated/ hold the
+# generator's output, which is neither formatted nor analyzed.
+analyzer:
+  exclude:
+    - '**.pb.dart'
+    - '**.pbjson.dart'
+    - '**.pbserver.dart'
+    - '**.pbenum.dart'
+    - fixtures/**
+    - example/generated/**
+
+linter:
+  rules:
+    comment_references: true
+    public_member_api_docs: true

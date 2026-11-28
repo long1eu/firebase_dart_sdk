@@ -1,0 +1,13 @@
+query ListItems @auth(level: PUBLIC) {
+  items {
+    id
+    name
+  }
+}
+
+query MyItems @auth(level: USER) {
+  items(where: { owner: { eq_expr: "auth.uid" } }) {
+    id
+    name
+  }
+}

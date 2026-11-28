@@ -64,6 +64,8 @@ jobs:
       analytics: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.analytics == 'true' }}
       # Whether the change touches _firebase_transport_dart, the seam test of firebase_app_dart or the web import check.
       transport: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.transport == 'true' }}
+      # Whether the change touches the Data Connect packages, the transports they use or their scripts.
+      dataconnect: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.dataconnect == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -88,7 +90,7 @@ jobs:
           # `browser` is true when any changed file is one of these: the library, the SQLite
           # opener package (the web opener and OPFS worker the tests use), the browser tests, and
           # what runs them.
-          # `indexeddb`, `securestorage`, `database`, `remoteconfig`, `transport` and `gallery` work the same way
+          # `indexeddb`, `securestorage`, `database`, `remoteconfig`, `transport`, `dataconnect` and `gallery` work the same way
           # for their own jobs.
           filters: |
             browser:
@@ -183,6 +185,19 @@ jobs:
               - 'tool/check_web_imports.dart'
               - '.github/workflows/ci.yml'
               - '.github/actions/**'
+            dataconnect:
+              - 'firebase_data_connect/**'
+              - 'firebase_core/_firebase_transport_grpc_dart/**'
+              - 'firebase_core/_firebase_transport_dart/**'
+              - 'firebase_core/firebase_app_dart/lib/**'
+              - 'firebase_core/firebase_app_dart/pubspec.yaml'
+              - 'tool/check_web_imports.dart'
+              - 'tool/start_data_connect_emulator.sh'
+              - 'tool/stop_data_connect_emulator.sh'
+              - 'tool/data_connect_emulator/**'
+              - 'tool/test_browser_data_connect.sh'
+              - '.github/workflows/ci.yml'
+              - '.github/actions/**'
 
   # The unit suite (tool/test_all.sh) runs in two parallel legs per SDK: cloud_firestore_dart
   # alone (its tests take about 9 of the 11 minutes) and every other package with the examples.
@@ -211,6 +226,7 @@ jobs:
               firebase_admin_dart firebase_storage_dart firebase_auth_secure_storage_dart
               firebase_database_dart firebase_database_dart_sqlite firebase_installations_dart
               firebase_remote_config_dart firebase_error_reporting_dart firebase_analytics_dart
+              _firebase_transport_grpc_dart firebase_data_connect_dart
               examples
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -259,6 +275,17 @@ jobs:
         if: ${{ !cancelled() && matrix.leg == 'others' }}
         working-directory: firebase_core/_firebase_transport_dart
         run: dart format --output=none --set-exit-if-changed lib test
+      - name: Check formatting (_firebase_transport_grpc_dart)
+        if: ${{ !cancelled() && matrix.leg == 'others' }}
+        working-directory: firebase_core/_firebase_transport_grpc_dart
+        run: dart format --output=none --set-exit-if-changed lib test
+      - name: Check formatting (firebase_data_connect_dart)
+        # The generator's output (fixtures/, example/generated/) is not formatted: the directories are named.
+        if: ${{ !cancelled() && matrix.leg == 'others' }}
+        working-directory: firebase_data_connect/firebase_data_connect_dart
+        run: |
+          dart format --output=none --set-exit-if-changed lib bin tool test \
+            example/main.dart example/web example/generated_main.dart
       - name: Check formatting (cloud_firestore_dart)
         if: ${{ !cancelled() && matrix.leg == 'cloud_firestore_dart' }}
         working-directory: cloud_firestore/cloud_firestore_dart
@@ -334,6 +361,7 @@ jobs:
               firebase_admin_dart firebase_storage_dart firebase_auth_secure_storage_dart
               firebase_database_dart firebase_database_dart_sqlite firebase_installations_dart
               firebase_remote_config_dart firebase_error_reporting_dart firebase_analytics_dart
+              _firebase_transport_grpc_dart firebase_data_connect_dart
               examples
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -994,6 +1022,109 @@ jobs:
         with:
           name: remote-config-browser-log-${{ matrix.compiler }}
           path: ${{ runner.temp }}/remote_config_browser.log
+
+  # firebase_data_connect_dart against the Data Connect emulator (test/integration, tag `emulator`), which
+  # tool/start_data_connect_emulator.sh starts on 9499 with the fixture of tool/data_connect_emulator (the
+  # emulator binary and its embedded PGLite database come from `firebase setup:emulators:dataconnect`, cached
+  # by the emulators action). A skipped test means FIREBASE_DATA_CONNECT_EMULATOR_HOST did not reach it: the
+  # step fails then. Only when the change touches the Data Connect packages, the transports they use,
+  # firebase_app_dart, the web import check, the emulator scripts or the fixture, ci.yml or .github/actions/.
+  # Required.
+  data-connect:
+    name: Data Connect emulator integration tests
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' && needs.changes.outputs.dataconnect == 'true' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set the emulator work directory
+        # The `runner` context is not available in job-level `env`.
+        run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/dart
+        with:
+          sdk: stable
+      - uses: ./.github/actions/emulators
+      - name: Download the Data Connect emulator
+        # Does nothing when the cache restored the binary of this CLI version.
+        run: firebase setup:emulators:dataconnect
+      - name: Start the Data Connect emulator
+        run: ./tool/start_data_connect_emulator.sh 9499
+      - name: Run the emulator tests of firebase_data_connect_dart
+        working-directory: firebase_data_connect/firebase_data_connect_dart
+        env:
+          FIREBASE_DATA_CONNECT_EMULATOR_HOST: 127.0.0.1:9499
+        run: |
+          set -o pipefail
+          dart pub get
+          dart test -t emulator -j 1 --reporter expanded test/integration 2>&1 | tee "$EMULATOR_DIR/data_connect_integration.log"
+          if grep -Eq ' ~[0-9]+' "$EMULATOR_DIR/data_connect_integration.log"; then
+            echo "::error::The Data Connect emulator tests skipped: FIREBASE_DATA_CONNECT_EMULATOR_HOST did not reach them."
+            exit 1
+          fi
+      - name: Stop the Data Connect emulator
+        if: always()
+        run: ./tool/stop_data_connect_emulator.sh 9499
+      - name: Upload the logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: data-connect-log
+          path: ${{ runner.temp }}/emulator/*.log
+
+  # The tests of firebase_data_connect_dart in headless Chrome, on both compilers, over the whole test tree
+  # (the files marked @TestOn('vm') drop out by themselves), against a Data Connect emulator on 9499 that
+  # tool/test_browser_data_connect.sh starts and stops. The REST transport is the only one the web build
+  # reaches; the import check first proves that neither dart:io, dart:ffi, package:grpc, package:protobuf nor
+  # package:fixnum is reachable from the web libraries. Same gating as the job above. Required: no other job
+  # runs the client on the web.
+  data-connect-browser:
+    name: Data Connect tests in Chrome (${{ matrix.compiler }})
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' && needs.changes.outputs.dataconnect == 'true' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [dart2js, dart2wasm]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set the emulator work directory
+        # The `runner` context is not available in job-level `env`.
+        run: echo "EMULATOR_DIR=$RUNNER_TEMP/emulator" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/dart
+        with:
+          sdk: stable
+      - uses: ./.github/actions/emulators
+      - name: Download the Data Connect emulator
+        # Does nothing when the cache restored the binary of this CLI version.
+        run: firebase setup:emulators:dataconnect
+      - name: Check that the web libraries reach no VM-only library
+        run: |
+          (cd firebase_data_connect/firebase_data_connect_dart && dart pub get)
+          dart tool/check_web_imports.dart firebase_data_connect/firebase_data_connect_dart \
+            lib/firebase_data_connect_dart.dart lib/flutterfire.dart \
+            --forbid package:grpc/ --forbid package:protobuf/ --forbid package:fixnum/
+      - name: Run the tests in Chrome
+        env:
+          COMPILER: ${{ matrix.compiler }}
+        run: |
+          set -o pipefail
+          ./tool/test_browser_data_connect.sh "$COMPILER" 2>&1 \
+            | tee "$RUNNER_TEMP/data_connect_browser.log"
+      - name: Upload the logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: data-connect-browser-log-${{ matrix.compiler }}
+          path: |
+            ${{ runner.temp }}/data_connect_browser.log
+            ${{ runner.temp }}/emulator/*.log
 
   # The acceptance gate of firebase_database_dart_platform: FlutterFire's own firebase_database
   # example integration tests (77) against the shim and a Database emulator on 9100

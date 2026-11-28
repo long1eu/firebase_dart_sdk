@@ -54,3 +54,8 @@ cloud_firestore/cloud_firestore_dart/example/cache_store/indexeddb/main.dart.js*
 firebase_storage/firebase_storage_dart/test/browser/emulator_port.txt
 firebase_installations/firebase_installations_dart/test/browser/server_port.txt
 firebase_remote_config/firebase_remote_config_dart/test/browser/server_port.txt
+
+# Data Connect (tool/start_data_connect_emulator.sh: the emulator writes its compiled schema into the fixture;
+# the browser runner writes the emulator address for the tests).
+tool/data_connect_emulator/dataconnect/.dataconnect/
+firebase_data_connect/firebase_data_connect_dart/test/browser/emulator_host.txt

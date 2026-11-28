@@ -1,0 +1,11 @@
+specVersion: "v1"
+serviceId: "test-service"
+location: "us-central1"
+schema:
+  source: "./schema"
+  datasource:
+    postgresql:
+      database: "test-db"
+      cloudSql:
+        instanceId: "test-instance"
+connectorDirs: ["./test-connector"]
