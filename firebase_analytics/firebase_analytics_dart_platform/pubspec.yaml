@@ -1,0 +1,61 @@
+name: firebase_analytics_dart_platform
+description: >-
+  FlutterFire Analytics on the pure-Dart Measurement Protocol client, for
+  Windows and Linux, where firebase_analytics has no implementation.
+version: 0.1.0-dev.1
+# Not released: nothing is published until the reporting checks of
+# docs/analytics_spec.md (section 10) pass.
+publish_to: none
+homepage: https://github.com/long1eu/firebase_dart_sdk
+repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_analytics/firebase_analytics_dart_platform
+issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
+topics:
+  - firebase
+  - analytics
+  - flutterfire
+  - linux
+  - windows
+
+environment:
+  sdk: ^3.12.0
+  flutter: '>=3.44.0'
+
+# Flutter registers the plugin class before main() only on the platforms listed
+# here. firebase_analytics has an implementation on Android, iOS, macOS and the
+# web, and none on Windows or Linux, so this package registers itself on those
+# two (on Windows firebase_core keeps its own implementation; on Linux, where it
+# has none, this package installs a small one). On the other platforms the app
+# calls FirebaseAnalyticsDart.configure() to choose this package instead (see
+# the README).
+flutter:
+  plugin:
+    implements: firebase_analytics
+    platforms:
+      linux:
+        dartPluginClass: FirebaseAnalyticsDart
+      windows:
+        dartPluginClass: FirebaseAnalyticsDart
+
+dependencies:
+  # Local development resolves firebase_analytics_dart and firebase_app_dart
+  # from the sibling packages through pubspec_overrides.yaml (not published).
+  firebase_analytics_dart: ^0.1.0-dev.1
+  firebase_analytics_platform_interface: ^6.1.0
+  firebase_app_dart: ^0.2.0
+  firebase_core: ^5.1.0
+  firebase_core_platform_interface: ^8.1.1
+  flutter:
+    sdk: flutter
+  http: ^1.6.0
+  # The directory of the default store on the VM.
+  path_provider: ^2.1.6
+
+dev_dependencies:
+  # The app-facing package the tests drive, as an app would.
+  firebase_analytics: ^13.1.0
+  flutter_test:
+    sdk: flutter
+  lints: ^6.1.0
+  # The default-store test points the application support directory at a
+  # temporary one.
+  path_provider_platform_interface: ^2.1.3

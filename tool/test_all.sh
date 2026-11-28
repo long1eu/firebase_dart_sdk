@@ -25,7 +25,8 @@
 # tool/smoke_gallery.mjs (the CI job "gallery").
 # The Flutter packages (cloud_firestore_dart_flutterfire, cloud_firestore_dart_platform,
 # firebase_auth_dart_platform, firebase_storage_dart_platform, firebase_database_dart_platform,
-# firebase_remote_config_dart_platform, firebase_auth_secure_storage_flutter) and the Flutter
+# firebase_remote_config_dart_platform, firebase_analytics_dart_platform,
+# firebase_auth_secure_storage_flutter) and the Flutter
 # examples need the Flutter SDK and are skipped without it; the CI job "flutter" runs them
 # (with FIRESTORE_EMULATOR_HOST, FIREBASE_AUTH_EMULATOR_HOST and FIREBASE_DATABASE_EMULATOR_HOST
 # set, so that the emulator tests of the platform packages run).
@@ -200,6 +201,8 @@ done
 # firebase_auth_dart_platform only when FIREBASE_AUTH_EMULATOR_HOST is set, those of
 # firebase_database_dart_platform only when FIREBASE_DATABASE_EMULATOR_HOST is set;
 # firebase_remote_config_dart_platform has unit tests only (fakes of the two endpoints);
+# firebase_analytics_dart_platform has unit tests only (a MockClient relay; nothing reaches
+# Google Analytics);
 # firebase_auth_secure_storage_flutter has unit tests only (a fake of the plugin's channel).
 for entry in "cloud_firestore_dart_flutterfire|cloud_firestore/cloud_firestore_dart_flutterfire" \
   "cloud_firestore_dart_platform|cloud_firestore/cloud_firestore_dart_platform" \
@@ -207,6 +210,7 @@ for entry in "cloud_firestore_dart_flutterfire|cloud_firestore/cloud_firestore_d
   "firebase_storage_dart_platform|firebase_storage/firebase_storage_dart_platform" \
   "firebase_database_dart_platform|firebase_database/firebase_database_dart_platform" \
   "firebase_remote_config_dart_platform|firebase_remote_config/firebase_remote_config_dart_platform" \
+  "firebase_analytics_dart_platform|firebase_analytics/firebase_analytics_dart_platform" \
   "firebase_auth_secure_storage_flutter|firebase_auth/firebase_auth_secure_storage_flutter"; do
   IFS='|' read -r name dir <<<"$entry"
   if [ $# -gt 0 ] && ! printf '%s\n' "$@" | grep -qx "$name"; then continue; fi
