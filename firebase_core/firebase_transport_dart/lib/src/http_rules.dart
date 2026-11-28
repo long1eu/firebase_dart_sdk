@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:firebase_transport_dart/src/hosts.dart' show canonicalHost;
 import 'package:http/http.dart' as http;
 
 /// A response read with a cap on its body.
@@ -291,25 +292,12 @@ bool _isRedirect(http.BaseResponse response, Uri requestUrl) {
       !_sameOrigin(response.url, requestUrl);
 }
 
-/// Same scheme, host and port. Hosts are compared by [_canonicalHost]; an internationalized name
+/// Same scheme, host and port. Hosts are compared by [canonicalHost]; an internationalized name
 /// is compared as given, so its Unicode and its punycode spellings are different origins.
 bool _sameOrigin(Uri a, Uri b) =>
     a.scheme.toLowerCase() == b.scheme.toLowerCase() &&
-    _canonicalHost(a.host) == _canonicalHost(b.host) &&
+    canonicalHost(a.host) == canonicalHost(b.host) &&
     a.port == b.port;
-
-/// [host] in a form for comparison: an IPv6 address by its parsed bytes, anything else lowercased.
-String _canonicalHost(String host) {
-  final String lowercase = host.toLowerCase();
-  if (!lowercase.contains(':')) {
-    return lowercase;
-  }
-  try {
-    return Uri.parseIPv6Address(lowercase).join('.');
-  } on FormatException {
-    return lowercase;
-  }
-}
 
 /// Stops listening to a body that is abandoned.
 ///

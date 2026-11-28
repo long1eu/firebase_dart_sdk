@@ -10,7 +10,7 @@ library;
 export 'src/bounded.dart';
 export 'src/environment.dart';
 export 'src/headers.dart';
-export 'src/hosts.dart';
+export 'src/hosts.dart' hide canonicalHost;
 export 'src/http_rules.dart';
 export 'src/json_guard.dart';
 export 'src/log_once.dart';
