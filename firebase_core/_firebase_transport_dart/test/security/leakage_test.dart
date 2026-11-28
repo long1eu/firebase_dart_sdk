@@ -1048,6 +1048,16 @@ void _redactionRuleTests() {
           reason: scheme,
         );
       }
+      expect(
+        await _detailFor(
+          plainUrl,
+          'refused ${_marker}TOKEN',
+          headers: <String, String>{
+            'Authorization': 'Firebase ${_marker}TOKEN',
+          },
+        ),
+        'refused <redacted>',
+      );
     });
   });
 }
