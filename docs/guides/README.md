@@ -85,9 +85,13 @@ READMEs are short landing pages; the API reference is on pub.dev.
     Sentry-protocol tracker on Windows, Linux, servers and the web.
 33. [Remote Config](remote_config.md): fetch, activate, values, custom signals and realtime updates with
     firebase_remote_config_dart
+34. [Analytics](analytics.md): `firebase_analytics_dart`, a Measurement Protocol client of a GA4 web stream (in
+    development, not released): the relay or direct transport, the store, events and screen views, consent,
+    delivery and retries, the errors it throws, and the Flutter adapter for Windows and Linux.
 
 Every Dart snippet in these guides is compiled against the current API by
 `cloud_firestore/cloud_firestore_dart/test/unit/api/readme_snippets_test.dart`, except the Realtime Database
-guides and `remote_config.md` (compiled by the snippet tests of their own packages) and the blocks
-marked `dart flutter`, which are taken from `examples/flutter_notes` and checked there by
-`flutter analyze`.
+guides, `remote_config.md` and `analytics.md` (compiled by the snippet tests of their own packages) and the blocks
+marked `dart flutter`, which are not compiled here: most are taken from `examples/flutter_notes` and checked
+there by `flutter analyze`, and the one in `analytics.md` follows the example of
+`firebase_analytics_dart_platform`.

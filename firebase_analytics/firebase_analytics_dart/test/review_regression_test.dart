@@ -9,7 +9,6 @@
 // decodes as an infinite int that passes `is int` (design rule 9).
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math';
 
 import 'package:fake_async/fake_async.dart';
@@ -281,35 +280,29 @@ void main() {
     });
   });
 
-  test(
-    '8 tampered store: future timestamp and huge session id are sent',
-    () async {
-      final store = _MapStore();
-      final app = _app();
-      store.values['${app.name}/G-TEST1234/queue'] = jsonEncode([
-        {
-          'n': 'level_up',
-          'p': {'session_id': 9007199254740993000, 'engagement_time_msec': 1},
-          't': 4102444800000000 * 100,
-          'x': <String, Object>{},
-        },
-      ]);
-      final reqs = <http.Request>[];
-      final a = FirebaseAnalytics(
-        app,
-        measurementId: 'G-TEST1234',
-        transport: AnalyticsTransport.direct(apiSecret: 's'),
-        store: store,
-        onWarning: (_) {},
-        httpClient: MockClient((r) async {
-          reqs.add(r);
-          return http.Response('', 204);
-        }),
-      );
-      await a.flush();
-      expect(reqs, isEmpty, reason: reqs.isEmpty ? '' : reqs.single.body);
-    },
-  );
+  test('8 tampered store: future timestamp and huge session id are sent', () async {
+    final store = _MapStore();
+    final app = _app();
+    // Written as JSON text: the session id has no exact value in JavaScript, where the literal would not
+    // compile, and the stored text is what a tampered store holds anyway.
+    store.values['${app.name}/G-TEST1234/queue'] =
+        '[{"n":"level_up","p":{"session_id":9007199254740993000,"engagement_time_msec":1},'
+        '"t":${4102444800000000 * 100},"x":{}}]';
+    final reqs = <http.Request>[];
+    final a = FirebaseAnalytics(
+      app,
+      measurementId: 'G-TEST1234',
+      transport: AnalyticsTransport.direct(apiSecret: 's'),
+      store: store,
+      onWarning: (_) {},
+      httpClient: MockClient((r) async {
+        reqs.add(r);
+        return http.Response('', 204);
+      }),
+    );
+    await a.flush();
+    expect(reqs, isEmpty, reason: reqs.isEmpty ? '' : reqs.single.body);
+  });
 
   test('9 a throwing onWarning', () async {
     final errors = <Object>[];

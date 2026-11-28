@@ -333,14 +333,32 @@ class AnalyticsSender {
     }
   }
 
-  static Future<void> _drain(http.StreamedResponse response) async {
+  // With listen rather than `await for`: compiled to JavaScript, `await for` resumes outside the zone it
+  // started in, which a zone-driven clock (the tests' fake_async) never reaches.
+  static Future<void> _drain(http.StreamedResponse response) {
+    final Completer<void> done = Completer<void>();
     int read = 0;
-    await for (final List<int> chunk in response.stream) {
-      read += chunk.length;
-      if (read >= maxResponseBytes) {
-        break;
-      }
-    }
+    late final StreamSubscription<List<int>> subscription;
+    subscription = response.stream.listen(
+      (List<int> chunk) {
+        read += chunk.length;
+        if (read >= maxResponseBytes && !done.isCompleted) {
+          done.complete(subscription.cancel());
+        }
+      },
+      onError: (Object error, StackTrace stack) {
+        if (!done.isCompleted) {
+          done.completeError(error, stack);
+        }
+      },
+      onDone: () {
+        if (!done.isCompleted) {
+          done.complete();
+        }
+      },
+      cancelOnError: true,
+    );
+    return done.future;
   }
 
   /// Closes the HTTP client when the sender created it.
