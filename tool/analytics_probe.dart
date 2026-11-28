@@ -115,6 +115,13 @@ Future<void> main(List<String> args) async {
     if (control != null) {
       stdout.writeln('\nControl body:\n${_pretty(run.controlBody())}');
     }
+    stdout.writeln(
+      '\nValidation-only checks (titles and sizes; bodies not shown):',
+    );
+    for (final check in run.informationalChecks()) {
+      final size = utf8.encode(jsonEncode(check.body)).length;
+      stdout.writeln('  ${check.title}: $size bytes');
+    }
     return;
   }
 
@@ -157,8 +164,8 @@ Analytics reporting probe
 
 It sends:
   1. the validation server, strict mode: nothing is recorded;
-  1b. the validation server again, with a complete device block (informational);
-  1c. the validation server again, with an A/B testing property firebase_exp_1 (informational);
+  1b-1j. the validation server again, once per open question of protocol section 10 (informational; see
+     tool/analytics_probe.md);
   2. /mp/collect, ${run.debugEventNames.length} events with debug_mode, for DebugView;
   3. /mp/collect, ${run.reportingEventNames.length} events without debug_mode, for Realtime and the reports;$controlStep
 with the user property probe_kind=measurement_protocol.''');
@@ -221,54 +228,32 @@ with the user property probe_kind=measurement_protocol.''');
     }
     stdout.writeln('   HTTP 200, no validation messages.');
 
-    // Informational, records nothing, and never stops the run.
-    stdout.writeln('\n1b. Validation server, a complete device block');
-    final deviceCheck = await _post(
-      client,
-      endpoint('/debug/mp/collect'),
-      run.deviceCheckBody(),
-      recordsData: false,
-    );
-    final deviceMessages = deviceCheck == null || deviceCheck.status != 200
-        ? null
-        : _validationMessages(deviceCheck.body, redact);
-    if (deviceMessages == null) {
-      stdout.writeln('   No validation answer; continuing.');
-    } else if (deviceMessages.isEmpty) {
-      stdout.writeln(
-        '   Accepted: a device block with all nine fields passes.',
+    // Informational: the validation server records nothing, and these never stop the run. Each answers a
+    // question of docs/analytics_protocol.md, section 10.
+    for (final check in run.informationalChecks()) {
+      stdout.writeln('\n${check.title}');
+      final answer = await _post(
+        client,
+        endpoint('/debug/mp/collect'),
+        check.body,
+        recordsData: false,
       );
-    } else {
-      stdout.writeln('   Refused, with these messages:');
-      for (final message in deviceMessages) {
-        stdout.writeln('   - $message');
-      }
-    }
-
-    // Informational, records nothing, and never stops the run.
-    stdout.writeln(
-      '\n1c. Validation server, an A/B testing property firebase_exp_1',
-    );
-    final experimentCheck = await _post(
-      client,
-      endpoint('/debug/mp/collect'),
-      run.experimentCheckBody(),
-      recordsData: false,
-    );
-    final experimentMessages =
-        experimentCheck == null || experimentCheck.status != 200
-        ? null
-        : _validationMessages(experimentCheck.body, redact);
-    if (experimentMessages == null) {
-      stdout.writeln('   No validation answer; continuing.');
-    } else if (experimentMessages.isEmpty) {
-      stdout.writeln(
-        '   Accepted: no validation message for the firebase_ prefix.',
-      );
-    } else {
-      stdout.writeln('   Refused, with these messages:');
-      for (final message in experimentMessages) {
-        stdout.writeln('   - $message');
+      final messages = answer == null || answer.status != 200
+          ? null
+          : _validationMessages(answer.body, redact);
+      if (messages == null) {
+        stdout.writeln(
+          answer == null
+              ? '   No answer; continuing.'
+              : '   HTTP ${answer.status}, not a validation response; continuing.',
+        );
+      } else if (messages.isEmpty) {
+        stdout.writeln('   Accepted, no validation messages.');
+      } else {
+        stdout.writeln('   Refused, with these messages:');
+        for (final message in messages) {
+          stdout.writeln('   - $message');
+        }
       }
     }
 
@@ -431,39 +416,149 @@ class _Run {
   Map<String, Object?> reportingBody() =>
       _body(clientId, _events(debug: false));
 
-  /// One event with every field of `device` filled, for the validation server
-  /// only: does strict mode accept a complete device block?
-  Map<String, Object?> deviceCheckBody() => <String, Object?>{
-    ..._body(clientId, <Map<String, Object?>>[
-      _event('probe_report', 0, 'device_check', debug: false),
-    ], validation: true),
-    'device': <String, Object?>{
-      'category': 'desktop',
-      'language': _language(),
-      'screen_resolution': '1920x1080',
-      'operating_system': _operatingSystem(),
-      'operating_system_version': '1.0',
-      'model': 'Probe',
-      'brand': 'Probe',
-      'browser': 'Probe',
-      'browser_version': '1.0',
-    },
-  };
-
-  /// One event with the user property an A/B testing experiment sets
-  /// (`firebase_exp_<id>`), for the validation server only: does strict mode
-  /// accept the reserved prefix, which Remote Config's hand-off needs?
-  Map<String, Object?> experimentCheckBody() {
-    final Map<String, Object?> body = _body(clientId, <Map<String, Object?>>[
-      _event('probe_report', 0, 'experiment_check', debug: false),
+  /// One body per open question of docs/analytics_protocol.md, section 10, for the validation server only,
+  /// in strict mode. Each title says what it asks.
+  List<({String title, Map<String, Object?> body})> informationalChecks() {
+    Map<String, Object?> one(
+      String arm, {
+      String name = 'probe_report',
+      Map<String, Object?> extra = const <String, Object?>{},
+    }) => _body(clientId, <Map<String, Object?>>[
+      _event(name, 0, arm, debug: false, extra: extra),
     ], validation: true);
-    return <String, Object?>{
-      ...body,
-      'user_properties': <String, Object?>{
-        ...body['user_properties']! as Map<String, Object?>,
-        'firebase_exp_1': <String, Object?>{'value': '1'},
-      },
-    };
+
+    String location(int length) {
+      const prefix = 'https://probe.example/';
+      return prefix + 'a' * (length - prefix.length);
+    }
+
+    return <({String title, Map<String, Object?> body})>[
+      (
+        title: '1b. Question 6: a complete device block (all nine fields)',
+        body: <String, Object?>{
+          ...one('device_check'),
+          'device': <String, Object?>{
+            'category': 'desktop',
+            'language': _language(),
+            'screen_resolution': '1920x1080',
+            'operating_system': _operatingSystem(),
+            'operating_system_version': '1.0',
+            'model': 'Probe',
+            'brand': 'Probe',
+            'browser': 'Probe',
+            'browser_version': '1.0',
+          },
+        },
+      ),
+      (
+        title: '1c. Question 7: the A/B testing user property firebase_exp_1',
+        body: () {
+          final body = one('experiment_check');
+          return <String, Object?>{
+            ...body,
+            'user_properties': <String, Object?>{
+              ...body['user_properties']! as Map<String, Object?>,
+              'firebase_exp_1': <String, Object?>{'value': '1'},
+            },
+          };
+        }(),
+      ),
+      for (final length in <int>[100, 101, 1000])
+        (
+          title:
+              '1${switch (length) {
+                100 => 'd',
+                101 => 'e',
+                _ => 'f',
+              }}. Question 3: a page_location of '
+              '$length characters',
+          body: one(
+            'location_$length',
+            name: 'page_view',
+            extra: <String, Object?>{
+              'page_title': 'Probe',
+              'page_location': location(length),
+            },
+          ),
+        ),
+      (
+        title:
+            '1g. Question 4, control: a text value of 101 ASCII characters (expected: refused)',
+        body: one(
+          'ascii_101',
+          extra: <String, Object?>{'probe_text': 'a' * 101},
+        ),
+      ),
+      (
+        title:
+            '1h. Question 4: a text value of 100 non-ASCII characters (\u0103), 200 UTF-8 bytes, 600 '
+            'percent-encoded',
+        body: one(
+          'non_ascii_100',
+          extra: <String, Object?>{'probe_text': '\u0103' * 100},
+        ),
+      ),
+      for (final (letter, size) in <(String, int)>[
+        ('i', 130000),
+        ('j', 133120),
+      ])
+        (
+          title: '1$letter. Question 5: a body of exactly $size bytes',
+          body: sizedBody(size),
+        ),
+    ];
+  }
+
+  /// A strict-mode body of exactly [bytes] bytes of UTF-8 JSON: `view_item_list` events whose items carry
+  /// the padding, at most 200 items an event.
+  Map<String, Object?> sizedBody(int bytes) {
+    Map<String, Object?> build(int items, int extra) {
+      final events = <Map<String, Object?>>[];
+      var left = extra;
+      for (var first = 0; first < items || events.isEmpty; first += 200) {
+        events.add(
+          _event(
+            'view_item_list',
+            events.length,
+            'size_$bytes',
+            debug: false,
+            extra: <String, Object?>{
+              'items': <Map<String, Object?>>[
+                for (var i = first; i < items && i < first + 200; i++)
+                  () {
+                    final grow = left < 50 ? left : 50;
+                    left -= grow;
+                    return <String, Object?>{
+                      'item_id': 'p${i.toString().padLeft(4, '0')}',
+                      'item_name': 'n' * (50 + grow),
+                    };
+                  }(),
+              ],
+            },
+          ),
+        );
+      }
+      return _body(clientId, events, validation: true);
+    }
+
+    int size(Map<String, Object?> body) => utf8.encode(jsonEncode(body)).length;
+
+    // An estimate from the size of one item, then a few steps to the largest count that fits.
+    final empty = size(build(0, 0));
+    final perItem = size(build(1, 0)) - empty;
+    var items = (bytes - empty) ~/ perItem;
+    while (items > 0 && size(build(items, 0)) > bytes) {
+      items--;
+    }
+    while (size(build(items + 1, 0)) <= bytes) {
+      items++;
+    }
+    final body = build(items, bytes - size(build(items, 0)));
+    final actual = size(body);
+    if (actual != bytes) {
+      throw StateError('Could not build a body of $bytes bytes (got $actual).');
+    }
+    return body;
   }
 
   /// The reporting events again, under the client_id from gtag.js.
@@ -652,8 +747,8 @@ Record for docs/analytics_protocol.md, section 10:
    1. Did the events of the generated client_id appear in DebugView? In
       Realtime? In the standard reports? And those of the control?
    2. Which country, if any, was reported?
-   3. The result of step 1b (the complete device block).
-   4. The result of step 1c (the firebase_exp_1 user property).
+   3. The results of steps 1b to 1j, each under its question of section 10
+      (3: page_location, 4: non-ASCII, 5: body size, 6: device, 7: firebase_exp_).
    Also the date, the run tag ${run.tag}, and whether a data filter was active.''';
 }
 

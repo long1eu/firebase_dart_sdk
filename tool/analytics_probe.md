@@ -27,11 +27,27 @@ repository.
 
 Every event carries `session_id`, `engagement_time_msec`, `probe_run` (the run tag) and `probe_arm` (`generated`
 or `control`). The requests carry no `device` block: in strict mode the validation server refuses one without
-`model` and `browser` (protocol §7), which a program cannot read. Step 1b sends one more body, to the
-validation server only, with all nine `device` fields filled, and prints whether strict mode accepts it; it
-never stops the run. Step 1c does the same with the user property `firebase_exp_1`, the name an A/B testing
-experiment sets through Remote Config (protocol §10, question 7). There is no `user_location`, no `ip_override` and no `user_id`. Event timestamps lie within the two minutes before the run, so a clock that runs a little fast still
+`model` and `browser` (protocol §7), which a program cannot read. There is no `user_location`, no `ip_override` and no `user_id`. Event timestamps lie within the two minutes before the run, so a clock that runs a little fast still
 dates them in the past.
+
+## The validation-only checks (production kit)
+
+Steps 1b to 1j are step 6 of [analytics_spec.md](../docs/analytics_spec.md): one body each, to the validation
+server only and in strict mode, for an open question of [analytics_protocol.md](../docs/analytics_protocol.md),
+section 10. The validation server records nothing. Each step prints "Accepted" or the messages of the refusal,
+and none of them stops the run.
+
+| Step | Question | Body |
+|---|---|---|
+| 1b | 6 | all nine `device` fields filled |
+| 1c | 7 | the user property `firebase_exp_1`, the name an A/B testing experiment sets through Remote Config |
+| 1d, 1e, 1f | 3 | a `page_view` with a `page_location` of 100, 101 and 1000 characters |
+| 1g | 4, control | a text value of 101 ASCII characters: if this is not refused, strict mode does not check value lengths and 1h tells nothing |
+| 1h | 4 | a text value of 100 characters `ă`: 200 bytes of UTF-8, 600 characters percent-encoded. Accepted means code points are counted |
+| 1i, 1j | 5 | bodies of exactly 130,000 and 133,120 bytes, padded with the items of `view_item_list` events |
+
+`--print` lists these steps with the size of each body. Question 2 (the country) is read in the reports; see the
+checklist.
 
 ## The control
 
@@ -102,8 +118,7 @@ The probe ends with a checklist. Write the answers into
 1. Did the events of the generated `client_id` appear in DebugView? In Realtime? In the standard reports after
    24 to 48 hours? And those of the control?
 2. Which country was reported, if any? The probe sends no location and no device block.
-3. What step 1b printed: does strict mode accept a complete `device` block?
-4. What step 1c printed: does strict mode accept the user property `firebase_exp_1`?
+3. What steps 1b to 1j printed, each under its question (see the table above).
 
 A 2xx answer from `/mp/collect` proves only that the request arrived. The endpoint answers 2xx even for data it
 does not process.
@@ -115,3 +130,6 @@ validation messages that echo the secret and a terminal escape, a 302 whose body
 500 from the validation server, and an answer that never comes. The secret did not appear in any output. An
 independent review of its secret handling and of how misleading its results could be found the missing
 control and the unredacted server text, both fixed here. It has not been run against Google Analytics.
+The validation-only checks were run the same way against a local fake server, which refused some of them and
+echoed the secret in a message: every check ran, none stopped the run, the two size bodies arrived at exactly
+130,000 and 133,120 bytes, and the secret did not appear in the output.

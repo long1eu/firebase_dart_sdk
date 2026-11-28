@@ -286,7 +286,9 @@ document lists the difference.
 ## 10. What the production kit must answer
 
 The documentation leaves these open. The kit (spec section 10, step 6) records each answer with the date and
-the property's settings:
+the property's settings. The kit is `tool/analytics_probe.dart`: questions 3 to 7 are its validation-only
+steps 1b to 1j ([tool/analytics_probe.md](../tool/analytics_probe.md)), and questions 1 and 2 are read in
+DebugView, Realtime and the reports after its run:
 
 1. Do events with a `client_id` that gtag.js never used appear in Realtime and DebugView? (Section 5. This
    decides whether the package works at all.) **Yes for DebugView and Realtime** (2026-11-28, run 22tjj8;
