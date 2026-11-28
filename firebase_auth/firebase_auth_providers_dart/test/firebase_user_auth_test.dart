@@ -1874,7 +1874,7 @@ void main() {
       for (final http.Request request in requests) {
         expect(
           request.headers['X-Client-Version'],
-          'Dart/DartCore/0.4.0/FirebaseCore-dart',
+          'Dart/DartCore/0.4.1/FirebaseCore-dart',
         );
         expect(request.headers['X-Firebase-gmpid'], '1:2:web:3');
         expect(request.headers.containsKey('X-Firebase-AppCheck'), isFalse);
