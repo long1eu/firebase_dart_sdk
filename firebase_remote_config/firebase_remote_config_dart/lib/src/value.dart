@@ -41,8 +41,8 @@ final class RemoteConfigValue {
   /// The UTF-8 bytes of [text] (Android's `getByteArray`); empty for a static value.
   Uint8List asBytes() => utf8.encode(text);
 
-  /// The JSON value [text] holds (iOS's `jsonValue`): a `Map<String, Object?>`, `List<Object?>`,
-  /// `String`, `num`, `bool` or null.
+  /// The JSON value [text] holds (iOS's `jsonValue`), as `jsonDecode` gives it: a
+  /// `Map<String, dynamic>`, `List<dynamic>`, `String`, `num`, `bool` or null.
   ///
   /// Returns null when the text is not JSON, nests arrays and objects deeper than 32 levels, is over
   /// 16 MiB of UTF-8, or the source is [ValueSource.valueStatic]; a text of `null` also gives null.

@@ -175,10 +175,12 @@ class FirebaseRemoteConfig {
   bool _staleIfRequestFails = false;
   _InFlight? _inFlight;
   Future<void>? _resetting;
+  Future<void>? _clearing;
   int _resetGeneration = 0;
   Set<RolloutAssignment> _rollouts = const <RolloutAssignment>{};
   // The A/B testing hand-offs of activate and reset run one at a time, in call order.
   Future<void> _experimentsTail = Future<void>.value();
+  Future<void> _backoffTail = Future<void>.value();
 
   /// Completes when the stored records are loaded. Started by the constructor and memoized; it fails
   /// only when the store cannot start (`storage-error`).
@@ -222,21 +224,26 @@ class FirebaseRemoteConfig {
   /// different version, or the stored one has none). Memory with the same version is that stored
   /// record, clamped to now when it was loaded.
   ///
-  /// A [reset] that starts while this call runs wins: the call then stores and applies nothing and
-  /// returns false.
+  /// A [reset] that starts while this call runs wins (A38): the call returns true only when its record
+  /// is active in the store and in memory when it returns, and [onActivated] emits only then. A call
+  /// whose record the reset removed returns false; one whose record survived a failed reset returns
+  /// true.
   ///
   /// When it returns true, it first hands the experiments of the new active template to the
   /// `analytics` constructor argument (A42): one `setUserProperties` call with `firebase<experimentId>`
   /// set to the variant id for each experiment and to null for each experiment handed over before that
   /// is gone, then `logEvent('set_firebase_experiment_state')`; nothing when that map is empty. A
-  /// failure of the hand-off, including the two calls taking longer than [fetchTimeout] together, is
-  /// logged and never fails this call; the next activate retries it.
+  /// failure of the hand-off, including the two calls not completing within [fetchTimeout] of the
+  /// hand-off being queued, is logged and never fails this call; the next activate retries it.
   ///
   /// Throws `storage-error` when the store fails; memory is then unchanged.
   Future<bool> activate() async {
     _checkOpen();
     await _guard(_initialization, null);
-    await _waitForReset(null);
+    // Inline, so no await falls between the last check and reading the generation (A38).
+    while (_resetting != null) {
+      await _guard(_resetting!, null);
+    }
     final int resetGeneration = _resetGeneration;
     final TemplateRecord? fetchedBefore = _fetched;
     // One `now` for every read below (A13): the fetched record is clamped to it, and the transform
@@ -285,31 +292,50 @@ class FirebaseRemoteConfig {
       }),
     );
     _checkOpen();
-    // Checked again: a reset may have started during the update; memory is then the reset's.
-    if (resetGeneration != _resetGeneration) {
-      return false;
+    int generation = resetGeneration;
+    String? activeText = result;
+    // A reset started during the update. When this call wrote the store, its record counts only if
+    // the reset failed before removing it; memory then takes it.
+    if (generation != _resetGeneration) {
+      if (!wrote || !await _survivedReset(fetchedText)) {
+        return false;
+      }
+      _checkOpen();
+      generation = _resetGeneration;
+      activeText = fetchedText;
     }
-    _active = TemplateRecord.tryParse(result, onDrop: _reportDrop, now: now);
+    _active = TemplateRecord.tryParse(
+      activeText,
+      onDrop: _reportDrop,
+      now: now,
+    );
     // A fetch that completed during the update stored a newer record; keep it.
     if (identical(_fetched, fetchedBefore)) {
       _fetched = fetched;
     }
-    if (wrote) {
+    _updateRollouts();
+    if (!wrote) {
+      return false;
+    }
+    await _handOffExperiments(_active, generation);
+    // A reset that started during the hand-off clears this record unless it fails.
+    if (generation != _resetGeneration && !await _survivedReset(fetchedText)) {
+      return false;
+    }
+    if (!_closed) {
       _activated.add(null);
     }
-    _updateRollouts();
-    if (wrote) {
-      await _handOffExperiments(_active, resetGeneration);
-    }
-    return wrote;
+    return true;
   }
 
   /// Clears the fetched and the active template, the fetch state ([info]) and the throttle, in memory
   /// and in the store (Android's `reset`, `A:FirebaseRemoteConfig.java:549-561`). The [defaults], the
   /// custom signals and the realtime backoff stay.
   ///
-  /// It waits for a fetch in flight to settle, and fetches and activates called meanwhile wait for it;
-  /// an [activate] already running stores and applies nothing and returns false. Afterwards reads answer from
+  /// It waits for a fetch in flight to settle; fetches, activates and other resets called meanwhile
+  /// wait for it, and custom-signal and ID-change updates of the fetch state wait while it clears. An
+  /// [activate] already running returns false unless this reset fails before removing its record (see
+  /// [activate]). Afterwards reads answer from
   /// [defaults], [info] is as before the first fetch, the next [fetch] sends a request without
   /// `If-None-Match`, and an open realtime stream stays open: its next connect announces version 0, so
   /// the server's current template is fetched (not activated). [onActivated] does not emit;
@@ -325,23 +351,27 @@ class FirebaseRemoteConfig {
   Future<void> reset() async {
     _checkOpen();
     await _guard(_initialization, null);
-    await _waitForReset(null);
+    // Resets run one at a time. Inline, so no await falls between the last check and taking the slot.
+    while (_resetting != null) {
+      await _guard(_resetting!, null);
+    }
     final Completer<void> done = Completer<void>();
+    final Completer<void> clearing = Completer<void>();
     _resetting = done.future;
-    // Every activate that began before this point now stores and applies nothing (A38).
+    // Every activate that began before this point now counts only if this reset fails (A38).
     _resetGeneration++;
     try {
       await _waitForFetches();
+      // From here, meta and throttle updates (custom signals, an ID change) wait for the end.
+      _clearing = clearing.future;
       for (final String name in const <String>[
         'fetched',
         'active',
         'meta',
         'throttle',
       ]) {
-        await _storeCall(() async {
-          await _store.write(_key(name), null);
-          return null;
-        });
+        _checkOpen();
+        await _storeCall(() => _store.update(_key(name), (String? _) => null));
       }
       await _clearExperiments();
       _checkOpen();
@@ -352,7 +382,13 @@ class FirebaseRemoteConfig {
       _staleIfRequestFails = false;
       _updateRollouts();
     } finally {
-      _resetting = null;
+      if (identical(_clearing, clearing.future)) {
+        _clearing = null;
+      }
+      clearing.complete();
+      if (identical(_resetting, done.future)) {
+        _resetting = null;
+      }
       done.complete();
     }
   }
@@ -790,6 +826,10 @@ class FirebaseRemoteConfig {
       _updateMeta((MetaRecord meta) => meta.copyWith(lastFetchStatus: status));
 
   Future<void> _updateMeta(MetaRecord Function(MetaRecord meta) change) async {
+    // Checked first, so an update outside a reset keeps its timing (no extra microtask).
+    if (_clearing != null) {
+      await _waitForClearing();
+    }
     final DateTime now = _clock();
     try {
       final String? stored = await _store.update(_key('meta'), (
@@ -807,6 +847,10 @@ class FirebaseRemoteConfig {
   Future<void> _updateThrottle(
     ThrottleRecord Function(ThrottleRecord record) change,
   ) async {
+    // Checked first, so an update outside a reset keeps its timing (no extra microtask).
+    if (_clearing != null) {
+      await _waitForClearing();
+    }
     final DateTime now = _clock();
     try {
       final String? stored = await _store.update(_key('throttle'), (
@@ -880,6 +924,10 @@ class FirebaseRemoteConfig {
     );
     if (backoff != null) {
       _realtime.restoreBackoff(backoff);
+      // Every wait it held has passed: remove the record instead of keeping it until the next change.
+      if (backoff.isEmpty) {
+        unawaited(_onRealtimeBackoff(backoff));
+      }
     }
     _rollouts = _rolloutsOf(_active);
     _initialized = true;
@@ -905,14 +953,41 @@ class FirebaseRemoteConfig {
     return record;
   }
 
-  /// Waits while a [reset] runs; one that starts after the wait is waited for too.
-  Future<void> _waitForReset(DateTime? deadline) async {
+  /// Waits while a [reset] clears the records, so an update never falls back to the memory the reset
+  /// is about to clear. Fetches the reset waits for run before that phase, so they never wait here.
+  Future<void> _waitForClearing() async {
     while (true) {
-      final Future<void>? resetting = _resetting;
-      if (resetting == null) {
+      final Future<void>? clearing = _clearing;
+      if (clearing == null) {
         return;
       }
-      await _guard(resetting, deadline);
+      await clearing;
+    }
+  }
+
+  /// After a [reset] started during an [activate]: waits for every reset to end, then tells whether
+  /// the stored active record is still [text] (the reset failed before removing it). A failed read
+  /// counts as removed.
+  Future<bool> _survivedReset(String text) async {
+    while (true) {
+      final Future<void>? resetting = _resetting;
+      if (resetting != null) {
+        await _guard(resetting, null);
+        continue;
+      }
+      final String? stored;
+      try {
+        stored = await _store.read(_key('active'));
+      } catch (error) {
+        _logOnce(
+          'store-call',
+          'A store call failed; the operation changed nothing.',
+        );
+        return false;
+      }
+      if (_resetting == null) {
+        return stored == text;
+      }
     }
   }
 
@@ -930,23 +1005,33 @@ class FirebaseRemoteConfig {
     }
   }
 
-  void _onRealtimeBackoff(RealtimeBackoffRecord record) {
-    unawaited(_storeRealtimeBackoff(record));
+  /// Queues a store of the realtime backoff after the ones handed over before it; completes with true
+  /// when it was stored.
+  Future<bool> _onRealtimeBackoff(RealtimeBackoffRecord record) {
+    final Future<bool> result = _backoffTail.then(
+      (void _) => _storeRealtimeBackoff(record),
+    );
+    _backoffTail = result.then<void>((bool _) {});
+    return result;
   }
 
-  /// Stores the realtime backoff, or removes the record when it holds nothing. A failed write is logged
-  /// once; the realtime client goes on from memory.
-  Future<void> _storeRealtimeBackoff(RealtimeBackoffRecord record) async {
+  /// Stores the realtime backoff, or removes the record when it holds nothing. Returns false without
+  /// writing once the instance is closed, so a queued store never lands after [close]; a failed write
+  /// is logged once and returns false, and the realtime client hands the state over again on its next
+  /// change.
+  Future<bool> _storeRealtimeBackoff(RealtimeBackoffRecord record) async {
     if (_closed) {
-      return;
+      return false;
     }
     try {
       await _store.write(
         _key('realtime'),
         record.isEmpty ? null : record.encode(),
       );
+      return true;
     } catch (error) {
       _writeFailed('realtime');
+      return false;
     }
   }
 
@@ -967,28 +1052,35 @@ class FirebaseRemoteConfig {
     TemplateRecord? active,
     int resetGeneration,
   ) {
+    // The deadline starts when the hand-off is queued, so a queue behind a hung connector holds this
+    // call for at most fetchTimeout in all.
+    final DateTime deadline = _clock().add(fetchTimeout);
     return _serialExperiments(() async {
       final Map<String, String> current = activeExperiments(
         active,
         _reportDrop,
       );
-      final Set<String>? previous = await _readExperiments();
-      if (previous == null || _closed || resetGeneration != _resetGeneration) {
+      final ({Set<String> ids, bool corrupt})? stored =
+          await _readExperiments();
+      if (stored == null || _closed || resetGeneration != _resetGeneration) {
         return;
       }
+      final Set<String> previous = stored.ids;
       final Map<String, String?> properties = experimentProperties(
         current,
         previous,
       );
       final bool sent =
-          properties.isEmpty || await _sendExperiments(properties);
+          properties.isEmpty || await _sendExperiments(properties, deadline);
       if (_closed) {
         return;
       }
       final Set<String> ids = sent
           ? current.keys.toSet()
           : _keptExperiments(current.keys, previous);
-      if (const SetEquality<String>().equals(ids, previous)) {
+      // A corrupt record is rewritten even when the set did not change, so it is repaired.
+      if (!stored.corrupt &&
+          const SetEquality<String>().equals(ids, previous)) {
         return;
       }
       try {
@@ -1021,14 +1113,18 @@ class FirebaseRemoteConfig {
   /// A failed hand-off keeps the set. Throws `storage-error` when the store fails, and
   /// `remote-config-closed` when the instance closed.
   Future<void> _clearExperiments() {
+    final DateTime deadline = _clock().add(fetchTimeout);
     return _serialExperiments(() async {
-      final Set<String> previous = _parseExperiments(
-        await _storeCall(() => _store.read(_key('experiments'))),
-      );
+      final Set<String> previous =
+          _parseExperiments(
+            await _storeCall(() => _store.read(_key('experiments'))),
+          ) ??
+          const <String>{};
       _checkOpen();
       if (previous.isNotEmpty &&
           !await _sendExperiments(
             experimentProperties(const <String, String>{}, previous),
+            deadline,
           )) {
         return;
       }
@@ -1040,9 +1136,9 @@ class FirebaseRemoteConfig {
     });
   }
 
-  /// The stored experiment ids; an empty set for a missing or bad record, and null when the store
-  /// fails.
-  Future<Set<String>?> _readExperiments() async {
+  /// The stored experiment ids, and whether the record was bad (its ids are then empty); null when the
+  /// store fails.
+  Future<({Set<String> ids, bool corrupt})?> _readExperiments() async {
     final String? text;
     try {
       text = await _store.read(_key('experiments'));
@@ -1053,10 +1149,12 @@ class FirebaseRemoteConfig {
       );
       return null;
     }
-    return _parseExperiments(text);
+    final Set<String>? ids = _parseExperiments(text);
+    return (ids: ids ?? const <String>{}, corrupt: ids == null);
   }
 
-  Set<String> _parseExperiments(String? text) {
+  /// The ids of a stored record: empty when there is none, null (logged once) for a bad one.
+  Set<String>? _parseExperiments(String? text) {
     if (text == null) {
       return const <String>{};
     }
@@ -1066,16 +1164,20 @@ class FirebaseRemoteConfig {
         'load-experiments',
         'The stored experiments record could not be read; it is ignored.',
       );
-      return const <String>{};
+      return null;
     }
     return record.ids;
   }
 
   /// Sends [properties] and the experiment state event to the connector. Returns false when the
-  /// connector failed, the two calls together took longer than [fetchTimeout] (`fetch-timeout`, the
-  /// connector's futures are then abandoned) or the instance closed meanwhile; true when both calls completed, and when there
-  /// is no connector (a warning is logged once).
-  Future<bool> _sendExperiments(Map<String, String?> properties) async {
+  /// connector failed, the two calls did not complete before [deadline] (set to [fetchTimeout] after
+  /// the hand-off was queued; `fetch-timeout`, the connector's futures are then abandoned, and a
+  /// deadline already past sends nothing) or the instance closed meanwhile; true when both calls
+  /// completed, and when there is no connector (a warning is logged once).
+  Future<bool> _sendExperiments(
+    Map<String, String?> properties,
+    DateTime deadline,
+  ) async {
     final RemoteConfigAnalytics? analytics = _analytics;
     if (analytics == null) {
       _logOnce(
@@ -1084,8 +1186,16 @@ class FirebaseRemoteConfig {
       );
       return true;
     }
-    // One deadline for both calls: a hung connector holds activate and reset for at most fetchTimeout.
-    final DateTime deadline = _clock().add(fetchTimeout);
+    // One deadline for both calls, set when the hand-off was queued: a hung connector holds activate
+    // and reset for at most fetchTimeout, queue included.
+    if (!deadline.isAfter(_clock())) {
+      _logOnce(
+        'analytics-queue-timeout',
+        'An A/B testing hand-off waited past its deadline behind an earlier one; the next activate '
+            'sends it again.',
+      );
+      return false;
+    }
     try {
       await _guard(
         analytics.setUserProperties(

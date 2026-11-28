@@ -255,8 +255,8 @@ final class RealtimeBackoffRecord {
     'retryUntil': ?retryUntil?.millisecondsSinceEpoch,
   });
 
-  /// Reads a stored record, or returns null for a bad one. A time later than [now] plus
-  /// [maxStoredRealtimeBackoff] becomes that time.
+  /// Reads a stored record, or returns null for a bad one. A time that is not after [now] is dropped
+  /// (that wait has passed); a time later than [now] plus [maxStoredRealtimeBackoff] becomes that time.
   static RealtimeBackoffRecord? tryParse(String? text, DateTime now) {
     final Map<String, Object?>? json = decodeRecord(text);
     if (json == null) {
@@ -298,7 +298,13 @@ final class RealtimeBackoffRecord {
         millis,
         isUtc: true,
       );
-      times.add(time.isAfter(latest) ? latest : time);
+      times.add(
+        !time.isAfter(now)
+            ? null
+            : time.isAfter(latest)
+            ? latest
+            : time,
+      );
     }
     return RealtimeBackoffRecord(
       serverFailures: server,

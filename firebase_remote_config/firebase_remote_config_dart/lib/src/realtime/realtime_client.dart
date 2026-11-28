@@ -30,7 +30,8 @@ final class RealtimeClient {
   ///
   /// When [ready] is given, a connect waits for it (its error too), so the backoff that
   /// [restoreBackoff] brings back applies to the first connect. [onBackoffChanged] receives each
-  /// change of the failure counts and waits, to persist it.
+  /// change of the failure counts and waits, to persist it, and completes with true when it was
+  /// stored; after a false the next change hands the state over again.
   RealtimeClient({
     required FirebaseOptions options,
     required FirebaseInstallations installations,
@@ -47,7 +48,7 @@ final class RealtimeClient {
     Future<void> Function(Duration duration)? delay,
     RemoteConfigLogger? logger,
     Future<void>? ready,
-    void Function(RealtimeBackoffRecord record)? onBackoffChanged,
+    Future<bool> Function(RealtimeBackoffRecord record)? onBackoffChanged,
   }) : _options = options,
        _ready = ready,
        _isReady = ready == null,
@@ -138,7 +139,7 @@ final class RealtimeClient {
   final RemoteConfigLogger? _logger;
   final String? _projectNumber;
   final Future<void>? _ready;
-  final void Function(RealtimeBackoffRecord record)? _onBackoffChanged;
+  final Future<bool> Function(RealtimeBackoffRecord record)? _onBackoffChanged;
   final Completer<void> _closedSignal = Completer<void>();
   final List<StreamSubscription<bool>> _subscriptions =
       <StreamSubscription<bool>>[];
@@ -161,7 +162,10 @@ final class RealtimeClient {
   bool _failureErrorSent = false;
   bool? _networkConnected;
   bool _isReady;
+  bool _regainedBeforeReady = false;
+  bool _recheckRestored = false;
   RealtimeBackoffRecord _persisted = const RealtimeBackoffRecord();
+  RealtimeBackoffRecord? _sending;
 
   /// The stream of `onConfigUpdated`. Each listen counts; the connection is open while at least one
   /// listener remains (and the other rules of 5.9 allow it).
@@ -181,6 +185,10 @@ final class RealtimeClient {
 
   /// Takes the failure counts and waits of [record], as stored by an earlier run. Call it before
   /// the `ready` future of the constructor completes; it replaces the current counts and waits.
+  ///
+  /// A network regain seen before the restore is applied to the restored waits (A20). A reconnect timer
+  /// set before the restore is replaced by one that honours the restored waits, and a connect already
+  /// waiting for `ready` checks them again before it sends.
   void restoreBackoff(RealtimeBackoffRecord record) {
     _serverFailures = record.serverFailures;
     _transportFailures = record.transportFailures;
@@ -188,6 +196,16 @@ final class RealtimeClient {
     _transportBackoffUntil = record.transportUntil;
     _serverRetryUntil = record.retryUntil;
     _persisted = record;
+    if (_regainedBeforeReady) {
+      _regainedBeforeReady = false;
+      _clearFailureWaits();
+      _persistBackoff();
+    }
+    _recheckRestored = _connection != null;
+    if (_reconnectTimer != null) {
+      _cancelTimer();
+      _evaluate();
+    }
   }
 
   /// Ends every listener's stream, aborts the connection and cancels every timer. Idempotent.
@@ -294,13 +312,21 @@ final class RealtimeClient {
     }
     // A regained network allows a connect at once, subject to the floor (5.9.1): the failure backoffs
     // are cleared. The server failure count stays, so the next server failure waits longer, and the
-    // server's own `retryIntervalSeconds` wait stays, because the server asked for it.
-    _transportFailures = 0;
-    _transportBackoffUntil = null;
-    _serverBackoffUntil = null;
+    // server's own `retryIntervalSeconds` wait stays, because the server asked for it. Before the
+    // stored records are loaded, the regain is also applied to the waits they restore.
+    if (!_isReady) {
+      _regainedBeforeReady = true;
+    }
+    _clearFailureWaits();
     _persistBackoff();
     _cancelTimer();
     _evaluate();
+  }
+
+  void _clearFailureWaits() {
+    _transportFailures = 0;
+    _transportBackoffUntil = null;
+    _serverBackoffUntil = null;
   }
 
   Future<void> _connect() async {
@@ -513,17 +539,24 @@ final class RealtimeClient {
   /// without counting a failure, and a timer is set for the end of the wait).
   Future<bool> _waitUntilReady(_Connection connection) async {
     final Future<void>? ready = _ready;
-    if (_isReady || ready == null) {
-      return true;
-    }
-    try {
-      await ready;
-    } catch (error) {
-      // A failed load leaves nothing restored; the connect goes on.
+    if (!_isReady && ready != null) {
+      try {
+        await ready;
+      } catch (error) {
+        // A failed load leaves nothing restored; the connect goes on.
+      }
+      _isReady = true;
+      _recheckRestored = true;
     }
     if (connection.finished) {
       return false;
     }
+    // Only the connect that was under way when the waits were restored checks them; any later
+    // connect was scheduled with them.
+    if (!_recheckRestored) {
+      return true;
+    }
+    _recheckRestored = false;
     final DateTime now = _clock();
     final bool waiting = <DateTime?>[
       _serverBackoffUntil,
@@ -541,8 +574,16 @@ final class RealtimeClient {
     return false;
   }
 
-  /// Hands the failure counts and waits to [_onBackoffChanged] when they differ from the last ones.
+  /// Hands the failure counts and waits to [_onBackoffChanged] when they differ from the last stored
+  /// ones and from the ones being stored. Waits that have passed are dropped first, so the record
+  /// empties (and is removed) once nothing is left to wait for.
   void _persistBackoff() {
+    final DateTime now = _clock();
+    DateTime? pending(DateTime? until) =>
+        until != null && until.isAfter(now) ? until : null;
+    _serverBackoffUntil = pending(_serverBackoffUntil);
+    _transportBackoffUntil = pending(_transportBackoffUntil);
+    _serverRetryUntil = pending(_serverRetryUntil);
     final RealtimeBackoffRecord record = RealtimeBackoffRecord(
       serverFailures: math.min(_serverFailures, RealtimeBackoffRecord.maxCount),
       transportFailures: math.min(
@@ -553,11 +594,23 @@ final class RealtimeClient {
       transportUntil: _transportBackoffUntil,
       retryUntil: _serverRetryUntil,
     );
-    if (record == _persisted) {
+    final Future<bool> Function(RealtimeBackoffRecord record)? store =
+        _onBackoffChanged;
+    if (store == null || record == _persisted || record == _sending) {
       return;
     }
-    _persisted = record;
-    _onBackoffChanged?.call(record);
+    _sending = record;
+    // Stores complete in the order they were handed over, so the last success is what the store holds.
+    unawaited(
+      store(record).then<void>((bool stored) {
+        if (identical(_sending, record)) {
+          _sending = null;
+        }
+        if (stored) {
+          _persisted = record;
+        }
+      }),
+    );
   }
 
   void _resetWatchdog(_Connection connection) {
