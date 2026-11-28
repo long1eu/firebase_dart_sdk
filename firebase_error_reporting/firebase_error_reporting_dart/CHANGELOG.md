@@ -1,3 +1,8 @@
+## Unreleased
+
+- The README: setup, the relay and direct transports, capturing errors, users and privacy, behaviour and
+  limits. Its Dart snippets are compiled by `test/readme_snippets_test.dart`.
+
 ## 0.1.0-dev.2
 
 Fixes from an independent review:

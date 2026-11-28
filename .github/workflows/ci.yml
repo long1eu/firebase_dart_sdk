@@ -241,7 +241,10 @@ jobs:
       - name: Check formatting (firebase_error_reporting_dart)
         if: ${{ !cancelled() && matrix.leg == 'others' }}
         working-directory: firebase_error_reporting/firebase_error_reporting_dart
-        run: dart format --output=none --set-exit-if-changed lib test
+        # Without test/readme: readme_snippets_test.dart generates it and the formatter does not leave it unchanged.
+        run: |
+          find lib test -name '*.dart' -not -path 'test/readme/*' -print0 \
+            | xargs -0 dart format --output=none --set-exit-if-changed
       - name: Check formatting (firebase_database_dart_sqlite)
         if: ${{ !cancelled() && matrix.leg == 'others' }}
         working-directory: firebase_database/firebase_database_dart_sqlite
