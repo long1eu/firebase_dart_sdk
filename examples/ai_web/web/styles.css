@@ -1,0 +1,24 @@
+:root {
+  color-scheme: light dark;
+  --err: #b03a2e;
+  --line: #8884;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --err: #ff8a80; }
+}
+body { font-family: system-ui, sans-serif; max-width: 44rem; margin: 1.5rem auto; padding: 0 1rem; line-height: 1.4; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; }
+dt { font-weight: 600; }
+dd { margin: 0; overflow-wrap: anywhere; }
+form { display: flex; flex-direction: column; gap: 0.5rem; margin: 1rem 0; }
+form label { display: flex; flex-direction: column; gap: 0.2rem; }
+button, input, select, textarea { font: inherit; padding: 0.35rem 0.6rem; }
+.buttons { display: flex; gap: 0.5rem; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--line); padding: 0.6rem; min-height: 3rem; }
+#error { color: var(--err); }
+.hint { font-size: 0.9rem; opacity: 0.85; margin: 0.25rem 0; }
+@media (max-width: 30rem) {
+  body { margin: 1rem auto; }
+  dl { grid-template-columns: 1fr; }
+  dt { margin-top: 0.4rem; }
+}

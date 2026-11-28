@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; connect-src https://firebasevertexai.googleapis.com">
+  <title>AI Logic: firebase_ai_dart</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h1>AI Logic</h1>
+  <p>Ask a Gemini model through Firebase AI Logic with <code>firebase_ai_dart</code> (pure Dart, compiled to
+    WebAssembly or JavaScript) and watch the answer stream in.</p>
+
+  <form id="connect">
+    <label>API key <input id="f-key" autocomplete="off" required></label>
+    <label>App id <input id="f-app" placeholder="1:1234567890:web:abc123" autocomplete="off" required></label>
+    <label>Project id <input id="f-project" placeholder="my-project" autocomplete="off" required></label>
+    <label>Model <input id="f-model" placeholder="a model name from your project" autocomplete="off" required></label>
+    <label>Backend
+      <select id="f-backend">
+        <option value="google-ai">Gemini Developer API</option>
+        <option value="agent-platform">Agent Platform</option>
+      </select>
+    </label>
+    <label>Location (Agent Platform only) <input id="f-location" value="global" autocomplete="off"></label>
+    <button type="submit">Connect</button>
+  </form>
+  <p class="hint">Nothing is stored, and nothing leaves the browser except to
+    <code>firebasevertexai.googleapis.com</code> (the page's Content-Security-Policy allows no other host). Your
+    API key, app id and project id are not stored. The API key of a web app is public: turn on App Check
+    enforcement for AI Logic in your project, and restrict the key to your site and to the Firebase AI Logic API.
+    Every prompt is billed to your project.</p>
+  <p id="error" role="alert"></p>
+
+  <dl>
+    <dt>Status</dt><dd id="status">Not connected</dd>
+    <dt>Compiler</dt><dd><span id="compiler"></span> (other build: <a id="other-compiler" href="?compiler=js">dart2js</a>)</dd>
+  </dl>
+
+  <form id="ask">
+    <label>Prompt <textarea id="f-prompt" rows="4" required>Write a haiku about Dart.</textarea></label>
+    <div class="buttons">
+      <button id="send" type="submit" disabled>Send</button>
+      <button id="stop" type="button" disabled>Stop</button>
+    </div>
+  </form>
+
+  <h2>Answer</h2>
+  <pre id="answer"></pre>
+  <p class="hint">Stop aborts the request in the browser. The service may still finish the request and bill it.</p>
+
+  <script src="bootstrap.js" data-app="main"></script>
+</body>
+</html>

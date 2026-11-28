@@ -1,3 +1,7 @@
+## 0.2.4
+
+- Doc comments of `isAutomaticDataCollectionEnabled` name its reader.
+
 ## 0.2.3
 
 - Documentation: point S8 of the provider contract: a `getToken(forceRefresh: true)` that cannot run answers with

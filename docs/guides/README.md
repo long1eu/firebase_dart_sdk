@@ -2,7 +2,8 @@
 
 Guides for `cloud_firestore_dart`, the unofficial pure-Dart Cloud Firestore client, its app layer
 `firebase_app_dart`, the token providers of `firebase_auth_providers_dart`, the SQLite cache of
-`cloud_firestore_dart_sqlite` and Remote Config with `firebase_remote_config_dart`. The package
+`cloud_firestore_dart_sqlite`, Remote Config with `firebase_remote_config_dart` and AI Logic with
+`firebase_ai_dart`. The package
 READMEs are short landing pages; the API reference is on pub.dev.
 
 1. [Getting started](getting_started.md): install, create the app and the instance, read and
@@ -88,10 +89,12 @@ READMEs are short landing pages; the API reference is on pub.dev.
 34. [Analytics](analytics.md): `firebase_analytics_dart`, a Measurement Protocol client of a GA4 web stream (in
     development, not released): the relay or direct transport, the store, events and screen views, consent,
     delivery and retries, the errors it throws, and the Flutter adapter for Windows and Linux.
+35. [AI Logic](ai_logic.md): Gemini through Firebase with firebase_ai_dart: generate, stream, chat, function
+    calling, structured output
 
 Every Dart snippet in these guides is compiled against the current API by
 `cloud_firestore/cloud_firestore_dart/test/unit/api/readme_snippets_test.dart`, except the Realtime Database
-guides, `remote_config.md` and `analytics.md` (compiled by the snippet tests of their own packages) and the blocks
+guides, `remote_config.md`, `analytics.md` and `ai_logic.md` (compiled by the snippet tests of their own packages) and the blocks
 marked `dart flutter`, which are not compiled here: most are taken from `examples/flutter_notes` and checked
 there by `flutter analyze`, and the one in `analytics.md` follows the example of
 `firebase_analytics_dart_platform`.

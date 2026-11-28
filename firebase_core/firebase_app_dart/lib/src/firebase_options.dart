@@ -175,9 +175,9 @@ class FirebaseOptions {
   /// The app group of an Apple app. Stored, not used.
   final String? appGroupId;
 
-  /// Whether automatic data collection is enabled. Default `true`. Stored, not used: no service of
-  /// this repository collects data, and [FirebaseApp.isAutomaticDataCollectionEnabled] does not read
-  /// it.
+  /// Whether automatic data collection is enabled. Default `true`. Stored, not used:
+  /// [FirebaseApp.isAutomaticDataCollectionEnabled] does not read it, and `firebase_ai_dart` reads
+  /// that getter, not this field.
   final bool dataCollectionEnabled;
 
   /// A copy of these options with the given values replaced.

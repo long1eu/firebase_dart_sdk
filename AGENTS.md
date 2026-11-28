@@ -27,6 +27,7 @@ Maintained, tested and published (`cloud_firestore_dart` 0.3.2, Dart `^3.8.0`):
 | `firebase_installations_dart` (0.1.0; not on pub.dev yet) | `firebase_installations/firebase_installations_dart` |
 | `firebase_remote_config_dart` (0.1.0; not on pub.dev yet) | `firebase_remote_config/firebase_remote_config_dart` |
 | `firebase_remote_config_dart_platform` (0.1.0, Flutter; not on pub.dev yet) | `firebase_remote_config/firebase_remote_config_dart_platform` |
+| `firebase_ai_dart` (0.1.0; not on pub.dev yet) | `firebase_ai/firebase_ai_dart` |
 
 - `examples/`: complete example packages (`server_shelf`, `cli`, `storage_cli`, `cloud_run_job`).
 - `docs/`: guides (`docs/guides/`), parity, support policy, how we test, upstream sync records.
@@ -65,8 +66,8 @@ In `cloud_firestore/cloud_firestore_dart`:
   Fix what the analyzer reports in the Markdown, not in the generated file. Blocks fenced as
   `dart lite` are checked against `lite.dart`; other info strings are not compiled. The Realtime
   Database guides (`database.md`, `database_flutter.md`) are compiled by the snippet tests of the
-  database packages, and `remote_config.md` by the snippet test of `firebase_remote_config_dart`
-  (`_guidesCheckedElsewhere` in the test).
+  database packages, `remote_config.md` by the snippet test of `firebase_remote_config_dart` and `ai_logic.md`
+  by that of `firebase_ai_dart` (`_guidesCheckedElsewhere` in the test).
 - `test/unit/api/public_api.golden.txt` lists the public API. A failing
   `public_api_golden_test.dart` means the public surface changed; if intended, regenerate with
   `UPDATE_GOLDEN=1 dart test test/unit/api/public_api_golden_test.dart` and review the diff.

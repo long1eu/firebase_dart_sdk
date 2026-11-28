@@ -16,6 +16,7 @@ examples=(
   "rtdb_web_app|Realtime Database web app|The Realtime Database client in a browser app."
   "rtdb_playground|Realtime Database playground|The real client against a simulated server in the page: offline writes, catch-up and rollback."
   "remote_config_web|Remote Config|Fetch values and watch realtime updates"
+  "ai_web|AI Logic|Ask a Gemini model through Firebase and watch the answer stream"
 )
 
 rm -rf "$out"

@@ -297,8 +297,8 @@ class FirebaseApp with _PlatformDependenciesMixin {
     return Future<void>.value();
   }
 
-  /// Whether automatic data collection is enabled. Stored, not used: no service of this repository
-  /// collects data.
+  /// Whether automatic data collection is enabled. Read by `firebase_ai_dart`: it sends the app id
+  /// to Firebase AI Logic only while this is true.
   ///
   /// The initial value is the one stored by [setAutomaticDataCollectionEnabled] in the [storage] of
   /// the platform dependencies, or `true`. It does not come from

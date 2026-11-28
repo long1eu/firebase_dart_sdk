@@ -1,0 +1,28 @@
+name: ai_web
+description: >-
+  A browser app in plain Dart (package:web, no Flutter) on firebase_ai_dart:
+  ask a Gemini model through Firebase AI Logic and watch the answer stream.
+publish_to: none
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  firebase_ai_dart: ^0.1.0
+  firebase_app_dart: ^0.2.3
+  web: ^1.1.0
+
+dev_dependencies:
+  lints: ^6.1.0
+
+# The packages come from this repository. Outside it, remove this section and
+# depend on the versions on pub.dev. _firebase_transport_dart is overridden as
+# well: firebase_ai_dart asks for it from pub.dev, and pub refuses a path for the
+# same package without an override.
+dependency_overrides:
+  _firebase_transport_dart:
+    path: ../../firebase_core/_firebase_transport_dart
+  firebase_ai_dart:
+    path: ../../firebase_ai/firebase_ai_dart
+  firebase_app_dart:
+    path: ../../firebase_core/firebase_app_dart

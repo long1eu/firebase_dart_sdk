@@ -18,6 +18,8 @@
 # firebase_error_reporting_dart runs all of test/ (MockClient, no emulator); the CI job
 # "error-reporting-browser" runs it in Chrome as well.
 # firebase_analytics_dart runs all of test/ (MockClient only; nothing reaches Google Analytics).
+# firebase_ai_dart runs all of test/ (MockClient and a fake server; nothing reaches Google); the CI job "ai-browser"
+# runs the same tree in Chrome.
 # _firebase_transport_dart runs all of test/; its browser run is the CI job transport-browser.
 # The example programs in examples/ are analyzed only (their tests need an emulator), except those with a
 # .test_without_emulator file, whose tests run too; select
@@ -62,6 +64,7 @@ PACKAGES=(
   "firebase_remote_config_dart|firebase_remote_config/firebase_remote_config_dart|"
   "firebase_error_reporting_dart|firebase_error_reporting/firebase_error_reporting_dart|"
   "firebase_analytics_dart|firebase_analytics/firebase_analytics_dart|"
+  "firebase_ai_dart|firebase_ai/firebase_ai_dart|"
 )
 
 summary=()
