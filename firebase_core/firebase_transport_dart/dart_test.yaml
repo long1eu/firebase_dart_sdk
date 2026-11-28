@@ -1,0 +1,4 @@
+tags:
+  browser:
+    test_on: browser
+    timeout: 2x
