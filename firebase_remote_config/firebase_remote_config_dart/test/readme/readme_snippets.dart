@@ -32,8 +32,8 @@ class AppDependencies extends PlatformDependencies {
   BehaviorSubject<bool> get onNetworkConnected => connectivity;
 }
 
-// README.md:61
-Future<void> remoteConfigReadmeLine61() async {
+// README.md:62
+Future<void> remoteConfigReadmeLine62() async {
   final FirebaseApp app = FirebaseApp.withOptions(
     const FirebaseOptions(
       apiKey: '<the API key of the app, 39 characters>',
@@ -52,8 +52,8 @@ Future<void> remoteConfigReadmeLine61() async {
   );
 }
 
-// README.md:97
-Future<void> remoteConfigReadmeLine97() async {
+// README.md:98
+Future<void> remoteConfigReadmeLine98() async {
   final FetchResult result = await remoteConfig.fetch();
   switch (result) {
     case FetchResult.updated:
@@ -67,16 +67,41 @@ Future<void> remoteConfigReadmeLine97() async {
   print('activated: $activated');
 }
 
-// README.md:120
-Future<void> remoteConfigReadmeLine120() async {
+// README.md:117
+Future<void> remoteConfigReadmeLine117() async {
+  final StreamSubscription<void> activations = remoteConfig.onActivated.listen((_) {
+    print('New values are active.');
+  });
+}
+
+// README.md:128
+Future<void> remoteConfigReadmeLine128() async {
+  await remoteConfig.reset();
+  print(remoteConfig.info.lastFetchStatus); // RemoteConfigFetchStatus.noFetchYet
+}
+
+// README.md:139
+Future<void> remoteConfigReadmeLine139() async {
   final String message = remoteConfig.getString('welcome_message');
   final int maxItems = remoteConfig.getInt('max_items');
   final RemoteConfigValue value = remoteConfig.getValue('welcome_message');
   print('$message, $maxItems, from ${value.source.name}');
 }
 
-// README.md:144
-Future<void> remoteConfigReadmeLine144() async {
+// README.md:146
+Future<void> remoteConfigReadmeLine146() async {
+  final List<String> themeKeys = remoteConfig.getKeysByPrefix('theme_');
+  final RemoteConfigValue fromDefaults = remoteConfig.getValueFrom(
+    'welcome_message',
+    ValueSource.valueDefault,
+  );
+  final Object? layout = remoteConfig.getValue('layout').asJson();
+  final List<int> bytes = remoteConfig.getValue('welcome_message').asBytes();
+  print('$themeKeys, ${fromDefaults.text}, $layout, ${bytes.length}');
+}
+
+// README.md:182
+Future<void> remoteConfigReadmeLine182() async {
   await remoteConfig.setCustomSignals(<String, Object?>{
     'subscription_tier': 'pro',
     'app_build': 412,
@@ -84,14 +109,25 @@ Future<void> remoteConfigReadmeLine144() async {
   });
 }
 
-// README.md:167
-Future<void> remoteConfigReadmeLine167() async {
+// README.md:205
+Future<void> remoteConfigReadmeLine205() async {
   final StreamSubscription<RemoteConfigUpdate> subscription = remoteConfig.onConfigUpdated.listen(
     (RemoteConfigUpdate update) async {
       print('Updated: ${update.updatedKeys}');
       await remoteConfig.activate();
     },
     onError: (Object error) => print('Realtime: $error'),
+  );
+}
+
+// README.md:239
+Future<void> remoteConfigReadmeLine239() async {
+  final StreamSubscription<Set<RolloutAssignment>> rollouts = remoteConfig.onRolloutsStateChanged.listen(
+    (Set<RolloutAssignment> assignments) {
+      for (final RolloutAssignment assignment in assignments) {
+        print('${assignment.rolloutId}: ${assignment.variantId} (${assignment.parameterKey})');
+      }
+    },
   );
 }
 
@@ -260,8 +296,20 @@ Future<void> remoteConfigGuideLine262() async {
   }
 }
 
-// ../../docs/guides/remote_config.md:309
-Future<void> remoteConfigGuideLine309() async {
+// ../../docs/guides/remote_config.md:282
+Future<void> remoteConfigGuideLine282() async {
+  void readMore(FirebaseRemoteConfig remoteConfig) {
+    final List<String> themeKeys = remoteConfig.getKeysByPrefix('theme_');
+    final RemoteConfigValue remoteOnly =
+        remoteConfig.getValueFrom('welcome_message', ValueSource.valueRemote);
+    final Object? layout = remoteConfig.getValue('layout').asJson();
+    final List<int> bytes = remoteConfig.getValue('welcome_message').asBytes();
+    print('$themeKeys ${remoteOnly.source.name} $layout ${bytes.length}');
+  }
+}
+
+// ../../docs/guides/remote_config.md:337
+Future<void> remoteConfigGuideLine337() async {
   Future<void> tell(FirebaseRemoteConfig remoteConfig) async {
     await remoteConfig.setCustomSignals(<String, Object?>{
       'plan': 'pro',
@@ -273,8 +321,8 @@ Future<void> remoteConfigGuideLine309() async {
   }
 }
 
-// ../../docs/guides/remote_config.md:336
-Future<void> remoteConfigGuideLine336() async {
+// ../../docs/guides/remote_config.md:364
+Future<void> remoteConfigGuideLine364() async {
   StreamSubscription<RemoteConfigUpdate> watch(FirebaseRemoteConfig remoteConfig) {
     return remoteConfig.onConfigUpdated.listen(
       (RemoteConfigUpdate update) async {
@@ -290,8 +338,8 @@ Future<void> remoteConfigGuideLine336() async {
   }
 }
 
-// ../../docs/guides/remote_config.md:369
-Future<void> remoteConfigGuideLine369() async {
+// ../../docs/guides/remote_config.md:397
+Future<void> remoteConfigGuideLine397() async {
   FirebaseApp appWithLifecycle(AppDependencies dependencies) {
     return FirebaseApp.withOptions(
       const FirebaseOptions(
@@ -304,8 +352,8 @@ Future<void> remoteConfigGuideLine369() async {
   }
 }
 
-// ../../docs/guides/remote_config.md:479
-Future<void> remoteConfigGuideLine479() async {
+// ../../docs/guides/remote_config.md:510
+Future<void> remoteConfigGuideLine510() async {
   Future<void> safeFetch(FirebaseRemoteConfig remoteConfig) async {
     try {
       await remoteConfig.fetchAndActivate();
@@ -322,8 +370,8 @@ Future<void> remoteConfigGuideLine479() async {
   }
 }
 
-// ../../docs/guides/remote_config.md:516
-Future<void> remoteConfigGuideLine516() async {
+// ../../docs/guides/remote_config.md:547
+Future<void> remoteConfigGuideLine547() async {
   FirebaseInstallations restricted(FirebaseApp app, KeyValueStore store) {
     return FirebaseInstallations(
       app,
