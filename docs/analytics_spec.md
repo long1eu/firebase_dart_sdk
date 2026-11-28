@@ -222,7 +222,9 @@ registration follows `firebase_storage_dart_platform`.
    Step 3 is built in parallel with the maintainer's run, with everything that knows the shape of the
    identifier in one class (`ClientIdentity`). **Nothing is released, and step 5 does not document the
    package as usable, until the probe shows the events reported.** The package's `pubspec.yaml` has
-   `publish_to: none` until then.
+   `publish_to: none` until then. The maintainer's run of 2026-11-28 (run 22tjj8) showed them in DebugView
+   and Realtime ([protocol §5](analytics_protocol.md#5-the-kind-of-stream)); the standard reports are
+   still to be checked.
 3. **The client core:** the model, validation, the stores, sessions, both transports, the queue, unit
    tests with `MockClient` and `fake_async`, security tests (the secret never leaks; tokens only go
    where design rule 5 allows; no redirects), and a web compile with `tool/check_web_imports.dart`.
