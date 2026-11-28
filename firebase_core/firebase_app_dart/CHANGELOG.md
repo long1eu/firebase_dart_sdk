@@ -1,3 +1,24 @@
+## 0.2.3
+
+- `LimitedUseAppCheckTokenProvider`: a second interface, with `getLimitedUseToken()`, for a provider that can mint
+  a token for one request to a backend that consumes App Check tokens. `AppCheckTokenProvider` itself is
+  unchanged, so every existing provider compiles as before. A provider that does not implement it gives no App
+  Check token on a limited-use request; nothing falls back to `getToken`.
+- `AppCheckTokenProvider.responseDeadline` (8 s): how long a provider may take to answer. A closed provider answers
+  with an empty token.
+- `AppCheckTokenResult.failure(error)` and `AppCheckTokenResult.placeholderToken`: the result of a failed request
+  carries the placeholder token of the JS and iOS SDKs (the base64 form of `{"error":"UNKNOWN_ERROR"}`). Services
+  send it, so that the backend can tell a failed attestation from an app without App Check.
+- Documentation: the contract of a provider. A result without an error carries a token with at least 5 minutes of
+  life left (half of the lifetime for a token that lives under 10 minutes); a failure is reported with
+  `AppCheckTokenResult.failure` and not thrown; `onTokenChanged` is a broadcast stream of successes without
+  replay.
+- `AppCheckTokenResult.toString()` shows neither the token nor the text of the error:
+  `AppCheckTokenResult(token: <redacted>)`, with `error: <runtime type>` when there is an error.
+- Documentation: the `authProvider` and `appCheckProvider` rows of the `PlatformDependencies` table name every
+  package that reads the provider. Firestore, `FirebaseUserAuth` and the Realtime Database read the App Check
+  provider once, when they are created; the other services read it at each request.
+
 ## 0.2.2
 
 - Documentation: an `AuthTokenChange` is a signal. An empty token means signed out; a token that is not empty may

@@ -47,7 +47,7 @@ dev_dependencies:
   # Its FlutterFireAppCheckProvider is the documented App Check provider;
   # test/unit_test.dart passes requests through it. Resolved from the sibling
   # directory through pubspec_overrides.yaml.
-  cloud_firestore_dart_flutterfire: ^0.1.0
+  cloud_firestore_dart_flutterfire: ^0.1.3
   # The app-facing package the tests drive, as an app would.
   firebase_storage: ^14.1.0
   flutter_test:

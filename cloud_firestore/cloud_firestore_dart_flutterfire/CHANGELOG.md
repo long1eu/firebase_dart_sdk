@@ -1,3 +1,16 @@
+## 0.1.3
+
+- `FlutterFireLimitedUseAppCheckProvider`: the bridge with `getLimitedUseToken`. It extends
+  `FlutterFireAppCheckProvider`, implements `LimitedUseAppCheckTokenProvider` of `firebase_app_dart` and takes
+  `FirebaseAppCheck.instance.getLimitedUseToken` as a third argument. A null or empty answer, or a throw, is
+  reported with the placeholder token. `FlutterFireAppCheckProvider` itself gives no limited-use token, and
+  nothing sends the session token in its place.
+- Changed: when the plugin throws or returns no token, `getToken` reports the failure with the placeholder token,
+  so the request carries the placeholder in `X-Firebase-AppCheck` where it carried no header before. A backend
+  that enforces App Check rejects both; one that does not accepts both.
+- Changed: a null (or empty) token on `onTokenChange` is no longer forwarded. The stream carries new tokens only.
+- Requires `firebase_app_dart` 0.2.3.
+
 ## 0.1.2
 
 No code change. A shorter package description (it was 190 characters, which pub.dev scores as too long).

@@ -110,24 +110,30 @@ void main() {
       expect(FirebaseStorageDart.clientFor(app).app.appCheckProvider, isNull);
     });
 
-    test('no token or a failing App Check fails nothing: no header', () async {
-      final FirebaseApp app = await newApp();
-      final FakeAppCheck appCheck = appChecks[app.name] = FakeAppCheck();
-      backend.put(bucket, 'a', <int>[1]);
-      final Reference ref = FirebaseStorage.instanceFor(app: app).ref('a');
+    test(
+      'no token or a failing App Check sends the placeholder token',
+      () async {
+        final FirebaseApp app = await newApp();
+        final FakeAppCheck appCheck = appChecks[app.name] = FakeAppCheck();
+        backend.put(bucket, 'a', <int>[1]);
+        final Reference ref = FirebaseStorage.instanceFor(app: app).ref('a');
 
-      await ref.getMetadata();
-      appCheck.error = FirebaseException(
-        plugin: 'firebase_app_check',
-        code: 'unknown',
-        message: 'attestation failed',
-      );
-      await ref.getMetadata();
+        await ref.getMetadata();
+        appCheck.error = FirebaseException(
+          plugin: 'firebase_app_check',
+          code: 'unknown',
+          message: 'attestation failed',
+        );
+        await ref.getMetadata();
 
-      expect(backend.requests, hasLength(2));
-      expect(backend.requests.map(appCheckHeader), <String?>[null, null]);
-      expect(appCheck.calls, hasLength(2));
-    });
+        expect(backend.requests, hasLength(2));
+        expect(backend.requests.map(appCheckHeader), <String?>[
+          dart_app.AppCheckTokenResult.placeholderToken,
+          dart_app.AppCheckTokenResult.placeholderToken,
+        ]);
+        expect(appCheck.calls, hasLength(2));
+      },
+    );
 
     test('forceRefresh reaches firebase_app_check', () async {
       final FirebaseApp app = await newApp();

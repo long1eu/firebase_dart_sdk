@@ -1,3 +1,10 @@
+## Unreleased
+
+- Documentation of `FirebaseStorageDart.use`: when the App Check provider reports a failure, the request carries
+  its placeholder token in the `X-Firebase-AppCheck` header (`FlutterFireAppCheckProvider` of
+  `cloud_firestore_dart_flutterfire` 0.1.3 does so); it goes without the header only when the provider throws or
+  gives an empty token. No change in this package's code.
+
 ## 0.2.0
 
 - `writeToFile` runs on the `DownloadTask` of `firebase_storage_dart` 0.2.0: a pause closes the connection

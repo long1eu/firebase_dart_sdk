@@ -1,3 +1,9 @@
+## 0.4.1
+
+- `FirebaseUserAuth` logs only the runtime type of an App Check provider's error
+  (`Error while retrieving App Check token: StateError`). It logged the error's text, which is written by the
+  provider and may quote a token. The request is sent as before.
+
 ## 0.4.0
 
 - Breaking: the package re-exports `secure_flow`, which is now 0.2.0 (new enum values in

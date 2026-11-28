@@ -92,12 +92,12 @@ from 0.1? The 0.2 API took FlutterFire's names: [what changed](docs/api_migratio
 | Package | pub.dev | Who needs it |
 |---|---|---|
 | [`cloud_firestore_dart`](cloud_firestore/cloud_firestore_dart/) | 0.3.2 | Any Dart program, server or Flutter app that calls Firestore through this client |
-| [`firebase_app_dart`](firebase_core/firebase_app_dart/) | 0.2.2 | Every user of `cloud_firestore_dart`: the `FirebaseApp` and its options |
-| [`firebase_auth_providers_dart`](firebase_auth/firebase_auth_providers_dart/) | 0.4.0 | Apps with signed-in users, and servers with a service account or Application Default Credentials |
+| [`firebase_app_dart`](firebase_core/firebase_app_dart/) | 0.2.3 | Every user of `cloud_firestore_dart`: the `FirebaseApp` and its options |
+| [`firebase_auth_providers_dart`](firebase_auth/firebase_auth_providers_dart/) | 0.4.1 | Apps with signed-in users, and servers with a service account or Application Default Credentials |
 | [`secure_flow`](secure_flow/secure_flow/) | 0.2.0 | Desktop apps and command line tools with a browser step (OAuth sign-in, reCAPTCHA, a typed code); used by `firebase_auth_providers_dart` |
 | [`cloud_firestore_dart_sqlite`](cloud_firestore/cloud_firestore_dart_sqlite/) | 0.1.3 | Anyone who wants the offline cache on disk instead of in memory |
 | [`cloud_firestore_dart_platform`](cloud_firestore/cloud_firestore_dart_platform/) | 0.1.2 | Flutter apps written against the official `cloud_firestore` API, on Linux or by choice elsewhere |
-| [`cloud_firestore_dart_flutterfire`](cloud_firestore/cloud_firestore_dart_flutterfire/) | 0.1.2 | Flutter apps that sign in with `firebase_auth` and want `cloud_firestore_dart` to use that user |
+| [`cloud_firestore_dart_flutterfire`](cloud_firestore/cloud_firestore_dart_flutterfire/) | 0.1.3 | Flutter apps that sign in with `firebase_auth` and want `cloud_firestore_dart` to use that user |
 | [`firebase_auth_dart_platform`](firebase_auth/firebase_auth_dart_platform/) | 0.2.0 | Flutter apps written against the official `firebase_auth` API, on Linux or by choice elsewhere; needs `firebase_auth_providers_dart` 0.3.2 |
 | [`firebase_auth_secure_storage_dart`](firebase_auth/firebase_auth_secure_storage_dart/) | 0.1.0 | Command line tools and servers that keep the signed-in session in the system's secret store (macOS Keychain; Linux and Windows untested) instead of a file |
 | [`firebase_storage_dart`](firebase_storage/firebase_storage_dart/) | 0.2.0 | Apps and servers that upload, download and list Cloud Storage for Firebase objects ([guide](docs/guides/storage.md), [parity](docs/storage_parity.md)) |

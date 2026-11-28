@@ -1874,7 +1874,7 @@ void main() {
       for (final http.Request request in requests) {
         expect(
           request.headers['X-Client-Version'],
-          'Dart/DartCore/0.4.0/FirebaseCore-dart',
+          'Dart/DartCore/0.4.1/FirebaseCore-dart',
         );
         expect(request.headers['X-Firebase-gmpid'], '1:2:web:3');
         expect(request.headers.containsKey('X-Firebase-AppCheck'), isFalse);
@@ -1930,12 +1930,17 @@ void main() {
         expect(requests[0].headers['X-Firebase-AppCheck'], 'placeholder');
         expect(requests[1].headers['X-Firebase-AppCheck'], 'placeholder');
         expect(requests[2].headers.containsKey('X-Firebase-AppCheck'), isFalse);
+        // The provider's error type is logged, never its text, which may carry a secret.
         expect(printed, <Matcher>[
-          contains('attestation failed'),
-          contains('attestation failed'),
-          contains('no provider'),
-          contains('no provider'),
+          contains('StateError'),
+          contains('StateError'),
+          contains('StateError'),
+          contains('StateError'),
         ]);
+        for (final String line in printed) {
+          expect(line, isNot(contains('attestation failed')));
+          expect(line, isNot(contains('no provider')));
+        }
       },
     );
   });

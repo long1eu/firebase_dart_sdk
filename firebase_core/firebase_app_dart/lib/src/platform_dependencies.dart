@@ -20,8 +20,8 @@ import 'package:rxdart/rxdart.dart';
 /// | [onNetworkConnected] | always connected | Firestore, Realtime Database and Remote Config realtime: `true` retries at once |
 /// | [onBackgroundChanged] | never in the background | Remote Config realtime: `true` closes the stream, `false` reopens it |
 /// | [storage] | this object, in memory | `FirebaseApp.setAutomaticDataCollectionEnabled` |
-/// | [authProvider] | none: requests carry no token | Firestore |
-/// | [appCheckProvider] | none: no App Check header | Firestore, `FirebaseUserAuth` |
+/// | [authProvider] | none: requests carry no token | Firestore, Storage, Realtime Database, Analytics, Error Reporting |
+/// | [appCheckProvider] | none: no App Check header | Firestore, `FirebaseUserAuth`, Storage, Realtime Database, Analytics, Error Reporting |
 /// | [headersBuilder] | none | nobody in this repository |
 ///
 /// ```dart
@@ -97,6 +97,9 @@ class PlatformDependencies extends LocalStorage {
 
   /// Firestore sends the token of this provider in the `x-firebase-appcheck` header of every
   /// request. Default null: no App Check header is sent.
+  ///
+  /// Firestore, `FirebaseUserAuth` and the Realtime Database read it once, when they are created: set
+  /// it before. The other services read it at each request.
   AppCheckTokenProvider? get appCheckProvider => null;
 
   /// The value stored in memory under [key], or null.
