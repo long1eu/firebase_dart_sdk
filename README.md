@@ -108,6 +108,8 @@ from 0.1? The 0.2 API took FlutterFire's names: [what changed](docs/api_migratio
 | [`firebase_installations_dart`](firebase_installations/firebase_installations_dart/) | 0.1.0 | Dart programs, servers and web apps that need a Firebase installation id and auth token, or a store for them ([guide](docs/guides/remote_config.md), [parity](docs/installations_parity.md)) |
 | [`firebase_remote_config_dart`](firebase_remote_config/firebase_remote_config_dart/) | 0.1.0 | Dart programs, servers and web apps that fetch Remote Config values and listen for realtime updates ([guide](docs/guides/remote_config.md), [parity](docs/remote_config_parity.md)) |
 | [`firebase_remote_config_dart_platform`](firebase_remote_config/firebase_remote_config_dart_platform/) | 0.1.0 | Flutter apps written against the official `firebase_remote_config` API, on Linux or by choice elsewhere; realtime updates on desktop |
+| [`firebase_analytics_dart`](firebase_analytics/firebase_analytics_dart/) | in development, not released | Dart programs, servers and desktop apps that send events to a GA4 web stream over the Measurement Protocol ([guide](docs/guides/analytics.md), [parity](docs/analytics_parity.md)) |
+| [`firebase_analytics_dart_platform`](firebase_analytics/firebase_analytics_dart_platform/) | in development, not released | Flutter apps written against the official `firebase_analytics` API, on Windows and Linux |
 
 ## How it fits together
 
@@ -269,7 +271,12 @@ desktop app, Safari and Firefox; the report of its large-snapshot benchmark is n
 store for them) and `firebase_remote_config/firebase_remote_config_dart` a Remote Config client with realtime updates for the
 Dart VM and the web, built on it ([docs/remote_config_parity.md](docs/remote_config_parity.md),
 [docs/installations_parity.md](docs/installations_parity.md), [guide](docs/guides/remote_config.md)); both are at 0.1.0 and
-not yet on pub.dev. The other directories under `firebase_auth`, and `google_sign_in_dart`, are
+not yet on pub.dev.
+`firebase_analytics/firebase_analytics_dart` is a Google Analytics client over the GA4 Measurement Protocol, for
+Windows and Linux apps, command-line tools and servers, with `firebase_analytics_dart_platform` as the adapter for
+the official `firebase_analytics` API. It sends to a web data stream through a relay you run ([`examples/analytics_relay`](examples/analytics_relay/))
+or directly, has no automatic events or attribution, and is in development and not released
+([guide](docs/guides/analytics.md), [parity](docs/analytics_parity.md)). The other directories under `firebase_auth`, and `google_sign_in_dart`, are
 older code from the original project and are not part of the migrated, tested set.
 
 ## Packages

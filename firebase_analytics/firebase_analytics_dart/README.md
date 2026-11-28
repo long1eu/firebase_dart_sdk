@@ -11,6 +11,8 @@ are. The plan is in [docs/analytics_spec.md](../../docs/analytics_spec.md), the 
 in [docs/analytics_protocol.md](../../docs/analytics_protocol.md), and the comparison with the official SDKs in
 [docs/analytics_parity.md](../../docs/analytics_parity.md).
 
+The [Analytics guide](../../docs/guides/analytics.md) covers setup, delivery and errors.
+
 On Android, iOS, macOS and the web, use FlutterFire's `firebase_analytics`. It collects automatic events,
 install attribution and device data that the Measurement Protocol cannot produce.
 

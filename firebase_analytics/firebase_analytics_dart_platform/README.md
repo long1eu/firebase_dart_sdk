@@ -16,6 +16,8 @@ Firebase.
 > Google Analytics reports such events in every report is still being checked (see
 > [docs/analytics_spec.md](../../docs/analytics_spec.md), section 10). Do not rely on it yet.
 
+The [Analytics guide](../../docs/guides/analytics.md) covers the client and this adapter.
+
 Read [the client's README](../firebase_analytics_dart/README.md) first: the API secret, the web stream, the
 throwing validation and the missing automatic events apply here unchanged.
 
