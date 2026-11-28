@@ -47,10 +47,12 @@ const String _guides = '../../docs/guides';
 /// Guides whose snippets another package compiles, because they need packages
 /// this one does not depend on: the Realtime Database guides are checked by the
 /// `readme_snippets_test.dart` of `firebase_database_dart_sqlite` and of
-/// `firebase_database_dart_platform`.
+/// `firebase_database_dart_platform`; the Remote Config guide is checked by the
+/// `readme_snippets_test.dart` of `firebase_remote_config_dart`.
 const Set<String> _guidesCheckedElsewhere = <String>{
   'database.md',
   'database_flutter.md',
+  'remote_config.md',
 };
 
 /// [_fixedReadmes] and every guide, in a fixed order.

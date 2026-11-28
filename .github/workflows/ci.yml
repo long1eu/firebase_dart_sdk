@@ -54,6 +54,8 @@ jobs:
       securestorage: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.securestorage == 'true' }}
       # Whether the change touches the Realtime Database packages or their scripts.
       database: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.database == 'true' }}
+      # Whether the change touches the Installations or Remote Config packages or their scripts.
+      remoteconfig: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.remoteconfig == 'true' }}
       # Whether the change touches the examples or the gallery scripts.
       gallery: ${{ github.event_name == 'workflow_dispatch' || steps.browser.outputs.gallery == 'true' }}
       # Whether the change touches firebase_error_reporting_dart or what it depends on.
@@ -82,8 +84,8 @@ jobs:
           # `browser` is true when any changed file is one of these: the library, the SQLite
           # opener package (the web opener and OPFS worker the tests use), the browser tests, and
           # what runs them.
-          # `indexeddb`, `securestorage`, `database` and `gallery` work the same way for their own
-          # jobs.
+          # `indexeddb`, `securestorage`, `database`, `remoteconfig` and `gallery` work the same way
+          # for their own jobs.
           filters: |
             browser:
               - 'cloud_firestore/cloud_firestore_dart/lib/**'
@@ -129,18 +131,31 @@ jobs:
               - 'tool/test_flutterfire_database_gate.sh'
               - '.github/workflows/ci.yml'
               - '.github/actions/**'
+            remoteconfig:
+              - 'firebase_installations/**'
+              - 'firebase_remote_config/**'
+              - 'firebase_core/firebase_app_dart/lib/**'
+              - 'firebase_core/firebase_app_dart/pubspec.yaml'
+              - 'tool/test_browser_remote_config.sh'
+              - 'tool/remote_config_fake_server.dart'
+              - '.github/workflows/ci.yml'
+              - '.github/actions/**'
             gallery:
               - 'examples/**'
               - 'tool/build_gallery.sh'
               - 'tool/check_gallery.sh'
               - 'tool/smoke_gallery.mjs'
-              # What examples/web_app resolves by path (the rtdb examples are covered by `database`).
+              # What examples/web_app resolves by path (the rtdb examples are covered by `database`; remote_config_web resolves the two packages below).
               - 'cloud_firestore/cloud_firestore_dart/lib/**'
               - 'cloud_firestore/cloud_firestore_dart/pubspec.yaml'
               - 'cloud_firestore/cloud_firestore_dart_sqlite/lib/**'
               - 'cloud_firestore/cloud_firestore_dart_sqlite/pubspec.yaml'
               - 'firebase_storage/firebase_storage_dart/lib/**'
               - 'firebase_storage/firebase_storage_dart/pubspec.yaml'
+              - 'firebase_installations/firebase_installations_dart/lib/**'
+              - 'firebase_installations/firebase_installations_dart/pubspec.yaml'
+              - 'firebase_remote_config/firebase_remote_config_dart/lib/**'
+              - 'firebase_remote_config/firebase_remote_config_dart/pubspec.yaml'
               - 'firebase_core/firebase_app_dart/lib/**'
               - 'firebase_core/firebase_app_dart/pubspec.yaml'
             errorreporting:
@@ -174,8 +189,8 @@ jobs:
             packages: >-
               secure_flow firebase_app_dart firebase_auth_providers_dart cloud_firestore_dart_sqlite
               firebase_admin_dart firebase_storage_dart firebase_auth_secure_storage_dart
-              firebase_database_dart firebase_database_dart_sqlite firebase_error_reporting_dart
-              examples
+              firebase_database_dart firebase_database_dart_sqlite firebase_installations_dart
+              firebase_remote_config_dart firebase_error_reporting_dart examples
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -280,8 +295,8 @@ jobs:
             packages: >-
               secure_flow firebase_app_dart firebase_auth_providers_dart cloud_firestore_dart_sqlite
               firebase_admin_dart firebase_storage_dart firebase_auth_secure_storage_dart
-              firebase_database_dart firebase_database_dart_sqlite firebase_error_reporting_dart
-              examples
+              firebase_database_dart firebase_database_dart_sqlite firebase_installations_dart
+              firebase_remote_config_dart firebase_error_reporting_dart examples
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -839,6 +854,49 @@ jobs:
         with:
           name: database-browser-log-${{ matrix.compiler }}
           path: ${{ runner.temp }}/database_browser.log
+
+  # The browser tests of firebase_installations_dart and firebase_remote_config_dart in headless Chrome,
+  # on both compilers, against the fake server of tool/remote_config_fake_server.dart (started and
+  # stopped by tool/test_browser_remote_config.sh). Only when the change touches the two packages,
+  # firebase_app_dart, their scripts, ci.yml or .github/actions/. Required: no other job runs the
+  # clients on the web.
+  remote-config-browser:
+    name: Remote Config tests in Chrome (${{ matrix.compiler }})
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' && needs.changes.outputs.remoteconfig == 'true' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [dart2js, dart2wasm]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/dart
+        with:
+          sdk: stable
+      - name: Check that the web libraries import neither dart:io nor dart:ffi
+        run: |
+          (cd firebase_installations/firebase_installations_dart && dart pub get)
+          (cd firebase_remote_config/firebase_remote_config_dart && dart pub get)
+          dart tool/check_web_imports.dart firebase_installations/firebase_installations_dart \
+            lib/firebase_installations_dart.dart lib/web.dart
+          dart tool/check_web_imports.dart firebase_remote_config/firebase_remote_config_dart
+      - name: Run the tests in Chrome
+        env:
+          COMPILER: ${{ matrix.compiler }}
+        run: |
+          set -o pipefail
+          ./tool/test_browser_remote_config.sh "$COMPILER" 2>&1 \
+            | tee "$RUNNER_TEMP/remote_config_browser.log"
+      - name: Upload the logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: remote-config-browser-log-${{ matrix.compiler }}
+          path: ${{ runner.temp }}/remote_config_browser.log
 
   # The acceptance gate of firebase_database_dart_platform: FlutterFire's own firebase_database
   # example integration tests (77) against the shim and a Database emulator on 9100

@@ -105,6 +105,8 @@ from 0.1? The 0.2 API took FlutterFire's names: [what changed](docs/api_migratio
 | [`firebase_database_dart`](firebase_database/firebase_database_dart/) | 0.1.1 | Dart programs, servers and web apps that use the Realtime Database through this client ([guide](docs/guides/database.md), [parity](docs/database_parity.md)) |
 | [`firebase_database_dart_sqlite`](firebase_database/firebase_database_dart_sqlite/) | 0.1.1 | Anyone who wants the Realtime Database cache on disk on the VM or in Flutter |
 | [`firebase_database_dart_platform`](firebase_database/firebase_database_dart_platform/) | 0.1.0 | Flutter apps written against the official `firebase_database` API, on desktop |
+| [`firebase_installations_dart`](firebase_installations/firebase_installations_dart/) | 0.1.0 | Dart programs, servers and web apps that need a Firebase installation id and auth token, or a store for them ([guide](docs/guides/remote_config.md), [parity](docs/installations_parity.md)) |
+| [`firebase_remote_config_dart`](firebase_remote_config/firebase_remote_config_dart/) | 0.1.0 | Dart programs, servers and web apps that fetch Remote Config values and listen for realtime updates ([guide](docs/guides/remote_config.md), [parity](docs/remote_config_parity.md)) |
 
 ## How it fits together
 
@@ -261,7 +263,12 @@ emulator, FlutterFire's own `firebase_database` integration suite through the ad
 against the emulator; against production, its verification kit (42 checks), once. What has not: a release build of a
 desktop app, Safari and Firefox; the report of its large-snapshot benchmark is not written yet. See its
 [README](firebase_database/firebase_database_dart/README.md), the [guide](docs/guides/database.md) and the
-[decisions](docs/database_decisions.md). The other directories under `firebase_auth`, and `google_sign_in_dart`, are
+[decisions](docs/database_decisions.md).
+`firebase_installations/firebase_installations_dart` is an Installations client (installation id, auth token, a key-value
+store for them) and `firebase_remote_config/firebase_remote_config_dart` a Remote Config client with realtime updates for the
+Dart VM and the web, built on it ([docs/remote_config_parity.md](docs/remote_config_parity.md),
+[docs/installations_parity.md](docs/installations_parity.md), [guide](docs/guides/remote_config.md)); both are at 0.1.0 and
+not yet on pub.dev. The other directories under `firebase_auth`, and `google_sign_in_dart`, are
 older code from the original project and are not part of the migrated, tested set.
 
 ## Packages

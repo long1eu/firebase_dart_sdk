@@ -1,8 +1,8 @@
 # Guides
 
 Guides for `cloud_firestore_dart`, the unofficial pure-Dart Cloud Firestore client, its app layer
-`firebase_app_dart`, the token providers of `firebase_auth_providers_dart` and the SQLite cache of
-`cloud_firestore_dart_sqlite`. The package
+`firebase_app_dart`, the token providers of `firebase_auth_providers_dart`, the SQLite cache of
+`cloud_firestore_dart_sqlite` and Remote Config with `firebase_remote_config_dart`. The package
 READMEs are short landing pages; the API reference is on pub.dev.
 
 1. [Getting started](getting_started.md): install, create the app and the instance, read and
@@ -83,8 +83,11 @@ READMEs are short landing pages; the API reference is on pub.dev.
 32. [Crash and error reporting](crash_reporting.md): which tool reports crashes and errors on each
     platform: the official Crashlytics plugin on Android, iOS and macOS, and Cloud Error Reporting or a
     Sentry-protocol tracker on Windows, Linux, servers and the web.
+33. [Remote Config](remote_config.md): fetch, activate, values, custom signals and realtime updates with
+    firebase_remote_config_dart
 
 Every Dart snippet in these guides is compiled against the current API by
-`cloud_firestore/cloud_firestore_dart/test/unit/api/readme_snippets_test.dart`, except the blocks
+`cloud_firestore/cloud_firestore_dart/test/unit/api/readme_snippets_test.dart`, except the Realtime Database
+guides and `remote_config.md` (compiled by the snippet tests of their own packages) and the blocks
 marked `dart flutter`, which are taken from `examples/flutter_notes` and checked there by
 `flutter analyze`.

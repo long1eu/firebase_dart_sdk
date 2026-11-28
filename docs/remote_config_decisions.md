@@ -1,0 +1,331 @@
+# Remote Config and Installations decisions
+
+The decisions behind `firebase_installations_dart` (`firebase_installations/firebase_installations_dart`) and `firebase_remote_config_dart` (`firebase_remote_config/firebase_remote_config_dart`): where the two packages differ from the official SDKs and why, and which alternatives were considered and rejected. [database_decisions.md](database_decisions.md) and [storage_decisions.md](storage_decisions.md) are the models of this document; [contributing_a_product.md](contributing_a_product.md) has the rules every product client follows. The comparison with the official SDKs, feature by feature, is in [remote_config_parity.md](remote_config_parity.md) and [installations_parity.md](installations_parity.md).
+
+The first part lists the departures from upstream, D1 to D14. The second part, "Changes made during review and testing", lists the changes the review and the test runs made, A1 to A37 of the spec's as-built addendum, and the known limits. The third part lists the alternatives considered, A1 to A16. A departure needs a written failure that it fixes; D3 is listed because the web behaviour differs from JS, not because Android fails.
+
+Which SDK each area follows:
+
+- the Installations protocol: JS;
+- Installations recovery and backoff: iOS;
+- fetch, throttling, activation, value conversion and realtime: Android;
+- the error for an invalid custom signal: iOS;
+- the store: no upstream has one that fits; it follows the Auth file storage of this repository.
+
+Every D section ends with a status line:
+
+- **designed**: the behaviour is specified and the code is not written yet;
+- **built**: the code does this. A test that pins it is named under "Pinned by"; where a section says "No test", no test pins that part, and the reason follows.
+
+Path shorthand for upstream code (read at the commits named in the parity documents):
+
+| Short | Meaning |
+|---|---|
+| `JS-RC/` | `firebase-js-sdk/packages/remote-config/src/` |
+| `JS-FIS/` | `firebase-js-sdk/packages/installations/src/` |
+| `AND-RC/` | `firebase-android-sdk/firebase-config/src/main/java/com/google/firebase/remoteconfig/` |
+| `IOS-RC/` | `firebase-ios-sdk/FirebaseRemoteConfig/Sources/` |
+| `IOS-FIS/` | `firebase-ios-sdk/FirebaseInstallations/Source/Library/` |
+
+"Pinned by" names a test file. A path without a prefix is relative to `firebase_remote_config/firebase_remote_config_dart/test/`, except where it starts with `firebase_installations/`, `docs/` or `tool/`.
+
+## Departures from upstream
+
+### D1. `fetch` returns what it did
+
+**Decision.** `fetch` returns a `FetchResult`: `updated` (a new template was stored), `unchanged` (the server answered `NO_CHANGE`) or `cached` (no request was sent). `fetchAndActivate` returns whether `activate` changed the active record.
+
+**Why.** Every SDK answers silently from the 12 h cache: a call that did nothing and a call that fetched look the same. A caller that wants to know whether a request went out, or whether new values arrived, has no way to ask.
+
+**What we gave up.** The signature differs from JS, Android and iOS, where `fetch` returns nothing. The FlutterFire adapter drops the result.
+
+**Pinned by.** `fetch_test.dart`, "5.5 cached result names the cache (§6 row 1): no request, status success".
+
+Status: built.
+
+### D2. The same request on every platform
+
+**Decision.** The fetch request carries `X-Firebase-RC-Fetch-Type` (`BASE/1`, or `REALTIME/<attempt>`) and `X-Goog-Firebase-Installations-Auth` on the web as well as on the VM.
+
+**Why.** Android sends both; JS omits them "once CORS error is fixed" (`JS-RC/client/rest_client.ts:93-94`). The CORS preflight of all four Google endpoints was measured: it allows `content-type`, `accept`, `x-goog-api-key`, `x-goog-firebase-installations-auth`, `if-none-match`, `x-firebase-rc-fetch-type`, `authorization` and the three restricted-key headers, and refuses `x-accept-response-streaming` and `x-google-gfe-can-retry`. One request shape means one set of tests and no platform branch.
+
+**What we gave up.** Nothing known. If the server ever changes its CORS answer, the web client fails where the VM client does not.
+
+**Pinned by.** `request_shape_test.dart`.
+
+Status: built.
+
+### D3. Realtime fetches at template version 0
+
+**Decision.** An invalidation makes the client fetch even when no template has been fetched or activated yet (version 0).
+
+**Why.** Android does it; JS does not (`JS-RC/client/realtime_handler.ts:617-620`), and FlutterFire's web documentation asks the app to fetch before listening. A desktop program that only listens should still receive its first template. This departure fixes no failure of Android; it is listed because the web behaviour differs from JS.
+
+**What we gave up.** On the web, a listener that was written for JS may now trigger a first fetch it did not expect.
+
+**Pinned by.** `realtime/realtime_test.dart`, "5.9.2 fetches at version 0 after the random wait and reports the keys (§6 row 3)".
+
+Status: built.
+
+### D4. The last cancel aborts the connection
+
+**Decision.** When the last listener of `onConfigUpdated` cancels, the open connection is aborted at once. So does `close()`, and so does the app going to the background.
+
+**Why.** iOS does it (`IOS-RC/RCNConfigRealtime.m:806-818`). Android keeps the connection until the next message arrives (`AND-RC/internal/ConfigAutoFetch.java:196-205`), which can be minutes, and holds a socket and a token for no reader.
+
+**What we gave up.** A listener that cancels and subscribes again opens a new connection; the client's backoff counts are not touched by a cancel, so this costs one request.
+
+**Pinned by.** `realtime/realtime_test.dart`, "5.9 opens on the first listener and aborts at once on the last cancel (§6 row 4)".
+
+Status: built.
+
+### D5. A stale generation after a signal or an installation change
+
+**Decision.** `setCustomSignals` (when it changes the stored map) and an installation id change increment `staleGeneration` in the `meta` record. While it is not 0, the cache check is skipped and no `If-None-Match` is sent. An installation id change counts only when the id changes from a stored one to a different one (as-built A9), and the generation is read after the installation id is known (as-built A8). A fetch that completes sets it back to 0 only if the stored value still equals what it read when it built its request.
+
+**Why.** Without it a fetch right after `setCustomSignals` would return the old template from the 12 h cache, and the server could answer `NO_CHANGE` to an ETag that belongs to another set of signals. It is not known whether the ETag covers the evaluated values or only the template. A counter instead of a flag makes a fetch that was in flight when the signals changed unable to clear the newer mark.
+
+**What we gave up.** One request more after a signal change.
+
+**Pinned by.** `fetch_test.dart`, "5.5 signals make the cache stale; the stale fetch sends no If-None-Match"; the same file, "5.5 an old fetch does not clear a newer generation".
+
+Status: built.
+
+### D6. A realtime connection succeeds after 60 seconds, with a 1 second floor
+
+**Decision.** A realtime connection counts as a success when it stayed open at least 60 s, counted from sending the request, without an error. Only a success resets the failure counts; messages do not. Every reconnect waits at least 1 s times a uniform factor in [0.5, 1.5), also after a clean end of the body.
+
+**Why.** Android resets its counts on any answer with status 200 (`AND-RC/internal/ConfigRealtimeHttpClient.java:555`), so a server that accepts the request and closes it at once is reconnected without delay.
+
+**What we gave up.** A server that closes a healthy stream every 50 s is treated as failing and backs off.
+
+**Pinned by.** `realtime/realtime_test.dart`, "5.9.1 accept-and-close over 1 h stays within the tables (§6 row 6)".
+
+Status: built.
+
+### D7. The stream keeps retrying after eight failures
+
+**Decision.** After 8 consecutive failures of either kind the stream emits one `stream-error` (re-armed only by a success) and keeps reconnecting on the backoff tables. A non-retryable status or an Installations `bad-config` stops it until a new subscription.
+
+**Why.** Android stops after its retries until a new listener or a foreground event (`AND-RC/internal/ConfigRealtimeHttpClient.java:361-401`); a desktop process gets neither, so a long network outage would end realtime updates for the life of the process.
+
+**What we gave up.** A listener that uses `cancelOnError` ends the stream at the first error report. The guide says not to.
+
+**Pinned by.** `realtime/realtime_test.dart`, "5.9.1 eight failures emit one stream-error, reconnecting continues (§6 row 7)".
+
+Status: built.
+
+### D8. A 330 second watchdog
+
+**Decision.** On every platform, 330 s without a byte from the server ends the connection as a clean end, and the client reconnects. The 330 s start when the request is sent, so response headers count as bytes, and the watchdog also covers reading the body of a non-200 answer (as-built A10).
+
+**Why.** Android sets no read timeout (`AND-RC/internal/ConfigRealtimeHttpClient.java:346`): a half-open socket is never detected. The iOS stream lives at most 330 s (`IOS-RC/RCNConfigRealtime.m:64`), which is where the number comes from. In one measured run the server sent its closing `]` 225 s after the request.
+
+**What we gave up.** A quiet but healthy connection is recycled after 330 s: one request.
+
+**Pinned by.** `realtime/realtime_test.dart`, "5.9.1 watchdog: 330 s without a byte ends the connection as a clean end (§6 row 8)".
+
+Status: built.
+
+### D9. Transport failures back off on a table of seconds
+
+**Decision.** A transport failure (no response, an error, an early end, or an Installations error classified as transport) waits the n-th entry of 1, 2, 4, 8, 16, 32, 60, 120, 300 s (n capped at 9) times a uniform factor in [0.5, 1.5): at most 450 s. A server failure (408, 429, 502, 503, 504, or an Installations `too-many-requests`) uses Android's table of 2 to 256 minutes.
+
+**Why.** On Android's table an hour offline means waits of over an hour after the network returns, and a desktop program is often offline for exactly that long (a closed laptop). The guide also tells apps to feed `onNetworkConnected`: a change from false to true clears both failure backoffs and allows a connect at once, subject to the 1 s floor and to a wait the server asked for with `retryIntervalSeconds` (as-built A11, A20).
+
+**What we gave up.** More retries per hour while offline. They are cheap: a failed connection costs no server work.
+
+**Pinned by.** `realtime/realtime_test.dart`, "5.9.1 offline recovery: the first connect after the network returns is within 5 minutes (§6 row 9)".
+
+Status: built.
+
+### D10. A failed auto-fetch is reported
+
+**Decision.** When the fetch that follows an invalidation fails or leaves the client stale, listeners get one `update-not-fetched` error with the cause.
+
+**Why.** JS reports it (`JS-RC/client/realtime_handler.ts:527-533`); Android drops it (`AND-RC/internal/ConfigAutoFetch.java:257,278-282`), so an app is told a template changed and never learns that it could not get it.
+
+**What we gave up.** A listener that did not expect errors must handle them (the same as for D7).
+
+**Pinned by.** `realtime/realtime_test.dart`, "5.9.2 a failed auto-fetch is reported as update-not-fetched (§6 row 10)".
+
+Status: built.
+
+### D11. Several messages per chunk, no newline needed
+
+**Decision.** The framer drops text before a `{`, takes a message from `{` to the next `}` (messages are flat), and handles every complete message in a chunk; a partial one waits. More than 16 KiB after a `{` without a `}` ends the connection after one `update-message-invalid`.
+
+**Why.** Android needs a newline after each message (`AND-RC/internal/ConfigAutoFetch.java:162-239`); JS drops all but the first message of a chunk (`JS-RC/client/realtime_handler.ts:577-650`). The measured body is a JSON array of flat objects, `[{\n  "latestTemplateVersionNumber": "2"\n}\n`, which the server can split anywhere.
+
+**What we gave up.** A nested object in a message would end it early and fail closed.
+
+**Pinned by.** `realtime/framer_test.dart`, "5.9 framing: two messages in one chunk, no newline between them".
+
+Status: built.
+
+### D12. `retryIntervalSeconds` is clamped to 86400
+
+**Decision.** A message's `retryIntervalSeconds` is ignored when it is malformed or not positive, and otherwise capped at 86400 s from now as the earliest next connect. No timer is scheduled more than 24 h ahead.
+
+**Why.** iOS clamps to 86400 (`IOS-RC/RCNConfigRealtime.m:69-71`); Android stores the value unchecked (`AND-RC/internal/ConfigAutoFetch.java:87-95,219-221`), so a value of 2147483647 s stops realtime for 68 years.
+
+**What we gave up.** A server that really wants a longer pause cannot have it.
+
+**Pinned by.** `security/numbers_test.dart`, "5.9: retryIntervalSeconds 2147483647 is capped at 86400 s before the next connect"; `realtime/realtime_test.dart`, "5.9 retryIntervalSeconds is capped at 24 h; no timer is further ahead".
+
+Status: built.
+
+### D13. Installation markers last 15 seconds and are re-stamped
+
+**Decision.** A marker on a registering installation or a token request is fresh when at most 15 s old and at most 1 s in the future. Its holder re-stamps it inside `update` before every HTTP attempt, and an attempt lasts at most 10 s. A marker holds its start time and the owner's nonce; only the owner re-stamps or clears it (as-built A5).
+
+**Why.** JS's marker timeout and request allowance are both 10 s (`JS-FIS/util/constants.ts:20`), so another tab can repeat a request that is merely slow. With a 15 s marker a live attempt always has a fresh marker, and one left by a crashed holder goes stale after 15 s.
+
+**What we gave up.** A crashed tab blocks registration for five seconds longer than in JS.
+
+**Pinned by.** `firebase_installations/firebase_installations_dart/test/markers_test.dart`, "5.3 markers: slow attempt not duplicated across two instances on one MemoryKeyValueStore".
+
+Status: built.
+
+### D14. Caps, a depth scan, bounded numbers, refused redirects, origins fixed at construction, redaction
+
+**Decision.** Both packages carry the same rules (each with its own copy of the helpers, as Storage and Database do):
+
+- origins are constructor arguments (https, or http to a loopback host);
+- redirects are refused;
+- response bodies are capped (Installations success 64 KiB, Remote Config success 8 MiB, error bodies 16 KiB, realtime messages 16 KiB), and a Remote Config body is scanned for nesting deeper than 32 before decoding;
+- every number from the server or the store goes through one bounded-integer function, with the same result on the VM, dart2js and dart2wasm;
+- no log line, exception message or `toString` holds a refresh token, an auth token, the API key, a request URL with a query, a request body or custom-signal text;
+- server text reaches callers only as `serverMessage`, control characters removed, at most 1 KiB;
+- on the web nothing is written outside the IndexedDB store, and tokens never travel in a `BroadcastChannel` message.
+
+**Why.** JS reads `response.json()` with no cap (`JS-RC/client/rest_client.ts:156`) and takes its origin from a page global (`JS-RC/client/rest_client.ts:82-85`); Android reads bodies to the end (`AND-RC/internal/ConfigFetchHttpClient.java:390-398`); iOS logs Installations response bodies (`IOS-FIS/InstallationsAPI/FIRInstallationsAPIService.m:296-311`). The refresh token is a credential: it must reach one server only, and no other text.
+
+**What we gave up.** A response over a cap is an error, not a slow success; a server that returns a template over 8 MiB cannot be used. A page cannot point the client at another origin.
+
+**Pinned by.** `security/hosts_test.dart`, `security/limits_test.dart`, `security/numbers_test.dart`, `security/store_corruption_test.dart`, `security/leakage_test.dart` and `security/storm_test.dart` in each package that has them.
+
+Status: built.
+
+## Changes made during review and testing
+
+Spec v4 was frozen before the closing review, its re-check and the test runs. They changed the behaviour in the places below. The entries keep the numbers A1 to A37 of the as-built addendum of the spec and its limits entry L1 (A18, and A22 to A24 with it, are the adapter entries, listed last; A30 is the dev dependencies); they are not the alternatives A1 to A16 further down. A number missing from a package's list belongs to another package. Test paths are relative to the `test/` folder of the package named at the start of each entry. A quoted test name is the exact name; a name with `$` in it is a test generated from a list, and the list names its cases. "No test" means the behaviour is built and no test covers that part, with the reason.
+
+### Installations (`firebase_installations_dart`)
+
+**A1. The directory check runs before any await.** What: the canonical path of a store directory is registered synchronously at first use, before any await, and released after the OS lock is closed. Why: review finding FIS M1: two stores on one directory both passed the check. Pinned by: `gap_fis_test.dart`, "A1 a second store whose first use races the first one is refused with a StateError; the first one works", "A1 the refused store can start once the first one has closed, and the directory is held again by it" and "A1 a path that reaches the directory through a symbolic link counts as the same directory"; `file_store_test.dart`, group "5.2.1 owner" (the single-owner cases).
+
+**A2. A no-change update writes nothing; IndexedDB reopens.** What: an `update` whose transform returns the current value writes and announces nothing, and the IndexedDB store reopens a connection that was closed. Why: review findings FIS M2 and M4: a transform that returned the current value still wrote and announced, and a closed IndexedDB connection was not reopened. Pinned by: `installations_r3_test.dart`, "5.3 (A2): a no-op update fails once, another instance deletes; the next call leaves the store empty and getId makes a new FID"; `browser/indexed_db_store_test.dart`, "5.2.2 a failed (aborted) update announces nothing" covers the neighbouring case. No test for the IndexedDB reopening: it needs a browser run in which the connection is closed by the browser, and no browser test does that.
+
+**A3. A failed write is retried as a guarded merge.** What: when a write fails, the record stays in memory and the retry runs inside `update` as a merge. Memory is applied only if nothing is stored, or the stored record has the same FID and is not further along. It is never applied after another writer deleted the record. Why: review finding FIS M3 and re-check N-b1: a plain retry could overwrite a record that was further along or that another writer had deleted. Pinned by: `installations_r3_test.dart`, group "A2 / A3 transient write failures and another instance", for example "5.3 (A3): a new token that failed to write is not written back after another instance deleted the record" and "5.3 (A3): first-ever getId with a failing write; the same FID is written once the store works ($mode)".
+
+**A4. Create and generate statuses are decided per endpoint.** What: a create answered 400, 401, 403 or 404 is `bad-config`, and only 400 and 403 block create for 24 h. A 409 on create feeds the recoverable backoff of 5xx and 429 (the n-th consecutive failure waits `min(2^n + random(0, 1), 1800)` s). At most one 409 recovery runs in one call, and a second 409 in the same call is `invalid-response` with status 409. A call made inside the window that a 409 started throws `too-many-requests`, not the 409's `bad-config`. A 401 or 404 on generate keeps the recovery with a new FID and resets the backoff. Why: review findings FIS M5 and M6 and re-check M6: one table for all create statuses did not fit the endpoints, a 409 on create could repeat without a limit, and the window must not report a status the caller did not get. A31 adds the other statuses. Pinned by: `installations_test.dart`, "5.3 backoff: 403 blocks create for 24 h; a new instance retries" and "5.3 register (A4): 409 discards the FID and feeds the recoverable backoff; the next getId gives a new one, registered after the window"; `installations_r3_test.dart`, group "A4 statuses per endpoint and the backoff": "5.3 (A4): a server always answering 409 gets two creates, then nothing inside the window" (the second 409 and the window), "5.3 (A4): create $status is bad-config with retryAfter; the next call rethrows it without a request" and "5.3 (A4): generate $status still recovers once with a new FID".
+
+**A5. A marker carries an owner nonce.** What: a registration or token marker holds its start time and a nonce of its owner; only the owner re-stamps or clears it. Why: review finding FIS M7: a holder could re-stamp or clear a marker that another instance had taken over. Pinned by: `installations_r3_test.dart`, group "A5 marker owners" ("5.3 (A5): a fresh registration marker of a foreign owner means wait; its registration is then used without a request", "5.3 (A5): a superseded holder's re-stamp before its retry does not change the record"); `markers_test.dart`, groups "5.3 markers: registration marker" and "5.3 markers: token marker" cover the age rules.
+
+**A6. `toString` prints no server text.** What: `FirebaseInstallationsException.toString` prints the code, the message and the HTTP status only. Why: review and the leakage test found server text in the string. Pinned by: `security/leakage_test.dart`, "5.11 rule 6: server text is not part of message or toString".
+
+**A7. A bounded integer has at most 16 digits.** What: `parseBoundedInt` accepts at most 16 digits (2^53 − 1 has 16) and checks the range after parsing. Why: found by the numbers test: the range check alone left the result of long digit strings different on the VM and the web. Pinned by: `security/numbers_test.dart`, group "5.11 rule 9 parseBoundedInt", case "1000 digits"; `gap_fis_test.dart`, "A7 a 16-digit string within 2^53 - 1 parses", "A7 a 16-digit string above 2^53 - 1 is absent", "A7 a string of 17 digits is absent even when its value is small" and "A7 a stored time written as a 16-digit string parses; as 17 digits the record is absent".
+
+**A31. The backoff takes every unexpected status.** What: this extends A4. The recoverable backoff is also fed by any 3xx, by any other 4xx, and by a create answered 401 or 404 (a generate answered 401 or 404 resets it; a transport error and an unusable 2xx body change nothing). A create answered 401 or 404 is `bad-config`. Any other 4xx is `invalid-response` with the status kept, so a proxy's 408 does not stop realtime updates. The create that follows a 409 recovery passes only the window its own 409 started, and only once. An internal restart or supersede signal that reaches a caller is `unavailable`. Why: final drift review and re-check 3: a status outside the tables must not be reported as `bad-config`, which ends realtime in Remote Config. Pinned by: `installations_r3_test.dart`, "5.3 (A4): a 302 on create opens a window; the next call inside it sends no request" and "5.3 (A4): a 302 on generate opens a window; the next call inside it sends no request" (3xx), "5.3 (A4): create $status is bad-config with retryAfter; the next call rethrows it without a request" (create 401 and 404), "5.3 (A4): a server always answering 409 gets two creates, then nothing inside the window" (the second 409 is `invalid-response` with status 409); `installations_r4_test.dart`, "5.3 (A31): create $status is invalid-response ($status); the next call inside the window is too-many-requests and sends nothing" and "5.3 (A31): generate $status is invalid-response ($status); the record stays registered with its refresh token, no new FID" (statuses 405, 408 and 410, the other 4xx rule), "5.3 (A31): create $status stays bad-config with the 24 h block" and "5.3 (A31): generate $status stays bad-config with the 24 h block" (400 and 403), "5.3 (A31): create $status is bad-config with a growing window (2.5 s, then 4.5 s)", "5.3 (A31): the 409 retry waits on a fresh foreign marker; once the marker is stale (16 s), still inside the 32.5 s window, it sends its create and the call succeeds" and "5.3 (A31): once the retry sent its create the pass is gone: a later look inside the window is too-many-requests" (the single window pass). The `_Restart`/`_Superseded` → `unavailable` branch is a defensive branch, not reachable through the public API (see the header comment of `gap_fis_test.dart`), so no test pins it.
+
+**A32. Nonces and deadlines use real random numbers and cancellable timers.** What: the marker-owner nonce and the temporary file names come from `Random.secure()`. The 60 s call deadline and the 10 s request deadline use `Timer`, which is fake under `fakeAsync`; the `delay` seam cannot be cancelled. `FileKeyValueStore` takes a `@visibleForTesting clock` for the cleanup of temporary files. Why: a nonce must not be predictable, and a deadline must be cancellable. Pinned by: `installations_r3_test.dart`, "5.11 deadline: a caller joining a getToken at t = 50 s fails at t = 110 s; the first caller still fails at 60 s" for the deadlines; `installations_r4_test.dart`, "5.2.1 (A32): a 2 h old temporary file survives when the injected clock is 30 min after its mtime" and "5.2.1 (A32): the same file is deleted when the injected clock is 61 min after its mtime" for the clock. No test for the secure nonce: `Random.secure()` cannot be observed (`fid_test.dart` pins the default randomness of the FID only, not of the nonce or the file names).
+
+**A33. Store failures are retried and replayed.** What: this refines A3. A failed read after start is also transient: it is logged once and the last known record is used. Every unsaved removal is kept and replayed. A foreign marker is removed only with the same start time, or when it is stale. A record that lives only in memory and is replaced by another instance's record emits the stored FID on `onIdChange`. `delete` waits on a fresh foreign marker, reads again after a race, and removes a `registering` record that is stale without a server call. An operation runs until 60 s after its last joiner. Why: re-check 3 nits and the final drift review. Pinned by: `installations_r3_test.dart`, "5.3 (A3): a failed delete() removal leaves a record registered since with another refresh token ($mode)" and "5.11 deadline: a caller joining a getToken at t = 50 s fails at t = 110 s; the first caller still fails at 60 s" (the 60 s after the last joiner); `installations_r4_test.dart`, groups "A33 replayed removals" and "A33 onIdChange for a FID kept only in memory", for example "5.3 (A33): counter-test: the removed marker, still there with the same owner and the same start time, is removed by the replay", "5.3 (A33): a removal of R fails to write, then a new FID made in memory is removed by a 409 while writes still fail; once the store recovers it no longer holds R ($mode)" and "5.3 (A33): the first getId with failing writes emits F1; another instance stores F2; the next call returns F2 and emits it"; `installations_test.dart`, "5.3 delete: waits for a registration in flight, then deletes it" and "5.3 delete: an unregistered installation is removed without a request". No test: the failed read after start being transient, `delete` waiting on a fresh foreign marker, and `delete` removing a stale `registering` record without a server call.
+
+**A34. Stored records and stores are bounded.** What: a stored token is 1 to 4096 printable ASCII characters; times lie between 0 and the year 9999; `tokenExpiresIn` is at least 1000 ms; `registrationOwner` and `tokenRequestOwner` match `^[A-Za-z0-9._-]{1,64}$`. The file store caps a write at 16 MiB, treats a non-regular file as absent, removes an empty directory found at the target, and throws on calls after close. The IndexedDB store works without `BroadcastChannel`. A DELETE request sends no `Content-Type`. An origin whose path is `/` is accepted. The backoff API is `afterUnrecoverableFailure` and `afterRecoverableFailure`. A malformed owner field voids the whole record (L1). Token fields are all present or all absent, and fields that do not belong to the record's status are dropped. A second file store on a directory whose first store is still starting gets a transient `StateError`. Why: the final drift review (hardening): every stored or configured value that reaches a parser or a request has a limit. Pinned by: `gap_fis_test.dart`, group "A34 stored records" ("A34 tokens of 1 and 4096 printable ASCII characters are kept", "A34 tokenExpiresIn under 1000 ms makes the record absent; 1000 ms is kept", "A34 times are within 0 and the end of year 9999", "A34 a registrationOwner not matching the pattern (\"$owner\") voids the record", "A34 a tokenRequestOwner not matching the pattern (\"$owner\") voids the record", "A34 owners of 1 to 64 letters, digits, dot, underscore and hyphen are kept"), group "A34 server answers" ("A34 tokens of 4096 printable ASCII characters are accepted", "A34 a token lifetime under one second is invalid-response", "A34 DELETE carries no Content-Type; POST does", "A34 an origin \"$origin\" is accepted and the requests go to it", "A34 an origin with a path other than / is refused") and group "A34 file store" ("A34 a value of 16 MiB + 1 byte is refused with storage-error and the old value stays", "A34 an empty directory at a key's path counts as absent and is removed by the next write", "A34 every call after close throws a StateError", "A34 calls after close throw a StateError also when the store never started"); `gap_fis_test.dart`, "A1 a second store whose first use races the first one is refused with a StateError; the first one works" (the transient `StateError`); `file_store_test.dart`, "5.2.1 a file of 16 MiB + 1 byte counts as absent" and "5.2 calls after close fail"; `security/store_corruption_test.dart`, groups "5.10 corrupt records in a MemoryKeyValueStore" and "5.10 corrupt files in a FileKeyValueStore". No test: IndexedDB working without `BroadcastChannel` (no browser test removes it) and the names of the backoff API (the backoff tests use them but none checks the names).
+
+### Remote Config (`firebase_remote_config_dart`)
+
+**A8. The stale generation is read after the installation id is known.** What: `fetch` reads the generation after `getIdAndToken`, and sends `If-None-Match` only when the generation is 0 and `meta.fid` equals the FID of the request. Why: review finding RC M1 and a test run: the generation was read with the request, before the first FID existed, and the first FID made the cache stale. Pinned by: `fetch_test.dart`, "5.5 a FID created inside the fetch call gets no If-None-Match (stale read at build time)".
+
+**A9. Only a change from a stored FID marks the cache stale.** What: a change of FID marks the cache stale only when it is a change from a stored `meta.fid` to a different one. A `meta` record with no `fid` but a successful fetch counts as different, which covers a store written before the field existed. Why: test run and re-check N-d1: a first FID must not count as a change, and a record written before `fid` was stored must. Pinned by: `fetch_test.dart`, "5.9.5 the first FID, created inside the first fetch, does not make the cache stale"; `rc_r3_test.dart`, "A9 a fresh install: its first FID marks nothing stale, and the first fetch is then served from the cache" and "A9 a meta record without fid but with a successful fetch, then an ID change: the next fetch inside the interval goes to the network".
+
+**A10. The watchdog starts when the request is sent.** What: the 330 s watchdog starts at sending, so headers count as bytes, and it also covers reading a non-200 body. Why: review finding RC M2: there was no deadline before the headers arrived. Pinned by: `realtime/realtime_test.dart`, "5.9.1 watchdog: each byte restarts the 330 s" for the byte rule; `gap_rc_test.dart`, "A10 a server that sends no headers for 330 s is cut; the end is clean, so the next connect waits only the floor" (the start at sending) and "A10 the watchdog also cuts a non-200 body that stalls, with that status's outcome (503: the 2-minute server wait)".
+
+**A11. Only a false-to-true network change acts.** What: `onNetworkConnected` acts only on a change from false to true. It clears the transport and server backoff, keeps the wait the server asked for with `retryIntervalSeconds`, and keeps the 1 s floor. Why: review finding RC M3 and its re-check: a `true` event with no change from `false` should not bypass the backoff. Pinned by: `realtime/realtime_test.dart`, "5.9.1 network regained connects at once, subject to the floor"; `gap_rc_test.dart`, "A11 a repeated true does nothing; only false then true clears the backoff" and "A11 repeated true events while the server asked for a wait do not shorten it".
+
+**A12. One auto-fetch chain at a time.** What: invalidations feed one chain. A chain that ends stale blocks a new chain for 60 s; then one deferred chain runs if the target is still ahead. A19 and A25 refine the cool-down. Why: review finding RC M4 and its re-check: announcements during a storm must not start a chain each. Pinned by: `realtime/realtime_test.dart`, "5.9.2 a higher target after a stale chain waits for the 60 s cool-down, then one chain runs", "5.9.2 (A12) after a stale chain the deferred chain is dropped when the target is no longer ahead" and "5.9.2 an invalidation during a chain raises its target"; `security/storm_test.dart`, "5.9.2 storm: 1000 invalidations of rising versions in 10 s -> at most 3 fetches and one update-not-fetched in the first 60 s, then one deferred chain".
+
+**A13. Stored numbers are bounded before a date is built.** What: every stored time goes through `parseBoundedInt` with an absolute value of at most 8.64e15 ms before a `DateTime` is built. A stored template version out of range makes the record absent. A fetch time in the future is clamped to now when the records are loaded; A27 changes what happens to it elsewhere. Why: review findings RC M5 and M6 and re-check: a stored number outside the range of `DateTime` must not reach its constructor. Pinned by: `security/numbers_test.dart`, group "5.10: persisted times in 2100"; `security/store_corruption_test.dart`, group "5.10 boundaries and validators"; `gap_rc_test.dart`, "A13 a stored templateVersion of ${jsonEncode(bad)} makes the record absent" (the out-of-range versions), "A13 a stored templateVersion of 0 and of 2^53 - 1 is kept" and "A13 a fetch time outside +-8.64e15 ms makes the record absent, one before the epoch within it is kept" and "A13 a fetch time later than now is clamped to now on load".
+
+**A14. Activation compares versions only when both records have one.** What: `activate` refuses a record only when both records have a version and the fetched one is lower. A `NO_TEMPLATE` or `EMPTY_CONFIG` record without a version always replaces the active record. The memory-or-store pick is by version, then by fetch time. A21 and A35 refine this. Why: review findings RC M6 and M7 and re-check: a record without a version could not replace a versioned one, and memory could be picked over a newer stored record. Pinned by: `activate_test.dart`, "5.5 NO_TEMPLATE without a version replaces a versioned active record and clears values" and "5.5 a lower version is refused and memory loads the stored active record".
+
+**A15. A null `featureDisabled` is invalid.** What: a `featureDisabled` that is present and null is an invalid message, and `featureDisabled: true` wins over other malformed fields in the same message. Why: found by the framer test: the flag must be strict, and a message that disables the feature must be honoured even when other fields are malformed. Pinned by: `realtime/framer_test.dart`, "5.9 fields: featureDisabled $bad is update-message-invalid"; `gap_rc_test.dart`, "A15 a present featureDisabled of null is invalid", "A15 featureDisabled true wins over a malformed version and a malformed retry interval" and "A15 featureDisabled true wins over a wrong-typed version".
+
+**A16. A failure after the deadline reports the timeout.** What: in `sendCapped` the timeout completes before the request is aborted, so a failure that follows the deadline is reported as `fetch-timeout` (or `network-error` for Installations). Why: found by a test run: the abort's own error was reported instead of the timeout. Pinned by: `fetch_test.dart`, "5.5 a hanging fetch request ends with fetch-timeout at the call's timeout".
+
+**A17. `close()` does not await subscription cancels.** What: `close()` cancels its subscriptions without waiting for the cancel futures. Why: a test run showed those futures can complete outside the caller's zone, so under `fake_async` `close()` never finished. Pinned by: `realtime/realtime_test.dart`, group "5.4 close".
+
+**A19. The 60 s cool-down follows only a chain that did not end up to date.** What: this refines A12. The cool-down applies after a chain that used up its attempts or failed (a throttle counts as a failure). After an up-to-date chain the next higher announcement starts a chain at once. The wait uses the injected clock, is capped at 60 s, and a clock step back cannot lengthen it. Why: re-check. A failed chain counts as not up to date, so a failing fetch plus a storm costs one chain per 60 s. Pinned by: `realtime/realtime_test.dart`, "5.9.2 (A19) after an up-to-date chain a higher announcement starts a chain at once"; `rc_r3_test.dart`, "A19 an up-to-date chain, then higher announcements: each is fetched with no 60 s wait", "A19 a throttled chain plus rising announcements: at most one chain per 60 s" and "A19 the clock stepped back during a cool-down: the deferred chain still runs within 60 s".
+
+**A20. Network regained keeps the server's wait.** What: this refines A11. A change from false to true clears both failure backoffs but keeps the wait the server set with `retryIntervalSeconds`, and the 1 s floor applies. Why: re-check of A11. Pinned by: `rc_r3_test.dart`, "A20 retryIntervalSeconds 600, then network false -> true: no connect before 600 s".
+
+**A21. A fetched record from another instance is kept only if it is newer.** What: this refines A14. The `fetched` update keeps the stored record only if another instance stored it while this request was in flight (the request was sent at or before its fetch time, and the fetch time is not after now) and it is newer: a higher version if both have one, else a later fetch time. Anything older, or with a fetch time in the future, is replaced. The memory-or-store pick in `activate` is by version, then fetch time. Why: re-check rc_f N1 and N2: a tampered huge stored version could block fetches. Pinned by: `rc_r3_test.dart`, "A21 a stored record with version 2^53-1 and an old fetch time is replaced by a fetch of v6", "A13 / A21 a stored record with a future fetch time and v9 is replaced by a fetch of v6" and "A21 two instances: B stores v6 while A's v5 request is in flight; v6 is kept"; `activate_test.dart`, "5.5 (A21) a write of fetched with a higher version replaces a stored record with a later fetch time".
+
+**A25. A chain is up to date only when the known version reaches the target.** What: this refines A19. A chain is up to date only when the known template version is at least the announced target. An unchanged answer below the target is stale: the next attempt runs, and then the cool-down applies. The old rule "attempted in the last 60 s" is removed. Why: re-check 3 NEW-R1 and the final drift review: an unchanged answer below the announced version is not proof that the client holds that version. Pinned by: `rc_r4_test.dart`, "A25 v5 known; announcements 6, 7 and 8; three NO_CHANGE answers (attempt 1 with If-None-Match, attempts 2 and 3 without): one 3-attempt chain ending update-not-fetched, then the next chain only after the 60 s cool-down", "A25 known v5, announcement 6: attempt 1 carries If-None-Match and gets NO_CHANGE; attempt 2 has none and its UPDATE v6 ends the chain up to date" and "A25 NO_CHANGE once v6 is known ends the chain for 6 with no error and no cool-down".
+
+**A26. An empty template keeps the version and the ETag.** What: `NO_TEMPLATE` and `EMPTY_CONFIG` store a record with no entries that keeps the server's template version and ETag when the server sends them. A record with no version still always replaces the active record (A14). `If-None-Match` takes `fetched.etag ?? active.etag`, field by field. A fetch that joins one in flight compares the generation read after Installations (A8). Why: final drift review: dropping the version kept a realtime target out of reach, because the client never held the announced version. Pinned by: `activate_test.dart`, "5.5 EMPTY_CONFIG with a newer template version clears values" (the record is replaced); `rc_r4_test.dart`, "A26 EMPTY_CONFIG with templateVersion "4" stores v4 and its ETag; the next fetch sends it" (the kept version and ETag), "A14 / A26 a versionless $state replaces an active v7 on activate", "A26 If-None-Match: a fetched record without an ETag and an active record with one send the active ETag" (the per-field `If-None-Match`) and "A8 / A26 a fetch waiting for Installations is shared after setCustomSignals; the one request carries the new signals" (the joined fetch).
+
+**A27. Stored times may be negative.** What: this changes A13. A stored time may be negative, within ±8.64e15 ms. `activate` clamps times in the future with one `now`. The `fetched` update does not clamp, because A21 replaces a record with a fetch time in the future. Why: final drift review and rc_f N1. Pinned by: `security/store_corruption_test.dart`, "5.10 / A27: fetched and active records with fetchTime $millis load" and "5.10 / A27: a meta record with lastSuccessfulFetchTime -5 loads with that time"; `rc_r4_test.dart`, "A21 / A27 the store holds A (v5, future fetch time) and memory holds B (no version, its write failed): activate makes B active" and "A35 the same record in both slots with a future fetch time: false" (activate clamps with one `now`); `rc_r3_test.dart`, "A13 / A21 a stored record with a future fetch time and v9 is replaced by a fetch of v6" (the `fetched` update does not clamp).
+
+**A28. Small input rules.** What: an empty or blank `languageCode` sends `en`. A `retryIntervalSeconds` above the range is capped at 86400 instead of being ignored. Web detection for `asInt` uses `dart.library.js_interop`, so dart2wasm counts as web. A whole-valued JSON number (`1.0`, `1e3`) parses as an integer, because dart2js cannot tell it from `1`. The framer's 16 KiB limit counts UTF-16 code units. Why: final drift review. Pinned by: `security/numbers_test.dart`, "5.9: retryIntervalSeconds 2147483647 is capped at 86400 s before the next connect"; `realtime/realtime_test.dart`, "5.9 retryIntervalSeconds is capped at 24 h; no timer is further ahead"; `value_test.dart`, group "5.7 asInt"; `rc_r4_test.dart`, "A28 languageCode ${jsonEncode(given)} sends "language_code": "en"" (given is "" and "   "); `browser/rc_r4_value_test.dart`, group "5.11 / A28 asInt on the web (dart2js and dart2wasm)", for example "A28 "9007199254740992".asInt() is null"; `gap_rc_test.dart`, "A28 a retryIntervalSeconds above the range clamps to 86400", "A28 a whole-valued JSON number (1.0, 1e3, 2.0e0) parses as an int in the message fields", "A28 a whole-valued JSON number parses as an int in parseBoundedInt; a fraction does not", "A28 the limit counts UTF-16 characters: 16384 characters between the braces are a message, 16385 are an overflow" and "A28 a character outside the BMP counts twice (two UTF-16 units)". No test: the `dart.library.js_interop` condition itself; the web run of `rc_r4_value_test.dart` under dart2js and dart2wasm exercises it.
+
+**A29. Parsing is strict about `state` and lenient about metadata.** What: an unknown `state` is `fetch-client-parse`, and `"state": null` counts as absent. An ETag must also be ASCII. Missing metadata fields are tolerated (a rollout without `affectedParameterKeys` gets an empty list, an experiment without it is kept with the key absent) and `experimentStartTime` is not checked as RFC 3339. Record limits: `staleGeneration` wraps at 0x7fffffff, `meta.fid` has at most 256 characters, a throttle count is at most 1000, and a project number has at most 32 digits. Why: the final drift review (defensive): Android drops a bad field and keeps the rest, and a bounded record cannot grow from a hostile store. Pinned by: `rc_r3_test.dart`, "5.10 meta with "fid": ${jsonEncode(badFid)} drops only that field" for the type and empty cases of `fid` (not for its length); `gap_rc_test.dart`, "A29 an unknown state is fetch-client-parse", "A29 a state that is not a string is fetch-client-parse", "A29 "state": null is absent: the body is an UPDATE", "A29 an ASCII ETag is stored", "A29 a non-ASCII ETag is not stored; the fetch still succeeds", "A29 an ETag with a control character, an empty one and one over 1024 characters are not stored", "A29 missing metadata fields are tolerated: a rollout without affectedParameterKeys keeps an empty list, an experiment without optional fields is kept, nothing is dropped" and "A29 an experimentStartTime that is not RFC 3339 is kept as sent"; `security/store_corruption_test.dart`, "5.10 throttle: wrong type: count is 1001 → absent, no throw, logged once; the next write repairs" (the throttle limit). No test: the wrap of `staleGeneration` at 0x7fffffff, a `meta.fid` of more than 256 characters, and a project number of more than 32 digits.
+
+**A30. Dev dependencies and the verification kit.** What: `rxdart` is a dev dependency of the package, and the production verification kit takes `--realtime-window`, `--skip-realtime` and `--help`. Why: final drift review: the spec listed other dev dependencies and a fixed window. Pinned by: no test; the kit runs only with the maintainer's credentials.
+
+**A35. A tampered version blocks activate for at most 24 hours.** What: this refines A14. `FirebaseRemoteConfigException` is `final` and `withThrottle` is `@internal`. The active record is kept only if its fetch time is not in the future and it was fetched at most 24 h before the fetched record. Equality of fetch times uses times clamped to one `now`. An installation id change that is still waiting for the load when `close()` runs does nothing. Why: final drift review and re-check 3 (rc nits): a tampered huge version in the active record would otherwise block activation for good. Pinned by: `rc_r3_test.dart`, "A14 / A21 the store holds v5 with a future time and the write of v6 fails: activate activates v6" for the future time; `rc_r4_test.dart`, "A35 an active v9 with a future fetch time and a fetched v8: true, v8 is active" and "A35 an active v9 fetched $hours h before a fetched v8: activate returns $activates" (the 24 h rule), "A35 the same record in both slots with a future fetch time: false" (the clamped equality) and "A35 an ID change waiting for the load when close() runs writes nothing: meta is unchanged". No test: `final` and `@internal`, which the analyzer enforces.
+
+### FlutterFire adapter (`firebase_remote_config_dart_platform`)
+
+**A18. The adapter follows its app.** What: the per-app instance rebuilds its clients when the FlutterFire app's options change or the app is gone. It registers a deletion hook through `registerService` that closes them, except for the default app off the web, and it never deletes the shared `firebase_app_dart` app. On cores that keep that app (native and web), an app re-created under the same name with other options is a restriction: it is not supported until the app restarts, and the calls throw `internal` with a message that names the cause and the remedy. Every error that leaves the adapter is a `FirebaseException` with the plugin `firebase_remote_config` and an interface code; anything unclassified is `internal` with a message that holds no value. Reads never throw: they answer from the defaults or the static values and log the cause once with `debugPrint`. `settings` returns a copy. `setConfigSettings` rejects negative durations only (zero is accepted, as the client does). `setDefaults` skips null values and decodes bytes. Why: review finding adapter M1 and nits, re-check 3 NEW-A and the final drift review: a per-app instance created once kept clients for an app that was deleted or re-created, and an error could leave the adapter without an interface code. Pinned by: `r3_rc_delete_test.dart`, "A18 a read or fetch during the delete window gets defaults or no-app and creates no clients; after the delete and a re-create, a use creates clients again", "A18 Firebase.app().delete() of the default app off the web throws; the client stays identical and an onConfigUpdated subscription stays open" and "A18 on the Linux core a re-create with other options gets new clients"; `r3_rc_native_core_test.dart`, "A18 native-style re-create with other options: the old Dart app is still listed, reads give defaults and fetch throws StateError"; `unit_test.dart`, "5.12 setConfigSettings: kept by the adapter as a copy", "5.12 setDefaults: values kept as toString(); a new call replaces the map" and "5.12 delegateFor: one per-app instance per app name". `r4_rc_test.dart`, "A18 a StateError from the store becomes internal with a value-free message", "A18 a StateError from the HTTP client becomes internal with a value-free message" (the `internal` message), "A18 Duration.zero for both settings is accepted and settings returns it", "A18 -1 µs for either setting gives invalid-argument and the old settings stay" and "A18 settings is a copy: changing it changes nothing", and group "A18 the deletion service registered at instance creation" (the limit entry L1).
+
+**A22. A failed support-directory lookup is retried.** What: a failed lookup of the application support directory is retried on the next call instead of being kept, and the default store is per isolate, not per process. Why: a transient `path_provider` failure would otherwise break the store until the app restarted. Pinned by: `gap_adapter_test.dart`, "A22 a failed directory lookup is thrown to the call that waited for it and retried on the next call", "A22 every failed lookup is retried, not only the first; a lookup that worked is not repeated", "A22 calls made together while the lookup fails all see the failure, and a call after them retries" and "A22 after close every call throws a StateError and no lookup is made again"; `r4_rc_test.dart`, "A22 after close() a read throws StateError and path_provider is not asked again; a second close() returns the same future"; `registration_test.dart`, "5.12 default store: without use(store:), every app keeps its records in one file store in firebase_dart under the application support directory; use after the first client throws" covers the default store. No test: that the default store is per isolate and not per process.
+
+**A23. One `httpClient` for both clients.** What: `use(httpClient:)` serves Installations and Remote Config. Why: one transport for tests and proxies. Pinned by: `gap_adapter_test.dart`, "A23 the client passed to use serves the Installations requests and the Remote Config fetch"; `unit_test.dart`, "5.12 per-app wiring: the requests carry the app options and the languageCode of use()" (the test rig passes the client through `use`).
+
+**A24. Installations messages and the realtime stream error.** What: the message of an Installations cause is used for every wrapped Remote Config exception that has one. `onConfigUpdated` returns a stream that errors with the converted error instead of throwing when it is called. Why: final drift review of the adapter: the Installations message names the real cause (for example a store held by another process), and a stream getter should report a failure through the stream, not by throwing. Pinned by: `unit_test.dart`, "5.12 a store in use by another process: internal with the store's message" and "5.12 onConfigUpdated: a realtime 403 reaches the app as a FirebaseException of the adapter (internal on the VM)".
+
+### Remote Config, added by the fourth re-check (`firebase_remote_config_dart`)
+
+**A36. Small rules from the fourth re-check.** What: an installation id change to the FID of a request in flight is left to that request, and its failure marks the cache stale. A negative cache age (the clock moved back) counts as expired. The language tag derived from the platform locale is trimmed. The package has extra test support files. Why: final drift review and re-check 4 (implementation details recorded). Pinned by: no test. No test covers the id change to the FID in flight, the negative cache age or the trim (`rc_r3_test.dart`, "A19 the clock stepped back during a cool-down: the deferred chain still runs within 60 s" steps the clock back for the realtime cool-down only), and the support files are not behaviour.
+
+**A37. Auto-fetch attempts 2 and 3 send no `If-None-Match`.** What: this refines A25. Auto-fetch attempts 2 and 3 never send `If-None-Match`, and a fetch without an ETag joins only an in-flight request that has none. Attempt 1 and BASE fetches are unchanged: a caller without an ETag never joins a request that sends one, and a BASE fetch can make attempts 2 and 3 wait behind it. In `activate`, a stored fetched record with a fetch time in the future loses to a different template in memory (a different version, or the stored one has none); memory with the same version is that record clamped at load. A zero-padded `retryIntervalSeconds` parses as its value. Why: re-check 4: a `NO_CHANGE` (304) answer to a publish that leaves this client's values unchanged kept the known version below N, so every reconnect cost 3 fetches and a false `update-not-fetched`. Pinned by: `rc_r4_test.dart`, "A25 v5 known; announcements 6, 7 and 8; three NO_CHANGE answers (attempt 1 with If-None-Match, attempts 2 and 3 without): one 3-attempt chain ending update-not-fetched, then the next chain only after the 60 s cool-down", "A25 known v5, announcement 6: attempt 1 carries If-None-Match and gets NO_CHANGE; attempt 2 has none and its UPDATE v6 ends the chain up to date" and "A26 a BASE fetch with the ETag in flight when attempt 2 starts: two requests, the second without If-None-Match", "A21 / A27 the store holds A (v5, future fetch time) and memory holds B (no version, its write failed): activate makes B active" and "A35 the same record in both slots with a future fetch time: false"; `security/numbers_test.dart`, "5.9: retryIntervalSeconds "00000000000000000600" → 600 (not invalid)".
+
+### Known limits
+
+**L1. Known limits, accepted for 0.1.0.**
+
+- The watchdog during a non-200 body counts 330 s from the headers, not from the last byte.
+- A watchdog end before any header is a clean end, not a failure.
+- A realtime-only app whose stored template version was tampered to a huge value skips auto-fetch until its first own `fetch()`.
+- Installations: a late create success is not stored over a record that the other attempt released to unregistered.
+- Installations: behind a captive portal each 3xx adds to the backoff, up to 30 minutes, and nothing clears it when the network returns.
+- Installations, unchanged small findings: tokens of equal age are not told apart (N4), a malformed owner field voids the record (N6), and the IndexedDB store reports "connection is closed" for every thrown error (N7).
+- Remote Config: while the stored fetched record is future-dated (the clock moved back), `activate` re-clamps it to now on each call and returns true, rewriting the active record, until that time passes. A versionless future-dated record gives one spurious true after load. "Same version = same record" can be wrong after a signals or FID change plus a failed write. Auto-fetch attempts 2 and 3 can wait behind a user fetch and time out.
+- Installations: a late joiner can re-arm the 409 pass (a superseded marker plus timing), and a 429 on `delete` carries no `retryAfter`.
+- Adapter: an instance first created with `instanceFor` while its app's delete runs registers a service that `firebase_core` never disposes; its clients stay open until its next use, which closes them.
+
+## Alternatives considered
+
+Each row is a question the design had to answer, the answer, and what was rejected with the reason. These are not departures from upstream, so no test pins them; the behaviour they lead to is covered by the tests of the sections above and by the unit tests of each package.
+
+| # | Question | Chosen | Rejected, and why |
+|---|---|---|---|
+| A1 | How products get Installations | An explicit `FirebaseInstallations` instance passed to Remote Config | (a) Remote Config creating its own: two instances per app lose call sharing, and ownership is unclear. (b) A provider on `FirebaseApp`: it needs a release of `firebase_app_dart` for this; revisit when Messaging needs Installations. (c) A static cache: it breaks the rule that configuration is immutable and there is no global instance cache. |
+| A2 | No Installations at all (a persisted local id, no registration) | Register with the server | Every SDK registers; Messaging needs the registration; console features keyed on installations (test devices) need ids the server knows (not measured). The measured acceptance of token-less fetches could be enforced later (not measured). |
+| A3 | The persistence default | `store` is a required argument | (a) A memory default: a new installation at every start, silently. (b) A file default: pure Dart has no application-support directory. (c) IndexedDB on the web and memory on the VM: two behaviours for one argument. |
+| A4 | Where the store interface lives | The Installations package | (a) `firebase_app_dart`: a release of a published package before Remote Config can ship. (b) `LocalStorage`: its reads are synchronous and it has no atomic update. (c) `AuthStorage`: it lives in the Auth package and has no atomic update. |
+| A5 | Concurrency on the VM | One process owns a store directory (an OS lock), and calls are serialized inside the process | (a) A lock-file protocol: review found takeover races and unfenced writes; the C++ defect it was meant to prevent (a new id at every fetch) is fixed by persistence alone. (b) SQLite: a native library for a handful of keys, and no web. |
+| A6 | Web storage names | This package's own IndexedDB database (`firebase_dart_kv`) | The JS SDK's database: it ties our stored shape to JS's, and its keys are ambiguous joins (`JS-FIS/util/get-key.ts:21-23`). |
+| A7 | Restricted-key headers | A `headers` argument on `FirebaseInstallations`, limited to three names | `PlatformDependencies.headersBuilder`: app-wide, it would add the headers to every product's requests. |
+| A8 | Shared helpers | One copy of the helpers per package | A shared library in `firebase_app_dart` or in Installations: Remote Config would depend on a not-public surface across packages. Storage and Database already carry their own copies. |
+| A9 | Packages | Two (Installations, Remote Config) | One package: Messaging will need Installations without Remote Config. |
+| A10 | Configuration | Fixed at construction, with per-call fetch options | Setters (FlutterFire): mutable state whose order against reads matters. The adapter provides them. |
+| A11 | Reads before initialization | Defaults and static values | (a) Throw: it breaks start-up reads that are correct on a first launch. (b) An async factory: the adapter's synchronous `instanceFor` cannot use it. |
+| A12 | Throttling | Fail fast | JS waits inside `fetch`: a server or a Flutter start-up cannot tell a long wait from a hang. |
+| A13 | Value conversion rules | Android's | JS turns every unknown string into false and accepts `0x10` and `Infinity` as numbers; iOS parses a prefix; FlutterFire treats only `true` and `1` as true. Android's is the only one that reports "not a boolean" separately, which lets a malformed remote value fall back to its default. |
+| A14 | Realtime transport | `package:http` streaming (`sendStreaming` over an abortable request) | A hand-written `fetch` interop (Firestore has one in `cloud_firestore_dart`): a second transport to maintain. `package:http` 1.6.0 already streams through `fetch` in the browser and aborts mid-body on the VM. |
+| A15 | One stream per store or per instance | One stream per instance | A shared stream: it needs cross-tab leader election, which JS does not have. |
+| A16 | What `activate` does to the fetched record | It keeps it | Removing it after activating (Android): another instance's newer fetch could be deleted. |
