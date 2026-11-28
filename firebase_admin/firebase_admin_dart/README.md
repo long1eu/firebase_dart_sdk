@@ -120,10 +120,11 @@ source the Firebase documentation names, and kept for the `max-age` of the answe
 
 `appCheck().verifyToken` checks an App Check token (the `X-Firebase-AppCheck` header) as the Node and Python
 Admin SDKs do: `typ` JWT, `alg` RS256, the signature with the key named by `kid` among those of
-`https://firebaseappcheck.googleapis.com/v1/jwks` (kept for six hours), `iss`
+`https://firebaseappcheck.googleapis.com/v1/jwks` (kept for six hours, fetched again at most every five minutes
+for an unknown `kid`, not retried for 30 seconds after a failure; RSA keys of 2048 to 8192 bits only), `iss`
 (`https://firebaseappcheck.googleapis.com/<project number>`), `aud` (a list holding `projects/<project id>`, or
-`projects/<projectNumber>` when it is given), a non-empty `sub` (the app id, returned as `appId`), `exp` and
-`iat`, with the clock skew of `verifyIdToken`. It throws a `FirebaseAppCheckAdminException` with the codes of the
+`projects/<projectNumber>` when it is given), a non-empty `sub` (the app id, returned as `appId`), `exp`, `iat`
+and `nbf` when present, with the clock skew of `verifyIdToken`. It throws a `FirebaseAppCheckAdminException` with the codes of the
 Node SDK: `invalid-argument`, `app-check-token-expired`, `internal-error`.
 
 ## Errors

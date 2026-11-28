@@ -68,8 +68,25 @@ class FirebaseAppCheckAdmin {
   /// The largest key set read.
   static const int _maxKeysBytes = 1024 * 1024;
 
+  /// How long a fetch of the keys may take.
+  static const Duration _fetchTimeout = Duration(seconds: 10);
+
+  /// After a failed fetch, how long checks fail without trying again, so that an outage of the key endpoint
+  /// does not turn every incoming request into an outgoing one.
+  static const Duration _retryAfterFailure = Duration(seconds: 30);
+
+  /// How often a token signed with a key that is not in the cached set may cause the set to be fetched again
+  /// (a key Google started using within the six hours).
+  static const Duration _refetchOnUnknownKid = Duration(minutes: 5);
+
+  /// The sizes of the RSA keys accepted, in bits.
+  static const int _minKeyBits = 2048;
+  static const int _maxKeyBits = 8192;
+
   _Keys? _keys;
   Future<_Keys>? _keysPending;
+  DateTime? _failedAt;
+  DateTime? _refetchedForKidAt;
 
   /// Verifies the App Check token [token] (the `X-Firebase-AppCheck` header of a request) and returns its
   /// claims.
@@ -143,7 +160,16 @@ class FirebaseAppCheckAdmin {
     if (kid is! String || kid.isEmpty) {
       invalid('it has no "kid" header');
     }
-    final RsaPublicKey? key = (await _publicKeys()).byId[kid];
+    RsaPublicKey? key = (await _publicKeys()).byId[kid];
+    if (key == null) {
+      final DateTime now = app.now();
+      final DateTime? last = _refetchedForKidAt;
+      if (last == null || !now.isBefore(last.add(_refetchOnUnknownKid))) {
+        _refetchedForKidAt = now;
+        _keys = null;
+        key = (await _publicKeys()).byId[kid];
+      }
+    }
     if (key == null) {
       invalid('its "kid" does not match a current App Check public key');
     }
@@ -178,9 +204,15 @@ class FirebaseAppCheckAdmin {
     }
     final Object? exp = payload['exp'];
     final Object? iat = payload['iat'];
-    // jsonDecode reads 1e999 as infinity: a token that never expires must not pass.
-    if (exp is! num || iat is! num || !exp.isFinite || !iat.isFinite) {
-      invalid('"exp" and "iat" must be finite numbers');
+    // jsonDecode reads 1e999 as infinity: a token that never expires must not pass. The upper bound is the
+    // last second a DateTime can hold.
+    if (!_isTime(exp) || !_isTime(iat)) {
+      invalid('"exp" and "iat" must be times in seconds');
+    }
+    exp as num;
+    iat as num;
+    if (exp <= iat) {
+      invalid('it expires ("exp") before it was issued ("iat")');
     }
     final double now = app.now().millisecondsSinceEpoch / 1000;
     final int skew = clockSkew.inSeconds;
@@ -193,83 +225,171 @@ class FirebaseAppCheckAdmin {
     if (iat > now + skew) {
       invalid('it was issued in the future ("iat")');
     }
+    if (payload.containsKey('nbf')) {
+      final Object? nbf = payload['nbf'];
+      if (!_isTime(nbf)) {
+        invalid('"nbf" must be a time in seconds');
+      }
+      if ((nbf as num) > now + skew) {
+        invalid('it is not valid yet ("nbf")');
+      }
+    }
     return VerifiedAppCheckToken._(Map<String, Object?>.unmodifiable(payload));
   }
 
   Future<_Keys> _publicKeys() {
+    final DateTime now = app.now();
     final _Keys? keys = _keys;
-    if (keys != null && app.now().isBefore(keys.expiresAt)) {
+    if (keys != null && now.isBefore(keys.expiresAt)) {
       return Future<_Keys>.value(keys);
     }
-    return _keysPending ??= _fetchKeys().whenComplete(
-      () => _keysPending = null,
-    );
+    final DateTime? failedAt = _failedAt;
+    if (failedAt != null && now.isBefore(failedAt.add(_retryAfterFailure))) {
+      return Future<_Keys>.error(
+        const FirebaseAppCheckAdminException(
+          code: 'internal-error',
+          message: '$_fetchFailure The last attempt failed moments ago.',
+        ),
+      );
+    }
+    return _keysPending ??= _fetchKeys()
+        .then(
+          (_Keys keys) {
+            _failedAt = null;
+            return keys;
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            _failedAt = app.now();
+            Error.throwWithStackTrace(error, stackTrace);
+          },
+        )
+        .whenComplete(() => _keysPending = null);
   }
 
+  static const String _fetchFailure =
+      'Could not fetch the public keys that sign App Check tokens.';
+
   Future<_Keys> _fetchKeys() async {
-    const String failure =
-        'Could not fetch the public keys that sign App Check tokens.';
-    final http.Response response;
+    final int status;
+    final Uint8List body;
     try {
-      response = await app.httpClient.get(jwksUri);
+      (status, body) = await _get().timeout(_fetchTimeout);
+    } on FirebaseAppCheckAdminException {
+      rethrow;
     } on Object {
       throw const FirebaseAppCheckAdminException(
         code: 'internal-error',
-        message: failure,
+        message: _fetchFailure,
       );
     }
-    if (response.statusCode != 200) {
+    if (status != 200) {
       throw FirebaseAppCheckAdminException(
         code: 'internal-error',
-        message: '$failure HTTP ${response.statusCode}.',
-        httpStatus: response.statusCode,
+        message: '$_fetchFailure HTTP $status.',
+        httpStatus: status,
       );
     }
     final Map<String, RsaPublicKey> byId = <String, RsaPublicKey>{};
     try {
-      if (response.bodyBytes.length > _maxKeysBytes) {
-        throw const FormatException('Too large');
-      }
-      final Object? json = jsonDecode(response.body);
+      final Object? json = jsonDecode(utf8.decode(body));
       final Object? keys = json is Map<String, Object?> ? json['keys'] : null;
       if (keys is! List) {
         throw const FormatException('No "keys" list');
       }
       for (final Object? jwk in keys) {
-        if (jwk is! Map<String, Object?>) {
-          continue;
+        final ({String kid, RsaPublicKey key})? entry = _rsaKey(jwk);
+        if (entry != null) {
+          byId[entry.kid] = entry.key;
         }
-        final Object? kid = jwk['kid'];
-        final Object? n = jwk['n'];
-        final Object? e = jwk['e'];
-        // Only RSA signing keys; a key that says it is for another algorithm is left out.
-        if (jwk['kty'] != 'RSA' ||
-            (jwk['alg'] != null && jwk['alg'] != 'RS256') ||
-            (jwk['use'] != null && jwk['use'] != 'sig') ||
-            kid is! String ||
-            n is! String ||
-            e is! String) {
-          continue;
-        }
-        byId[kid] = RsaPublicKey(
-          _unsigned(decodeSegment(n)),
-          _unsigned(decodeSegment(e)),
-        );
       }
       if (byId.isEmpty) {
-        throw const FormatException('No RSA signing key');
+        throw const FormatException('No usable RSA signing key');
       }
     } on Object {
       throw FirebaseAppCheckAdminException(
         code: 'internal-error',
-        message: '$failure The answer is not a JSON Web Key Set of RSA keys.',
-        httpStatus: response.statusCode,
+        message:
+            '$_fetchFailure The answer is not a JSON Web Key Set with a usable RSA key.',
+        httpStatus: status,
       );
     }
     final _Keys set = _Keys(byId, app.now().add(keysLifetime));
     _keys = set;
     return set;
   }
+
+  /// Gets [jwksUri], reading at most [_maxKeysBytes] of the answer.
+  Future<(int, Uint8List)> _get() async {
+    final http.StreamedResponse response = await app.httpClient.send(
+      http.Request('GET', jwksUri)..followRedirects = false,
+    );
+    final int? declared = response.contentLength;
+    if (declared != null && declared > _maxKeysBytes) {
+      unawaited(response.stream.listen(null, onError: (Object _) {}).cancel());
+      throw FirebaseAppCheckAdminException(
+        code: 'internal-error',
+        message: '$_fetchFailure The answer is too large.',
+        httpStatus: response.statusCode,
+      );
+    }
+    final BytesBuilder builder = BytesBuilder(copy: false);
+    await for (final List<int> chunk in response.stream) {
+      builder.add(chunk);
+      if (builder.length > _maxKeysBytes) {
+        throw FirebaseAppCheckAdminException(
+          code: 'internal-error',
+          message: '$_fetchFailure The answer is too large.',
+          httpStatus: response.statusCode,
+        );
+      }
+    }
+    return (response.statusCode, builder.takeBytes());
+  }
+
+  /// The RS256 signing key of [jwk], or null for a key of another kind, algorithm or use, or with parameters
+  /// out of bounds (a modulus of fewer than 2048 or more than 8192 bits, an exponent that is even, below 3 or
+  /// above 2^32).
+  static ({String kid, RsaPublicKey key})? _rsaKey(Object? jwk) {
+    if (jwk is! Map<String, Object?>) {
+      return null;
+    }
+    final Object? kid = jwk['kid'];
+    final Object? n = jwk['n'];
+    final Object? e = jwk['e'];
+    if (jwk['kty'] != 'RSA' ||
+        (jwk['alg'] != null && jwk['alg'] != 'RS256') ||
+        (jwk['use'] != null && jwk['use'] != 'sig') ||
+        kid is! String ||
+        kid.isEmpty ||
+        n is! String ||
+        e is! String) {
+      return null;
+    }
+    try {
+      final Uint8List nBytes = decodeSegment(n);
+      final Uint8List eBytes = decodeSegment(e);
+      // Bound the sizes before any arithmetic: a huge modulus or exponent costs time on every check.
+      if (nBytes.length > _maxKeyBits ~/ 8 + 1 ||
+          eBytes.isEmpty ||
+          eBytes.length > 4) {
+        return null;
+      }
+      final BigInt modulus = _unsigned(nBytes);
+      final BigInt exponent = _unsigned(eBytes);
+      if (modulus.bitLength < _minKeyBits ||
+          modulus.bitLength > _maxKeyBits ||
+          exponent < BigInt.from(3) ||
+          exponent.isEven) {
+        return null;
+      }
+      return (kid: kid, key: RsaPublicKey(modulus, exponent));
+    } on FormatException {
+      return null;
+    }
+  }
+
+  static bool _isTime(Object? value) =>
+      value is num && value.isFinite && value >= 0 && value <= 8640000000000;
 
   static BigInt _unsigned(List<int> bytes) {
     BigInt value = BigInt.zero;
@@ -295,9 +415,10 @@ final class VerifiedAppCheckToken {
     FirebaseAppCheckAdmin.issuerPrefix.length,
   );
 
-  /// The audiences (`aud`).
+  /// The audiences (`aud`) that are strings.
   List<String> get audience => <String>[
-    for (final Object? value in claims['aud']! as List) '$value',
+    for (final Object? value in claims['aud']! as List)
+      if (value is String) value,
   ];
 
   /// When the token expires (`exp`).
