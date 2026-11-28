@@ -107,6 +107,7 @@ from 0.1? The 0.2 API took FlutterFire's names: [what changed](docs/api_migratio
 | [`firebase_database_dart_platform`](firebase_database/firebase_database_dart_platform/) | 0.1.0 | Flutter apps written against the official `firebase_database` API, on desktop |
 | [`firebase_installations_dart`](firebase_installations/firebase_installations_dart/) | 0.1.0 | Dart programs, servers and web apps that need a Firebase installation id and auth token, or a store for them ([guide](docs/guides/remote_config.md), [parity](docs/installations_parity.md)) |
 | [`firebase_remote_config_dart`](firebase_remote_config/firebase_remote_config_dart/) | 0.1.0 | Dart programs, servers and web apps that fetch Remote Config values and listen for realtime updates ([guide](docs/guides/remote_config.md), [parity](docs/remote_config_parity.md)) |
+| [`firebase_remote_config_dart_platform`](firebase_remote_config/firebase_remote_config_dart_platform/) | 0.1.0 | Flutter apps written against the official `firebase_remote_config` API, on Linux or by choice elsewhere; realtime updates on desktop |
 
 ## How it fits together
 

@@ -1,0 +1,54 @@
+name: firebase_remote_config_dart_platform
+description: >-
+  FlutterFire Remote Config on the pure-Dart client: realtime updates and
+  persistence on Linux, Windows and macOS.
+version: 0.1.0
+homepage: https://github.com/long1eu/firebase_dart_sdk
+repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_remote_config/firebase_remote_config_dart_platform
+issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
+topics:
+  - firebase
+  - remote-config
+  - flutterfire
+  - linux
+
+environment:
+  sdk: ^3.12.0
+  flutter: '>=3.44.0'
+
+# Flutter registers the plugin class before main() only on the platforms listed
+# here. Linux is the only platform where neither firebase_remote_config nor
+# firebase_core has an implementation of its own; elsewhere the app calls
+# FirebaseRemoteConfigDart.use() (see the README).
+flutter:
+  plugin:
+    implements: firebase_remote_config
+    platforms:
+      linux:
+        dartPluginClass: FirebaseRemoteConfigDart
+
+dependencies:
+  # Local development resolves firebase_app_dart, firebase_installations_dart
+  # and firebase_remote_config_dart from the sibling packages through
+  # pubspec_overrides.yaml (not published).
+  firebase_app_dart: ^0.2.0
+  firebase_core: ^5.1.0
+  firebase_core_platform_interface: ^8.1.1
+  firebase_installations_dart: ^0.1.0
+  firebase_remote_config_dart: ^0.1.0
+  firebase_remote_config_platform_interface: ^3.1.0
+  flutter:
+    sdk: flutter
+  http: ^1.6.0
+  # The directory of the default store on the VM.
+  path_provider: ^2.1.6
+
+dev_dependencies:
+  # The app-facing package the tests drive, as an app would.
+  firebase_remote_config: ^7.1.0
+  flutter_test:
+    sdk: flutter
+  lints: ^6.1.0
+  # The default-store test points the application support directory at a
+  # temporary one.
+  path_provider_platform_interface: ^2.1.3

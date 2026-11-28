@@ -24,10 +24,10 @@
 # tool/smoke_gallery.mjs (the CI job "gallery").
 # The Flutter packages (cloud_firestore_dart_flutterfire, cloud_firestore_dart_platform,
 # firebase_auth_dart_platform, firebase_storage_dart_platform, firebase_database_dart_platform,
-# firebase_auth_secure_storage_flutter) and the Flutter examples need the Flutter SDK and are
-# skipped without it; the CI job "flutter" runs them (with FIRESTORE_EMULATOR_HOST,
-# FIREBASE_AUTH_EMULATOR_HOST and FIREBASE_DATABASE_EMULATOR_HOST set, so that the emulator tests
-# of the platform packages run).
+# firebase_remote_config_dart_platform, firebase_auth_secure_storage_flutter) and the Flutter
+# examples need the Flutter SDK and are skipped without it; the CI job "flutter" runs them
+# (with FIRESTORE_EMULATOR_HOST, FIREBASE_AUTH_EMULATOR_HOST and FIREBASE_DATABASE_EMULATOR_HOST
+# set, so that the emulator tests of the platform packages run).
 # A Flutter example with a web/index.html is also built for the web, with dart2js
 # (`flutter build web`) and with dart2wasm (`flutter build web --wasm`), so that a change that
 # breaks web compilation fails here.
@@ -197,12 +197,14 @@ done
 # cloud_firestore_dart_platform run only when FIRESTORE_EMULATOR_HOST is set, those of
 # firebase_auth_dart_platform only when FIREBASE_AUTH_EMULATOR_HOST is set, those of
 # firebase_database_dart_platform only when FIREBASE_DATABASE_EMULATOR_HOST is set;
+# firebase_remote_config_dart_platform has unit tests only (fakes of the two endpoints);
 # firebase_auth_secure_storage_flutter has unit tests only (a fake of the plugin's channel).
 for entry in "cloud_firestore_dart_flutterfire|cloud_firestore/cloud_firestore_dart_flutterfire" \
   "cloud_firestore_dart_platform|cloud_firestore/cloud_firestore_dart_platform" \
   "firebase_auth_dart_platform|firebase_auth/firebase_auth_dart_platform" \
   "firebase_storage_dart_platform|firebase_storage/firebase_storage_dart_platform" \
   "firebase_database_dart_platform|firebase_database/firebase_database_dart_platform" \
+  "firebase_remote_config_dart_platform|firebase_remote_config/firebase_remote_config_dart_platform" \
   "firebase_auth_secure_storage_flutter|firebase_auth/firebase_auth_secure_storage_flutter"; do
   IFS='|' read -r name dir <<<"$entry"
   if [ $# -gt 0 ] && ! printf '%s\n' "$@" | grep -qx "$name"; then continue; fi

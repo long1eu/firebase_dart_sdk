@@ -562,6 +562,29 @@ There is no emulator. For unit tests:
 [`examples/remote_config_web`](../../examples/remote_config_web) is a browser page that fetches, shows the values
 and logs realtime updates.
 
+## FlutterFire (`firebase_remote_config_dart_platform`)
+
+A Flutter app written against the official `firebase_remote_config` API can run on this client through
+`firebase_remote_config_dart_platform`. On Linux, adding the package is enough. On other platforms, call
+`FirebaseRemoteConfigDart.use()` first in `main()`:
+
+```dart flutter
+WidgetsFlutterBinding.ensureInitialized();
+FirebaseRemoteConfigDart.use();
+await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+await FirebaseRemoteConfig.instance.fetchAndActivate();
+```
+
+- The default store is one per isolate: on the VM, a `firebase_dart` folder under the application support directory;
+  on the web, the IndexedDB database `firebase_dart_kv`. A second process of the same desktop app gets the error code
+  `internal` ("in use by another process"); `FirebaseRemoteConfigDart.use(store: ...)` gives each process its own
+  directory.
+- Values use FlutterFire's conversions: only `true` and `1` are true.
+- Error codes on the VM are `network-error`, `throttled`, `forbidden`, `remote-config-server-error`,
+  `invalid-argument` and `internal`; on the web they are this client's codes.
+
+See the [package README](../../firebase_remote_config/firebase_remote_config_dart_platform/README.md).
+
 ## What differs from FlutterFire and the JS SDK
 
 - Configuration is immutable and given to the constructor: `defaults`, `minimumFetchInterval`, `fetchTimeout`.
