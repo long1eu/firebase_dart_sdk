@@ -14,7 +14,7 @@ The Status column compares the Dart behaviour with the SDK named in the cell, or
 
 - **same**: the behaviour of the SDK named in the cell, or of all four
 - **different**: a deliberate change, with the reason in the notes
-- **missing**: not in 0.1.0; the notes say whether it is planned
+- **missing**: not in the package; the notes say whether it is planned
 - **won't do**: the notes give the reason
 
 Path shorthand:
@@ -30,10 +30,10 @@ Path shorthand:
 
 | Status | Rows |
 |---|---|
-| same | 47 |
-| different | 33 |
-| missing | 11 |
-| won't do | 6 |
+| same | 51 |
+| different | 37 |
+| missing | 1 |
+| won't do | 8 |
 
 ## What the Dart packages are for
 
@@ -55,7 +55,7 @@ The C++ SDK's desktop Remote Config sends a new random installation id and a ran
 | `ensureInitialized` | memoized storage load J:api.ts:137-145 | loads the caches and warms Installations A:FirebaseRemoteConfig.java:207-222 | waits for the database, 30 s I:FIRRemoteConfig.m:215-233 | completes at once CD:remote_config_desktop.cc:113-120 | `Future<void> ensureInitialized()`, started by the constructor; fails only with a store configuration failure; `isInitialized` | same (JS) | Reads before it completes answer from defaults and static values, as JS does. |
 | State before the first fetch | `no-fetch-yet`, time `-1` | `NO_FETCH_YET`, `-1` | `NoFetchYet`, time 1970 I:FIRRemoteConfig.m:583-590 | `Success`, time 0 CD:metadata.cc:32-33 | `RemoteConfigFetchStatus.noFetchYet`, `lastSuccessfulFetchTime == null` | different | No sentinel value is copied. |
 | `close()` | none | none | none | the destructor joins the save thread | `close()`: idempotent, ends `onConfigUpdated`, aborts the stream and any request; later async calls fail with `remote-config-closed`, reads keep answering from memory; does not close the `FirebaseInstallations`; runs by itself when the app is deleted | different | Required by the house rule that every client has a `close()`. |
-| `reset()` | none | clears all caches A:FirebaseRemoteConfig.java:549-561 | none | none | none | missing | Additive later. |
+| `reset()` | none | clears the activated, fetched and default caches and the SharedPreferences A:FirebaseRemoteConfig.java:549-561 | none | none | `Future<void> reset()` (Unreleased): clears the fetched and active records, `meta` (so `info`) and the throttle, in memory and in the store; waits for a fetch in flight, and fetches and activates called meanwhile wait for it; `storage-error` on a store failure, memory unchanged | different (Android) | Defaults are constructor arguments and stay; custom signals and the realtime backoff stay too, so a reset loop cannot skip the server's waits. An open realtime stream stays open; its next connect sends version 0. `onActivated` does not emit; `onRolloutsStateChanged` emits an empty set if rollouts were active. |
 | `isSupported`, `initialFetchResponse` | browser and SSR only J:api2.ts:57-68 | none | none | none | none | won't do | Browser and SSR concepts. On the web a failing IndexedDB is a `storage-error`. |
 | Developer mode, device-context bypass | none | none | bypass on app, OS or locale change I:RCNDevice.m:223-244 | dead setting CD:rest.h:58 | none | won't do | A desktop program has no stable app version; `Duration.zero` does the job. |
 
@@ -72,7 +72,7 @@ The C++ SDK's desktop Remote Config sends a new random installation id and a ran
 | `fetchAndActivate` | fetch, then activate J:api2.ts:39-45 | the same A:FirebaseRemoteConfig.java:239-241 | activates even on a cache hit I:FIRRemoteConfig.m:371-404 | skips activation on a cache hit CD:remote_config_desktop.cc:140-199 | `Future<bool>`: the result of `activate()` after any successful fetch, `cached` and `unchanged` included | same (JS, Android) | |
 | Concurrent fetches | not serialized | not serialized | returns the last status I:RCNConfigFetch.m:159-174 | reports success without fetching CD:remote_config_desktop.cc:724-753 | one shared in-flight request; a call made while another is in flight gets its result, unless the stale generation changed since the request was built | different | One request per client is enough; a second caller should neither repeat it nor get a false success. |
 | `X-Firebase-RC-Fetch-Type` | a TODO, for CORS J:client/rest_client.ts:93-94 | `BASE/1`, `REALTIME/n` AI:ConfigFetchHandler.java:86-89 | the same I:RCNConfigFetch.m:57-60 | none | `BASE/1` or `REALTIME/<attempt>`, on every platform | different (JS) | The measured CORS preflight allows it (D2). |
-| Activate notification | none | none | `FIRRemoteConfigActivateNotification` I:FIRRemoteConfig.m:482-493 | none | none | missing | Not planned; `onConfigUpdated` is the only stream. |
+| Activate notification | none | none | `FIRRemoteConfigActivateNotification` I:FIRRemoteConfig.m:482-493 | none | `Stream<void> onActivated` (Unreleased): broadcast, one event after each `activate()` that returned true; ends at `close()` | same (iOS) | A stream instead of `NSNotificationCenter`; the event carries nothing, as the instance is known to the listener. |
 
 ## Getters and value conversion
 
@@ -86,10 +86,10 @@ The C++ SDK's desktop Remote Config sends a new random installation id and a ran
 | Bool conversion | lower-cased, not trimmed, unknown is false J:value.ts:24-41 | trimmed, any case; `asBoolean` throws on unknown AI:FirebaseRemoteConfigValueImpl.java:90-103 | `NSString.boolValue` I:FIRConfigValue.m:58-61 | a lower-case word list CD:remote_config_desktop.cc:453-514 | trimmed, case-insensitive: `1`, `true`, `t`, `yes`, `y`, `on` give true; `0`, `false`, `f`, `no`, `n`, `off` and the empty string give false; anything else is null | same (Android) | The four upstream rules differ. Android's is the only one that reports "not a boolean" separately, so a malformed remote value falls back to its default. |
 | Number conversion | `Number()`: hex, `""` is 0, `Infinity` J:value.ts:43-52 | trimmed; `asLong` throws, getters fall back | prefix parse | strict with a flag CD:remote_config_desktop.cc:465-486 | `asInt`: trimmed `^[+-]?\d+$` within 64 bits on the VM and ±(2^53 − 1) on the web; `asDouble`: finite `double.tryParse` of the trimmed text | same (Android) | Web means `dart.library.js_interop`, so dart2wasm counts. A whole-valued JSON number (`1.0`, `1e3`) from the server parses as an integer, because dart2js cannot tell it from `1`. A web integer outside ±(2^53 − 1) is null on dart2js and dart2wasm; the VM accepts the full 64 bits, so a value between 2^53 and 2^63 reads differently on the two. |
 | Static values | `""`, false, 0 | the same | the same | the same | `''`, false, 0; they convert to null | same | |
-| Bytes | none | `getByteArray` (UTF-8) | `dataValue` | `GetData` | `RemoteConfigValue.text` only | missing | `utf8.encode(value.text)` gives the bytes. Not planned: the text already holds them. |
-| JSON value | none | none | `jsonValue` I:FIRConfigValue.m:64-75 | none | none | missing | `asJson()` is additive later. |
-| Keys with a prefix | none | active and defaults, sorted AI:ConfigGetParameterHandler.java:288-321 | active only I:FIRRemoteConfig.m:622-640 | active and defaults CD:remote_config_desktop.cc:616-626 | none | missing | `getAll().keys.where(...)` does it; `getKeysByPrefix` is additive later. |
-| Source-specific lookup | none | none | `configValueForKey:source:` | none | none | missing | Not planned: no use case yet. |
+| Bytes | none | `getByteArray` (UTF-8) | `dataValue` | `GetData` | `Uint8List RemoteConfigValue.asBytes()` (Unreleased): the UTF-8 bytes of the text | same (Android) | |
+| JSON value | none | none | `jsonValue` I:FIRConfigValue.m:64-75 | none | `Object? RemoteConfigValue.asJson()` (Unreleased): the decoded value, or null when the text is not JSON, nests deeper than 32 levels, is over 16 MiB or the source is static; never throws | same (iOS) | The bounds are the package's record limits. A text of `null` also gives null. |
+| Keys with a prefix | none | active and defaults, sorted AI:ConfigGetParameterHandler.java:288-321 | active only I:FIRRemoteConfig.m:622-640 | active and defaults CD:remote_config_desktop.cc:616-626 | `List<String> getKeysByPrefix(String prefix)` (Unreleased): active and default keys, deduplicated, sorted by UTF-16 code units; an empty prefix gives every key | same (Android, C++) | |
+| Source-specific lookup | none | none | `configValueForKey:source:` I:FIRRemoteConfig.m:546-565 | none | `RemoteConfigValue getValueFrom(String key, ValueSource source)` (Unreleased): remote reads the active record only, default the defaults only, static the static value | different (iOS) | A key the source lacks gives the static value, where iOS returns nil. `getValue(key)` is unchanged. |
 | Codable, property wrappers, Kotlin `rc[key]` | none | Kotlin | Swift | C++ idiom | none | won't do | Language idioms. |
 
 ## Defaults
@@ -132,7 +132,7 @@ The C++ SDK's desktop Remote Config sends a new random installation id and a ran
 | Read watchdog | none | no read timeout AI:ConfigRealtimeHttpClient.java:346 | the stream lives at most 330 s I:RCNConfigRealtime.m:64 | none | 330 s without a byte, counted from sending the request (headers count as bytes) and also while reading a non-200 body, ends the connection as a clean end | different | D8, A10 (a watchdog end before any header is a clean end; during a non-200 body the 330 s count from the headers, L1): a half-open socket is otherwise never detected. |
 | `retryIntervalSeconds` | stored unchecked | stored unchecked AI:ConfigAutoFetch.java:87-95 | clamped to 86400 I:RCNConfigRealtime.m:69-71 | none | ignored if malformed or not positive; a value above the range is capped at 86400 s | same (iOS) | D12, A28. |
 | Non-retryable status | `stream-error` | the 403 body as the message AI:ConfigRealtimeHttpClient.java:596-611 | error 8001 | none | one `stream-error` and a stop until a new listener; a 403 carries the server's text | same (Android) | |
-| Persisted backoff | IndexedDB | SharedPreferences | UserDefaults | none | in memory | missing | Not planned: it matters little for a desktop process. |
+| Persisted backoff | `realtime_backoff_metadata`: failed streams and the backoff end J:storage/storage.ts:59-64,200-210 | SharedPreferences AI:ConfigSharedPrefsClient.java:376-407 | UserDefaults | none | the `realtime` record (Unreleased): server and transport failure counts (0 to 1000) and the ends of the server, transport and `retryIntervalSeconds` waits, each bounded to now + 24 h when read; restored at start, and the first connect waits for the load | different (JS) | Cleared when a connection stays open 60 s (the package's success rule), where JS clears on an HTTP 200; the `retryIntervalSeconds` wait stays until it passes (A20). The fetch throttle was already persisted. A bad record is ignored and logged once. |
 | Installation id change | — | — | — | none | an open stream reconnects, because its body names the id | different | The realtime request body carries the installation id, so a stream opened for the old id is stale. |
 
 ## Custom signals
@@ -153,10 +153,10 @@ The C++ SDK's desktop Remote Config sends a new random installation id and a ran
 | Rollout metadata | parsed, internal J:client/rest_client.ts:166 | parsed AI:ConfigContainer.java:198-225 | parsed I:RCNConfigContent.m:309-421 | ignored | stored with the fetched and active records; feeds `updatedKeys` | same | Fields of the wrong shape are dropped one by one and logged, as Android does. |
 | Experiment descriptions | parsed J:public_types.ts:67-87 | stored | stored, validated I:RCNConfigFetch.m:765-779 | none | stored; feed `updatedKeys` | same | |
 | Personalization metadata | none | stored | stored | none | stored; feeds `updatedKeys` | same (Android, iOS) | |
-| Rollouts state stream | none | Crashlytics interop AI:rollouts/RolloutsStateSubscriptionsHandler.java:53-95 | `RemoteConfigInterop` | none | none | missing | Not planned. |
-| A/B testing hand-off on activate | sets Analytics user properties J:abt/experiment.ts:36-101 | `firebase-abt` | `FIRExperimentController` | none | none | missing | Not planned: this SDK has no Analytics. |
-| Personalization events on read | none | `personalization_assignment` A:Personalization.java:26-107 | the same, as a side effect of a read I:RCNPersonalization.m:33-84 | none | none | missing | Not planned: no Analytics. |
-| `analyticsUserProperties`, `firstOpenTime` in the body | none | from Analytics AI:ConfigFetchHandler.java:577-604 | from Analytics I:RCNConfigSettings.m:388-416 | schema only | none | missing | Not planned: no Analytics. |
+| Rollouts state stream | none | Crashlytics interop AI:rollouts/RolloutsStateSubscriptionsHandler.java:53-95 | `RemoteConfigInterop` | none | `Stream<Set<RolloutAssignment>> onRolloutsStateChanged` (Unreleased): one assignment per rollout of the active record (rollout id, variant id, first affected key, its value as `getString` reads it, template version or 0), as AI:rollouts/RolloutsStateFactory.java builds it | different (Android) | A new listener gets the current set once the records are loaded, an empty set when nothing is active (Android sends nothing then); later sets only after an `activate()` or `reset()` that changes them (Android publishes after every activate). |
+| A/B testing hand-off on activate | sets Analytics user properties J:abt/experiment.ts:36-101 | `firebase-abt` | `FIRExperimentController` | none | none | missing | Being built next. |
+| Personalization events on read | none | `personalization_assignment` A:Personalization.java:26-107 | the same, as a side effect of a read I:RCNPersonalization.m:33-84 | none | none | won't do | Android and iOS only; the JS SDK does not do it either. |
+| `analyticsUserProperties`, `firstOpenTime` in the body | none | from Analytics AI:ConfigFetchHandler.java:577-604 | from Analytics I:RCNConfigSettings.m:388-416 | schema only | none | won't do | Android and iOS only; the JS SDK does not do it either. |
 
 ## Persistence
 

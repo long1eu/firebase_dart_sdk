@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:collection/collection.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:firebase_installations_dart/firebase_installations_dart.dart';
 import 'package:firebase_remote_config_dart/src/custom_signals.dart';
@@ -92,6 +93,9 @@ class FirebaseRemoteConfig {
       clock: _clock,
       onDrop: _reportDrop,
     );
+    _initialization = _load();
+    // A failed load is reported by ensureInitialized and the calls that wait for it.
+    _initialization.ignore();
     _realtime = RealtimeClient(
       options: app.options,
       installations: installations,
@@ -110,10 +114,9 @@ class FirebaseRemoteConfig {
       random: _random,
       delay: delay,
       logger: logger,
+      ready: _initialization,
+      onBackoffChanged: _onRealtimeBackoff,
     );
-    _initialization = _load();
-    // A failed load is reported by ensureInitialized and the calls that wait for it.
-    _initialization.ignore();
     _subscriptions.add(installations.onIdChange.listen(_onIdChange));
     _subscriptions.add(
       app.onDeleteApp.listen((String _) => unawaited(close())),
@@ -146,6 +149,9 @@ class FirebaseRemoteConfig {
   final Completer<void> _closedSignal = Completer<void>();
   final List<StreamSubscription<Object?>> _subscriptions =
       <StreamSubscription<Object?>>[];
+  final StreamController<void> _activated = StreamController<void>.broadcast();
+  final Set<MultiStreamController<Set<RolloutAssignment>>> _rolloutListeners =
+      <MultiStreamController<Set<RolloutAssignment>>>{};
   late final KeyValueStore _store;
   late final LogOnce _logOnce;
   late final FetchClient _fetchClient;
@@ -162,6 +168,9 @@ class FirebaseRemoteConfig {
   String? _requestFid;
   bool _staleIfRequestFails = false;
   _InFlight? _inFlight;
+  Future<void>? _resetting;
+  int _resetGeneration = 0;
+  Set<RolloutAssignment> _rollouts = const <RolloutAssignment>{};
 
   /// Completes when the stored records are loaded. Started by the constructor and memoized; it fails
   /// only when the store cannot start (`storage-error`).
@@ -205,10 +214,15 @@ class FirebaseRemoteConfig {
   /// different version, or the stored one has none). Memory with the same version is that stored
   /// record, clamped to now when it was loaded.
   ///
+  /// A [reset] that starts while this call runs wins: the call then stores and applies nothing and
+  /// returns false.
+  ///
   /// Throws `storage-error` when the store fails; memory is then unchanged.
   Future<bool> activate() async {
     _checkOpen();
     await _guard(_initialization, null);
+    await _waitForReset(null);
+    final int resetGeneration = _resetGeneration;
     final TemplateRecord? fetchedBefore = _fetched;
     // One `now` for every read below (A13): the fetched record is clamped to it, and the transform
     // compares the stored active record's time against it.
@@ -240,6 +254,11 @@ class FirebaseRemoteConfig {
     bool wrote = false;
     final String? result = await _storeCall(
       () => _store.update(_key('active'), (String? current) {
+        // A reset started since this call began: the record it read belongs to the cleared state.
+        if (resetGeneration != _resetGeneration) {
+          wrote = false;
+          return current;
+        }
         // Not clamped: _keepsActive replaces an active record with a future fetch time.
         final TemplateRecord? active = TemplateRecord.tryParse(current);
         if (active != null && _keepsActive(active, fetched, now)) {
@@ -251,13 +270,85 @@ class FirebaseRemoteConfig {
       }),
     );
     _checkOpen();
+    // Checked again: a reset may have started during the update; memory is then the reset's.
+    if (resetGeneration != _resetGeneration) {
+      return false;
+    }
     _active = TemplateRecord.tryParse(result, onDrop: _reportDrop, now: now);
     // A fetch that completed during the update stored a newer record; keep it.
     if (identical(_fetched, fetchedBefore)) {
       _fetched = fetched;
     }
+    if (wrote) {
+      _activated.add(null);
+    }
+    _updateRollouts();
     return wrote;
   }
+
+  /// Clears the fetched and the active template, the fetch state ([info]) and the throttle, in memory
+  /// and in the store (Android's `reset`, `A:FirebaseRemoteConfig.java:549-561`). The [defaults], the
+  /// custom signals and the realtime backoff stay.
+  ///
+  /// It waits for a fetch in flight to settle, and fetches and activates called meanwhile wait for it;
+  /// an [activate] already running stores and applies nothing and returns false. Afterwards reads answer from
+  /// [defaults], [info] is as before the first fetch, the next [fetch] sends a request without
+  /// `If-None-Match`, and an open realtime stream stays open: its next connect announces version 0, so
+  /// the server's current template is fetched (not activated). [onActivated] does not emit;
+  /// [onRolloutsStateChanged] emits an empty set when rollouts were active.
+  ///
+  /// Throws `storage-error` when the store fails; memory is then unchanged, and the records cleared
+  /// before the failure stay cleared in the store.
+  Future<void> reset() async {
+    _checkOpen();
+    await _guard(_initialization, null);
+    await _waitForReset(null);
+    final Completer<void> done = Completer<void>();
+    _resetting = done.future;
+    // Every activate that began before this point now stores and applies nothing (A38).
+    _resetGeneration++;
+    try {
+      await _waitForFetches();
+      for (final String name in const <String>[
+        'fetched',
+        'active',
+        'meta',
+        'throttle',
+      ]) {
+        await _storeCall(() async {
+          await _store.write(_key(name), null);
+          return null;
+        });
+      }
+      _checkOpen();
+      _fetched = null;
+      _active = null;
+      _meta = const MetaRecord();
+      _throttle = const ThrottleRecord();
+      _staleIfRequestFails = false;
+      _updateRollouts();
+    } finally {
+      _resetting = null;
+      done.complete();
+    }
+  }
+
+  /// Emits after each [activate] that returned true (iOS's `FIRRemoteConfigActivateNotification`,
+  /// `I:FIRRemoteConfig.m:482-493`). A broadcast stream; it ends at [close].
+  Stream<void> get onActivated => _activated.stream;
+
+  /// The rollouts assigned to this installation in the active template (Android's
+  /// `RolloutsStateSubscriptionsHandler`, `AI:rollouts/RolloutsStateSubscriptionsHandler.java:53-95`).
+  ///
+  /// Each listener first gets the current set once the stored records are loaded (an empty set when
+  /// nothing is active, nothing when the load fails), then a new set after each [activate] or [reset]
+  /// that changes it. One [RolloutAssignment] per rollout, for its first affected parameter. A broadcast
+  /// stream; it ends at [close].
+  Stream<Set<RolloutAssignment>> get onRolloutsStateChanged =>
+      Stream<Set<RolloutAssignment>>.multi(
+        _onRolloutsListen,
+        isBroadcast: true,
+      );
 
   /// [fetch], then [activate] after a successful fetch (including [FetchResult.cached] and
   /// [FetchResult.unchanged]); returns what [activate] returns.
@@ -270,12 +361,33 @@ class FirebaseRemoteConfig {
   }
 
   /// The value of [key]: the active template's, else the default, else the static value (`''`).
-  RemoteConfigValue getValue(String key) {
-    final String? remote = _active?.entries[key];
-    if (remote != null) {
-      return RemoteConfigValue(remote, ValueSource.valueRemote);
-    }
-    return defaults[key] ?? staticValue;
+  RemoteConfigValue getValue(String key) =>
+      _remote(key) ?? defaults[key] ?? staticValue;
+
+  /// The value of [key] from one [source] only (iOS's `configValueForKey:source:`): the active
+  /// template's for [ValueSource.valueRemote], the default for [ValueSource.valueDefault]. When that
+  /// source has no [key], and always for [ValueSource.valueStatic], the static value (`''`).
+  RemoteConfigValue getValueFrom(String key, ValueSource source) {
+    final RemoteConfigValue? value = switch (source) {
+      ValueSource.valueRemote => _remote(key),
+      ValueSource.valueDefault => defaults[key],
+      ValueSource.valueStatic => null,
+    };
+    return value ?? staticValue;
+  }
+
+  /// The keys of the active template and the defaults that start with [prefix], without duplicates and
+  /// sorted by UTF-16 code units (Android's `getKeysByPrefix`). An empty [prefix] gives every key.
+  /// Unmodifiable.
+  List<String> getKeysByPrefix(String prefix) {
+    final List<String> keys = <String>[
+      for (final String key in <String>{
+        ...?_active?.entries.keys,
+        ...defaults.keys,
+      })
+        if (key.startsWith(prefix)) key,
+    ]..sort();
+    return List<String>.unmodifiable(keys);
   }
 
   /// Every key of the active template and the defaults, each as [getValue] gives it.
@@ -384,6 +496,15 @@ class FirebaseRemoteConfig {
     for (final StreamSubscription<Object?> subscription in _subscriptions) {
       unawaited(subscription.cancel());
     }
+    // Not awaited: closing a controller without a listener never completes.
+    unawaited(_activated.close());
+    final List<MultiStreamController<Set<RolloutAssignment>>> rolloutListeners =
+        _rolloutListeners.toList();
+    _rolloutListeners.clear();
+    for (final MultiStreamController<Set<RolloutAssignment>> listener
+        in rolloutListeners) {
+      unawaited(listener.close());
+    }
     await _realtime.close();
     if (_ownsClient) {
       _client.close();
@@ -411,6 +532,12 @@ class FirebaseRemoteConfig {
     await _guard(_initialization, deadline);
     while (true) {
       _checkOpen();
+      // A reset in progress clears what this request would build on; it starts after the reset.
+      final Future<void>? resetting = _resetting;
+      if (resetting != null) {
+        await _guard(resetting, deadline);
+        continue;
+      }
       final _InFlight? inFlight = _inFlight;
       if (inFlight == null) {
         break;
@@ -682,6 +809,7 @@ class FirebaseRemoteConfig {
           'meta',
           'throttle',
           'signals',
+          'realtime',
         ])
           _store.read(_key(name)),
       ]);
@@ -721,6 +849,15 @@ class FirebaseRemoteConfig {
     _signals =
         _loaded('signals', texts[4], SignalsRecord.tryParse)?.signals ??
         const <String, String>{};
+    final RealtimeBackoffRecord? backoff = _loaded(
+      'realtime',
+      texts[5],
+      (String? text) => RealtimeBackoffRecord.tryParse(text, now),
+    );
+    if (backoff != null) {
+      _realtime.restoreBackoff(backoff);
+    }
+    _rollouts = _rolloutsOf(_active);
     _initialized = true;
   }
 
@@ -742,6 +879,118 @@ class FirebaseRemoteConfig {
       );
     }
     return record;
+  }
+
+  /// Waits while a [reset] runs; one that starts after the wait is waited for too.
+  Future<void> _waitForReset(DateTime? deadline) async {
+    while (true) {
+      final Future<void>? resetting = _resetting;
+      if (resetting == null) {
+        return;
+      }
+      await _guard(resetting, deadline);
+    }
+  }
+
+  /// Waits until no fetch is in flight, ignoring their results.
+  Future<void> _waitForFetches() async {
+    while (true) {
+      final _InFlight? inFlight = _inFlight;
+      if (inFlight == null) {
+        return;
+      }
+      await _guard(
+        inFlight.future.then<void>((FetchResult _) {}, onError: (Object _) {}),
+        null,
+      );
+    }
+  }
+
+  void _onRealtimeBackoff(RealtimeBackoffRecord record) {
+    unawaited(_storeRealtimeBackoff(record));
+  }
+
+  /// Stores the realtime backoff, or removes the record when it holds nothing. A failed write is logged
+  /// once; the realtime client goes on from memory.
+  Future<void> _storeRealtimeBackoff(RealtimeBackoffRecord record) async {
+    if (_closed) {
+      return;
+    }
+    try {
+      await _store.write(
+        _key('realtime'),
+        record.isEmpty ? null : record.encode(),
+      );
+    } catch (error) {
+      _writeFailed('realtime');
+    }
+  }
+
+  void _onRolloutsListen(
+    MultiStreamController<Set<RolloutAssignment>> controller,
+  ) {
+    if (_closed) {
+      controller.closeSync();
+      return;
+    }
+    _rolloutListeners.add(controller);
+    controller.onCancel = () {
+      _rolloutListeners.remove(controller);
+    };
+    if (_initialized) {
+      controller.add(_rollouts);
+      return;
+    }
+    unawaited(
+      _initialization.then<void>(
+        (void _) {
+          if (_rolloutListeners.contains(controller)) {
+            controller.add(_rollouts);
+          }
+        },
+        // A failed load has no current set to give.
+        onError: (Object _) {},
+      ),
+    );
+  }
+
+  /// Recomputes the rollout assignments of the active record and emits them when they changed.
+  void _updateRollouts() {
+    final Set<RolloutAssignment> rollouts = _rolloutsOf(_active);
+    if (const SetEquality<RolloutAssignment>().equals(rollouts, _rollouts)) {
+      return;
+    }
+    _rollouts = rollouts;
+    for (final MultiStreamController<Set<RolloutAssignment>> listener
+        in _rolloutListeners.toList()) {
+      listener.add(rollouts);
+    }
+  }
+
+  /// Android's `RolloutsStateFactory.getActiveRolloutsState` (`AI:rollouts/RolloutsStateFactory.java`):
+  /// one assignment per rollout of [active], for its first affected key, with the value `getString`
+  /// would read for it and the record's template version (0 without one).
+  Set<RolloutAssignment> _rolloutsOf(TemplateRecord? active) {
+    if (active == null) {
+      return const <RolloutAssignment>{};
+    }
+    final Set<RolloutAssignment> result = <RolloutAssignment>{};
+    for (final Map<String, Object?> rollout in active.rolloutMetadata) {
+      final Object? keys = rollout['affectedParameterKeys'];
+      final String key = keys is List<String> && keys.isNotEmpty
+          ? keys.first
+          : '';
+      result.add(
+        RolloutAssignment(
+          rolloutId: rollout['rolloutId']! as String,
+          variantId: rollout['variantId']! as String,
+          parameterKey: key,
+          parameterValue: active.entries[key] ?? defaults[key]?.text ?? '',
+          templateVersion: active.templateVersion ?? 0,
+        ),
+      );
+    }
+    return Set<RolloutAssignment>.unmodifiable(result);
   }
 
   void _onIdChange(String fid) {
@@ -838,6 +1087,13 @@ class FirebaseRemoteConfig {
       'drop-$field',
       'A $field of the template had the wrong shape and was dropped.',
     );
+  }
+
+  RemoteConfigValue? _remote(String key) {
+    final String? remote = _active?.entries[key];
+    return remote == null
+        ? null
+        : RemoteConfigValue(remote, ValueSource.valueRemote);
   }
 
   T? _convert<T>(String key, T? Function(RemoteConfigValue value) convert) {

@@ -279,6 +279,34 @@ A read returns the active (fetched and activated) value, else the default, else 
 `0`, `0.0`. `ValueSource` says which: `valueRemote`, `valueDefault` or `valueStatic`. `getAll()` is the union of the
 active and the default keys.
 
+```dart
+void readMore(FirebaseRemoteConfig remoteConfig) {
+  final List<String> themeKeys = remoteConfig.getKeysByPrefix('theme_');
+  final RemoteConfigValue remoteOnly =
+      remoteConfig.getValueFrom('welcome_message', ValueSource.valueRemote);
+  final Object? layout = remoteConfig.getValue('layout').asJson();
+  final List<int> bytes = remoteConfig.getValue('welcome_message').asBytes();
+  print('$themeKeys ${remoteOnly.source.name} $layout ${bytes.length}');
+}
+```
+
+`getKeysByPrefix` returns the keys of the active template and the defaults that start with the prefix, sorted
+(Android's behaviour; iOS looks only at the active template). `getValueFrom` reads one source only, as iOS's
+`configValueForKey:source:` does, and returns the static value where iOS returns nil. `asJson()` returns null for
+text that is not JSON, nests deeper than 32 levels or is over 16 MiB, and never throws. `asBytes()` is the UTF-8
+encoding of the text.
+
+**Reset.** `reset()` clears the fetched and the active template, `info` and the throttle, in memory and in the store,
+as Android's `reset()` does; the defaults, the custom signals and the realtime backoff stay. It waits for a fetch in
+flight, and fetches and activates called meanwhile wait for it. A store failure throws `storage-error` and leaves
+memory as it was.
+
+**Streams besides realtime.** `onActivated` emits after each `activate()` that returned true (iOS posts
+`FIRRemoteConfigActivateNotification` at the same moment). `onRolloutsStateChanged` gives the rollouts assigned in
+the active template, one `RolloutAssignment` (rollout id, variant id, parameter key, parameter value, template
+version) per rollout, as Android hands them to Crashlytics: the current set when you listen, then a new set after
+each `activate()` or `reset()` that changes it.
+
 The rules for turning text into a type are Android's:
 
 - `asBool()`: after trimming, case-insensitive, `1`, `true`, `t`, `yes`, `y`, `on` give `true`; `0`, `false`, `f`,
@@ -411,6 +439,9 @@ FirebaseApp appWithLifecycle(AppDependencies dependencies) {
   starts one at once. A chain is up to date only when the client holds the announced version, so an unchanged
   answer below it counts as stale. An update that changes no key produces no event.
 - **The installation changes.** The stream reconnects with the new id.
+- **Restarts.** The failure counts and the ends of the waits are stored in the `realtime` record and restored at
+  start, so a restarted process does not reconnect before a wait ends (the JS SDK keeps the same in IndexedDB). A
+  connection that stays open for a minute clears them.
 
 The package works without a first `fetch`: the first message makes the client fetch the template. (The JS SDK
 does not; FlutterFire's web documentation asks for a fetch first.)
@@ -595,4 +626,6 @@ See the [package README](../../firebase_remote_config/firebase_remote_config_dar
   fetches (the official C++ desktop SDK sends a new random id with every fetch).
 - Realtime works on desktop. `onConfigUpdated` needs no first fetch, and the stream is yours to activate.
 - The value rules are Android's, not FlutterFire's.
-- No emulator support, no Analytics, no A/B testing hand-off, no `getKeysByPrefix`, `reset()` or `asJson()` in 0.1.0.
+- No emulator support, no Analytics, no A/B testing hand-off. `getKeysByPrefix`, `reset()`, `asJson()`, `asBytes()`,
+  `getValueFrom`, `onActivated` and `onRolloutsStateChanged` are in the Dart API but not in FlutterFire's, so the
+  adapter does not expose them.

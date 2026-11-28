@@ -54,6 +54,7 @@ export 'package:firebase_remote_config_dart/src/types.dart'
         FetchResult,
         RemoteConfigFetchStatus,
         RemoteConfigInfo,
-        RemoteConfigUpdate;
+        RemoteConfigUpdate,
+        RolloutAssignment;
 export 'package:firebase_remote_config_dart/src/value.dart'
     show RemoteConfigValue, ValueSource;
