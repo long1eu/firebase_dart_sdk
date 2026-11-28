@@ -157,6 +157,7 @@ Analytics reporting probe
 
 It sends:
   1. the validation server, strict mode: nothing is recorded;
+  1b. the validation server again, with a complete device block (informational);
   2. /mp/collect, ${run.debugEventNames.length} events with debug_mode, for DebugView;
   3. /mp/collect, ${run.reportingEventNames.length} events without debug_mode, for Realtime and the reports;$controlStep
 with the user property probe_kind=measurement_protocol.''');
@@ -218,6 +219,30 @@ with the user property probe_kind=measurement_protocol.''');
       }
     }
     stdout.writeln('   HTTP 200, no validation messages.');
+
+    // Informational, records nothing, and never stops the run.
+    stdout.writeln('\n1b. Validation server, a complete device block');
+    final deviceCheck = await _post(
+      client,
+      endpoint('/debug/mp/collect'),
+      run.deviceCheckBody(),
+      recordsData: false,
+    );
+    final deviceMessages = deviceCheck == null || deviceCheck.status != 200
+        ? null
+        : _validationMessages(deviceCheck.body, redact);
+    if (deviceMessages == null) {
+      stdout.writeln('   No validation answer; continuing.');
+    } else if (deviceMessages.isEmpty) {
+      stdout.writeln(
+        '   Accepted: a device block with all nine fields passes.',
+      );
+    } else {
+      stdout.writeln('   Refused, with these messages:');
+      for (final message in deviceMessages) {
+        stdout.writeln('   - $message');
+      }
+    }
 
     final steps = <(String, Map<String, Object?>)>[
       ('2. /mp/collect, for DebugView', run.debugBody()),
@@ -359,11 +384,8 @@ class _Run {
     'user_properties': <String, Object?>{
       'probe_kind': <String, Object?>{'value': 'measurement_protocol'},
     },
-    'device': <String, Object?>{
-      'category': 'desktop',
-      'operating_system': _operatingSystem(),
-      'language': _language(),
-    },
+    // No `device`: in strict mode the validation server requires fields of it
+    // that a program cannot read (model, browser), and refuses a partial one.
     'events': events,
     if (validation) 'validation_behavior': 'ENFORCE_RECOMMENDATIONS',
   };
@@ -380,6 +402,25 @@ class _Run {
 
   Map<String, Object?> reportingBody() =>
       _body(clientId, _events(debug: false));
+
+  /// One event with every field of `device` filled, for the validation server
+  /// only: does strict mode accept a complete device block?
+  Map<String, Object?> deviceCheckBody() => <String, Object?>{
+    ..._body(clientId, <Map<String, Object?>>[
+      _event('probe_report', 0, 'device_check', debug: false),
+    ], validation: true),
+    'device': <String, Object?>{
+      'category': 'desktop',
+      'language': _language(),
+      'screen_resolution': '1920x1080',
+      'operating_system': _operatingSystem(),
+      'operating_system_version': '1.0',
+      'model': 'Probe',
+      'brand': 'Probe',
+      'browser': 'Probe',
+      'browser_version': '1.0',
+    },
+  };
 
   /// The reporting events again, under the client_id from gtag.js.
   Map<String, Object?> controlBody({bool validation = false}) => _body(
@@ -556,7 +597,8 @@ $controlNote
 C. Standard reports, 24 to 48 hours later:
    - Reports > Engagement > Events: probe_report and select_content.
    - Reports > Engagement > Pages and screens: the page title "Probe home".
-   - Reports > Tech > Overview: operating system ${_operatingSystem()}, category desktop.
+   - Reports > Tech > Overview: whatever Google Analytics derives; the
+     probe sends no device block.
    - Reports > User > Demographics: the country, or "(not set)".
    probe_run, probe_arm and probe_kind appear in reports only after they are
    registered as custom dimensions (event-scoped and user-scoped); DebugView
@@ -566,6 +608,7 @@ Record for docs/analytics_protocol.md, section 10:
    1. Did the events of the generated client_id appear in DebugView? In
       Realtime? In the standard reports? And those of the control?
    2. Which country, if any, was reported?
+   3. The result of step 1b (the complete device block).
    Also the date, the run tag ${run.tag}, and whether a data filter was active.''';
 }
 
