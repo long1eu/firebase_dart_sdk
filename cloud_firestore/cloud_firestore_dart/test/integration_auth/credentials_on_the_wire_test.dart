@@ -95,6 +95,14 @@ class FakeAppCheck implements AppCheckTokenProvider {
   }
 
   @override
+  Future<AppCheckTokenResult> getLimitedUseToken() async {
+    return AppCheckTokenResult(
+      '',
+      error: UnsupportedError('This fake gives no limited-use tokens.'),
+    );
+  }
+
+  @override
   Stream<AppCheckTokenResult> get onTokenChanged => changes.stream;
 }
 

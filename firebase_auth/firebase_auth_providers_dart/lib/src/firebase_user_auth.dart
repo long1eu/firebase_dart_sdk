@@ -2620,7 +2620,8 @@ class FirebaseUserAuth implements AuthTokenProvider {
 
   /// The headers the JS SDK sends with every request (`_getAdditionalHeaders`): the client version, the app id and
   /// the App Check token. A failed App Check request is logged and the request goes out anyway, with the
-  /// placeholder token the provider returned (without the header when it threw), like in the JS SDK.
+  /// placeholder token the provider returned (without the header when it threw), like in the JS SDK. The log
+  /// line names the runtime type of the provider's error and never its text, which may quote a token.
   Future<Map<String, String>> _additionalHeaders() async {
     final Map<String, String> headers = <String, String>{
       'X-Client-Version': clientVersion,
@@ -2635,17 +2636,21 @@ class FirebaseUserAuth implements AuthTokenProvider {
         final AppCheckTokenResult result = await appCheck.getToken(
           forceRefresh: false,
         );
-        if (result.error != null) {
+        final Object? error = result.error;
+        if (error != null) {
           Log.w(
             'FirebaseUserAuth',
-            'Error while retrieving App Check token: ${result.error}',
+            'Error while retrieving App Check token: ${error.runtimeType}',
           );
         }
         if (result.token.isNotEmpty) {
           headers['X-Firebase-AppCheck'] = result.token;
         }
       } on Object catch (e) {
-        Log.w('FirebaseUserAuth', 'Error while retrieving App Check token: $e');
+        Log.w(
+          'FirebaseUserAuth',
+          'Error while retrieving App Check token: ${e.runtimeType}',
+        );
       }
     }
     return headers;

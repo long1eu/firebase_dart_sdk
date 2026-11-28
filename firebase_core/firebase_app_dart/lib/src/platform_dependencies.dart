@@ -21,7 +21,7 @@ import 'package:rxdart/rxdart.dart';
 /// | [onBackgroundChanged] | never in the background | Remote Config realtime: `true` closes the stream, `false` reopens it |
 /// | [storage] | this object, in memory | `FirebaseApp.setAutomaticDataCollectionEnabled` |
 /// | [authProvider] | none: requests carry no token | Firestore |
-/// | [appCheckProvider] | none: no App Check header | Firestore, `FirebaseUserAuth` |
+/// | [appCheckProvider] | none: no App Check header | Firestore, `FirebaseUserAuth`, Storage, Realtime Database, Analytics and Error Reporting |
 /// | [headersBuilder] | none | nobody in this repository |
 ///
 /// ```dart

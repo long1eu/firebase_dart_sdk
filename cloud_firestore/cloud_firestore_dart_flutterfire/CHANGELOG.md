@@ -1,3 +1,18 @@
+## 0.1.3
+
+- Behaviour change: when the plugin throws or returns no token, `FlutterFireAppCheckProvider.getToken` returns
+  `AppCheckTokenResult.failure(...)`, the placeholder token with the error, where it returned an empty token.
+  Firestore and the other clients then send the request with the placeholder in the App Check header, where they
+  sent no header. A backend that enforces App Check rejects both; one that does not accepts both.
+- Behaviour change: `FlutterFireAppCheckProvider.onTokenChanged` drops an event of the plugin without a token
+  (null or empty), where it emitted an empty token. The stream carries new tokens only.
+- `FlutterFireAppCheckProvider` takes an optional `getLimitedUseToken` (pass
+  `FirebaseAppCheck.instance.getLimitedUseToken`) and overrides `AppCheckTokenProvider.getLimitedUseToken()` with
+  it. A null or empty answer, or a throw, is an `AppCheckTokenResult.failure(...)`. Without the
+  argument the provider gives no limited-use token (an empty token with an `UnsupportedError`); it never returns
+  the session token instead. Firestore does not ask for limited-use tokens; the method is for packages that do.
+- Requires `firebase_app_dart` 0.2.3.
+
 ## 0.1.2
 
 No code change. A shorter package description (it was 190 characters, which pub.dev scores as too long).

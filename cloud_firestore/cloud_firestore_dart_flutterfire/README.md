@@ -11,7 +11,7 @@ platforms as the official `cloud_firestore`. To keep the official `cloud_firesto
 [`cloud_firestore_dart_platform`](https://pub.dev/packages/cloud_firestore_dart_platform). It is not
 affiliated with or supported by Google or Firebase.
 
-> **Status: 0.1.2.** Covered by unit tests with fake plugins only. It has not been run in a
+> **Status: 0.1.3.** Covered by unit tests with fake plugins only. It has not been run in a
 > Flutter app with the real plugins, on any platform, or against a real Firebase project.
 
 ## Install
@@ -109,8 +109,12 @@ final FirebaseFirestore firestore = await FlutterFireBridge.firestore(
 );
 ```
 
-A failed App Check request does not fail the Firestore request: it goes out without the header
-and a warning is logged, as with the App Check SDKs.
+A failed App Check request does not fail the Firestore request: it goes out with the placeholder
+token of the App Check SDKs in the header and a warning is logged.
+
+Firestore uses session tokens only. For a package that asks the provider for limited-use tokens,
+also pass `getLimitedUseToken: appCheck.getLimitedUseToken`; without it the provider gives no
+limited-use token, and never the session token in its place.
 
 ## What is not covered
 

@@ -94,9 +94,11 @@ abstract final class FirebaseStorageDart {
   ///   ```
   ///
   ///   It is called once per app. Without it, or when it returns null,
-  ///   requests carry no App Check token. A token that cannot be had (the
-  ///   provider throws or returns none) fails nothing: the request goes
-  ///   without the header and the backend decides. An existing
+  ///   requests carry no App Check token. A token that cannot be had fails
+  ///   nothing, and the backend decides: a provider that reports the failure
+  ///   (as `FlutterFireAppCheckProvider` does from 0.1.3) has its placeholder
+  ///   token sent in the header; when the provider throws or gives an empty
+  ///   token the request goes without the header. An existing
   ///   `firebase_app_dart` app without an App Check provider gets this one.
   /// * [httpClient] sends the requests (for tests and proxies); by default
   ///   one client is shared by all instances.

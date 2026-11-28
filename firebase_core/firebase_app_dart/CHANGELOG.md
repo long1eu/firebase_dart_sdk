@@ -1,3 +1,24 @@
+## 0.2.3
+
+- `AppCheckTokenProvider.getLimitedUseToken()`: a token for one request to a backend that consumes App Check
+  tokens. The method has a default, so a provider that `extends AppCheckTokenProvider` compiles unchanged. The
+  default gives no token: an empty token with an `UnsupportedError` in `AppCheckTokenResult.error`. It does not
+  fall back to `getToken`, because a consuming backend would spend the cached session token. No package of this
+  repository calls the method yet.
+- A provider declared with `implements AppCheckTokenProvider` no longer compiles until it defines
+  `getLimitedUseToken()` or changes to `extends`, which is the documented form.
+- `AppCheckTokenResult.failure(error)` and `AppCheckTokenResult.placeholderToken`: the result of a failed request
+  carries the placeholder token of the JS and iOS SDKs (the base64 form of `{"error":"UNKNOWN_ERROR"}`). Services
+  send it, so that the backend can tell a failed attestation from an app without App Check.
+- Documentation: the contract of a provider. A result without an error carries a token with at least 5 minutes of
+  life left (half of the lifetime for a token that lives under 10 minutes); a failure is reported with
+  `AppCheckTokenResult.failure` and not thrown; both methods complete within a deadline of the provider;
+  `onTokenChanged` is a broadcast stream of successes without replay.
+- `AppCheckTokenResult.toString()` shows neither the token nor the text of the error:
+  `AppCheckTokenResult(token: <redacted>)`, with `error: <runtime type>` when there is an error.
+- Documentation: the `appCheckProvider` row of the `PlatformDependencies` table names every package that reads
+  the provider.
+
 ## 0.2.2
 
 - Documentation: an `AuthTokenChange` is a signal. An empty token means signed out; a token that is not empty may
