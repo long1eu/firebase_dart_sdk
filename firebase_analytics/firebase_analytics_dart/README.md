@@ -56,4 +56,7 @@ Future<void> main() async {
   and `userLocation` to report a location.
 - **State** (client id, user id, user properties, default parameters, consent, the collection switch and
   unsent events) lives in an `AnalyticsStore`: memory by default, or `FileAnalyticsStore` from
-  `package:firebase_analytics_dart/io.dart`.
+  `package:firebase_analytics_dart/io.dart`. A state that cannot be read may hold an opt-out, so the client
+  then collects nothing until the collection switch, consent or a reset is set again.
+- **At least once.** A request that times out may still have arrived, and its events are sent again: the
+  Measurement Protocol cannot recognise a repeated request.

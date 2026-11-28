@@ -5,8 +5,11 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'firebase_analytics_dart.dart';
+
+final Random _random = Random();
 
 /// An [AnalyticsStore] that keeps one file per key in [directory].
 ///
@@ -14,9 +17,9 @@ import 'firebase_analytics_dart.dart';
 /// the new value, never half of one. The directory is created on the first write. File names are the
 /// base64url form of the key, so any key maps to one file.
 ///
-/// The files hold the client id, the user id, user properties and unsent events. Put them where the user's
-/// other application data lives (for example the application support directory) and not in a shared
-/// location.
+/// The files hold the client id, the user id, user properties and unsent events. They are created with the
+/// process's default permissions: put them where the user's other application data lives (for example the
+/// application support directory), not in a shared location.
 final class FileAnalyticsStore implements AnalyticsStore {
   /// A store in [directory].
   FileAnalyticsStore(this.directory);
@@ -51,8 +54,20 @@ final class FileAnalyticsStore implements AnalyticsStore {
       return;
     }
     await directory.create(recursive: true);
-    final File temporary = File('${file.path}.tmp');
-    await temporary.writeAsString(value, flush: true);
-    await temporary.rename(file.path);
+    // A name of its own per write, so two processes on one directory never write the same temporary file.
+    final File temporary = File(
+      '${file.path}.${DateTime.now().microsecondsSinceEpoch}-${_random.nextInt(0x7fffffff)}.tmp',
+    );
+    try {
+      await temporary.writeAsString(value, flush: true);
+      await temporary.rename(file.path);
+    } on Object {
+      try {
+        await temporary.delete();
+      } on Object {
+        // Nothing left to clean up.
+      }
+      rethrow;
+    }
   }
 }

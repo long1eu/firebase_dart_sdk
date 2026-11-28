@@ -804,16 +804,51 @@ void main() {
           'x': <String, Object?>{},
         };
 
-    fakeTest('invalid JSON starts clean', (_Env env) {
-      final AnalyticsStore store = AnalyticsStore.memory();
-      env.wait(store.write(key(stateKey, env.app), '{not json'));
-      env.wait(store.write(key(queueKey, env.app), '[{'));
-      final FirebaseAnalytics analytics = env.create(store: store);
-      env.wait(analytics.logEvent(name: 'a'));
-      env.wait(analytics.flush());
-      expect(env.sent.single.names, <String>['a']);
-      expect(env.sent.single.body['client_id'], matches(_clientIdPattern));
-      expect(env.warnings, hasLength(greaterThanOrEqualTo(2)));
+    fakeTest(
+      'an unreadable state fails closed until the user decides again, and is not overwritten',
+      (_Env env) {
+        // It may have held an opt-out (design rule 7).
+        final AnalyticsStore store = AnalyticsStore.memory();
+        env.wait(store.write(key(stateKey, env.app), '{not json'));
+        env.wait(store.write(key(queueKey, env.app), '[{'));
+        final FirebaseAnalytics analytics = env.create(store: store);
+        env.wait(analytics.setUserId('u1'));
+        env.wait(analytics.logEvent(name: 'a'));
+        env.wait(analytics.flush());
+        expect(env.sent, isEmpty);
+        expect(env.wait(store.read(key(stateKey, env.app))), '{not json');
+        expect(env.warnings.any((String w) => w.contains('opt-out')), isTrue);
+
+        env.wait(analytics.setAnalyticsCollectionEnabled(true));
+        env.wait(analytics.logEvent(name: 'b'));
+        env.wait(analytics.flush());
+        expect(env.sent.single.names, <String>['b']);
+        expect(env.sent.single.body['client_id'], matches(_clientIdPattern));
+        expect(
+          env.wait(store.read(key(stateKey, env.app))),
+          isNot('{not json'),
+        );
+      },
+    );
+
+    fakeTest('a collection switch or consent of the wrong type fails closed', (
+      _Env env,
+    ) {
+      for (final Map<String, Object?> state in <Map<String, Object?>>[
+        <String, Object?>{'v': 1, 'collectionEnabled': 'no'},
+        <String, Object?>{'v': 1, 'consent': 'granted'},
+        <String, Object?>{
+          'v': 1,
+          'consent': <String, Object?>{'analyticsStorage': 0},
+        },
+      ]) {
+        final AnalyticsStore store = AnalyticsStore.memory();
+        env.wait(store.write(key(stateKey, env.app), jsonEncode(state)));
+        final FirebaseAnalytics analytics = env.create(store: store);
+        env.wait(analytics.logEvent(name: 'a'));
+        env.wait(analytics.close());
+        expect(env.sent, isEmpty, reason: '$state');
+      }
     });
 
     fakeTest('wrong types are dropped', (_Env env) {
@@ -829,8 +864,6 @@ void main() {
             'defaultParameters': <String, Object?>{
               'bad': <int>[1],
             },
-            'consent': 'granted',
-            'collectionEnabled': 'no',
             'sessionId': 'x',
           }),
         ),
@@ -906,18 +939,25 @@ void main() {
     });
   });
 
-  fakeTest('a store that throws does not stop the client', (_Env env) {
-    final FirebaseAnalytics analytics = env.create(store: _ThrowingStore());
-    env.wait(analytics.setUserId('u1'));
-    env.wait(analytics.logEvent(name: 'a'));
-    env.fa.elapse(const Duration(seconds: 5));
-    expect(env.sent.single.names, <String>['a']);
-    expect(env.sent.single.body['user_id'], 'u1');
-    expect(env.sent.single.body['client_id'], matches(_clientIdPattern));
-    expect(env.warnings.any((String w) => w.contains('read')), isTrue);
-    expect(env.warnings.any((String w) => w.contains('saved')), isTrue);
-    env.wait(analytics.close());
-  });
+  fakeTest(
+    'a store that throws fails closed, then works once the user decides',
+    (_Env env) {
+      final FirebaseAnalytics analytics = env.create(store: _ThrowingStore());
+      env.wait(analytics.logEvent(name: 'ignored'));
+      env.fa.elapse(const Duration(seconds: 5));
+      expect(env.sent, isEmpty);
+      env.wait(analytics.setAnalyticsCollectionEnabled(true));
+      env.wait(analytics.setUserId('u1'));
+      env.wait(analytics.logEvent(name: 'a'));
+      env.fa.elapse(const Duration(seconds: 5));
+      expect(env.sent.single.names, <String>['a']);
+      expect(env.sent.single.body['user_id'], 'u1');
+      expect(env.sent.single.body['client_id'], matches(_clientIdPattern));
+      expect(env.warnings.any((String w) => w.contains('read')), isTrue);
+      expect(env.warnings.any((String w) => w.contains('saved')), isTrue);
+      env.wait(analytics.close());
+    },
+  );
 
   fakeTest('resetAnalyticsData starts over and keeps default parameters', (
     _Env env,

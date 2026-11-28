@@ -54,6 +54,20 @@ class ConsentState {
     'adStorage': ?adStorage,
   };
 
+  /// Whether [json] is a consent map as [toJson] writes it.
+  static bool isWellFormed(Object? json) =>
+      json is Map &&
+      json.entries.every(
+        (MapEntry<Object?, Object?> e) =>
+            const <String>{
+              'adUserData',
+              'adPersonalization',
+              'analyticsStorage',
+              'adStorage',
+            }.contains(e.key) &&
+            e.value is bool,
+      );
+
   static ConsentState fromJson(Object? json) {
     if (json is! Map) {
       return const ConsentState();
@@ -122,9 +136,15 @@ class AnalyticsState {
     'lastEventMicros': ?lastEventMicros,
   });
 
-  /// Reads a stored state. The store is untrusted: each field that does not pass the checks the public
-  /// methods apply is dropped, and [warn] is told.
-  static AnalyticsState decode(String? text, void Function(String) warn) {
+  /// Reads a stored state, or returns null when it cannot be read at all, or when the collection switch or
+  /// a consent is stored in a form that cannot be trusted: the caller must then not collect, since the user
+  /// may have opted out (design rule 7, fail closed). The store is untrusted: any other field that does not
+  /// pass the checks of the public methods is dropped, and [warn] is told. [now] bounds the stored times.
+  static AnalyticsState? decode(
+    String? text,
+    void Function(String) warn,
+    DateTime now,
+  ) {
     if (text == null) {
       return AnalyticsState();
     }
@@ -132,12 +152,16 @@ class AnalyticsState {
     try {
       json = jsonDecode(text);
     } on FormatException {
-      warn('The stored analytics state could not be read; starting empty.');
-      return AnalyticsState();
+      return null;
     }
     if (json is! Map) {
-      warn('The stored analytics state could not be read; starting empty.');
-      return AnalyticsState();
+      return null;
+    }
+    final Object? enabled = json['collectionEnabled'];
+    final Object? consent = json['consent'];
+    if ((enabled != null && enabled is! bool) ||
+        (consent != null && !ConsentState.isWellFormed(consent))) {
+      return null;
     }
     final AnalyticsState state = AnalyticsState();
     final Object? clientId = json['clientId'];
@@ -180,16 +204,19 @@ class AnalyticsState {
         warn('The stored default parameters are not valid; they were dropped.');
       }
     }
-    state.consent = ConsentState.fromJson(json['consent']);
-    final Object? enabled = json['collectionEnabled'];
+    state.consent = ConsentState.fromJson(consent);
     if (enabled is bool) {
       state.collectionEnabled = enabled;
     }
     final Object? sessionId = json['sessionId'];
     final Object? last = json['lastEventMicros'];
-    if (sessionId is int && sessionId > 0 && last is int && last > 0) {
-      state.sessionId = sessionId;
-      state.lastEventMicros = last;
+    final int latestMicros = now.add(_clockSlack).microsecondsSinceEpoch;
+    if (isStoredCount(sessionId, latestMicros ~/ 1000000) &&
+        isStoredCount(last, latestMicros)) {
+      state.sessionId = sessionId! as int;
+      state.lastEventMicros = last! as int;
+    } else if (sessionId != null || last != null) {
+      warn('The stored session is not valid; a new one starts.');
     }
     return state;
   }
@@ -336,8 +363,9 @@ class QueuedEvent {
     'x': context.toJson(),
   };
 
-  /// Reads a stored event, or returns null when it does not pass the checks of `logEvent`.
-  static QueuedEvent? fromJson(Object? json) {
+  /// Reads a stored event, or returns null when it does not pass the checks of `logEvent`, or when its
+  /// time is later than [now] (with a day of slack for clocks).
+  static QueuedEvent? fromJson(Object? json, DateTime now) {
     if (json is! Map) {
       return null;
     }
@@ -345,10 +373,10 @@ class QueuedEvent {
     final Object? parameters = json['p'];
     final Object? timestamp = json['t'];
     final EventContext? context = EventContext.fromJson(json['x']);
+    final int latestMicros = now.add(_clockSlack).microsecondsSinceEpoch;
     if (name is! String ||
         parameters is! Map ||
-        timestamp is! int ||
-        timestamp <= 0 ||
+        !isStoredCount(timestamp, latestMicros) ||
         context == null) {
       return null;
     }
@@ -363,10 +391,13 @@ class QueuedEvent {
         }
         if (key == 'session_id' || key == 'engagement_time_msec') {
           final Object? value = entry.value;
-          if (value is! int || value <= 0) {
+          final int max = key == 'session_id'
+              ? latestMicros ~/ 1000000
+              : const Duration(days: 1).inMilliseconds;
+          if (!isStoredCount(value, max)) {
             return null;
           }
-          session[key] = value;
+          session[key] = value! as int;
         } else {
           user[key] = entry.value;
         }
@@ -376,7 +407,7 @@ class QueuedEvent {
       return QueuedEvent(
         name: name,
         parameters: <String, Object>{...checked, ...session},
-        timestampMicros: timestamp,
+        timestampMicros: timestamp! as int,
         context: context,
       );
     } on Object {
@@ -384,3 +415,13 @@ class QueuedEvent {
     }
   }
 }
+
+/// How far ahead of the clock a stored time may be: clocks are corrected, and a time further ahead was not
+/// written by this client.
+const Duration _clockSlack = Duration(days: 1);
+
+/// Whether [value], read from a store, is a positive integer no larger than [max]. A JSON number such as
+/// `1e999` is infinite on the web and passes `is int` there, so finiteness is checked first (design rule 9).
+@internal
+bool isStoredCount(Object? value, int max) =>
+    value is num && value.isFinite && value is int && value > 0 && value <= max;

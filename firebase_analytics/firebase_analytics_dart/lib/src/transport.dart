@@ -129,6 +129,9 @@ enum SendOutcome {
 
   /// A network error, a timeout, 429 or 5xx: worth trying again later.
   retry,
+
+  /// Not sent: the batch was no longer wanted when the request was about to leave.
+  skipped,
 }
 
 /// Sends request bodies over a transport. It never reads, logs or rethrows anything that could carry the
@@ -144,6 +147,7 @@ class AnalyticsSender {
     required this.warn,
     http.Client? httpClient,
     this.timeout = const Duration(seconds: 30),
+    this.tokenTimeout = const Duration(seconds: 10),
   }) : _client = httpClient ?? http.Client(),
        _ownsClient = httpClient == null;
 
@@ -153,6 +157,9 @@ class AnalyticsSender {
   final AnalyticsRegion region;
   final void Function(String message) warn;
   final Duration timeout;
+
+  /// How long a token provider may take before the request goes without that token.
+  final Duration tokenTimeout;
   final http.Client _client;
   final bool _ownsClient;
 
@@ -160,52 +167,33 @@ class AnalyticsSender {
   static const int maxResponseBytes = 16 * 1024;
 
   /// Sends one request body, once.
-  Future<SendOutcome> send(List<int> body) async {
-    final http.Request request;
-    switch (transport) {
-      case final RelayTransport relay:
-        final Uri url = relay.endpoint.replace(
-          queryParameters: <String, String>{
-            ...relay.endpoint.queryParameters,
-            ...ClientIdentity.streamQuery(measurementId),
-          },
-        );
-        request = http.Request('POST', url);
-        request.headers.addAll(await _relayHeaders(url));
-      case final DirectTransport direct:
-        request = http.Request(
-          'POST',
-          Uri.https(region.host, '/mp/collect', <String, String>{
-            ...ClientIdentity.streamQuery(measurementId),
-            'api_secret': direct._apiSecret,
-          }),
-        );
-    }
-    request
-      // The protocol never redirects, and a redirect could carry tokens or the secret to another host.
-      ..followRedirects = false
-      ..headers['Content-Type'] = 'application/json'
-      ..bodyBytes = body;
+  ///
+  /// The whole attempt (reading the tokens, sending, reading the answer) is bounded by [timeout]; a request
+  /// still running then is aborted. [stillWanted] is asked once the tokens are read, just before the request
+  /// leaves: when it answers false (collection was turned off, consent denied, the queue dropped or the client
+  /// closed meanwhile), nothing is sent and the result is [SendOutcome.skipped].
+  ///
+  /// A request that times out may still have reached the endpoint, and its events are sent again later: the
+  /// Measurement Protocol has no way to recognise a repeated request, so delivery is at least once.
+  Future<SendOutcome> send(
+    List<int> body, {
+    required Future<bool> Function() stillWanted,
+  }) async {
+    final Completer<void> abort = Completer<void>();
     try {
-      final http.StreamedResponse response = await _client
-          .send(request)
-          .timeout(timeout);
-      await _drain(response);
-      final int status = response.statusCode;
-      if (status >= 200 && status < 300) {
-        return SendOutcome.delivered;
-      }
-      if (status == 429 || status >= 500) {
-        warn(
-          'Analytics: the endpoint answered HTTP $status; the events stay queued and are sent later.',
-        );
-        return SendOutcome.retry;
-      }
-      warn(
-        'Analytics: the endpoint answered HTTP $status; ${_count(body)} dropped, since a refused request is '
-        'not retried.',
+      return await _attempt(body, stillWanted, abort.future).timeout(
+        timeout,
+        onTimeout: () {
+          if (!abort.isCompleted) {
+            abort.complete();
+          }
+          warn(
+            'Analytics: the request did not finish within ${timeout.inSeconds} s; its events stay queued and '
+            'are sent later.',
+          );
+          return SendOutcome.retry;
+        },
       );
-      return SendOutcome.rejected;
     } on Object catch (error) {
       // Only the type: the message of a ClientException quotes the URL, which holds the secret.
       warn(
@@ -213,6 +201,59 @@ class AnalyticsSender {
       );
       return SendOutcome.retry;
     }
+  }
+
+  Future<SendOutcome> _attempt(
+    List<int> body,
+    Future<bool> Function() stillWanted,
+    Future<void> abortTrigger,
+  ) async {
+    final Uri url;
+    Map<String, String> headers = const <String, String>{};
+    switch (transport) {
+      case final RelayTransport relay:
+        url = relay.endpoint.replace(
+          queryParameters: <String, String>{
+            ...relay.endpoint.queryParameters,
+            ...ClientIdentity.streamQuery(measurementId),
+          },
+        );
+        headers = await _relayHeaders(url);
+      case final DirectTransport direct:
+        url = Uri.https(region.host, '/mp/collect', <String, String>{
+          ...ClientIdentity.streamQuery(measurementId),
+          'api_secret': direct._apiSecret,
+        });
+    }
+    if (!await stillWanted()) {
+      return SendOutcome.skipped;
+    }
+    final http.AbortableRequest
+    request = http.AbortableRequest('POST', url, abortTrigger: abortTrigger)
+      // The protocol never redirects, and a redirect could carry tokens or the secret to another host.
+      // In a browser, fetch reports a redirect as an error, so there it is retried until the events age
+      // out instead of being dropped; it is still never followed.
+      ..followRedirects = false
+      ..headers.addAll(headers)
+      ..headers['Content-Type'] = 'application/json'
+      ..bodyBytes = body;
+    final http.StreamedResponse response = await _client.send(request);
+    await _drain(response);
+    final int status = response.statusCode;
+    if (status >= 200 && status < 300) {
+      return SendOutcome.delivered;
+    }
+    if (status == 429 || status >= 500) {
+      warn(
+        'Analytics: the endpoint answered HTTP $status; the events stay queued and are sent later.',
+      );
+      return SendOutcome.retry;
+    }
+    warn(
+      'Analytics: the endpoint answered HTTP $status; the events of a request of ${body.length} bytes were '
+      'dropped, since a refused request is not retried.',
+    );
+    return SendOutcome.rejected;
   }
 
   Future<Map<String, String>> _relayHeaders(Uri url) async {
@@ -250,9 +291,9 @@ class AnalyticsSender {
       return null;
     }
     try {
-      final GetTokenResult result = await provider.getAccessToken(
-        forceRefresh: false,
-      );
+      final GetTokenResult result = await provider
+          .getAccessToken(forceRefresh: false)
+          .timeout(tokenTimeout);
       return result.token.isEmpty ? null : result.token;
     } on FirebaseNoSignedInUserException {
       return null;
@@ -273,9 +314,9 @@ class AnalyticsSender {
       return null;
     }
     try {
-      final AppCheckTokenResult result = await provider.getToken(
-        forceRefresh: false,
-      );
+      final AppCheckTokenResult result = await provider
+          .getToken(forceRefresh: false)
+          .timeout(tokenTimeout);
       return result.token.isEmpty ? null : result.token;
     } on Object {
       return null;
@@ -291,9 +332,6 @@ class AnalyticsSender {
       }
     }
   }
-
-  static String _count(List<int> body) =>
-      'the events of a request of ${body.length} bytes were';
 
   /// Closes the HTTP client when the sender created it.
   void close() {

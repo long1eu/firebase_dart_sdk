@@ -83,7 +83,7 @@ class FirebaseAnalytics {
        store = store ?? AnalyticsStore.memory(),
        _clock = clock ?? DateTime.now,
        _random = random ?? Random.secure(),
-       _warn = onWarning ?? _defaultWarning {
+       _warn = _safeWarning(onWarning ?? _defaultWarning) {
     if (!_measurementIdPattern.hasMatch(this.measurementId)) {
       throw ArgumentError.value(
         this.measurementId,
@@ -171,6 +171,11 @@ class FirebaseAnalytics {
       AnalyticsLimits.maxEventAge - const Duration(minutes: 10);
 
   late AnalyticsState _state;
+
+  /// Set when the stored state could not be read: until the user decides again (the collection switch,
+  /// consent or a reset), nothing is collected and the stored state is not overwritten, since it may hold an
+  /// opt-out.
+  bool _stateUnreadable = false;
   final List<QueuedEvent> _queue = <QueuedEvent>[];
   Future<void>? _loading;
   Future<void> _tail = Future<void>.value();
@@ -193,6 +198,17 @@ class FirebaseAnalytics {
 
   String get _stateKey => '${app.name}/$measurementId/state';
   String get _queueKey => '${app.name}/$measurementId/queue';
+
+  /// [warn], made safe to call from timers: a handler that throws is ignored rather than escaping as an
+  /// unhandled error.
+  static void Function(String) _safeWarning(void Function(String) warn) =>
+      (String message) {
+        try {
+          warn(message);
+        } on Object {
+          // The warning is lost; the client goes on.
+        }
+      };
 
   static void _defaultWarning(String message) =>
       developer.log(message, name: 'firebase_analytics_dart', level: 900);
@@ -249,7 +265,7 @@ class FirebaseAnalytics {
         context: _context(),
       );
       final String clientId = await _clientId();
-      if (encodedSize(_requestBody(clientId, <QueuedEvent>[event])) >
+      if (encodedSize(_requestBody(clientId, <QueuedEvent>[event])) >=
           AnalyticsLimits.maxBodyBytes) {
         throw FirebaseAnalyticsException(
           code: 'event-too-large',
@@ -384,6 +400,7 @@ class FirebaseAnalytics {
     bool? adStorage,
   }) {
     return _locked(() async {
+      _stateUnreadable = false;
       _state.consent = _state.consent.merge(
         adUserData: adUserData,
         adPersonalization: adPersonalization,
@@ -392,6 +409,7 @@ class FirebaseAnalytics {
       );
       if (_state.consent.analyticsStorage == false) {
         _dropQueue();
+        await _saveQueueNow();
       }
       await _saveState();
     });
@@ -401,9 +419,11 @@ class FirebaseAnalytics {
   /// sending; events logged while it is off are dropped.
   Future<void> setAnalyticsCollectionEnabled(bool enabled) {
     return _locked(() async {
+      _stateUnreadable = false;
       _state.collectionEnabled = enabled;
       if (!enabled) {
         _dropQueue();
+        await _saveQueueNow();
       }
       await _saveState();
     });
@@ -419,7 +439,11 @@ class FirebaseAnalytics {
         ..userProperties = <String, String>{}
         ..sessionId = null
         ..lastEventMicros = null;
+      _stateUnreadable = false;
+      // The queue first: after a crash between the two writes, the old user's events must not go out
+      // under the new client id.
       _dropQueue();
+      await _saveQueueNow();
       await _saveState();
     });
   }
@@ -464,14 +488,14 @@ class FirebaseAnalytics {
         _engagedMicros += max(0, now.difference(since).inMicroseconds);
       }
       _activeSince = null;
-      unawaited(flush());
+      unawaited(flush().catchError((Object _) {}));
     }
     _active = active;
   }
 
   /// Sends every queued event now, without waiting for the batch delay or a retry. Completes when the queue
-  /// is empty or a request failed in a way worth retrying; the events of that request stay queued. Never
-  /// throws for a delivery problem.
+  /// is empty or a request failed in a way worth retrying; the events of that request stay queued and are
+  /// retried later with backoff. Never throws; does nothing once [close] was called.
   Future<void> flush() async {
     if (_closed) {
       return;
@@ -480,8 +504,8 @@ class FirebaseAnalytics {
     _batchTimer = null;
     _retryTimer?.cancel();
     _retryTimer = null;
-    await _send(retryLater: false);
-    await _locked(_saveQueueNow);
+    await _send();
+    await _locked(_saveQueueNow, allowClosed: true);
   }
 
   /// Sends what is queued, as [flush] does, saves the state and releases the HTTP client. Later calls throw a
@@ -505,6 +529,7 @@ class FirebaseAnalytics {
   // Internals
 
   bool get _collecting =>
+      !_stateUnreadable &&
       (_state.collectionEnabled ?? collectionEnabledByDefault) &&
       _state.consent.analyticsStorage != false;
 
@@ -528,24 +553,46 @@ class FirebaseAnalytics {
   }
 
   Future<void> _load() async {
-    String? stateText;
+    final DateTime now = _clock();
+    AnalyticsState? state;
+    try {
+      state = AnalyticsState.decode(
+        await store.read(_stateKey),
+        (String message) => _warn('Analytics: $message'),
+        now,
+      );
+    } on Object catch (error) {
+      _warn(
+        'Analytics: the stored state could not be read (${error.runtimeType}).',
+      );
+    }
+    if (state == null) {
+      _stateUnreadable = true;
+      _state = AnalyticsState();
+      _warn(
+        'Analytics: the stored state could not be read, so it may hold an opt-out. Nothing is collected '
+        'and the store is left as it is until setAnalyticsCollectionEnabled, setConsent or '
+        'resetAnalyticsData is called.',
+      );
+    } else {
+      _state = state;
+    }
     String? queueText;
     try {
-      stateText = await store.read(_stateKey);
       queueText = await store.read(_queueKey);
     } on Object catch (error) {
       _warn(
-        'Analytics: the store could not be read (${error.runtimeType}); starting empty with a new client id.',
+        'Analytics: the stored queue could not be read (${error.runtimeType}); its events are not sent in '
+        'this run.',
       );
     }
-    _state = AnalyticsState.decode(stateText, _warn);
     if (queueText != null) {
       int dropped = 0;
       try {
         final Object? json = jsonDecode(queueText);
         if (json is List) {
           for (final Object? item in json) {
-            final QueuedEvent? event = QueuedEvent.fromJson(item);
+            final QueuedEvent? event = QueuedEvent.fromJson(item, now);
             if (event == null) {
               dropped++;
             } else {
@@ -646,6 +693,9 @@ class FirebaseAnalytics {
     if (!_queueDirty) {
       return;
     }
+    if (_stateUnreadable) {
+      return;
+    }
     _queueDirty = false;
     try {
       await store.write(
@@ -657,11 +707,15 @@ class FirebaseAnalytics {
               ]),
       );
     } on Object catch (error) {
+      _queueDirty = true;
       _warn('Analytics: the queue could not be saved (${error.runtimeType}).');
     }
   }
 
   Future<void> _saveState() async {
+    if (_stateUnreadable) {
+      return;
+    }
     try {
       await store.write(_stateKey, _state.encode());
     } on Object catch (error) {
@@ -676,24 +730,24 @@ class FirebaseAnalytics {
     if (_queue.length >= AnalyticsLimits.maxEventsPerRequest) {
       _batchTimer?.cancel();
       _batchTimer = null;
-      unawaited(_send(retryLater: true));
+      unawaited(_send());
       return;
     }
     _batchTimer ??= Timer(batchDelay, () {
       _batchTimer = null;
-      unawaited(_send(retryLater: true));
+      unawaited(_send());
     });
   }
 
-  /// Sends batches until the queue is empty or a request fails in a way worth retrying. With [retryLater],
-  /// a failure schedules the next attempt with exponential backoff and jitter.
-  Future<void> _send({required bool retryLater}) {
+  /// Sends batches until the queue is empty or a request fails in a way worth retrying; a failure schedules
+  /// the next attempt with exponential backoff and jitter.
+  Future<void> _send() {
     final Future<void>? running = _sending;
     if (running != null) {
       _sendAgain = true;
       return running;
     }
-    final Future<void> run = _sendLoop(retryLater: retryLater)
+    final Future<void> run = _sendLoop()
         .catchError((Object error) {
           // Sends run from timers; nothing may escape as an unhandled error.
           _warn(
@@ -705,7 +759,7 @@ class FirebaseAnalytics {
     return run;
   }
 
-  Future<void> _sendLoop({required bool retryLater}) async {
+  Future<void> _sendLoop() async {
     do {
       _sendAgain = false;
       while (true) {
@@ -713,11 +767,23 @@ class FirebaseAnalytics {
         if (batch == null) {
           break;
         }
-        final SendOutcome outcome = await _sender.send(batch.body);
+        final SendOutcome outcome = await _sender.send(
+          batch.body,
+          // Asked just before the request leaves, after the tokens were read: a switch turned off, a
+          // consent denied, a queue dropped or a close meanwhile stops it.
+          stillWanted: () => _locked(
+            () async =>
+                !_closed && _collecting && batch.generation == _queueGeneration,
+            allowClosed: true,
+          ),
+        );
         final bool keepGoing = await _locked(() async {
+          if (outcome == SendOutcome.skipped) {
+            return false;
+          }
           if (outcome == SendOutcome.retry) {
             _failures++;
-            if (retryLater && !_closed) {
+            if (!_closed) {
               _scheduleRetry();
             }
             return false;
@@ -749,14 +815,14 @@ class FirebaseAnalytics {
     final int delay = ceiling ~/ 2 + _random.nextInt(ceiling ~/ 2 + 1);
     _retryTimer = Timer(Duration(milliseconds: delay), () {
       _retryTimer = null;
-      unawaited(_send(retryLater: true));
+      unawaited(_send());
     });
   }
 
   /// The next request: the oldest events that share a user context, up to the event and size limits. Events
   /// too old to be dated correctly are dropped first.
   Future<_Batch?> _nextBatch() async {
-    if (!_collecting) {
+    if (_closed || !_collecting) {
       return null;
     }
     final int oldest =
@@ -774,6 +840,17 @@ class FirebaseAnalytics {
       return null;
     }
     final String clientId = await _clientId();
+    // An event read from the store was never size-checked; one that cannot fit a request alone is dropped.
+    while (_queue.isNotEmpty &&
+        encodedSize(_requestBody(clientId, <QueuedEvent>[_queue.first])) >=
+            AnalyticsLimits.maxBodyBytes) {
+      _queue.removeAt(0);
+      _markQueueDirty();
+      _warn('Analytics: a stored event too large for one request was dropped.');
+    }
+    if (_queue.isEmpty) {
+      return null;
+    }
     final EventContext context = _queue.first.context;
     final List<QueuedEvent> events = <QueuedEvent>[];
     final int baseSize = encodedSize(
@@ -788,7 +865,7 @@ class FirebaseAnalytics {
       final int eventSize =
           encodedSize(event.toRequest()) + (events.isEmpty ? 0 : 1);
       if (events.isNotEmpty &&
-          size + eventSize > AnalyticsLimits.maxBodyBytes) {
+          size + eventSize >= AnalyticsLimits.maxBodyBytes) {
         break;
       }
       events.add(event);

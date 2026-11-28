@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:firebase_analytics_dart/firebase_analytics_dart.dart';
 import 'package:firebase_app_dart/firebase_app_dart.dart';
 import 'package:http/http.dart' as http;
@@ -61,6 +62,42 @@ class _FailingAuth extends AuthTokenProvider {
   @override
   Stream<AuthTokenChange> get onTokenChanged =>
       const Stream<AuthTokenChange>.empty();
+}
+
+class _FailingAppCheck extends AppCheckTokenProvider {
+  @override
+  Future<AppCheckTokenResult> getToken({required bool forceRefresh}) =>
+      Future<AppCheckTokenResult>.error(
+        StateError('failed for $_appCheckToken'),
+      );
+
+  @override
+  Stream<AppCheckTokenResult> get onTokenChanged =>
+      const Stream<AppCheckTokenResult>.empty();
+}
+
+/// Providers whose futures never complete.
+class _SilentAuth extends AuthTokenProvider {
+  @override
+  Future<GetTokenResult> getAccessToken({required bool forceRefresh}) =>
+      Completer<GetTokenResult>().future;
+
+  @override
+  String? get uid => 'u1';
+
+  @override
+  Stream<AuthTokenChange> get onTokenChanged =>
+      const Stream<AuthTokenChange>.empty();
+}
+
+class _SilentAppCheck extends AppCheckTokenProvider {
+  @override
+  Future<AppCheckTokenResult> getToken({required bool forceRefresh}) =>
+      Completer<AppCheckTokenResult>().future;
+
+  @override
+  Stream<AppCheckTokenResult> get onTokenChanged =>
+      const Stream<AppCheckTokenResult>.empty();
 }
 
 class _StaticAppCheck extends AppCheckTokenProvider {
@@ -356,16 +393,73 @@ void main() {
     );
 
     test('a token with a line break is not sent as a header', () async {
-      final FirebaseApp app = _app(appCheck: false)
-        ..authProvider = _StaticAuth('abc\r\nX-Evil: 1');
+      final FirebaseApp app = _app()
+        ..authProvider = _StaticAuth('abc\r\nX-Evil: 1')
+        ..appCheckProvider = _StaticAppCheck('def\nX-Evil: 2');
       final _Rig rig = _Rig(
         AnalyticsTransport.relay(Uri.parse('https://relay.example/collect')),
         app: app,
       );
       await rig.sendOne();
-      expect(rig.requests.single.headers.containsKey('Authorization'), isFalse);
-      expect(rig.requests.single.headers.containsKey('X-Evil'), isFalse);
+      final Map<String, String> headers = rig.requests.single.headers;
+      expect(headers.containsKey('Authorization'), isFalse);
+      expect(headers.containsKey('X-Firebase-AppCheck'), isFalse);
+      for (final String value in headers.values) {
+        expect(value, isNot(contains('X-Evil')));
+      }
     });
+
+    test(
+      'a failing App Check provider sends the event without the header and does not leak the error',
+      () async {
+        final FirebaseApp app = _app(signedIn: false)
+          ..appCheckProvider = _FailingAppCheck();
+        final _Rig rig = _Rig(
+          AnalyticsTransport.relay(Uri.parse('https://relay.example/collect')),
+          app: app,
+        );
+        await rig.sendOne();
+        expect(rig.requests, hasLength(1));
+        expect(
+          rig.requests.single.headers.containsKey('X-Firebase-AppCheck'),
+          isFalse,
+        );
+        expect(rig.warnings.join('\n'), isNot(contains(_appCheckToken)));
+      },
+    );
+
+    test(
+      'token providers that never answer delay a request by at most the token timeout',
+      () {
+        fakeAsync((FakeAsync fa) {
+          final FirebaseApp app = _app()
+            ..authProvider = _SilentAuth()
+            ..appCheckProvider = _SilentAppCheck();
+          final _Rig rig = _Rig(
+            AnalyticsTransport.relay(
+              Uri.parse('https://relay.example/collect'),
+            ),
+            app: app,
+          );
+          bool flushed = false;
+          rig.analytics
+              .logEvent(name: 'level_up')
+              .then((_) => rig.analytics.flush())
+              .then((_) => flushed = true);
+          fa.elapse(const Duration(seconds: 25));
+          expect(flushed, isTrue);
+          expect(rig.requests, hasLength(1));
+          expect(
+            rig.requests.single.headers.containsKey('Authorization'),
+            isFalse,
+          );
+          expect(
+            rig.requests.single.headers.containsKey('X-Firebase-AppCheck'),
+            isFalse,
+          );
+        });
+      },
+    );
 
     test('toString shows neither the query nor user info of the relay URL', () {
       final AnalyticsTransport transport = AnalyticsTransport.relay(
@@ -420,26 +514,38 @@ void main() {
   });
 
   group('the store', () {
-    test('holds no secret and no token', () async {
-      final _MapStore store = _MapStore();
-      final List<String> warnings = <String>[];
-      final FirebaseAnalytics analytics = FirebaseAnalytics(
-        _app(),
-        measurementId: 'G-TEST1234',
-        transport: AnalyticsTransport.direct(apiSecret: _secret),
-        store: store,
-        onWarning: warnings.add,
-        httpClient: MockClient(
-          (http.Request request) async => http.Response('', 503),
-        ),
-      );
-      await analytics.logEvent(name: 'level_up');
-      await analytics.close();
-      final String everything = store.values.values.join('\n');
-      expect(everything, contains('level_up'));
-      expect(everything, isNot(contains(_secret)));
-      expect(everything, isNot(contains(_idToken)));
-      expect(everything, isNot(contains(_appCheckToken)));
+    test('holds no secret (direct) and no token (relay)', () async {
+      for (final AnalyticsTransport transport in <AnalyticsTransport>[
+        AnalyticsTransport.direct(apiSecret: _secret),
+        AnalyticsTransport.relay(Uri.parse('https://relay.example/collect')),
+      ]) {
+        final _MapStore store = _MapStore();
+        final List<String> warnings = <String>[];
+        int calls = 0;
+        final FirebaseAnalytics analytics = FirebaseAnalytics(
+          _app(),
+          measurementId: 'G-TEST1234',
+          transport: transport,
+          store: store,
+          onWarning: warnings.add,
+          httpClient: MockClient((http.Request request) async {
+            calls++;
+            if (transport is RelayTransport) {
+              // The tokens were read for this request, so they were in memory while the queue was saved.
+              expect(request.headers['Authorization'], 'Bearer $_idToken');
+            }
+            return http.Response('', 503);
+          }),
+        );
+        await analytics.logEvent(name: 'level_up');
+        await analytics.close();
+        expect(calls, 1);
+        final String everything = store.values.values.join('\n');
+        expect(everything, contains('level_up'));
+        expect(everything, isNot(contains(_secret)));
+        expect(everything, isNot(contains(_idToken)));
+        expect(everything, isNot(contains(_appCheckToken)));
+      }
     });
   });
 

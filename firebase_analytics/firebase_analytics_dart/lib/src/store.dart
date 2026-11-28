@@ -9,8 +9,11 @@
 /// directory. Implement this interface to keep the state anywhere else (a database, the browser's
 /// `localStorage`, a Flutter preferences plugin).
 ///
-/// A store that throws does not stop the client: a failed read starts from an empty state with a new client
-/// id, a failed write keeps the state in memory, and both are reported to the client's `onWarning`.
+/// A store that fails does not throw into the client's methods, and it fails closed. When the state cannot
+/// be read (the store throws, or the text is not valid), it may hold an opt-out, so the client collects
+/// nothing and leaves the store as it is until `setAnalyticsCollectionEnabled`, `setConsent` or
+/// `resetAnalyticsData` is called. A failed write keeps the state in memory and is tried again with the next
+/// change. Both are reported to the client's `onWarning`.
 abstract interface class AnalyticsStore {
   /// A store that keeps everything in memory.
   factory AnalyticsStore.memory() = _MemoryAnalyticsStore;
