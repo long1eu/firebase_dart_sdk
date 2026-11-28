@@ -1,0 +1,12 @@
+{
+  "name": "functions-fixture",
+  "private": true,
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-functions": "7.4.0",
+    "firebase-admin": "14.5.1"
+  }
+}

@@ -1,0 +1,42 @@
+name: cloud_functions_dart
+description: >-
+  Firebase callable Cloud Functions for pure Dart: calls and streaming calls on
+  the VM and the web.
+version: 0.1.0
+homepage: https://github.com/long1eu/firebase_dart_sdk
+repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/cloud_functions/cloud_functions_dart
+issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
+topics:
+  - firebase
+  - functions
+  - cloud-functions
+
+platforms:
+  android:
+  ios:
+  linux:
+  macos:
+  web:
+  windows:
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  # Resolved from ../../firebase_core/firebase_app_dart through
+  # pubspec_overrides.yaml while it is not published.
+  firebase_app_dart: ^0.2.3
+  # Internal request helpers; resolved from ../../firebase_core/_firebase_transport_dart
+  # through pubspec_overrides.yaml (not published).
+  _firebase_transport_dart: ^0.1.0
+  # 1.6.0: AbortableRequest, and BrowserClient streams response bodies.
+  http: ^1.6.0
+  meta: ^1.11.0
+
+dev_dependencies:
+  args: ^2.5.0
+  fake_async: ^1.3.0
+  # The production verification kit signs a test user in.
+  firebase_auth_providers_dart: ^0.4.0
+  lints: ^6.1.0
+  test: ^1.25.0

@@ -34,6 +34,7 @@ public API of the main library is the golden listing linked below.
 - [Authentication and App Check](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/authentication.md): signed-in users over REST, service accounts, Application Default Credentials, the Auth emulator
 - [Cloud Storage](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/storage.md): `firebase_storage_dart`: references, uploads, resumable uploads, lists, errors, retries, the Storage emulator
 - [Remote Config](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/remote_config.md): `firebase_remote_config_dart`: the store, defaults, fetch and activate, typed values, custom signals, realtime updates, throttling, errors, security notes
+- [Cloud Functions](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/functions.md): `cloud_functions_dart`: callable and streaming functions, values, errors, timeouts, the emulator, App Check
 - [The emulator and testing](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/emulator_and_testing.md): connecting to the emulator, mock users, tests with `package:test`, Enterprise edition differences
 - [Platforms](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/platforms.md): the Dart VM on macOS, Linux and Windows, Flutter, the web transport and its limits
 - [Firestore Lite](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/docs/guides/lite.md): the client without cache and listeners
@@ -52,6 +53,7 @@ public API of the main library is the golden listing linked below.
 - [firebase_storage_dart README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/firebase_storage/firebase_storage_dart/README.md): Cloud Storage for Firebase client for pure Dart (0.2.0)
 - [firebase_installations_dart README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/firebase_installations/firebase_installations_dart/README.md): Firebase Installations client: installation id, auth token, the key-value store (0.1.0, unreleased)
 - [firebase_remote_config_dart README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/firebase_remote_config/firebase_remote_config_dart/README.md): Remote Config client with realtime updates (0.1.0, unreleased)
+- [cloud_functions_dart README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/cloud_functions/cloud_functions_dart/README.md): callable Cloud Functions client (0.1.0, unreleased)
 - [cloud_firestore_dart_flutterfire README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/cloud_firestore/cloud_firestore_dart_flutterfire/README.md): the FlutterFire app options and `firebase_auth` user for `cloud_firestore_dart`
 - [firebase_admin_dart README](https://raw.githubusercontent.com/long1eu/firebase_dart_sdk/main/firebase_admin/firebase_admin_dart/README.md): admin calls for trusted code (`auth.dart`: custom tokens, users, claims, revocation, `verifyIdToken`)
 

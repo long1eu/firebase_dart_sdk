@@ -19,6 +19,9 @@
 # "error-reporting-browser" runs it in Chrome as well.
 # firebase_analytics_dart runs all of test/ (MockClient only; nothing reaches Google Analytics).
 # _firebase_transport_dart runs all of test/; its browser run is the CI job transport-browser.
+# cloud_functions_dart runs all of test/: its emulator tests skip themselves without FIREBASE_FUNCTIONS_EMULATOR_HOST
+# (the CI job "functions" sets it), its browser tests run only in a browser, and test/readme_snippets_test.dart
+# compiles the snippets of docs/guides/functions.md and of its README.
 # The example programs in examples/ are analyzed only (their tests need an emulator), except those with a
 # .test_without_emulator file, whose tests run too; select
 # them alone with the name "examples", or one with "examples/<name>". The web builds of the
@@ -62,6 +65,7 @@ PACKAGES=(
   "firebase_remote_config_dart|firebase_remote_config/firebase_remote_config_dart|"
   "firebase_error_reporting_dart|firebase_error_reporting/firebase_error_reporting_dart|"
   "firebase_analytics_dart|firebase_analytics/firebase_analytics_dart|"
+  "cloud_functions_dart|cloud_functions/cloud_functions_dart|"
 )
 
 summary=()

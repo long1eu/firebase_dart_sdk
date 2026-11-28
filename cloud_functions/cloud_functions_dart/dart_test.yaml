@@ -1,0 +1,7 @@
+# Browser tests need the Functions emulator: tool/test_browser_functions.sh
+# starts it (tool/start_functions_emulator.sh does too, for the emulator tests).
+tags:
+  browser:
+    test_on: browser
+    timeout: 2x
+  emulator: {}

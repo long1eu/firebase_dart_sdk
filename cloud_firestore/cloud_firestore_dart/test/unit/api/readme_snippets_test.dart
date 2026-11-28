@@ -49,11 +49,13 @@ const String _guides = '../../docs/guides';
 /// `readme_snippets_test.dart` of `firebase_database_dart_sqlite` and of
 /// `firebase_database_dart_platform`; the Remote Config guide is checked by the
 /// `readme_snippets_test.dart` of `firebase_remote_config_dart`; the Analytics
-/// guide by that of `firebase_analytics_dart`.
+/// guide by that of `firebase_analytics_dart`; the Functions guide by that of
+/// `cloud_functions_dart`.
 const Set<String> _guidesCheckedElsewhere = <String>{
   'analytics.md',
   'database.md',
   'database_flutter.md',
+  'functions.md',
   'remote_config.md',
 };
 

@@ -110,6 +110,7 @@ from 0.1? The 0.2 API took FlutterFire's names: [what changed](docs/api_migratio
 | [`firebase_remote_config_dart_platform`](firebase_remote_config/firebase_remote_config_dart_platform/) | 0.1.0 | Flutter apps written against the official `firebase_remote_config` API, on Linux or by choice elsewhere; realtime updates on desktop |
 | [`firebase_analytics_dart`](firebase_analytics/firebase_analytics_dart/) | in development, not released | Dart programs, servers and desktop apps that send events to a GA4 web stream over the Measurement Protocol ([guide](docs/guides/analytics.md), [parity](docs/analytics_parity.md)) |
 | [`firebase_analytics_dart_platform`](firebase_analytics/firebase_analytics_dart_platform/) | in development, not released | Flutter apps written against the official `firebase_analytics` API, on Windows and Linux |
+| [`cloud_functions_dart`](cloud_functions/cloud_functions_dart/) | 0.1.0, not released | Dart programs, servers and web apps that call Firebase callable functions, streaming ones included ([guide](docs/guides/functions.md), [parity](docs/functions_parity.md)) |
 
 ## How it fits together
 
@@ -278,6 +279,7 @@ the official `firebase_analytics` API. It sends to a web data stream through a r
 or directly, has no automatic events or attribution, and is in development and not released
 ([guide](docs/guides/analytics.md), [parity](docs/analytics_parity.md)). The other directories under `firebase_auth`, and `google_sign_in_dart`, are
 older code from the original project and are not part of the migrated, tested set.
+`cloud_functions/cloud_functions_dart` calls Firebase callable functions, streaming ones included, from the Dart VM and the web ([guide](docs/guides/functions.md), [parity](docs/functions_parity.md)); it is at 0.1.0, not released.
 
 ## Packages
 

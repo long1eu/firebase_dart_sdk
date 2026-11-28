@@ -1,0 +1,12 @@
+# Local development only: use the sibling checkouts instead of the hosted
+# packages. Excluded from the published archive by .pubignore.
+dependency_overrides:
+  firebase_app_dart:
+    path: ../../firebase_core/firebase_app_dart
+  _firebase_transport_dart:
+    path: ../../firebase_core/_firebase_transport_dart
+  firebase_auth_providers_dart:
+    path: ../../firebase_auth/firebase_auth_providers_dart
+  # A dependency of firebase_auth_providers_dart, not published yet.
+  secure_flow:
+    path: ../../secure_flow/secure_flow

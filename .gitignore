@@ -54,3 +54,5 @@ cloud_firestore/cloud_firestore_dart/example/cache_store/indexeddb/main.dart.js*
 firebase_storage/firebase_storage_dart/test/browser/emulator_port.txt
 firebase_installations/firebase_installations_dart/test/browser/server_port.txt
 firebase_remote_config/firebase_remote_config_dart/test/browser/server_port.txt
+tool/functions_emulator/functions/node_modules/
+tool/functions_emulator/functions_emulator_*.json
