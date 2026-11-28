@@ -1,5 +1,5 @@
 final RegExp _hostLabel = RegExp(r'^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$');
-final RegExp _decimalPart = RegExp(r'^[0-9]{1,3}$');
+final RegExp _decimalPart = RegExp(r'^(0|[1-9][0-9]{0,2})$');
 final RegExp _hostAndPort = RegExp(
   r'^(\[[0-9A-Fa-f:.]+\]|[A-Za-z0-9.-]+):([0-9]{1,5})$',
 );
@@ -85,9 +85,27 @@ List<int>? _parseIpv6(String text) {
   }
 }
 
-/// The canonical text of the IPv6 address [text] (RFC 5952): lowercase groups without leading
-/// zeros, the longest run of two or more zero groups (the first of equal ones) written as `::`.
-/// Null when [text] is not an IPv6 address.
+/// [host] in the one form hosts are compared in: lowercase, and an IPv6 address (with or without
+/// brackets) as its canonical text without brackets, so every spelling of one address is equal.
+///
+/// A name is only lowercased: an internationalised name is compared as given, so its Unicode and
+/// its `xn--` spelling differ. Never throws. Not part of the package's public library.
+String canonicalHost(String host) {
+  final String lowercase = host.toLowerCase();
+  if (!lowercase.contains(':')) {
+    return lowercase;
+  }
+  final bool bracketed = lowercase.startsWith('[') && lowercase.endsWith(']');
+  final String address = bracketed
+      ? lowercase.substring(1, lowercase.length - 1)
+      : lowercase;
+  return _canonicalIpv6(address) ?? lowercase;
+}
+
+/// The canonical text of the IPv6 address [text]: lowercase groups without leading zeros, the
+/// longest run of two or more zero groups (the first of equal ones) written as `::`. That is the
+/// form of RFC 5952, except that an embedded IPv4 part is written as two groups too
+/// (`::ffff:7f00:1`), not in dotted form. Null when [text] is not an IPv6 address.
 String? _canonicalIpv6(String text) {
   final List<int>? bytes = _parseIpv6(text);
   if (bytes == null || bytes.length != 16) {
@@ -199,8 +217,8 @@ final class EmulatorHost {
 
   const EmulatorHost._(this.host, this.port);
 
-  /// The host in lowercase. An IPv6 address is without brackets and in its canonical text
-  /// (RFC 5952): `0:0:0:0:0:0:0:1` is kept as `::1`.
+  /// The host in lowercase. An IPv6 address is without brackets and in the canonical text of
+  /// RFC 5952, with an embedded IPv4 part as two groups: `0:0:0:0:0:0:0:1` is kept as `::1`.
   final String host;
 
   /// The port, 1 to 65535.
@@ -215,15 +233,7 @@ final class EmulatorHost {
   /// True when [url] has this host and this port. A name or an IPv4 address is compared as
   /// lowercase text; an IPv6 address by its parsed value, so every spelling of it matches. The
   /// port is `url.port`, so the default of an `http` or `https` URL applies.
-  bool owns(Uri url) {
-    if (url.port != port) {
-      return false;
-    }
-    final String urlHost = url.host.toLowerCase();
-    return host.contains(':')
-        ? _canonicalIpv6(urlHost) == host
-        : urlHost == host;
-  }
+  bool owns(Uri url) => url.port == port && canonicalHost(url.host) == host;
 
   @override
   bool operator ==(Object other) {
@@ -273,7 +283,8 @@ bool mayCarryTokens(Uri url, {EmulatorHost? emulator}) {
   return isLoopbackHost(url.host) || (emulator != null && emulator.owns(url));
 }
 
-/// [origin] reduced to scheme, host and port, after checking it (rule O).
+/// [origin] reduced to scheme, host and port, after checking it (rule O). An IPv6 host is given
+/// in its canonical text.
 ///
 /// It must be `https`, or `http` to a loopback host (see [isLoopbackHost]), with a host and no user
 /// info, path (other than `/`), query or fragment. Throws an [ArgumentError] otherwise; its text
@@ -299,18 +310,25 @@ Uri checkOrigin(Uri origin) {
       'must use https, or http to a loopback host',
     );
   }
+  return _normalOrigin(scheme, origin);
+}
+
+/// The one form origins are compared in: [scheme], the canonical host of [url] and its explicit
+/// port. `Uri` drops the default port of `http` and `https` by itself.
+Uri _normalOrigin(String scheme, Uri url) {
   return Uri(
     scheme: scheme,
-    host: host,
-    port: origin.hasPort ? origin.port : null,
+    host: canonicalHost(url.host),
+    port: url.hasPort ? url.port : null,
   );
 }
 
 /// The origin tokens are bound to and compared by: the normal form of the origin of [url].
 ///
-/// The scheme, with `ws` mapped to `http` and `wss` to `https`; the host in lowercase; the port,
-/// which is the explicit port of [url], or 443 or 80 for `https` and `http`. An HTTPS URL and a
-/// socket URL on the same host and port therefore have the same token origin.
+/// The scheme, with `ws` mapped to `http` and `wss` to `https`; the host in lowercase, an IPv6
+/// address in its canonical text; the port, which is the explicit port of [url], or 443 or 80 for
+/// `https` and `http`. An HTTPS URL and a socket URL on the same host and port therefore have the
+/// same token origin, and so have two spellings of one IPv6 address.
 ///
 /// Throws an [ArgumentError] for a `ws` or `wss` URL without an explicit port: Dart knows no
 /// default port for those schemes.
@@ -324,13 +342,10 @@ Uri tokenOrigin(Uri url) {
       'a ws or wss URL must have an explicit port',
     );
   }
-  return Uri(
-    scheme: switch (scheme) {
-      'ws' => 'http',
-      'wss' => 'https',
-      _ => scheme,
-    },
-    host: url.host.toLowerCase(),
-    port: url.hasPort ? url.port : null,
-  );
+  final String mapped = switch (scheme) {
+    'ws' => 'http',
+    'wss' => 'https',
+    _ => scheme,
+  };
+  return _normalOrigin(mapped, url);
 }
