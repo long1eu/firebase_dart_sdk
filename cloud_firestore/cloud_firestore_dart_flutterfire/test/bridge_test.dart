@@ -220,13 +220,15 @@ void main() {
       final AppCheckTokenResult result = await failing.getToken(
         forceRefresh: false,
       );
-      expect(result.token, isEmpty);
+      // A failure carries the placeholder token, which the services send (shared spec 5.2, 5.6).
+      expect(result.token, AppCheckTokenResult.placeholderToken);
       expect(result.error, isA<StateError>());
+      // Tokenless events are not successes, so they are not emitted.
       expect(
         await failing.onTokenChanged
             .map((AppCheckTokenResult r) => r.token)
             .toList(),
-        <String>['a', ''],
+        <String>['a'],
       );
     });
   });
