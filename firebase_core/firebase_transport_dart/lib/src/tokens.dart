@@ -220,6 +220,9 @@ void applyTokens(
 /// It holds no token and no subscription and needs no closing. Between calls it keeps only which
 /// kinds owe a forced refresh, when Auth was last forced, and whether a provider is stuck; while
 /// an App Check `getToken` call is pending it also keeps that call, for other requests to join.
+///
+/// A provider that never answers is called once every 70 s: a wait of 10 s, then a pause of 60 s
+/// that starts at the timeout. Requests in between are not held up by it.
 final class TokenSource {
   /// A source of the tokens of [app] for requests to [origins] and to [emulator].
   ///
@@ -295,8 +298,9 @@ final class TokenSource {
   /// anything.
   ///
   /// Throws, through the returned future:
+  /// - a [StateError] when the app was deleted, before or during the wait; a deleted app is
+  ///   reported before anything else is checked;
   /// - an [ArgumentError] when [timeLeft] is zero or negative;
-  /// - a [StateError] when the app was deleted, before or during the wait;
   /// - a [TokenFetchException] when [url] may not receive tokens (no provider is asked then), or
   ///   when the Auth provider failed, did not answer in [providerWait] or gave a token that is
   ///   too long;
@@ -307,10 +311,10 @@ final class TokenSource {
     bool originChosenByApplication = false,
     Duration? timeLeft,
   }) async {
+    _throwIfDeleted();
     if (timeLeft != null && timeLeft <= Duration.zero) {
       throw ArgumentError.value(timeLeft, 'timeLeft', 'must be positive');
     }
-    _throwIfDeleted();
     final Uri origin = _allowedOrigin(
       url,
       originChosenByApplication: originChosenByApplication,
