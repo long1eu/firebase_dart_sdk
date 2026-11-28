@@ -1,0 +1,32 @@
+name: _firebase_transport_grpc_dart
+description: Internal gRPC channel helpers shared by the firebase_*_dart packages. Not for application code.
+version: 0.1.0
+homepage: https://github.com/long1eu/firebase_dart_sdk
+repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_core/_firebase_transport_grpc_dart
+issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
+topics:
+  - firebase
+  - grpc
+
+platforms:
+  android:
+  ios:
+  linux:
+  macos:
+  windows:
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  _firebase_transport_dart: ^0.1.0
+  # The same ranges as cloud_firestore_dart: grpc 5.2 requires http2 ^2.3.1, and the keepalive
+  # transport implements an http2 interface, so both move to http2 3.x together with Firestore.
+  grpc: ^5.1.0
+  http2: ^2.3.1
+  meta: ^1.11.0
+  protobuf: ^6.1.0
+
+dev_dependencies:
+  lints: ^6.1.0
+  test: ^1.25.0

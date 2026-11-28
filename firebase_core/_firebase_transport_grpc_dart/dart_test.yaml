@@ -1,0 +1,2 @@
+# The package imports dart:io: every test runs on the VM only. There is no browser tag.
+test_on: vm
