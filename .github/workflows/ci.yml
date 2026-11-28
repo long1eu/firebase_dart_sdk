@@ -88,7 +88,7 @@ jobs:
           # `browser` is true when any changed file is one of these: the library, the SQLite
           # opener package (the web opener and OPFS worker the tests use), the browser tests, and
           # what runs them.
-          # `indexeddb`, `securestorage`, `database`, `remoteconfig` and `gallery` work the same way
+          # `indexeddb`, `securestorage`, `database`, `remoteconfig`, `transport` and `gallery` work the same way
           # for their own jobs.
           filters: |
             browser:
@@ -172,14 +172,14 @@ jobs:
               - 'firebase_analytics/firebase_analytics_dart/**'
               - 'firebase_core/firebase_app_dart/lib/**'
               - 'firebase_core/firebase_app_dart/pubspec.yaml'
+              - 'tool/check_web_imports.dart'
+              - '.github/workflows/ci.yml'
+              - '.github/actions/**'
             transport:
               - 'firebase_core/firebase_transport_dart/**'
               - 'firebase_core/firebase_app_dart/lib/**'
               - 'firebase_core/firebase_app_dart/test/**'
               - 'firebase_core/firebase_app_dart/pubspec.yaml'
-              - 'tool/check_web_imports.dart'
-              - '.github/workflows/ci.yml'
-              - '.github/actions/**'
               - 'tool/check_web_imports.dart'
               - '.github/workflows/ci.yml'
               - '.github/actions/**'
