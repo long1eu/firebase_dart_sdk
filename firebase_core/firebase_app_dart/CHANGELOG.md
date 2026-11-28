@@ -1,5 +1,7 @@
 ## 0.2.3
 
+- Documentation: `getToken(forceRefresh: true)` that cannot run answers with the cached token when it still has at
+  least 5 minutes left, with no error; callers never throttle forced refreshes themselves.
 - `LimitedUseAppCheckTokenProvider`: a second interface, with `getLimitedUseToken()`, for a provider that can mint
   a token for one request to a backend that consumes App Check tokens. `AppCheckTokenProvider` itself is
   unchanged, so every existing provider compiles as before. A provider that does not implement it gives no App

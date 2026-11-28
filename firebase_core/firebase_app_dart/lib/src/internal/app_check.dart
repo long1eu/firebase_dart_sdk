@@ -175,6 +175,12 @@ abstract class AppCheckTokenProvider {
   /// Fetches a token. [forceRefresh] must only be set when the cached token was
   /// invalidated out of band (for example the backend answered UNAUTHENTICATED).
   ///
+  /// The provider, not the caller, limits how often a forced call leads to a
+  /// new exchange. When a forced call cannot run (too soon after the last
+  /// exchange, or the provider is throttled) and the cached token still has at
+  /// least 5 minutes left, answer with that cached token and no error. Without
+  /// such a token, answer with a failure.
+  ///
   /// Report a failure with [AppCheckTokenResult.failure], like the App Check
   /// SDKs do; do not throw, and answer within [responseDeadline]. Firestore
   /// sends its requests anyway: with the placeholder, or without the header
