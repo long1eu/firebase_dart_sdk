@@ -82,7 +82,7 @@ Both names were free on pub.dev on 2026-11-27. Dependencies of the client: `fire
 ```dart
 final analytics = FirebaseAnalytics(
   app,
-  measurementId: 'G-XXXXXXX',
+  measurementId: 'G-XXXXXXX',                    // default: app.options.measurementId
   transport: AnalyticsTransport.relay(Uri.parse('https://example.com/collect')),
   // or AnalyticsTransport.direct(apiSecret: '...'): internal tools and servers only
   store: FileAnalyticsStore(directory),          // from io.dart; AnalyticsStore.memory() by default
@@ -99,8 +99,8 @@ await analytics.setDefaultEventParameters({'app_version': '1.4.0'});
 await analytics.setConsent(adUserData: false, adPersonalization: false);
 await analytics.setConsent(analyticsStorage: false);  // nothing is queued or sent while denied
 await analytics.setAnalyticsCollectionEnabled(false);  // persisted; queued events are dropped
-await analytics.resetAnalyticsData();                  // new client id, clears the user id, properties and queue
-final String id = await analytics.appInstanceId;       // the client id of this installation
+await analytics.resetAnalyticsData();                  // new client id; clears the user id, properties, session and queue
+final String? id = await analytics.appInstanceId;      // the client id; null while analytics storage is denied
 final int? session = await analytics.sessionId;
 analytics.setAppActive(true);                          // lifecycle hook; the adapter calls it
 await analytics.flush();
@@ -166,9 +166,10 @@ Both transports:
   time the event was logged, not sent. Events older than the documented backdating limit of 72 hours are
   dropped from the queue rather than sent, because the server would silently re-date them.
 - **Session parameters on every event:** `session_id` (the start time of the session, in seconds) and
-  `engagement_time_msec`. A session ends after `sessionTimeout` without events while the app is
-  inactive, as in gtag. Engagement time is the time the app was active since the previous event, at
-  least 1 ms. Without `setAppActive` calls (a CLI or a server) the app counts as active.
+  `engagement_time_msec`. A session ends after `sessionTimeout` without events, whether or not the app
+  is active: a CLI or a server never goes inactive, and its sessions would otherwise never end. Engagement
+  time is the time the app was active since the previous event, at least 1 ms and at most
+  `sessionTimeout`. Without `setAppActive` calls (a CLI or a server) the app counts as active.
 - **Device and location fields** ([protocol §7](analytics_protocol.md#7-device-and-geography)): no
   `device` block by default. Strict validation refused a partial one (it required `model`, then `browser`,
   measured on 2026-11-28), and a program cannot read those fields; a developer may pass a complete block.
@@ -218,7 +219,12 @@ registration follows `firebase_storage_dart_platform`.
    a `client_id` from gtag.js as a positive control, and prints what to look for in DebugView, Realtime and
    the standard reports. It answers
    the first question of [protocol §10](analytics_protocol.md#10-what-the-production-kit-must-answer).
-   **Step 3 does not start until the maintainer has run it and the events are reported.**
+   Step 3 is built in parallel with the maintainer's run, with everything that knows the shape of the
+   identifier in one class (`ClientIdentity`). **Nothing is released, and step 5 does not document the
+   package as usable, until the probe shows the events reported.** The package's `pubspec.yaml` has
+   `publish_to: none` until then. The maintainer's run of 2026-11-28 (run 22tjj8) showed them in DebugView
+   and Realtime ([protocol §5](analytics_protocol.md#5-the-kind-of-stream)); the standard reports are
+   still to be checked.
 3. **The client core:** the model, validation, the stores, sessions, both transports, the queue, unit
    tests with `MockClient` and `fake_async`, security tests (the secret never leaks; tokens only go
    where design rule 5 allows; no redirects), and a web compile with `tool/check_web_imports.dart`.

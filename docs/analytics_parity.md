@@ -99,7 +99,7 @@ binary, and it reports to an app stream through a channel this package cannot us
 | Session id | none | `getSessionId()` | `sessionID()` | `GetSessionId()` | `sessionId` | first release | Start time of the session in seconds (protocol §6). |
 | Session timeout | none | `setSessionTimeoutDuration(ms)` | `setSessionTimeoutInterval(_:)` | `SetSessionTimeoutDuration` (no-op on Windows) | `sessionTimeout:` constructor argument | first release | Configuration, not a setter (design rule 4). The adapter's setter is allowed before the first event and throws after it (adapter table). |
 | Engagement time | by gtag | automatic | automatic | Windows: by the DLL | `engagement_time_msec` from `setAppActive` | first release | Spec section 6. |
-| Reset | none | `resetAnalyticsData()` | `resetAnalyticsData()` | `ResetAnalyticsData()` | `resetAnalyticsData()`: new client id, clears user id, properties, defaults and the queue | first release | |
+| Reset | none | `resetAnalyticsData()` | `resetAnalyticsData()` | `ResetAnalyticsData()` | `resetAnalyticsData()`: new client id, clears user id, properties, session and the queue; default parameters, consent and the collection switch stay | first release | Default parameters are app configuration (an app version), not user data. |
 | Device and geography | from the browser | automatic | automatic | Windows: by the DLL | `device` from the platform; `user_location` only if supplied | first release | Protocol §7. No IP address. |
 
 ## Consent and collection

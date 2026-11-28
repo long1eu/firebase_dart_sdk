@@ -190,7 +190,8 @@ jobs:
               secure_flow firebase_app_dart firebase_auth_providers_dart cloud_firestore_dart_sqlite
               firebase_admin_dart firebase_storage_dart firebase_auth_secure_storage_dart
               firebase_database_dart firebase_database_dart_sqlite firebase_installations_dart
-              firebase_remote_config_dart firebase_error_reporting_dart examples
+              firebase_remote_config_dart firebase_error_reporting_dart firebase_analytics_dart
+              examples
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -268,6 +269,10 @@ jobs:
         run: |
           find lib test tool -name '*.dart' -not -path 'test/readme/*' -print0 \
             | xargs -0 dart format --output=none --set-exit-if-changed
+      - name: Check formatting (firebase_analytics_dart)
+        if: ${{ !cancelled() && matrix.leg == 'others' }}
+        working-directory: firebase_analytics/firebase_analytics_dart
+        run: dart format --output=none --set-exit-if-changed lib test example
       - name: Lowest versions of the dependencies (firebase_auth_providers_dart)
         # The package claims `googleapis_auth: ^2.0.0`, `http: ^1.2.0` and `crypto: ^3.0.3`: run its
         # tests with the lowest versions this SDK resolves (only the runtime dependencies are
@@ -296,7 +301,8 @@ jobs:
               secure_flow firebase_app_dart firebase_auth_providers_dart cloud_firestore_dart_sqlite
               firebase_admin_dart firebase_storage_dart firebase_auth_secure_storage_dart
               firebase_database_dart firebase_database_dart_sqlite firebase_installations_dart
-              firebase_remote_config_dart firebase_error_reporting_dart examples
+              firebase_remote_config_dart firebase_error_reporting_dart firebase_analytics_dart
+              examples
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

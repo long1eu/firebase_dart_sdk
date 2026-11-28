@@ -17,6 +17,7 @@
 # snippets of docs/guides/remote_config.md and of its README.
 # firebase_error_reporting_dart runs all of test/ (MockClient, no emulator); the CI job
 # "error-reporting-browser" runs it in Chrome as well.
+# firebase_analytics_dart runs all of test/ (MockClient only; nothing reaches Google Analytics).
 # The example programs in examples/ are analyzed only (their tests need an emulator), except those with a
 # .test_without_emulator file, whose tests run too; select
 # them alone with the name "examples", or one with "examples/<name>". The web builds of the
@@ -57,6 +58,7 @@ PACKAGES=(
   "firebase_installations_dart|firebase_installations/firebase_installations_dart|"
   "firebase_remote_config_dart|firebase_remote_config/firebase_remote_config_dart|"
   "firebase_error_reporting_dart|firebase_error_reporting/firebase_error_reporting_dart|"
+  "firebase_analytics_dart|firebase_analytics/firebase_analytics_dart|"
 )
 
 summary=()
