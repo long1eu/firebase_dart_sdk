@@ -130,7 +130,9 @@ Decisions behind the proposal:
 
 ## 5. Transport
 
-`AnalyticsTransport` is a sealed class with two implementations.
+`AnalyticsTransport` is a sealed class with two implementations. A third, which would speak gtag.js's
+undocumented `/g/collect` protocol without a secret, is planned in [analytics_gtag.md](analytics_gtag.md)
+and waits for a capture of real traffic.
 
 - **Relay** posts the Measurement Protocol body, without the secret, to a URL of the developer's server.
   It attaches the App Check token from `app.appCheckProvider` and, when a user is signed in, the ID token
