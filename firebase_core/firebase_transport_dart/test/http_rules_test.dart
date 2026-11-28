@@ -135,6 +135,49 @@ http.ClientException _markedClientException() {
 }
 
 void main() {
+  // The names §8.1 cites (T3, row 11), at the top level so that they are exact.
+  test('redirect is not followed', () {
+    fakeAsync((FakeAsync async) {
+      final FakeClient client = FakeClient(
+        honourAbort: false,
+        statusCode: 302,
+        headers: const <String, String>{
+          'location': 'https://elsewhere.example.test/',
+        },
+      );
+      final Outcome<CappedResponse> outcome = _sendCapped(client);
+      client.body.add(_bytes(5));
+      async.flushMicrotasks();
+
+      expect(outcome.error, _transportFailure(TransportFailure.redirected));
+      expect(client.requests, hasLength(1));
+      expect(client.requests.single.followRedirects, isFalse);
+      expect(client.body.bytesRead, 0);
+      expect(client.body.cancelled, isTrue);
+      expect(client.aborted, isTrue);
+      expect(async.pendingTimers, isEmpty);
+    });
+  });
+
+  test('client that follows a redirect is caught', () {
+    fakeAsync((FakeAsync async) {
+      final FakeClient client = FakeClient(
+        responseUrl: Uri.parse(
+          'https://elsewhere.example.test/v1/run?key=SENTINEL',
+        ),
+      );
+      final Outcome<CappedResponse> outcome = _sendCapped(client);
+      client.body
+        ..add(_bytes(5))
+        ..close();
+      async.flushMicrotasks();
+
+      expect(outcome.error, _transportFailure(TransportFailure.redirected));
+      expect(client.body.bytesRead, 0);
+      expect(client.aborted, isTrue);
+    });
+  });
+
   group('sendCapped', () {
     test('a body under successCap is returned', () {
       fakeAsync((FakeAsync async) {
@@ -180,7 +223,7 @@ void main() {
 
     test('a body over successCap aborts with CapExceededException', () {
       fakeAsync((FakeAsync async) {
-        final FakeClient client = FakeClient();
+        final FakeClient client = FakeClient(honourAbort: false);
         final Outcome<CappedResponse> outcome = _sendCapped(client);
         client.body.add(_bytes(17));
         async.flushMicrotasks();
@@ -218,7 +261,10 @@ void main() {
 
     test('an error body over errorCap is cut, with its status kept', () {
       fakeAsync((FakeAsync async) {
-        final FakeClient client = FakeClient(statusCode: 500);
+        final FakeClient client = FakeClient(
+          honourAbort: false,
+          statusCode: 500,
+        );
         final Outcome<CappedResponse> outcome = _sendCapped(client);
         client.body.add(utf8.encode('0123456789abcdef'));
         async.flushMicrotasks();
@@ -248,7 +294,7 @@ void main() {
 
     test('the deadline passes during the body', () {
       fakeAsync((FakeAsync async) {
-        final FakeClient client = FakeClient();
+        final FakeClient client = FakeClient(honourAbort: false);
         final Outcome<CappedResponse> outcome = _sendCapped(client);
         client.body.add(_bytes(3));
         async.elapse(_deadline - const Duration(milliseconds: 1));
@@ -281,7 +327,7 @@ void main() {
     test('cancel aborts the request', () {
       fakeAsync((FakeAsync async) {
         final Completer<void> cancel = Completer<void>();
-        final FakeClient client = FakeClient();
+        final FakeClient client = FakeClient(honourAbort: false);
         final Outcome<CappedResponse> outcome = _sendCapped(
           client,
           cancel: cancel.future,
@@ -354,48 +400,80 @@ void main() {
         expect(outcome.error, _timeoutAfter(_deadline));
       });
     });
-
-    test(
-      'a redirect is not followed: a 302 answer throws redirected, its body unread',
-      () {
+    for (final int status in <int>[300, 301, 307, 308, 399]) {
+      test('a $status answer throws redirected, its body unread', () {
         fakeAsync((FakeAsync async) {
           final FakeClient client = FakeClient(
-            statusCode: 302,
-            headers: const <String, String>{
-              'location': 'https://elsewhere.example.test/',
-            },
+            honourAbort: false,
+            statusCode: status,
           );
           final Outcome<CappedResponse> outcome = _sendCapped(client);
           client.body.add(_bytes(5));
           async.flushMicrotasks();
 
           expect(outcome.error, _transportFailure(TransportFailure.redirected));
-          expect(client.requests, hasLength(1));
-          expect(client.requests.single.followRedirects, isFalse);
           expect(client.body.bytesRead, 0);
           expect(client.body.cancelled, isTrue);
           expect(client.aborted, isTrue);
-          expect(async.pendingTimers, isEmpty);
+        });
+      });
+    }
+
+    for (final int status in <int>[201, 204, 299]) {
+      test('a $status answer is a success under successCap', () {
+        fakeAsync((FakeAsync async) {
+          final FakeClient client = FakeClient(statusCode: status);
+          final Outcome<CappedResponse> outcome = _sendCapped(client);
+          client.body
+            ..add(_bytes(12))
+            ..close();
+          async.flushMicrotasks();
+
+          final CappedResponse response = outcome.value!;
+          expect(response.statusCode, status);
+          expect(response.isSuccess, isTrue);
+          expect(response.body, _bytes(12));
+          expect(response.truncated, isFalse);
+        });
+      });
+    }
+
+    test('a 299 body over successCap, not errorCap, is refused', () {
+      fakeAsync((FakeAsync async) {
+        final FakeClient client = FakeClient(statusCode: 299);
+        final Outcome<CappedResponse> outcome = _sendCapped(client);
+        client.body.add(_bytes(17));
+        async.flushMicrotasks();
+
+        expect(outcome.error, isA<CapExceededException>());
+      });
+    });
+
+    test(
+      'a client RequestAbortedException before the headers is cancelled',
+      () {
+        fakeAsync((FakeAsync async) {
+          final FakeClient client = FakeClient(
+            error: http.RequestAbortedException(_url),
+          );
+          final Outcome<CappedResponse> outcome = _sendCapped(client);
+          async.flushMicrotasks();
+
+          expect(outcome.error, _transportFailure(TransportFailure.cancelled));
         });
       },
     );
 
-    test('a client that follows a redirect is caught', () {
+    test('a client RequestAbortedException in the body is cancelled', () {
       fakeAsync((FakeAsync async) {
-        final FakeClient client = FakeClient(
-          responseUrl: Uri.parse(
-            'https://elsewhere.example.test/v1/run?key=SENTINEL',
-          ),
-        );
+        final FakeClient client = FakeClient();
         final Outcome<CappedResponse> outcome = _sendCapped(client);
         client.body
-          ..add(_bytes(5))
-          ..close();
+          ..add(_bytes(2))
+          ..addError(http.RequestAbortedException(_url));
         async.flushMicrotasks();
 
-        expect(outcome.error, _transportFailure(TransportFailure.redirected));
-        expect(client.body.bytesRead, 0);
-        expect(client.aborted, isTrue);
+        expect(outcome.error, _transportFailure(TransportFailure.cancelled));
       });
     });
   });
@@ -510,7 +588,7 @@ void main() {
     });
   });
 
-  group('cancel listener (review M4)', () {
+  group('late cancel', () {
     test(
       'a cancel future that completes after sendCapped returned runs nothing',
       () {
@@ -535,32 +613,29 @@ void main() {
       },
     );
 
-    test(
-      'a cancel future that completes after a sendStreaming body ended runs nothing',
-      () {
-        fakeAsync((FakeAsync async) {
-          final Completer<void> cancel = Completer<void>();
-          final FakeClient client = FakeClient();
-          final Outcome<http.StreamedResponse> outcome = _sendStreaming(
-            client,
-            cancel: cancel.future,
-          );
-          async.flushMicrotasks();
-          final BodyRecorder recorder = BodyRecorder(outcome.value!.stream);
-          client.body
-            ..add(_bytes(4))
-            ..close();
-          async.flushMicrotasks();
-          expect(recorder.done, isTrue);
+    test('a late cancel after a sendStreaming body ended does nothing', () {
+      fakeAsync((FakeAsync async) {
+        final Completer<void> cancel = Completer<void>();
+        final FakeClient client = FakeClient();
+        final Outcome<http.StreamedResponse> outcome = _sendStreaming(
+          client,
+          cancel: cancel.future,
+        );
+        async.flushMicrotasks();
+        final BodyRecorder recorder = BodyRecorder(outcome.value!.stream);
+        client.body
+          ..add(_bytes(4))
+          ..close();
+        async.flushMicrotasks();
+        expect(recorder.done, isTrue);
 
-          cancel.complete();
-          async.flushMicrotasks();
-          expect(client.aborted, isFalse);
-          expect(recorder.errors, isEmpty);
-          expect(recorder.bytes, _bytes(4));
-        });
-      },
-    );
+        cancel.complete();
+        async.flushMicrotasks();
+        expect(client.aborted, isFalse);
+        expect(recorder.errors, isEmpty);
+        expect(recorder.bytes, _bytes(4));
+      });
+    });
   });
 
   group('readCapped', () {
@@ -818,7 +893,7 @@ void main() {
     test('cancel ends the body with cancelled and aborts', () {
       fakeAsync((FakeAsync async) {
         final Completer<void> cancel = Completer<void>();
-        final FakeClient client = FakeClient();
+        final FakeClient client = FakeClient(honourAbort: false);
         final Outcome<http.StreamedResponse> outcome = _sendStreaming(
           client,
           cancel: cancel.future,
@@ -862,7 +937,7 @@ void main() {
 
     test('a cancelled subscription aborts the request', () {
       fakeAsync((FakeAsync async) {
-        final FakeClient client = FakeClient();
+        final FakeClient client = FakeClient(honourAbort: false);
         final Outcome<http.StreamedResponse> outcome = _sendStreaming(
           client,
           idleTimeout: _idle,
@@ -893,9 +968,46 @@ void main() {
       });
     });
 
-    test('idleTimeout fires when no bytes arrive', () {
+    test('a client that follows a redirect is caught', () {
+      fakeAsync((FakeAsync async) {
+        final FakeClient client = FakeClient(
+          honourAbort: false,
+          responseUrl: Uri.parse(
+            'https://elsewhere.example.test/v1/run?key=SENTINEL',
+          ),
+        );
+        final Outcome<http.StreamedResponse> outcome = _sendStreaming(client);
+        client.body.add(_bytes(5));
+        async.flushMicrotasks();
+
+        expect(outcome.error, _transportFailure(TransportFailure.redirected));
+        expect(client.body.bytesRead, 0);
+        expect(client.body.cancelled, isTrue);
+        expect(client.aborted, isTrue);
+        expect(async.pendingTimers, isEmpty);
+      });
+    });
+
+    test('a client RequestAbortedException in the body is cancelled', () {
       fakeAsync((FakeAsync async) {
         final FakeClient client = FakeClient();
+        final Outcome<http.StreamedResponse> outcome = _sendStreaming(client);
+        async.flushMicrotasks();
+        final BodyRecorder recorder = BodyRecorder(outcome.value!.stream);
+        client.body.addError(http.RequestAbortedException(_url));
+        async.flushMicrotasks();
+
+        expect(
+          recorder.errors.single,
+          _transportFailure(TransportFailure.cancelled),
+        );
+        expect(recorder.done, isTrue);
+      });
+    });
+
+    test('idleTimeout fires when no bytes arrive', () {
+      fakeAsync((FakeAsync async) {
+        final FakeClient client = FakeClient(honourAbort: false);
         final Outcome<http.StreamedResponse> outcome = _sendStreaming(
           client,
           idleTimeout: _idle,
@@ -1226,7 +1338,7 @@ void main() {
 
     test('an endless body is aborted at the cap', () {
       fakeAsync((FakeAsync async) {
-        final FakeClient client = FakeClient();
+        final FakeClient client = FakeClient(honourAbort: false);
         client.body.feedForever(_bytes(100));
         final Outcome<CappedResponse> outcome = _sendCapped(
           client,

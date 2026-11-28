@@ -95,7 +95,8 @@ final class FakeResponse extends http.StreamedResponse
 ///
 /// It honours the abort trigger of an `http.Abortable` request the way the clients of
 /// `package:http` do: before the headers, `send` fails with `RequestAbortedException`; after
-/// them, the body raises it and closes.
+/// them, the body raises it and closes. With `honourAbort: false` it only records the abort, so a
+/// test can tell what the code under test stopped by itself.
 final class FakeClient extends http.BaseClient {
   /// A client whose response comes from [responseUrl] (the request's URL when null), and whose
   /// headers wait for [releaseHeaders] when [holdHeaders] is true.
@@ -106,6 +107,7 @@ final class FakeClient extends http.BaseClient {
     this.holdHeaders = false,
     this.error,
     this.errorTrace,
+    this.honourAbort = true,
   });
 
   /// The status of the response.
@@ -125,6 +127,9 @@ final class FakeClient extends http.BaseClient {
 
   /// The stack trace [error] is raised with.
   final StackTrace? errorTrace;
+
+  /// When false, an abort is recorded in [aborted] and does nothing else.
+  final bool honourAbort;
 
   /// The body of the response.
   final FakeBody body = FakeBody();
@@ -179,6 +184,9 @@ final class FakeClient extends http.BaseClient {
 
   void _onAbort(Uri url) {
     aborted = true;
+    if (!honourAbort) {
+      return;
+    }
     final Completer<http.StreamedResponse>? pending = _pending;
     if (pending != null && !pending.isCompleted) {
       pending.completeError(http.RequestAbortedException(url));

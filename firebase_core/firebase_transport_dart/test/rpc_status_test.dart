@@ -135,7 +135,7 @@ void main() {
     });
   });
 
-  test('failure table: each row of rpcStatusOfFailure', () {
+  test('failure table', () {
     final Uri url = Uri.parse('https://api.example.test/v1');
     final List<(Object, RpcStatus)> rows = <(Object, RpcStatus)>[
       (
