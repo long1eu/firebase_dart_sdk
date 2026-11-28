@@ -12,6 +12,7 @@ Maintained, tested and published (`cloud_firestore_dart` 0.3.2, Dart `^3.8.0`):
 | `cloud_firestore_dart` | `cloud_firestore/cloud_firestore_dart` |
 | `firebase_app_dart` | `firebase_core/firebase_app_dart` |
 | `_firebase_transport_dart` (0.1.0; internal request helpers; not on pub.dev yet) | `firebase_core/_firebase_transport_dart` |
+| `_firebase_transport_grpc_dart` (0.1.0; internal gRPC transport for Data Connect; not on pub.dev yet) | `firebase_core/_firebase_transport_grpc_dart` |
 | `firebase_auth_providers_dart` | `firebase_auth/firebase_auth_providers_dart` |
 | `secure_flow` (0.2.0; the browser flows of the Auth client) | `secure_flow/secure_flow` |
 | `cloud_firestore_dart_sqlite` (0.1.3) | `cloud_firestore/cloud_firestore_dart_sqlite` |
@@ -27,6 +28,7 @@ Maintained, tested and published (`cloud_firestore_dart` 0.3.2, Dart `^3.8.0`):
 | `firebase_installations_dart` (0.1.0; not on pub.dev yet) | `firebase_installations/firebase_installations_dart` |
 | `firebase_remote_config_dart` (0.1.0; not on pub.dev yet) | `firebase_remote_config/firebase_remote_config_dart` |
 | `firebase_remote_config_dart_platform` (0.1.0, Flutter; not on pub.dev yet) | `firebase_remote_config/firebase_remote_config_dart_platform` |
+| `firebase_data_connect_dart` (0.1.0; Data Connect client, gRPC on the VM and REST on the web; not on pub.dev yet) | `firebase_data_connect/firebase_data_connect_dart` |
 
 - `examples/`: complete example packages (`server_shelf`, `cli`, `storage_cli`, `cloud_run_job`).
 - `docs/`: guides (`docs/guides/`), parity, support policy, how we test, upstream sync records.

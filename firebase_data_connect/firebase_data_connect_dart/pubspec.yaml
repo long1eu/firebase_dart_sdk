@@ -23,10 +23,14 @@ environment:
   sdk: ^3.8.0
 
 dependencies:
-  # Local development resolves the two internal packages from the sibling
+  # Local development resolves the three internal packages from the sibling
   # directories through pubspec_overrides.yaml (not published yet).
   _firebase_transport_dart: ^0.1.0
+  _firebase_transport_grpc_dart: ^0.1.0
   firebase_app_dart: ^0.2.3
+  # GrpcError types; the same range as cloud_firestore_dart. Imported only behind
+  # dart.library.io; the web import check forbids package:grpc/.
+  grpc: ^5.1.0
   # 1.6.0: AbortableRequest, and BrowserClient streams response bodies.
   http: ^1.6.0
   meta: ^1.11.0

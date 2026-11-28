@@ -3,6 +3,8 @@ Copyright 2026 Razvan Lung (long1eu) and contributors.
 
 This package is an unofficial client of the Firebase Data Connect service (gRPC and REST). Its protocol behaviour follows the Firebase JavaScript, Android and iOS SDKs (https://github.com/firebase/firebase-js-sdk, https://github.com/firebase/firebase-android-sdk and https://github.com/firebase/firebase-ios-sdk, Apache License 2.0); the protocol buffer definitions in res/protos come from the Firebase iOS SDK. It is not a port of a Firebase SDK.
 
+lib/src/compat/ (the library package:firebase_data_connect_dart/flutterfire.dart) ports the public API of FlutterFire's firebase_data_connect 0.4.2 (https://github.com/firebase/flutterfire, commit 6a80b1b, Apache License 2.0, copyright Google LLC): lib/src/optional.dart, lib/src/timestamp.dart, lib/src/any_value.dart, lib/src/core/empty_serializer.dart, lib/src/common/dataconnect_error.dart, lib/src/common/dataconnect_options.dart, and the value types of lib/src/cache/cache_data_types.dart and lib/src/core/ref.dart.
+
 This package is not affiliated with, endorsed by or supported by Google LLC or Firebase. "Firebase" is a trademark of Google LLC.
 
 Licensed under the Apache License, Version 2.0; see the LICENSE file.

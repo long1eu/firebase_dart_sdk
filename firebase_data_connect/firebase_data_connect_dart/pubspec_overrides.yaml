@@ -3,5 +3,7 @@
 dependency_overrides:
   _firebase_transport_dart:
     path: ../../firebase_core/_firebase_transport_dart
+  _firebase_transport_grpc_dart:
+    path: ../../firebase_core/_firebase_transport_grpc_dart
   firebase_app_dart:
     path: ../../firebase_core/firebase_app_dart
