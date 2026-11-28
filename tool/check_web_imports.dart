@@ -7,9 +7,13 @@
 // `if (dart.library.html)` or `if (dart.library.js)` branch, else the default URI.
 //
 // Usage, from the repository root:
-//   dart tool/check_web_imports.dart <package dir> [entry library...]
+//   dart tool/check_web_imports.dart <package dir> [entry library...] [--forbid <prefix>...]
 //
 // Entry libraries are paths relative to the package directory; the default is lib/<package name>.dart.
+// Arguments are read left to right: the first one that is not a flag is the package directory, every
+// other one an entry library. `--forbid <prefix>`, repeatable, also forbids every import or export whose
+// URI starts with <prefix> (for example `package:grpc/`); such a URI is recorded before it is resolved,
+// like a forbidden dart: library, so its chain is printed and it is not followed.
 // Exits 1 and prints the chain of imports when a forbidden library is reached, 2 on a usage error.
 import 'dart:convert';
 import 'dart:io';
@@ -69,10 +73,14 @@ Map<String, Uri> packageRoots(Directory packageDir) {
 
 /// For each forbidden library reached from [entries], the chain of files that leads to it (empty when the
 /// libraries are clean).
+///
+/// A directive URI that starts with one of [forbiddenPrefixes] is forbidden too; it is recorded as
+/// written and not followed.
 Map<String, List<String>> forbiddenFrom(
   List<Uri> entries,
-  Map<String, Uri> roots,
-) {
+  Map<String, Uri> roots, {
+  Set<String> forbiddenPrefixes = const <String>{},
+}) {
   final Map<Uri, Uri?> parents = <Uri, Uri?>{
     for (final Uri entry in entries) entry: null,
   };
@@ -83,8 +91,10 @@ Map<String, List<String>> forbiddenFrom(
     for (final String uri in webDirectives(
       File.fromUri(file).readAsStringSync(),
     )) {
-      if (uri.startsWith('dart:')) {
-        if (_forbidden.contains(uri) && !found.containsKey(uri)) {
+      final bool forbiddenByPrefix = forbiddenPrefixes.any(uri.startsWith);
+      if (forbiddenByPrefix || uri.startsWith('dart:')) {
+        final bool forbidden = forbiddenByPrefix || _forbidden.contains(uri);
+        if (forbidden && !found.containsKey(uri)) {
           found[uri] = _chain(file, parents)..add(uri);
         }
         continue;
@@ -122,14 +132,59 @@ List<String> _chain(Uri file, Map<Uri, Uri?> parents) {
   return chain;
 }
 
+const String _usage =
+    'Usage: dart tool/check_web_imports.dart <package dir> [entry library...] [--forbid <prefix>...]';
+
+/// The arguments of one run: the package directory, the entry paths and the forbidden prefixes.
+typedef _Arguments = ({
+  String packageDir,
+  List<String> entryPaths,
+  List<String> prefixes,
+});
+
+/// Reads [args] left to right; null on a usage error.
+_Arguments? _parse(List<String> args) {
+  String? packageDir;
+  final List<String> entryPaths = <String>[];
+  final List<String> prefixes = <String>[];
+  for (int i = 0; i < args.length; i++) {
+    final String arg = args[i];
+    if (arg == '--forbid') {
+      if (i + 1 >= args.length || args[i + 1].isEmpty) {
+        return null;
+      }
+      prefixes.add(args[++i]);
+    } else if (arg.startsWith('-')) {
+      return null;
+    } else if (packageDir == null) {
+      packageDir = arg;
+    } else {
+      entryPaths.add(arg);
+    }
+  }
+  if (packageDir == null) {
+    return null;
+  }
+  return (packageDir: packageDir, entryPaths: entryPaths, prefixes: prefixes);
+}
+
+/// The OK line: unchanged without forbidden prefixes, else every forbidden item named.
+String _okLine(List<String> entryPaths, String name, List<String> prefixes) {
+  final String entries = entryPaths.join(', ');
+  if (prefixes.isEmpty) {
+    return 'OK: $entries of $name reach neither dart:io nor dart:ffi on the web.';
+  }
+  final String items = <String>['dart:io', 'dart:ffi', ...prefixes].join(', ');
+  return 'OK: $entries of $name reach none of $items on the web.';
+}
+
 void main(List<String> args) {
-  if (args.isEmpty || args.first.startsWith('-')) {
-    stderr.writeln(
-      'Usage: dart tool/check_web_imports.dart <package dir> [entry library...]',
-    );
+  final _Arguments? parsed = _parse(args);
+  if (parsed == null) {
+    stderr.writeln(_usage);
     exit(2);
   }
-  final Directory packageDir = Directory(args.first).absolute;
+  final Directory packageDir = Directory(parsed.packageDir).absolute;
   final File pubspec = File('${packageDir.path}/pubspec.yaml');
   if (!pubspec.existsSync()) {
     stderr.writeln('${packageDir.path} has no pubspec.yaml.');
@@ -139,8 +194,8 @@ void main(List<String> args) {
     r'^name:\s*(\S+)',
     multiLine: true,
   ).firstMatch(pubspec.readAsStringSync())!.group(1)!;
-  final List<String> entryPaths = args.length > 1
-      ? args.sublist(1)
+  final List<String> entryPaths = parsed.entryPaths.isNotEmpty
+      ? parsed.entryPaths
       : <String>['lib/$name.dart'];
   final List<Uri> entries = <Uri>[];
   for (final String path in entryPaths) {
@@ -155,11 +210,10 @@ void main(List<String> args) {
   final Map<String, List<String>> found = forbiddenFrom(
     entries,
     packageRoots(packageDir),
+    forbiddenPrefixes: parsed.prefixes.toSet(),
   );
   if (found.isEmpty) {
-    stdout.writeln(
-      'OK: ${entryPaths.join(', ')} of $name reach neither dart:io nor dart:ffi on the web.',
-    );
+    stdout.writeln(_okLine(entryPaths, name, parsed.prefixes));
     return;
   }
   for (final MapEntry<String, List<String>> entry in found.entries) {
