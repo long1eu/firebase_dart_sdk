@@ -23,12 +23,12 @@ environment:
   sdk: ^3.8.0
 
 dependencies:
-  # Resolved from ../../firebase_core/firebase_app_dart through
-  # pubspec_overrides.yaml while it is not published.
-  firebase_app_dart: ^0.2.3
   # Internal request helpers; resolved from ../../firebase_core/_firebase_transport_dart
   # through pubspec_overrides.yaml (not published).
   _firebase_transport_dart: ^0.1.0
+  # Resolved from ../../firebase_core/firebase_app_dart through
+  # pubspec_overrides.yaml while it is not published.
+  firebase_app_dart: ^0.2.3
   # 1.6.0: AbortableRequest, and BrowserClient streams response bodies.
   http: ^1.6.0
   meta: ^1.11.0
