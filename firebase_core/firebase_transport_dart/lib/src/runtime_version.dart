@@ -1,0 +1,6 @@
+/// `dartRuntimeVersion`: the first word of `Platform.version` on the VM, `web` on the web.
+/// `dart:io` is imported only where it exists.
+library;
+
+export 'package:firebase_transport_dart/src/runtime_version_web.dart'
+    if (dart.library.io) 'package:firebase_transport_dart/src/runtime_version_io.dart';
