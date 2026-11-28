@@ -166,8 +166,12 @@ class FirebaseAppCheckAdmin {
       final DateTime? last = _refetchedForKidAt;
       if (last == null || !now.isBefore(last.add(_refetchOnUnknownKid))) {
         _refetchedForKidAt = now;
-        _keys = null;
-        key = (await _publicKeys()).byId[kid];
+        // Keep the current set until a new one has arrived: a failed refetch must not discard good keys.
+        try {
+          key = (await (_keysPending ??= _fetchKeysTracked())).byId[kid];
+        } on FirebaseAppCheckAdminException {
+          key = null;
+        }
       }
     }
     if (key == null) {
@@ -252,7 +256,11 @@ class FirebaseAppCheckAdmin {
         ),
       );
     }
-    return _keysPending ??= _fetchKeys()
+    return _keysPending ??= _fetchKeysTracked();
+  }
+
+  Future<_Keys> _fetchKeysTracked() {
+    return _fetchKeys()
         .then(
           (_Keys keys) {
             _failedAt = null;

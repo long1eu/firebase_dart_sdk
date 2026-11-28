@@ -269,15 +269,18 @@ final class ErrorEvent {
   }
 }
 
+/// A whole number from JSON, which may come from a store someone else wrote: anything that is not a finite
+/// number (on the web `1e999` reads as infinity and passes `is int`) becomes 0, and the value is kept within
+/// the range of a 32-bit integer.
 int _int(Object? value) {
-  if (value is int) {
-    return value;
+  num? number;
+  if (value is num) {
+    number = value;
+  } else if (value is String) {
+    number = num.tryParse(value);
   }
-  if (value is num && value.isFinite) {
-    return value.toInt();
+  if (number == null || !number.isFinite) {
+    return 0;
   }
-  if (value is String) {
-    return int.tryParse(value) ?? 0;
-  }
-  return 0;
+  return number.clamp(-2147483648, 2147483647).toInt();
 }

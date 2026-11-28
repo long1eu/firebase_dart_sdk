@@ -704,6 +704,29 @@ void main() {
     );
 
     test(
+      'a failed refetch for an unknown kid keeps the current keys',
+      () async {
+        await verify(token());
+        jwksStatus = 503;
+        await expectLater(
+          verify(
+            token(
+              header: <String, Object?>{
+                'alg': 'RS256',
+                'kid': 'made-up',
+                'typ': 'JWT',
+              },
+            ),
+          ),
+          throwsAppCheck('invalid-argument', contains('does not match')),
+        );
+        expect(backend.to('firebaseappcheck.googleapis.com'), hasLength(2));
+        expect(await verify(token()), isA<VerifiedAppCheckToken>());
+        expect(backend.to('firebaseappcheck.googleapis.com'), hasLength(2));
+      },
+    );
+
+    test(
       'an unknown kid fetches the set again at most once per five minutes',
       () async {
         await verify(token());

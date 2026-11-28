@@ -31,6 +31,11 @@ compares it with the other choices on each platform. This README grows a full gu
   the default) or sent as Dart prints them with a `reportLocation` (`MessageFormat.dart`).
   `tool/error_reporting_probe.dart` checks how the console takes each; until it has run, the default is
   unverified.
-- No symbolication of obfuscated builds. On the web in a release build, `dart2js` shortens type names, so
-  headers may show minified types.
+- No symbolication of obfuscated builds. On the web in a release build, `dart2js` shortens type names, so pass
+  `typeName:` to `recordError` for errors you record yourself, and expect the top frame of many errors to be
+  the throw helper of `dart2js`.
+- One reporter per store: two processes on one file, or two browser tabs on one `localStorage` key, overwrite
+  each other's queue and switch.
+- If the saved state cannot be read, the reporter starts with `collectionEnabledByDefault`. An app that must
+  not report without consent passes `collectionEnabledByDefault: false` and turns collection on after consent.
 - Error Reporting keeps 30 days of history, and its API is `v1beta1`.

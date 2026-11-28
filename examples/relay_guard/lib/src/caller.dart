@@ -47,11 +47,30 @@ abstract interface class CallerVerifier {
 /// looks the user up, which needs a credential with access to Firebase Auth.
 final class AdminCallerVerifier implements CallerVerifier {
   /// A verifier for the project of [app].
+  ///
+  /// An app made with `FirebaseAdminApp.emulator` accepts unsigned ID tokens for any uid, which would let anyone
+  /// choose the user of a report: it throws an [ArgumentError] unless [allowEmulator] is set (for tests against
+  /// the Auth emulator). A [projectNumber] that is not a number throws too.
   AdminCallerVerifier(
     this.app, {
     this.projectNumber,
     this.checkRevoked = false,
-  });
+    bool allowEmulator = false,
+  }) {
+    if (app.isEmulator && !allowEmulator) {
+      throw ArgumentError(
+        'An emulator app accepts unsigned ID tokens; pass allowEmulator: true only in tests.',
+      );
+    }
+    final String? number = projectNumber;
+    if (number != null && !RegExp(r'^\d{1,30}$').hasMatch(number)) {
+      throw ArgumentError.value(
+        number,
+        'projectNumber',
+        'Not a project number',
+      );
+    }
+  }
 
   /// The app whose project the tokens must belong to.
   final FirebaseAdminApp app;
@@ -85,10 +104,20 @@ final class AdminCallerVerifier implements CallerVerifier {
         checkRevoked: checkRevoked,
       )).uid;
     } on FirebaseAuthAdminException catch (e) {
-      if (e.code == 'internal-error' || e.code == 'network-error') {
-        rethrow;
+      // Only verdicts about the token or the user are the caller's fault; anything else (keys, quota, the
+      // permission of the relay's credential with checkRevoked) is the relay's, and becomes 503.
+      if (_verdicts.contains(e.code)) {
+        throw CallerRejected('ID token: ${e.code}');
       }
-      throw CallerRejected('ID token: ${e.code}');
+      rethrow;
     }
   }
+
+  static const Set<String> _verdicts = <String>{
+    'argument-error',
+    'id-token-expired',
+    'id-token-revoked',
+    'user-disabled',
+    'user-not-found',
+  };
 }

@@ -220,7 +220,9 @@ Decisions behind the proposal:
   checks the tokens, applies a size cap and a rate limit per App Check token or user, sets
   `serviceContext` from an allow-list rather than trusting the body, and forwards the event to
   `events:report` with its own service account, which holds `roles/errorreporting.writer` and nothing else.
-  The package ships an example relay in `examples/` on `shelf`, and its README lists these checks.
+  The example relay is `examples/error_reporting_relay`, on the shared checks of `examples/relay_guard`. It
+  answers 204, 400 or 422 (the event is refused; the client drops it), 401 (the tokens; the client pauses) or
+  503 (the relay's or Error Reporting's problem; the client keeps the event).
 - **Direct with credentials** (servers and jobs) calls `events:report` with an OAuth access token from an
   `AuthTokenProvider`: `OAuthTokenProvider.serviceAccount(key, scopes: [cloudPlatformScope])` from
   `firebase_auth_providers_dart`, or Application Default Credentials on Google Cloud. On a 401 it asks for
@@ -233,8 +235,10 @@ All three:
 
 - send one event per request, in the order captured, one request at a time;
 - treat 2xx as delivered;
-- retry network errors, 408, 429 and 5xx with injected exponential backoff and jitter, honouring
-  `Retry-After`; drop the event on any other 4xx, which means the request is wrong (400, a bad
+- retry network errors, 408, 429 and 5xx with injected exponential backoff and jitter, honouring a
+  `Retry-After` longer than the backoff; drop an event after ten failed attempts in a row; through the relay,
+  pause for five minutes on 401 or 403 (the relay refused the tokens, which may pass); drop the event on any
+  other 4xx, which means the request is wrong (400, a bad
   `eventTime` or an oversize message), the credential is refused (403), or the API is disabled, and log the
   status and a size-capped body;
 - do not follow redirects, read at most 64 KiB of a response, and keep the API key and tokens out of

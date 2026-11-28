@@ -407,6 +407,16 @@ class FirebaseAuthAdmin {
 
   _KeySet? _keys;
   Future<_KeySet>? _keysPending;
+  DateTime? _keysFailedAt;
+
+  /// How long a fetch of the ID token keys may take.
+  static const Duration _keysFetchTimeout = Duration(seconds: 10);
+
+  /// After a failed fetch of the keys, how long checks fail without fetching again.
+  static const Duration _keysRetryAfterFailure = Duration(seconds: 30);
+
+  /// The shortest time the keys are kept, whatever the `max-age` of the answer (none, or 0).
+  static const Duration _keysMinLifetime = Duration(minutes: 5);
 
   /// Verifies the Firebase ID token [idToken] of a user and returns its claims.
   ///
@@ -549,13 +559,42 @@ class FirebaseAuthAdmin {
   }
 
   Future<_KeySet> _publicKeys() {
+    final DateTime now = app.now();
     final _KeySet? keys = _keys;
-    if (keys != null && app.now().isBefore(keys.expiresAt)) {
+    if (keys != null && now.isBefore(keys.expiresAt)) {
       return Future<_KeySet>.value(keys);
     }
-    return _keysPending ??= _fetchPublicKeys().whenComplete(
-      () => _keysPending = null,
-    );
+    final DateTime? failedAt = _keysFailedAt;
+    if (failedAt != null &&
+        now.isBefore(failedAt.add(_keysRetryAfterFailure))) {
+      return Future<_KeySet>.error(
+        const FirebaseAuthAdminException(
+          code: 'internal-error',
+          message:
+              'Could not fetch the public keys that sign Firebase ID tokens. The last attempt failed moments ago.',
+        ),
+      );
+    }
+    return _keysPending ??= _fetchPublicKeys()
+        .timeout(
+          _keysFetchTimeout,
+          onTimeout: () => throw const FirebaseAuthAdminException(
+            code: 'internal-error',
+            message:
+                'Could not fetch the public keys that sign Firebase ID tokens: no answer in time.',
+          ),
+        )
+        .then(
+          (_KeySet keys) {
+            _keysFailedAt = null;
+            return keys;
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            _keysFailedAt = app.now();
+            Error.throwWithStackTrace(error, stackTrace);
+          },
+        )
+        .whenComplete(() => _keysPending = null);
   }
 
   Future<_KeySet> _fetchPublicKeys() async {
@@ -598,10 +637,10 @@ class FirebaseAuthAdmin {
       r'max-age=(\d+)',
     ).firstMatch(response.headers['cache-control'] ?? '');
     final int seconds = maxAge == null ? 0 : int.parse(maxAge.group(1)!);
-    final _KeySet set = _KeySet(
-      keys,
-      app.now().add(Duration(seconds: seconds)),
-    );
+    final Duration lifetime = Duration(seconds: seconds) < _keysMinLifetime
+        ? _keysMinLifetime
+        : Duration(seconds: seconds);
+    final _KeySet set = _KeySet(keys, app.now().add(lifetime));
     _keys = set;
     return set;
   }

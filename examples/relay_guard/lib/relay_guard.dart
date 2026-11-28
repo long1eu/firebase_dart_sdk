@@ -8,7 +8,9 @@
 /// * it carries a valid App Check token (`X-Firebase-AppCheck`), unless `requireAppCheck` is false;
 /// * it carries a valid Firebase ID token (`Authorization: Bearer`) when `requireUser` is true, and a token that
 ///   is present is always checked;
-/// * the caller (the user, else the app, else the address of the connection) has not passed `maxPerMinute`.
+/// * the rate limits have room: per App Check token, per user, per app and in all (see [relayGuard]).
+///
+/// Serve it with [serveGuarded], which destroys connections that never send their body.
 ///
 /// The tokens are checked by a [CallerVerifier]: [AdminCallerVerifier] with `firebase_admin_dart`, or your own.
 /// The handler behind the middleware reads the caller with [callerOf] and the body with [bodyOf].
@@ -16,3 +18,4 @@ library;
 
 export 'src/caller.dart';
 export 'src/guard.dart';
+export 'src/serve.dart';

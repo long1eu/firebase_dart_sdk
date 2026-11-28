@@ -3,7 +3,7 @@ description: >-
   Unofficial pure-Dart reporter of Dart errors to Google Cloud Error Reporting,
   for the project of a Firebase app: desktop, servers, command-line tools and
   the web.
-version: 0.1.0-dev.1
+version: 0.1.0-dev.2
 homepage: https://github.com/long1eu/firebase_dart_sdk
 repository: https://github.com/long1eu/firebase_dart_sdk/tree/main/firebase_error_reporting/firebase_error_reporting_dart
 issue_tracker: https://github.com/long1eu/firebase_dart_sdk/issues
