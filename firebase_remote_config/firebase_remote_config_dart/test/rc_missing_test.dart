@@ -235,9 +235,9 @@ void main() {
         final RcEnv env = h.env(store: store);
         final FirebaseRemoteConfig rc = env.remoteConfig;
         final Gate gate = Gate();
-        // Only reset writes the fetched record with write (a fetch uses update).
+        // The fetch waits for the reset, so the first update of the fetched record is the reset's.
         store.before = (StoreOp op, String key) =>
-            op == StoreOp.write && key == env.recordKey('fetched')
+            op == StoreOp.update && key == env.recordKey('fetched')
             ? gate.future
             : null;
 
@@ -279,8 +279,9 @@ void main() {
         );
         h.settle(rc.fetch());
         final Gate gate = Gate();
+        // activate only reads the fetched record, so this update is the reset's.
         store.before = (StoreOp op, String key) =>
-            op == StoreOp.write && key == env.recordKey('fetched')
+            op == StoreOp.update && key == env.recordKey('fetched')
             ? gate.future
             : null;
 
@@ -319,11 +320,16 @@ void main() {
         );
         h.settle(rc.fetch());
         final Gate gate = Gate();
-        // The activate stops just before its update of the active record.
-        store.before = (StoreOp op, String key) =>
-            op == StoreOp.update && key == env.recordKey('active')
-            ? gate.future
-            : null;
+        // The activate stops just before its update of the active record; the reset's later update
+        // of the same record is not held.
+        bool held = false;
+        store.before = (StoreOp op, String key) {
+          if (!held && op == StoreOp.update && key == env.recordKey('active')) {
+            held = true;
+            return gate.future;
+          }
+          return null;
+        };
         final Future<bool> activate = rc.activate();
         async.elapse(_zero);
 
@@ -358,7 +364,7 @@ void main() {
         expect(h.settle(rc.fetchAndActivate()), isTrue);
         final DateTime? lastSuccess = rc.info.lastSuccessfulFetchTime;
         store.before = (StoreOp op, String key) {
-          if (op == StoreOp.write && key == env.recordKey('active')) {
+          if (op == StoreOp.update && key == env.recordKey('active')) {
             throw StateError('fake disk full');
           }
         };
