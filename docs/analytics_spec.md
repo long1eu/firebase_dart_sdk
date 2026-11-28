@@ -211,9 +211,11 @@ registration follows `firebase_storage_dart_platform`.
    documentation only and sends no request to Google.
 2. **The parity document** (`docs/analytics_parity.md`): JS, Android, iOS and C++ public APIs, method
    by method, ranked first release, later, or not applicable.
-2a. **The reporting probe**, the core of step 6 brought forward: one Dart script under `tool/` that sends a
-   few events and a user property with a self-generated `client_id` to `/debug/mp/collect` and then
-   `/mp/collect`, and prints what to look for in DebugView, Realtime and the standard reports. It answers
+2a. **The reporting probe**, the core of step 6 brought forward: `tool/analytics_probe.dart`
+   ([tool/analytics_probe.md](../tool/analytics_probe.md)) sends a few events and a user property with a
+   self-generated `client_id` to `/debug/mp/collect` and then `/mp/collect`, optionally the same events under
+   a `client_id` from gtag.js as a positive control, and prints what to look for in DebugView, Realtime and
+   the standard reports. It answers
    the first question of [protocol §10](analytics_protocol.md#10-what-the-production-kit-must-answer).
    **Step 3 does not start until the maintainer has run it and the events are reported.**
 3. **The client core:** the model, validation, the stores, sessions, both transports, the queue, unit

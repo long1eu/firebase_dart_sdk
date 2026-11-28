@@ -264,7 +264,9 @@ The documentation leaves these open. The kit (spec section 10, step 6) records e
 the property's settings:
 
 1. Do events with a `client_id` that gtag.js never used appear in Realtime and DebugView? (Section 5. This
-   decides whether the package works at all.)
+   decides whether the package works at all.) `tool/analytics_probe.dart` asks it, with a `client_id` from
+   gtag.js as a control: without the control, a negative answer could also mean a wrong secret or stream,
+   which neither endpoint reports.
 2. Is geography reported for such a client without `user_location`? (Section 7.)
 3. Does the validation server, in strict mode, accept a `page_location` longer than 100 characters?
    (Section 4.)
