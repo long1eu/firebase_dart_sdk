@@ -26,12 +26,12 @@ Path shorthand:
 
 ## Summary
 
-37 feature rows in 4 groups.
+38 feature rows in 4 groups.
 
 | Status | Rows |
 |---|---|
-| same | 16 |
-| different | 19 |
+| same | 15 |
+| different | 21 |
 | missing | 0 |
 | won't do | 2 |
 
