@@ -134,14 +134,16 @@ final class RequestTokens {
   ///
   /// The map holds the tokens as plain strings: put it on the request at once and never store it.
   ///
-  /// Throws a [StateError] when the token origin of [destination] is not [origin], or when it was
-  /// called before on this object.
+  /// Throws a [StateError] when the token origin of [destination] is not [origin], when
+  /// [destination] has user info, or when it was called before on this object.
   Map<String, String> headersFor(
     Uri destination, {
     required AuthHeaderStyle auth,
   }) {
     if (!_isBoundTo(destination)) {
-      throw StateError('These tokens were fetched for another origin.');
+      throw StateError(
+        'These tokens were fetched for another origin, or the destination has user info.',
+      );
     }
     if (_used) {
       throw StateError(
@@ -170,7 +172,7 @@ final class RequestTokens {
 
   bool _isBoundTo(Uri destination) {
     try {
-      return tokenOrigin(destination) == origin;
+      return destination.userInfo.isEmpty && tokenOrigin(destination) == origin;
     } on ArgumentError {
       return false;
     }
@@ -192,12 +194,18 @@ final class RequestTokens {
 
 /// Sets `tokens.headersFor(request.url, auth: auth)` on [request].
 ///
-/// Throws the [StateError] of [RequestTokens.headersFor].
+/// Throws the [StateError] of [RequestTokens.headersFor], and a [StateError] when [request] was
+/// already sent: its headers can no longer be set, and [tokens] is then left unused.
 void applyTokens(
   http.BaseRequest request,
   RequestTokens tokens, {
   required AuthHeaderStyle auth,
 }) {
+  if (request.finalized) {
+    throw StateError(
+      'The request was already sent; its headers cannot be set.',
+    );
+  }
   request.headers.addAll(tokens.headersFor(request.url, auth: auth));
 }
 
@@ -210,12 +218,14 @@ void applyTokens(
 /// to its emulator, or to a URL the application chose itself.
 ///
 /// It holds no token and no subscription and needs no closing. Between calls it keeps only which
-/// kinds owe a forced refresh, when Auth was last forced, and whether a provider is stuck.
+/// kinds owe a forced refresh, when Auth was last forced, and whether a provider is stuck; while
+/// an App Check `getToken` call is pending it also keeps that call, for other requests to join.
 final class TokenSource {
   /// A source of the tokens of [app] for requests to [origins] and to [emulator].
   ///
   /// [onWarning] receives fixed text and type names, never a token, a URL or the text of an error;
-  /// each warning is given once. [elapsed] is the monotonic clock the 60 s intervals are measured
+  /// each warning is given once per key (the provider type, and the error type where the warning
+  /// names one). [elapsed] is the monotonic clock the 60 s intervals are measured
   /// with; by default a stopwatch started here.
   ///
   /// Throws an [ArgumentError] when an entry of [origins] is a `ws` or `wss` URL without an
@@ -258,6 +268,8 @@ final class TokenSource {
     final Set<Uri> checked = <Uri>{};
     for (final Uri entry in origins) {
       final Uri origin = tokenOrigin(entry);
+      // Called for its ArgumentError: rule O sees the entry itself, with only the scheme mapped,
+      // so a path or user info is refused before tokenOrigin's reduction can hide it.
       checkOrigin(entry.replace(scheme: origin.scheme));
       checked.add(origin);
     }
@@ -317,10 +329,11 @@ final class TokenSource {
     ], timeLeft);
     _throwIfDeleted();
 
-    final String? authToken = _authTokenOf(await authCall?.answer);
+    // App Check first: its warning is logged also when the Auth result then fails the call.
     final (String? appCheckToken, AppCheckOutcome outcome) = await _appCheckOf(
       appCheckAsk,
     );
+    final String? authToken = _authTokenOf(await authCall?.answer);
     if (authToken != null || appCheckToken != null) {
       _warnOfRemoteEmulator(url);
     }
@@ -387,6 +400,7 @@ final class TokenSource {
     }
     return _ProviderCall<T>(
       ask,
+      wait: providerWait,
       onAnswer: () => state.pausedAt = null,
       onTimeout: () => state.pausedAt = _elapsed(),
     );
@@ -456,30 +470,30 @@ final class TokenSource {
     return token;
   }
 
+  /// Starts the App Check step. Nothing is logged here: [_appCheckOf] logs every outcome, once
+  /// the request is known to go on.
   _AppCheckAsk _askAppCheck(
     AppCheckTokenProvider? provider, {
     required bool limitedUse,
   }) {
     if (provider == null) {
-      return const _AppCheckAsk.settled(AppCheckOutcome.none);
-    }
-    if (_isPaused(_appCheck)) {
-      return const _AppCheckAsk.settled(AppCheckOutcome.skipped);
+      return const _AppCheckSettled(AppCheckOutcome.none);
     }
     if (!limitedUse) {
-      return _AppCheckAsk.pending(provider, _sessionCall(provider));
+      return _isPaused(_appCheck)
+          ? const _AppCheckSettled(AppCheckOutcome.skipped)
+          : _AppCheckPending(provider, _sessionCall(provider));
     }
+    // The second interface is not a subtype of the first, so the test needs a plain Object to
+    // promote.
     final Object minter = provider;
     if (minter is! LimitedUseAppCheckTokenProvider) {
-      final Type type = provider.runtimeType;
-      _warnOnce(
-        'app-check-unsupported:$type',
-        'App Check: $type cannot mint limited-use tokens; '
-            'the request was sent without an App Check token.',
-      );
-      return const _AppCheckAsk.settled(AppCheckOutcome.unsupported);
+      return _AppCheckUnsupported(provider);
     }
-    return _AppCheckAsk.pending(
+    if (_isPaused(_appCheck)) {
+      return const _AppCheckSettled(AppCheckOutcome.skipped);
+    }
+    return _AppCheckPending(
       provider,
       _startCall(_appCheck, minter.getLimitedUseToken),
     );
@@ -513,18 +527,35 @@ final class TokenSource {
     return call;
   }
 
+  /// The token and the outcome of the App Check step, with the warning of the outcome.
   Future<(String?, AppCheckOutcome)> _appCheckOf(_AppCheckAsk ask) async {
-    final AppCheckOutcome? settled = ask.outcome;
-    if (settled != null) {
-      return (null, settled);
+    switch (ask) {
+      case _AppCheckSettled(:final AppCheckOutcome outcome):
+        return (null, outcome);
+      case _AppCheckUnsupported(:final AppCheckTokenProvider provider):
+        final Type type = provider.runtimeType;
+        _warnOnce(
+          'app-check-unsupported:$type',
+          'App Check: $type cannot mint limited-use tokens; $_sentWithoutAppCheck',
+        );
+        return (null, AppCheckOutcome.unsupported);
+      case _AppCheckPending(
+        :final AppCheckTokenProvider provider,
+        :final _ProviderCall<AppCheckTokenResult> call,
+      ):
+        return _appCheckOfAnswer(provider.runtimeType, await call.answer);
     }
-    final Type type = ask.provider.runtimeType;
-    switch (await ask.call!.answer) {
+  }
+
+  (String?, AppCheckOutcome) _appCheckOfAnswer(
+    Type type,
+    _Answer<AppCheckTokenResult> answer,
+  ) {
+    switch (answer) {
       case _TimedOut<AppCheckTokenResult>():
         _warnOnce(
           'app-check-timed-out:$type',
-          'App Check: $type did not answer in 10 s; '
-              'the request was sent without an App Check token.',
+          'App Check: $type did not answer in 10 s; $_sentWithoutAppCheck',
         );
         return (null, AppCheckOutcome.timedOut);
       case _Threw<AppCheckTokenResult>(:final Object error):
@@ -534,7 +565,7 @@ final class TokenSource {
         final Type errorType = error.runtimeType;
         _warnOnce(
           'app-check-threw:$type:$errorType',
-          'App Check: $type threw $errorType; the request was sent without an App Check token.',
+          'App Check: $type threw $errorType; $_sentWithoutAppCheck',
         );
         return (null, AppCheckOutcome.providerFailed);
       case _Value<AppCheckTokenResult>(:final AppCheckTokenResult value):
@@ -549,7 +580,7 @@ final class TokenSource {
     if (!isTokenText(result.token)) {
       _warnOnce(
         'app-check-empty:$type',
-        'App Check: $type gave no usable token; the request was sent without an App Check token.',
+        'App Check: $type gave no usable token; $_sentWithoutAppCheck',
       );
       return (null, AppCheckOutcome.empty);
     }
@@ -568,10 +599,7 @@ final class TokenSource {
   void _warnOfRemoteEmulator(Uri url) {
     final EmulatorHost? emulator = _emulator;
     if (emulator != null && emulator.owns(url) && !emulator.isLoopback) {
-      _warnOnce(
-        'remote-emulator',
-        'Tokens are sent in clear text to the emulator host, which is not this machine.',
-      );
+      _warnOnce('remote-emulator', _remoteEmulatorWarning);
     }
   }
 
@@ -623,18 +651,40 @@ typedef _SharedSessionCall = ({
   _ProviderCall<AppCheckTokenResult> call,
 });
 
+const String _sentWithoutAppCheck =
+    'the request was sent without an App Check token.';
+const String _remoteEmulatorWarning =
+    'Tokens are sent in clear text to the emulator host, which is not this machine.';
+
 /// The App Check step of one request: a call to wait for, or an outcome known without one.
-final class _AppCheckAsk {
-  const _AppCheckAsk.pending(AppCheckTokenProvider this.provider, this.call)
-    : outcome = null;
+sealed class _AppCheckAsk {
+  const _AppCheckAsk();
 
-  const _AppCheckAsk.settled(AppCheckOutcome this.outcome)
-    : provider = null,
-      call = null;
+  /// The provider call the request waits for, when there is one.
+  _ProviderCall<AppCheckTokenResult>? get call => null;
+}
 
-  final AppCheckTokenProvider? provider;
-  final _ProviderCall<AppCheckTokenResult>? call;
-  final AppCheckOutcome? outcome;
+final class _AppCheckPending extends _AppCheckAsk {
+  const _AppCheckPending(this.provider, this.call);
+
+  final AppCheckTokenProvider provider;
+
+  @override
+  final _ProviderCall<AppCheckTokenResult> call;
+}
+
+/// No call was made and nothing is logged: no provider, or a paused one.
+final class _AppCheckSettled extends _AppCheckAsk {
+  const _AppCheckSettled(this.outcome);
+
+  final AppCheckOutcome outcome;
+}
+
+/// A limited-use token was asked of a [provider] that cannot mint one; it was not called.
+final class _AppCheckUnsupported extends _AppCheckAsk {
+  const _AppCheckUnsupported(this.provider);
+
+  final AppCheckTokenProvider provider;
 }
 
 sealed class _Answer<T> {
@@ -657,7 +707,7 @@ final class _TimedOut<T> extends _Answer<T> {
   const _TimedOut();
 }
 
-/// One call to a provider, under [TokenSource.providerWait].
+/// One call to a provider, under a wait.
 ///
 /// [answer] never fails and completes at the end of the wait at the latest. What the provider
 /// gives after that is dropped, and its late error is handled, so it never becomes an unhandled
@@ -665,11 +715,12 @@ final class _TimedOut<T> extends _Answer<T> {
 final class _ProviderCall<T extends Object> {
   _ProviderCall(
     Future<T> Function() ask, {
+    required Duration wait,
     required void Function() onAnswer,
     required void Function() onTimeout,
   }) : _onAnswer = onAnswer,
        _onTimeout = onTimeout {
-    _timer = Timer(TokenSource.providerWait, _timedOut);
+    _timer = Timer(wait, _timedOut);
     final Future<T> result;
     try {
       result = ask();
