@@ -28,10 +28,11 @@ const String _productionHost =
 /// Whether [host] names this machine (rule L). Never throws.
 ///
 /// After lowercasing and removing one pair of surrounding brackets, a host is loopback when it is
-/// `localhost`, an IPv4 address of four decimal parts whose first is `127`, or an IPv6 address
-/// equal to `::1` in any spelling. Nothing else is: not `a.localhost`, not `localhost.`, not
-/// `0.0.0.0`, not `::ffff:127.0.0.1`, and not a name that resolves to a loopback address (names are
-/// not resolved).
+/// `localhost`; an IPv4 address of four decimal parts, each `0` or 1 to 3 digits starting with 1
+/// to 9 and at most 255, whose first is `127`; or an IPv6 address equal to `::1` in any spelling.
+/// Nothing else is: not `a.localhost`, not `localhost.`, not `0.0.0.0`, not `::ffff:127.0.0.1`,
+/// not an IPv4 part with a leading zero (`127.0.0.09`, `127.00.0.1`), which some resolvers read
+/// as octal, and not a name that resolves to a loopback address (names are not resolved).
 bool isLoopbackHost(String host) {
   String text = host.toLowerCase();
   if (text.length >= 2 && text.startsWith('[') && text.endsWith(']')) {
