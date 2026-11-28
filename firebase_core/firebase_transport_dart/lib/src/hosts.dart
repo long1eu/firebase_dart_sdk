@@ -85,6 +85,47 @@ List<int>? _parseIpv6(String text) {
   }
 }
 
+/// The canonical text of the IPv6 address [text] (RFC 5952): lowercase groups without leading
+/// zeros, the longest run of two or more zero groups (the first of equal ones) written as `::`.
+/// Null when [text] is not an IPv6 address.
+String? _canonicalIpv6(String text) {
+  final List<int>? bytes = _parseIpv6(text);
+  if (bytes == null || bytes.length != 16) {
+    return null;
+  }
+  final List<int> groups = <int>[
+    for (int i = 0; i < 16; i += 2) (bytes[i] << 8) | bytes[i + 1],
+  ];
+  final (int start, int length) = _longestZeroRun(groups);
+  if (length < 2) {
+    return groups.map(_hex).join(':');
+  }
+  final String head = groups.sublist(0, start).map(_hex).join(':');
+  final String tail = groups.sublist(start + length).map(_hex).join(':');
+  return '$head::$tail';
+}
+
+String _hex(int group) => group.toRadixString(16);
+
+/// The start and the length of the first longest run of zeros in [groups]; a length of 0 when
+/// there is none.
+(int, int) _longestZeroRun(List<int> groups) {
+  int bestStart = 0;
+  int bestLength = 0;
+  int runStart = 0;
+  for (int i = 0; i <= groups.length; i++) {
+    if (i < groups.length && groups[i] == 0) {
+      continue;
+    }
+    if (i - runStart > bestLength) {
+      bestStart = runStart;
+      bestLength = i - runStart;
+    }
+    runStart = i + 1;
+  }
+  return (bestStart, bestLength);
+}
+
 /// True for a DNS label: 1 to 63 characters of `a-z`, `0-9` and `-`, not starting or ending with
 /// `-`.
 ///
@@ -140,8 +181,12 @@ final class EmulatorHost {
       throw ArgumentError(_portOutOfRange);
     }
     final String lowercase = host.toLowerCase();
-    if (isIpv6 && _parseIpv6(lowercase) == null) {
-      throw ArgumentError(_notIpv6);
+    if (isIpv6) {
+      final String? canonical = _canonicalIpv6(lowercase);
+      if (canonical == null) {
+        throw ArgumentError(_notIpv6);
+      }
+      return EmulatorHost._(canonical, port);
     }
     if (_isProductionHost(lowercase)) {
       throw ArgumentError(_productionHost);
@@ -154,7 +199,8 @@ final class EmulatorHost {
 
   const EmulatorHost._(this.host, this.port);
 
-  /// The host in lowercase; an IPv6 address without brackets.
+  /// The host in lowercase. An IPv6 address is without brackets and in its canonical text
+  /// (RFC 5952): `0:0:0:0:0:0:0:1` is kept as `::1`.
   final String host;
 
   /// The port, 1 to 65535.
@@ -166,9 +212,18 @@ final class EmulatorHost {
   /// `host:port`, with an IPv6 host in brackets.
   String get authority => host.contains(':') ? '[$host]:$port' : '$host:$port';
 
-  /// True when [url] has this host (compared in lowercase) and this port. The port is `url.port`,
-  /// so the default of an `http` or `https` URL applies.
-  bool owns(Uri url) => url.host.toLowerCase() == host && url.port == port;
+  /// True when [url] has this host and this port. A name or an IPv4 address is compared as
+  /// lowercase text; an IPv6 address by its parsed value, so every spelling of it matches. The
+  /// port is `url.port`, so the default of an `http` or `https` URL applies.
+  bool owns(Uri url) {
+    if (url.port != port) {
+      return false;
+    }
+    final String urlHost = url.host.toLowerCase();
+    return host.contains(':')
+        ? _canonicalIpv6(urlHost) == host
+        : urlHost == host;
+  }
 
   @override
   bool operator ==(Object other) {
