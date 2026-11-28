@@ -48,3 +48,34 @@ this repository creates the service account or grants the role.
 ```
 dart test        # MockClient; no emulator, no request to Google
 ```
+
+## Production verification kit
+
+`tool/verify_production.dart` runs the real client (`firebase_error_reporting_dart`) and this relay against the
+real Error Reporting API of a project, and prints `PASS`, `FAIL`, `INCONCLUSIVE` or `SKIPPED` for each check. It
+is for the maintainer to run, in a project of their own with the Error Reporting API enabled; nothing in this
+repository creates a project, a key, a service account or a role binding.
+
+| Check | Needs | What it proves |
+| --- | --- | --- |
+| `direct-api-key` | `ER_API_KEY` | the API takes a report sent with a key restricted to it |
+| `direct-token-v8` | `ER_ACCESS_TOKEN` | the API takes a report in the V8 format, with a `reportLocation` |
+| `direct-token-dart` | `ER_ACCESS_TOKEN` | the API takes a report with the Dart trace, with a `reportLocation` |
+| `direct-token-fatal` | `ER_ACCESS_TOKEN` | the API takes a fatal report |
+| `relay` | `ER_ACCESS_TOKEN` | the relay, run on 127.0.0.1 by the kit, checks the request and the API takes what it forwards (App Check is replaced by a token the kit makes up: the check is about forwarding) |
+| `refused-key` | `ER_OTHER_API_KEY` | a key restricted to another API is refused, and the client drops the report instead of looping |
+
+```
+export ER_PROJECT_ID=my-project
+export ER_ACCESS_TOKEN="$(gcloud auth print-access-token)"   # an account with Error Reporting Writer
+read -rs ER_API_KEY && export ER_API_KEY                      # optional
+dart run tool/verify_production.dart          # prints the plan, sends nothing
+dart run tool/verify_production.dart --yes    # at most six reports
+```
+
+The credentials come only from the environment and are never printed. Every report has the service `verify-kit`
+and the run tag as its version; at the end the kit prints what to look for in the console (whether the traces
+are parsed, how the reports group). `test/verify_production_test.dart` runs the kit against a fake API, so the
+kit's own logic is tested; what it reports about the real API is known only after the maintainer's run.
+`tool/error_reporting_probe.dart` at the repository root is the companion that sends raw events in many shapes
+to settle the message format.
