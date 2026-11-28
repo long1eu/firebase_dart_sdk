@@ -18,6 +18,7 @@ void main() {
     final ProcessResult result = _check(<String>[
       'lib/firebase_admin_dart.dart',
       'lib/auth.dart',
+      'lib/app_check.dart',
     ]);
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
   });

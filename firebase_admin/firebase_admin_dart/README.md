@@ -63,6 +63,7 @@ delete the user.
 | --- | --- |
 | `package:firebase_admin_dart/firebase_admin_dart.dart` | What every admin area shares: `FirebaseAdminApp`, `AdminCredential`, `FirebaseAdminException` |
 | `package:firebase_admin_dart/auth.dart` | Firebase Auth: `FirebaseAuthAdmin` (`app.auth()`), `AdminUser`, `VerifiedIdToken`, `FirebaseAuthAdminException`. Exports the library above |
+| `package:firebase_admin_dart/app_check.dart` | Firebase App Check: `FirebaseAppCheckAdmin` (`app.appCheck()`), `VerifiedAppCheckToken`, `FirebaseAppCheckAdminException`. Exports the first library |
 | `package:firebase_admin_dart/adc.dart` | `applicationDefaultCredential()`: Application Default Credentials. Needs `dart:io` |
 
 The names do not collide with `firebase_app_dart` (`FirebaseApp`, `FirebaseException`) or with
@@ -105,6 +106,7 @@ The service account needs the role Firebase Authentication Admin (`roles/firebas
 | `deleteUser(uid)`, `deleteUsers(uids)` (batches of 1000) | `accounts:delete`, `accounts:batchDelete` | yes |
 | `setCustomUserClaims(uid, claims)`, `revokeRefreshTokens(uid)` | `accounts:update` | yes |
 | `verifyIdToken(idToken, {checkRevoked, clockSkew})` | Google's x509 keys; `accounts:lookup` with `checkRevoked` | yes (unsigned tokens) |
+| `appCheck().verifyToken(token, {projectNumber, clockSkew})` | the App Check JWKS | no (App Check has no emulator) |
 
 Custom tokens follow the rules of the Firebase documentation: RS256, base64url without padding, the
 Identity Toolkit audience, one hour of life, `uid` of 1 to 128 characters, no reserved claim names
@@ -115,6 +117,15 @@ Identity Toolkit audience, one hour of life, `uid` of 1 to 128 characters, no re
 fetched from
 `https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com`, the
 source the Firebase documentation names, and kept for the `max-age` of the answer.
+
+`appCheck().verifyToken` checks an App Check token (the `X-Firebase-AppCheck` header) as the Node and Python
+Admin SDKs do: `typ` JWT, `alg` RS256, the signature with the key named by `kid` among those of
+`https://firebaseappcheck.googleapis.com/v1/jwks` (kept for six hours, fetched again at most every five minutes
+for an unknown `kid`, not retried for 30 seconds after a failure; RSA keys of 2048 to 8192 bits only), `iss`
+(`https://firebaseappcheck.googleapis.com/<project number>`), `aud` (a list holding `projects/<project id>`, or
+`projects/<projectNumber>` when it is given), a non-empty `sub` (the app id, returned as `appId`), `exp`, `iat`
+and `nbf` when present, with the clock skew of `verifyIdToken`. It throws a `FirebaseAppCheckAdminException` with the codes of the
+Node SDK: `invalid-argument`, `app-check-token-expired`, `internal-error`.
 
 ## Errors
 
@@ -267,7 +278,8 @@ This is a small subset of the Firebase Admin SDKs. For anything else use the off
 [`firebase_admin_sdk`](https://pub.dev/packages/firebase_admin_sdk) (Dart, VM only) or a Firebase
 Admin SDK in another language: session cookies, `listUsers`, `getUsers`, lookups by phone or
 provider, user import with password hashes, email action links, OIDC and SAML provider configs,
-tenant management, project config, multi-factor fields, and every other Firebase service.
+tenant management, project config, multi-factor fields, App Check replay protection
+(`consumeAppCheckToken`), and every other Firebase service.
 `docs/guides/admin.md` in the repository compares the options.
 
 ## License

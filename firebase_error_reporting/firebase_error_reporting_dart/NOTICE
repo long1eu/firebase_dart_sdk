@@ -1,0 +1,6 @@
+firebase_error_reporting_dart
+Copyright 2018 Razvan Lung (long1eu) and contributors.
+
+This package is an unofficial client of the Google Cloud Error Reporting API
+(projects.events.report), written from Google's public documentation of that
+API. It is not affiliated with or endorsed by Google.

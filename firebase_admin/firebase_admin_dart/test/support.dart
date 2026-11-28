@@ -72,6 +72,12 @@ class TestKey {
     d = e.modInverse((p - BigInt.one) * (q - BigInt.one));
   }
 
+  /// A key made of the primes [p] and [q] (for keys too slow to generate in a test).
+  TestKey.fixed(this.p, this.q) {
+    n = p * q;
+    d = e.modInverse((p - BigInt.one) * (q - BigInt.one));
+  }
+
   final BigInt e = BigInt.from(65537);
   late final BigInt p;
   late final BigInt q;
